@@ -38,8 +38,7 @@ class TypiClust(_TaskAgnosticPoolQueryStrategy):
         The name of the parameter for the number of clusters.
     k : int, default=5
         The number for k-nearest-neighbors for the computation of typicality.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
         unambiguous one-dimensional targets; two-dimensional multi-label
         targets must be declared explicitly.

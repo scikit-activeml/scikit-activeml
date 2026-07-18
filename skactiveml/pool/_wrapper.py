@@ -88,9 +88,9 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
-        Declared target type. Automatic resolution preserves target semantics
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The selected target type must be supported by
+        `query_strategy`. Automatic resolution preserves target semantics
         declared by the wrapped strategy or a supplied estimator.
     """
 
@@ -392,9 +392,9 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
-        Declared target type. Automatic resolution preserves target semantics
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The selected target type must be supported by
+        `query_strategy`. Automatic resolution preserves target semantics
         declared by the wrapped strategy or a supplied estimator.
 
     """

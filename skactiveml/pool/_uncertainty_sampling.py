@@ -67,9 +67,11 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         `predict_proba` may return either shape `(n_samples, n_outputs)` or a
         list of binary probability matrices with shape `(n_samples, 2)` per
         output.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
-        Declared target type. A fitted classifier's target specification is
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. Single-output classification is always supported.
+        Multi-label classification is supported only when `cost_matrix=None`
+        and `method` is `"least_confident"`, `"margin_sampling"`, or
+        `"entropy"`. A fitted classifier's target specification is
         authoritative when available.
 
     References

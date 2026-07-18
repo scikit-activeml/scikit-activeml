@@ -133,11 +133,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         * 'list'  -> list of `(n_samples, 2)` arrays
         * 'array' -> array of shape `(n_samples, n_outputs)` with
           `P(y=pos_label)`
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
-        Declared target type. Explicit `"multi-label"` supports resolving
-        binary per-label vocabularies from observed targets when `classes` is
-        `None`. Multi-output classification is recognized but unsupported.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. Single-output classification is always supported.
+        Multi-label classification requires an estimator with `predict_proba`;
+        an explicit `"multi-label"` can resolve binary per-label vocabularies
+        from observed targets when `classes` is `None`.
 
     Attributes
     ----------
@@ -911,10 +911,10 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. It must remain compatible with the wrapped
-        estimator across incremental updates.
+        estimator across incremental updates. The wrapper supports only
+        single-output classification.
     """
 
     def __init__(
@@ -1432,10 +1432,9 @@ if successful_skorch_torch_import:
               inference fails, default to `np.int64`.
             - Otherwise, cast targets via
               `y_enc.astype(target_dtype, copy=False)`.
-        target_type : {"auto", "single-output", "multi-label", \
-                "multi-output"}, default="auto"
-            Declared target type. Multi-label classification is supported;
-            multi-output classification is recognized but unsupported.
+        target_type : "auto" or "single-output" or "multi-label", \
+                default="auto"
+            Declared target type. Multi-label classification is supported.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
               of the estimator.
@@ -1999,8 +1998,7 @@ if successful_capymoa_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : {"auto", "single-output", "multi-label", \
-                "multi-output"}, default="auto"
+        target_type : "auto" or "single-output", default="auto"
             Declared target type. This wrapper supports only single-output
             classification.
 
@@ -2296,8 +2294,7 @@ if successful_river_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : {"auto", "single-output", "multi-label", \
-                "multi-output"}, default="auto"
+        target_type : "auto" or "single-output", default="auto"
             Declared target type. This wrapper supports only single-output
             classification.
 

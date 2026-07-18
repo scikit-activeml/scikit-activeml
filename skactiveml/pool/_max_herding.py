@@ -39,8 +39,7 @@ class MaxHerding(_TaskAgnosticPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
         unambiguous one-dimensional targets; two-dimensional multi-label
         targets must be declared explicitly.

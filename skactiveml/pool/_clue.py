@@ -94,10 +94,11 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         `np.sum` is not allowed. This is only used for the multilabel
         extension of CLUE and is not part of the original method proposed in
         [1]_.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
-        Declared target type. A fitted estimator's target specification is
-        authoritative when available.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The strategy supports single-output
+        classification and regression, and multi-label classification. A
+        fitted estimator's target specification is authoritative when
+        available.
 
     References
     ----------

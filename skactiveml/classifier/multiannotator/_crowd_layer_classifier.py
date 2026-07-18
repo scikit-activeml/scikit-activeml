@@ -65,8 +65,7 @@ try:
         random_state : int or RandomState sample or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : {"auto", "single-output", "multi-label", \
-                "multi-output"}, default="auto"
+        target_type : "auto" or "single-output", default="auto"
             Declared target type. This classifier supports only single-output
             classification with multiple annotators.
 

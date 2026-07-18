@@ -570,7 +570,7 @@ def check_X_y(
         Whether to raise a value error if X is not 2D.
     allow_nd : boolean, default=False
         Whether to allow X.ndim > 2.
-    target_type : {"single-output", "multi-label", "multi-output"}, \
+    target_type : "single-output" or "multi-label" or "multi-output", \
             default="single-output"
         Resolved target type controlling target-array validation.
     allow_nan : boolean, default=None

@@ -24,7 +24,7 @@ class TargetSpec:
     ----------
     task : {"classification", "regression"}
         The prediction task.
-    target_type : {"single-output", "multi-label", "multi-output"}
+    target_type : "single-output" or "multi-label" or "multi-output"
         The resolved structure of one sample's target.
     annotation_type : {"single-annotator", "multi-annotator"}
         Whether observations come from one or multiple annotators.
@@ -218,8 +218,8 @@ def resolve_target_spec(
         Target observations, including values equal to `missing_label`.
     task : {"classification", "regression"}
         The prediction task.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label" or \
+            "multi-output", default="auto"
         Declared target type. The returned specification is always concrete.
     annotation_type : {"single-annotator", "multi-annotator"}, \
             default="single-annotator"

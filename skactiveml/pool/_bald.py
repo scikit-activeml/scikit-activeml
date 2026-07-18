@@ -68,8 +68,7 @@ class _GeneralBALD(QueryByCommittee):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. BALD strategies support only single-output
         classification.
 
@@ -306,8 +305,7 @@ class BatchBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. BatchBALD supports only single-output
         classification.
 
@@ -380,8 +378,7 @@ class GreedyBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. GreedyBALD supports only single-output
         classification.
 

@@ -29,7 +29,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
-    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. This strategy supports only single-output
         regression.
 

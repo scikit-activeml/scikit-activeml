@@ -42,8 +42,7 @@ class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
         unambiguous one-dimensional targets; two-dimensional multi-label
         targets must be declared explicitly.
@@ -227,8 +226,7 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. A fitted regressor's target specification is
         authoritative when available. Only single-output regression is
         supported.

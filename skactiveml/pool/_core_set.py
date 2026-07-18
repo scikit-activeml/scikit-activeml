@@ -41,8 +41,7 @@ class CoreSet(_TaskAgnosticPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
         unambiguous one-dimensional targets; two-dimensional multi-label
         targets must be declared explicitly.
@@ -242,7 +241,7 @@ def k_greedy_center(
     metric_dict : dict, default=None
         Any further parameters are passed directly to the function
         `sklearn.metrics.pairwise_distances_argmin_min` as `metric_kwargs`.
-    target_type : {"single-output", "multi-label"}, default="single-output"
+    target_type : "single-output" or "multi-label", default="single-output"
         Resolved target type used for sample-level label masks.
 
     Returns

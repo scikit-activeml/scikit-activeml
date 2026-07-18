@@ -41,10 +41,10 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         Callable that takes `axis` as keyword argument and reduces the
         per-label uncertainty scores for multilabel classification. This is
         only used for resolved multi-label classification targets.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
-        Declared target type. A fitted classifier's target specification is
-        authoritative when available.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The strategy supports single-output and
+        multi-label classification. A fitted classifier's target specification
+        is authoritative when available.
 
     References
     ----------

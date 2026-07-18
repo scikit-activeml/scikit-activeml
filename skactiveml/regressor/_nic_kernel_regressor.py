@@ -41,9 +41,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
     random_state : int, RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-output"}, default="auto"
-        Declared target type. Multi-output regression is recognized but not
-        supported for execution in version 1.1.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This estimator supports only single-output
+        regression.
     """
 
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
@@ -222,9 +222,9 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-output"}, default="auto"
-        Declared target type. Multi-output regression is recognized but not
-        supported for execution in version 1.1.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This estimator supports only single-output
+        regression.
     """
 
     def __init__(

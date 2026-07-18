@@ -55,7 +55,7 @@ def is_unlabeled(
         Class labels to be checked w.r.t. to missing labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    target_type : {"single-output", "multi-label"}, default="single-output"
+    target_type : "single-output" or "multi-label", default="single-output"
         The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
@@ -170,7 +170,7 @@ def is_labeled(
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    target_type : {"single-output", "multi-label"}, default="single-output"
+    target_type : "single-output" or "multi-label", default="single-output"
         The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
@@ -206,7 +206,7 @@ def unlabeled_indices(
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    target_type : {"single-output", "multi-label"}, default="single-output"
+    target_type : "single-output" or "multi-label", default="single-output"
         The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
@@ -245,7 +245,7 @@ def labeled_indices(
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    target_type : {"single-output", "multi-label"}, default="single-output"
+    target_type : "single-output" or "multi-label", default="single-output"
         The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing

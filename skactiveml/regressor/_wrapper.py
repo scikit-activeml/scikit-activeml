@@ -61,9 +61,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-output"}, default="auto"
-        Declared target type. Multi-output regression is recognized but not
-        supported for execution in version 1.1.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This wrapper supports only single-output
+        regression.
 
     Attributes
     ----------
@@ -513,9 +513,9 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-output"}, default="auto"
-        Declared target type. Multi-output regression is recognized but not
-        supported for execution in version 1.1.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This wrapper supports only single-output
+        regression.
     """
 
     def __init__(
@@ -715,10 +715,9 @@ if successful_skorch_torch_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for 'predict' method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : {"auto", "single-output", "multi-output"}, \
-                default="auto"
-            Declared target type. Multi-output regression is recognized but
-            not supported for execution in version 1.1.
+        target_type : "auto" or "single-output", default="auto"
+            Declared target type. This wrapper supports only single-output
+            regression.
 
         References
         ----------

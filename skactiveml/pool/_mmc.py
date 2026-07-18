@@ -31,8 +31,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "multi-label", default="auto"
         Declared target type. A fitted classifier's target specification is
         authoritative when available. This strategy supports only multi-label
         classification with a single annotator.

@@ -41,8 +41,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. Expected-error-reduction strategies support
         only single-output classification.
 
@@ -542,8 +541,7 @@ class MonteCarloEER(ExpectedErrorReduction):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None,d efault=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. MonteCarloEER supports only single-output
         classification.
 
@@ -683,8 +681,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. ValueOfInformationEER supports only
         single-output classification.
 

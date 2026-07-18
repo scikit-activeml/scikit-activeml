@@ -262,8 +262,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output" or "multi-label" or \
+            "multi-output", default="auto"
         Declared target type. Subclasses reject resolved specifications
         outside their exact capabilities.
     """
@@ -627,8 +627,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output" or "multi-label" or \
+            "multi-output", default="auto"
         Declared target type. Multi-annotator strategies support only
         single-output classification in version 1.1.
     """
@@ -1300,8 +1300,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label" or \
+            "multi-output", default="auto"
         Declared target type. Components reject resolved target specifications
         outside their exact capabilities.
 
@@ -1657,8 +1657,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     random_state : int or np.RandomState or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-label", \
-            "multi-output"}, default="auto"
+    target_type : "auto" or "single-output" or "multi-label" or \
+            "multi-output", default="auto"
         Declared target type. Concrete estimators reject resolved
         specifications outside their exact capabilities.
     """
@@ -1801,7 +1801,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     random_state : int, RandomState or None, default=None
         Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
-    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+    target_type : "auto" or "single-output" or "multi-output", default="auto"
         Declared target type. Multi-output regression is recognized but not
         supported for execution in version 1.1.
 

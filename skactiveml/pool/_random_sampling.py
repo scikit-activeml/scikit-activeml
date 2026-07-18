@@ -17,8 +17,7 @@ class RandomSampling(_TaskAgnosticPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Random state for candidate selection.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
         unambiguous one-dimensional targets; two-dimensional multi-label
         targets must be declared explicitly.

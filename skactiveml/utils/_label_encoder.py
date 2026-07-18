@@ -23,7 +23,7 @@ class ExtLabelEncoder(BaseEstimator):
           `y` must contain one column per binary class vocabulary.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    target_type : {"single-output", "multi-label"}, default="single-output"
+    target_type : "single-output" or "multi-label", default="single-output"
         Resolved target type controlling whether one shared encoder or one
         encoder per label is used.
 

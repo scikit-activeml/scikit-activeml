@@ -60,8 +60,7 @@ class IntervalEstimationAnnotModel(BaseEstimator):
     random_state : None or int or numpy.random.RandomState, default=None
         The random state used for deciding on majority vote labels in case of
         ties.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. This estimator supports only single-output
         classification with multiple annotators.
 
@@ -240,8 +239,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         Half of the confidence level for student's t-distribution.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
-            default="auto"
+    target_type : "auto" or "single-output", default="auto"
         Declared target type. This strategy supports only single-output
         classification with multiple annotators.
 
