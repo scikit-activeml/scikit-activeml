@@ -12,6 +12,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 
@@ -83,8 +84,7 @@ class TestRegressionTreeBasedAL(
         with self.assertRaisesRegex(ValueError, "Single-output regression"):
             strategy.query(X, y, reg, fit_reg=False)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
+        assert_no_query_state(self, strategy)
 
     def test_strategy_target_type_errors_are_semantic(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
@@ -114,9 +114,7 @@ class TestRegressionTreeBasedAL(
         with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
             strategy.query(X, y, reg, fit_reg=False)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []

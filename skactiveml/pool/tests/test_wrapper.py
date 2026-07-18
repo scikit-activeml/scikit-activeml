@@ -22,6 +22,7 @@ from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
@@ -142,7 +143,7 @@ class TestSubSamplingWrapper(
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             wrapper.query(X, y)
 
-        self.assertFalse(hasattr(wrapper, "n_features_in_"))
+        assert_no_query_state(self, wrapper)
 
     def test_fitted_estimator_semantics_reach_wrapped_strategy(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
@@ -191,7 +192,7 @@ class TestSubSamplingWrapper(
         )
         with self.assertRaisesRegex(ValueError, "conflicts"):
             conflicting.query(X, y_query, clf=clf, fit_clf=False)
-        self.assertFalse(hasattr(conflicting, "n_features_in_"))
+        assert_no_query_state(self, conflicting)
 
     def test_resolved_target_type_reaches_auto_and_nested_strategies(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
@@ -508,7 +509,7 @@ class TestParallelUtilityEstimationWrapper(
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             wrapper.query(X, y)
 
-        self.assertFalse(hasattr(wrapper, "n_features_in_"))
+        assert_no_query_state(self, wrapper)
 
     def test_resolved_target_type_reaches_auto_strategy(self):
         X = np.arange(12, dtype=float).reshape(6, 2)

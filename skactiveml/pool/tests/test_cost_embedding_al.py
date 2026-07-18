@@ -9,6 +9,7 @@ from skactiveml.pool._cost_embedding_al import MDSP, smacof_p
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -48,9 +49,7 @@ class TestCostEmbeddingAL(
         ):
             strategy.query(X=X, y=y)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def test_init_param_base_regressor(self):
         test_cases = [

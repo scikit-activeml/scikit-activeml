@@ -375,7 +375,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(clf.target_spec_.classes, (2, 3))
         np.testing.assert_array_equal(clf.classes_, [2, 3])
 
-        # Test semi-supervised learning.
+    def test_fit_include_unlabeled_samples_with_self_training(self):
         X, y = make_blobs(
             centers=10, n_samples=200, random_state=0, shuffle=True
         )

@@ -8,6 +8,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL, is_labeled
 from sklearn.gaussian_process import GaussianProcessRegressor
 
@@ -116,7 +117,7 @@ class TestGreedySamplingTarget(
         with self.assertRaisesRegex(ValueError, "does not support"):
             strategy.query(X, y, reg, fit_reg=False)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        assert_no_query_state(self, strategy)
 
     def test_init_param_x_metric(self):
         test_cases = [

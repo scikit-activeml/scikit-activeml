@@ -10,6 +10,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.multioutput import MultiOutputClassifier
 
 from skactiveml.tests.utils import (
+    assert_no_query_state,
     check_positional_args,
     check_test_param_test_availability,
 )
@@ -678,9 +679,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         ):
             strategy.query(**query_params)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def _test_classification_target_contract(
         self,
@@ -705,9 +704,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         with self.assertRaisesRegex(ValueError, "conflicts"):
             conflicting.query(**query_params)
 
-        self.assertFalse(hasattr(conflicting, "n_features_in_"))
-        self.assertFalse(hasattr(conflicting, "missing_label_"))
-        self.assertFalse(hasattr(conflicting, "random_state_"))
+        assert_no_query_state(self, conflicting)
 
     def test_query_al_cycles(self):
         budget = 1

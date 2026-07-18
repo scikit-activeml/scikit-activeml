@@ -12,6 +12,7 @@ from skactiveml.pool._quire import (
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled
 
 
@@ -61,9 +62,7 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         ):
             strategy.query(X=self.X, y=y)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def test_init_param_lmbda(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

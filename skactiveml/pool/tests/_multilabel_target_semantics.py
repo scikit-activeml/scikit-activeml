@@ -4,15 +4,11 @@ from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
+from skactiveml.tests.utils import assert_no_query_state
 
 
 class MultilabelOnlyTargetSemanticsMixin:
     """Shared target-contract tests for multi-label-only strategies."""
-
-    def _assert_no_acquisition_state(self, strategy):
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
 
     def test_query_requires_multilabel_y(self):
         y = np.array([0.0, 1.0, 0.0, np.nan, np.nan, np.nan, np.nan, np.nan])
@@ -25,7 +21,7 @@ class MultilabelOnlyTargetSemanticsMixin:
         ):
             self._query_strategy(strategy, y, clf)
 
-        self._assert_no_acquisition_state(strategy)
+        assert_no_query_state(self, strategy)
 
     def test_target_contract(self):
         strategy = self.strategy_class()
@@ -47,7 +43,7 @@ class MultilabelOnlyTargetSemanticsMixin:
         with self.assertRaisesRegex(ValueError, "conflicts"):
             self._query_strategy(strategy, self.y, clf, fit_clf=False)
 
-        self._assert_no_acquisition_state(strategy)
+        assert_no_query_state(self, strategy)
 
     def test_query_reuses_fitted_target_spec_without_class_evidence(self):
         clf = SklearnClassifier(
@@ -133,7 +129,7 @@ class MultilabelOnlyTargetSemanticsMixin:
         with self.assertRaisesRegex(ValueError, "no mixing"):
             self._query_strategy(strategy, y, clf, fit_clf=False)
 
-        self._assert_no_acquisition_state(strategy)
+        assert_no_query_state(self, strategy)
 
     def test_query_rejects_other_target_capabilities_before_state(self):
         multi_output_y = np.array(
@@ -169,4 +165,4 @@ class MultilabelOnlyTargetSemanticsMixin:
                     rf"{component} does not support target capability",
                 ):
                     self._query_strategy(strategy, y, clf, fit_clf=False)
-                self._assert_no_acquisition_state(strategy)
+                assert_no_query_state(self, strategy)

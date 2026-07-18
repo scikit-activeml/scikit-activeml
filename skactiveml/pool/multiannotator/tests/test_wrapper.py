@@ -8,6 +8,7 @@ from skactiveml.classifier import SklearnClassifier, MixtureModelClassifier
 from skactiveml.classifier.multiannotator import AnnotatorLogisticRegression
 from skactiveml.pool import UncertaintySampling, RandomSampling
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import is_labeled
 from skactiveml.utils import majority_vote, MISSING_LABEL, is_unlabeled
 
@@ -94,12 +95,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             wrapper.query(self.X, self.y)
 
         self.assertEqual(calls, [])
-        for attribute in (
-            "n_features_in_",
-            "missing_label_",
-            "random_state_",
-        ):
-            self.assertFalse(hasattr(wrapper, attribute))
+        assert_no_query_state(self, wrapper)
 
     def test_wrapped_target_rejection_precedes_query_state(self):
         wrapper = SingleAnnotatorWrapper(
@@ -110,12 +106,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         with self.assertRaises(ValueError):
             wrapper.query(self.X, self.y)
 
-        for attribute in (
-            "n_features_in_",
-            "missing_label_",
-            "random_state_",
-        ):
-            self.assertFalse(hasattr(wrapper, attribute))
+        assert_no_query_state(self, wrapper)
 
     def test_wrapped_classifier_rejection_precedes_query_state(self):
         strategy = UncertaintySampling(random_state=self.random_state)
@@ -129,12 +120,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             wrapper.query(self.X, self.y, clf=clf)
 
         for component in (wrapper, strategy):
-            for attribute in (
-                "n_features_in_",
-                "missing_label_",
-                "random_state_",
-            ):
-                self.assertFalse(hasattr(component, attribute))
+            assert_no_query_state(self, component)
 
     def test_wrapped_rejection_preserves_existing_query_state(self):
         strategy = UncertaintySampling(random_state=self.random_state)

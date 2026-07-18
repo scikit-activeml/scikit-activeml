@@ -15,6 +15,7 @@ from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 
 
 class TestUncertaintySampling(
@@ -306,9 +307,7 @@ class TestUncertaintySampling(
         with self.assertRaisesRegex(ValueError, r"outside `classes\[0\]`"):
             strategy.query(X, y_query, clf, fit_clf=False)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def test_query_fits_explicit_multilabel_without_declared_classes(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
@@ -349,9 +348,7 @@ class TestUncertaintySampling(
         with self.assertRaisesRegex(ValueError, "does not support"):
             strategy.query(X, y, clf, fit_clf=False)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def test_cost_sensitive_multilabel_methods_fail_before_acquisition_state(
         self,
@@ -374,9 +371,7 @@ class TestUncertaintySampling(
                 with self.assertRaisesRegex(ValueError, "does not support"):
                     strategy.query(X, y, clf, fit_clf=False)
 
-                self.assertFalse(hasattr(strategy, "n_features_in_"))
-                self.assertFalse(hasattr(strategy, "missing_label_"))
-                self.assertFalse(hasattr(strategy, "random_state_"))
+                assert_no_query_state(self, strategy)
 
     def test_ambiguous_resolution_failure_precedes_acquisition_state(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
@@ -389,9 +384,7 @@ class TestUncertaintySampling(
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             strategy.query(X, y, clf, fit_clf=False)
 
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
+        assert_no_query_state(self, strategy)
 
     def test_unfitted_classifier_declaration_conflict_precedes_state(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
@@ -410,9 +403,7 @@ class TestUncertaintySampling(
                 with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
                     strategy.query(X, y, clf, fit_clf=fit_clf)
 
-                self.assertFalse(hasattr(strategy, "n_features_in_"))
-                self.assertFalse(hasattr(strategy, "missing_label_"))
-                self.assertFalse(hasattr(strategy, "random_state_"))
+                assert_no_query_state(self, strategy)
 
     def test_estimator_preflight_configuration_cross_product(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
@@ -505,9 +496,7 @@ class TestUncertaintySampling(
                 if vocabulary == "outside" or unsupported:
                     with self.assertRaises(ValueError):
                         strategy.query(X, y, clf, fit_clf=not is_fitted)
-                    self.assertFalse(hasattr(strategy, "n_features_in_"))
-                    self.assertFalse(hasattr(strategy, "missing_label_"))
-                    self.assertFalse(hasattr(strategy, "random_state_"))
+                    assert_no_query_state(self, strategy)
                 else:
                     query_idx = strategy.query(
                         X, y, clf, fit_clf=not is_fitted

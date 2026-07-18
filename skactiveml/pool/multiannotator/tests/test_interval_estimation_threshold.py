@@ -10,6 +10,7 @@ from skactiveml.pool.multiannotator import (
     IntervalEstimationThreshold,
     IntervalEstimationAnnotModel,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import TargetSpec
 
 
@@ -199,9 +200,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
                 annotators=self.A_cand,
             )
 
-        self.assertFalse(hasattr(ie_thresh, "n_features_in_"))
-        self.assertFalse(hasattr(ie_thresh, "missing_label_"))
-        self.assertFalse(hasattr(ie_thresh, "random_state_"))
+        assert_no_query_state(self, ie_thresh)
 
     def test_fitted_aggregated_classifier_is_a_semantic_boundary(self):
         clf = ParzenWindowClassifier(classes=[0, 1]).fit(
@@ -228,12 +227,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not support"):
             ie_thresh.query(X=self.X, y=self.y, clf=clf)
 
-        for attribute in (
-            "n_features_in_",
-            "missing_label_",
-            "random_state_",
-        ):
-            self.assertFalse(hasattr(ie_thresh, attribute))
+        assert_no_query_state(self, ie_thresh)
 
     def test_cycle_zero_rejection_precedes_query_state(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)
@@ -245,12 +239,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         ):
             ie_thresh.query(X=self.X, y=y, clf=clf)
 
-        for attribute in (
-            "n_features_in_",
-            "missing_label_",
-            "random_state_",
-        ):
-            self.assertFalse(hasattr(ie_thresh, attribute))
+        assert_no_query_state(self, ie_thresh)
 
     def test_query_param_fit_clf(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)
@@ -274,12 +263,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "explicit `target_type`"):
             ie_thresh.query(X=self.X, y=self.y, clf=clf)
 
-        for attribute in (
-            "n_features_in_",
-            "missing_label_",
-            "random_state_",
-        ):
-            self.assertFalse(hasattr(ie_thresh, attribute))
+        assert_no_query_state(self, ie_thresh)
 
     def test_fitted_classifier_conflict_precedes_query_state(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)
@@ -297,12 +281,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "vocabulary conflicts"):
             ie_thresh.query(X=self.X, y=y, clf=clf, fit_clf=False)
 
-        for attribute in (
-            "n_features_in_",
-            "missing_label_",
-            "random_state_",
-        ):
-            self.assertFalse(hasattr(ie_thresh, attribute))
+        assert_no_query_state(self, ie_thresh)
 
     def test_classifier_rejection_preserves_existing_query_state(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)

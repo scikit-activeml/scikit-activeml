@@ -5,6 +5,22 @@ from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
 
+def assert_no_query_state(test_case, strategy):
+    """Assert that semantic query failure did not commit public state."""
+    for attribute in (
+        "n_features_in_",
+        "missing_label_",
+        "random_state_",
+    ):
+        test_case.assertFalse(
+            hasattr(strategy, attribute),
+            msg=(
+                f"{type(strategy).__name__} committed query state "
+                f"`{attribute}` after semantic failure."
+            ),
+        )
+
+
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = []

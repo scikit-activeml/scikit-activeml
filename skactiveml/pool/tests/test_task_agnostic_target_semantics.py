@@ -12,6 +12,7 @@ from skactiveml.pool import (
     RandomSampling,
     TypiClust,
 )
+from skactiveml.tests.utils import assert_no_query_state
 
 TASK_AGNOSTIC_STRATEGIES = (
     RandomSampling,
@@ -160,20 +161,20 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 *[[-1, -1] for _ in range(6)],
             ]
         )
-        query_state_attributes = {
+        strategy_specific_state_attributes = {
             "delta_max_",
             "distances_",
-            "missing_label_",
-            "n_features_in_",
-            "random_state_",
         }
 
         for strategy, extra in _strategy_cases():
             with self.subTest(strategy=type(strategy).__name__):
                 with self.assertRaisesRegex(ValueError, "ambiguous"):
                     strategy.query(X, y, **extra)
+                assert_no_query_state(self, strategy)
                 self.assertTrue(
-                    query_state_attributes.isdisjoint(strategy.__dict__)
+                    strategy_specific_state_attributes.isdisjoint(
+                        strategy.__dict__
+                    )
                 )
 
     def test_semantic_and_capability_failures_precede_query_state(self):
@@ -216,4 +217,4 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 ):
                     with self.assertRaisesRegex(ValueError, message):
                         strategy.query(X, y, **extra)
-                    self.assertFalse(hasattr(strategy, "n_features_in_"))
+                    assert_no_query_state(self, strategy)
