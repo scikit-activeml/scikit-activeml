@@ -131,6 +131,45 @@ class TestRegressionTreeBasedAL(
             replace_init_params={"method": "representativity"},
         )
 
+    def test_representativity_iterations_improve_acquisition_utility(self):
+        X = np.array(
+            [
+                [2.24, 0.98],
+                [-0.85, 0.31],
+                [0.40, 1.76],
+                [1.45, 0.14],
+                [-0.98, 1.87],
+                [-0.21, 1.49],
+                [0.12, 0.76],
+                [-0.15, 0.95],
+                [0.33, 0.44],
+                [0.41, -0.10],
+            ]
+        )
+        y = np.array([0, 1, 2] + [MISSING_LABEL] * 7)
+        batch_size = 2
+        acquisition_utility_sums = []
+
+        for max_iter in [1, 10]:
+            query_indices, utilities = RegressionTreeBasedAL(
+                method="representativity",
+                max_iter_representativity=max_iter,
+                random_state=0,
+            ).query(
+                X,
+                y,
+                reg=self.reg,
+                batch_size=batch_size,
+                return_utilities=True,
+            )
+            acquisition_utility_sums.append(
+                utilities[np.arange(batch_size), query_indices].sum()
+            )
+
+        self.assertGreater(
+            acquisition_utility_sums[1], acquisition_utility_sums[0]
+        )
+
     def test_query_param_reg(self, test_cases=None):
         test_cases = test_cases or []
         test_cases += [
