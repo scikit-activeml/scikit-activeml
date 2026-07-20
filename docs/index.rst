@@ -4,12 +4,10 @@
 
    Home <self>
    Tutorials <tutorials>
-   Target Semantics <target_semantics>
    Strategy Overview <generated/strategy_overview>
    generated/sphinx_gallery_examples/index
    generated/api/skactiveml
    contributing
-   Release Notes <release_notes>
    Changelog <https://github.com/scikit-activeml/scikit-activeml/releases>
 
 .. include:: ../README.rst

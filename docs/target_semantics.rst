@@ -1,14 +1,16 @@
+:orphan:
+
 .. _target-semantics:
 
-================================
-Target Semantics in Version 1.1
-================================
+===============================
+Target and Annotation Semantics
+===============================
 
 Target semantics describe the task, target type, and annotation type that give
-target data its meaning.  Version 1.1 resolves those semantics once, represents
-them with :class:`~skactiveml.utils.TargetSpec`, and then checks whether a
-consumer supports the exact resolved target capability.  Resolution and
-capability checking are deliberately separate: a target can be meaningful
+target data its meaning.  The target contract resolves those semantics once,
+represents them with :class:`~skactiveml.utils.TargetSpec`, and then checks
+whether a consumer supports the exact resolved target capability.  Resolution
+and capability checking are deliberately separate: a target can be meaningful
 even when a particular estimator or query strategy cannot execute it.
 
 Public API
@@ -121,8 +123,8 @@ vocabulary.  A column with fewer than two observed classes raises an error.
    ...
    ValueError:
 
-Version 1.1 treats a multi-label sample as one complete vector.  Each row must
-therefore be wholly observed or wholly missing; mixed rows would imply
+The current contract treats a multi-label sample as one complete vector.  Each
+row must therefore be wholly observed or wholly missing; mixed rows would imply
 partial-label training or acquisition, which is not supported.
 
 .. doctest::
@@ -160,7 +162,7 @@ fitted estimator whose ``target_spec_`` already provides resolved evidence.
 A flat vocabulary under ``"auto"`` means single-output classification.  A
 nested set of binary vocabularies means multi-label classification.  A nested
 vocabulary containing a non-binary output resolves to future multi-output
-classification, which version 1.1 components then reject as unsupported.
+classification, which current components reject as unsupported.
 
 Target-aware masks and indices
 ==============================
@@ -187,7 +189,7 @@ Regression
 ==========
 
 Regressors accept ``target_type="auto"`` and ``"single-output"`` for
-version 1.1 execution.  One-dimensional numerical targets resolve to
+currently supported execution.  One-dimensional numerical targets resolve to
 single-output regression, and column vectors remain compatible.  Multiple
 target columns resolve to recognized ``"multi-output"`` regression semantics,
 but regressors reject that valid specification because multi-output execution
@@ -223,7 +225,7 @@ resolution from array shape.  In particular, inspect its ``target_type`` and
 Recognized future semantics
 ===========================
 
-Version 1.1 deliberately recognizes without executing multi-output
+The contract deliberately recognizes without executing multi-output
 classification and multi-output regression.  It also defers partial-label
 querying and multi-label multi-annotator querying.  These are capability and
 acquisition-scope limits, not architectural conflations: target type remains
