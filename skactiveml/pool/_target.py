@@ -25,6 +25,7 @@ def _resolve_estimator_target_spec(strategy, estimator, y):
     else:  # pragma: no cover - callers validate their estimator type first.
         raise TypeError("`estimator` must be a scikit-activeml estimator.")
 
+    check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     strategy_target_type = strategy.target_type
     _validate_target_semantics(
         task,

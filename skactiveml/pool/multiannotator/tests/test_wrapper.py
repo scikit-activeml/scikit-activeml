@@ -122,6 +122,35 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         for component in (wrapper, strategy):
             assert_no_query_state(self, component)
 
+    def test_prefitted_estimator_marker_rejection_precedes_query_state(self):
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            classes=self.classes,
+        ).fit(self.X, np.array([0, 0, 1, 1]))
+        strategy = UncertaintySampling(
+            missing_label=-1,
+            random_state=self.random_state,
+        )
+        wrapper = SingleAnnotatorWrapper(
+            strategy,
+            missing_label=-1,
+            random_state=self.random_state,
+        )
+        y = np.array(
+            [
+                [0, 0, 1],
+                [0, 1, 1],
+                [1, 0, 1],
+                [1, 1, 0],
+            ]
+        )
+
+        with self.assertRaisesRegex(ValueError, "must be equal"):
+            wrapper.query(self.X, y, clf=clf, fit_clf=False)
+
+        for component in (wrapper, strategy):
+            assert_no_query_state(self, component)
+
     def test_wrapped_rejection_preserves_existing_query_state(self):
         strategy = UncertaintySampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(

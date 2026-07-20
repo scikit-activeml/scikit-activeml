@@ -19,6 +19,7 @@ from ...utils import (
     majority_vote,
     check_random_state,
     check_scalar,
+    check_equal_missing_label,
     resolve_target_spec,
 )
 from ...utils._target import check_target_capability
@@ -203,17 +204,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         check_type(
             self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
         )
-        if self.strategy.missing_label != self.missing_label and not (
-            np.isnan(self.strategy.missing_label)
-            & np.isnan(self.missing_label)
-        ):
-            raise ValueError(
-                f"`self.missing_label` must equal "
-                f"`self.strategy.missing_label`, but "
-                f"`self.missing_label` equals {self.missing_label} and"
-                f"`self.strategy.missing_label` equals "
-                f"{self.strategy.missing_label}."
-            )
+        check_equal_missing_label(
+            self.strategy.missing_label, self.missing_label
+        )
 
         uses_default_aggregate = self.y_aggregate is None
         y_aggregate = (
