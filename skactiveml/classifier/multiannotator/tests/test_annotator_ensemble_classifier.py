@@ -119,6 +119,17 @@ class TestAnnotatorEnsembleClassifier(
         )
         self.assertRaises(ValueError, clf.fit, X=[], y=[])
 
+    def test_fit_rejects_wrong_number_of_annotators(self):
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[
+                ("pwc-0", ParzenWindowClassifier()),
+                ("pwc-1", ParzenWindowClassifier()),
+            ]
+        )
+
+        with self.assertRaisesRegex(ValueError, "n_estimators=2"):
+            clf.fit(self.X, self.y[:, :1])
+
     def test_predict_proba(self):
         pwc = ParzenWindowClassifier()
         gnb = SklearnClassifier(GaussianNB())

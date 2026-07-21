@@ -149,13 +149,6 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         if self.mode not in ["lower", "mean", "upper"]:
             raise ValueError("`mode` must be in `['lower', 'mean', `upper`].`")
 
-        # Check shape of labels.
-        if y.ndim != 2:
-            raise ValueError(
-                "`y` but must be a 2d array with shape "
-                "`(n_samples, n_annotators)`."
-            )
-
         # Compute majority vote labels.
         y_mv = majority_vote(
             y=y,

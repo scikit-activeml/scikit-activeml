@@ -866,11 +866,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         is_multilabel = all(len(classes_j) == 2 for classes_j in self.classes_)
         if self.proba_format == "auto":
             return "array" if is_multilabel else "list"
-        if self.proba_format == "array" and not is_multilabel:
-            raise ValueError(
-                "`proba_format='array'` is only supported for multilabel "
-                "classification."
-            )
         return self.proba_format
 
     def _is_multilabel_target(self):
@@ -1200,18 +1195,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         # if self.classes=None or self.estimator.classes=None then no checks
         # are done if general test is removed it should be checked again
-        if (
-            self.classes is not None
-            and self.estimator.classes is not None
-            and not np.array_equiv(self.classes, self.estimator.classes)
-        ):
-            raise ValueError(
-                "'classes' and estimator.classes must be equal. "
-                "Got {} is not equal to {}.".format(
-                    self.classes, self.estimator.classes
-                )
-            )
-
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
         self.target_spec_ = target_spec
@@ -1752,8 +1735,6 @@ if successful_skorch_torch_import:
             target_spec = getattr(self, "target_spec_", None)
             if target_spec is not None:
                 return target_spec.target_type
-            if y is not None:
-                return self._resolve_target_spec(y).target_type
             if self.classes is not None:
                 y_dummy = (
                     np.empty(
@@ -1904,14 +1885,6 @@ if successful_skorch_torch_import:
                 else:
                     y_dummy = np.arange(P.shape[-1], dtype=int)
                 self._initialize_label_state(y_dummy)
-            if not hasattr(self, "cost_matrix_"):
-                if (
-                    self.cost_matrix is None
-                    and self.target_spec_.target_type == "single-output"
-                ):
-                    self.cost_matrix_ = 1 - np.eye(len(self.classes_))
-                else:
-                    self.cost_matrix_ = self.cost_matrix
             check_classifier_params(
                 self.classes_, self.missing_label, self.cost_matrix_
             )

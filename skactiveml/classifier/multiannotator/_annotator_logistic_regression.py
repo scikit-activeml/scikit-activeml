@@ -252,11 +252,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         # Set auxiliary variables.
         n_classes = len(self.classes_)
         if self.n_features_in_ is not None:
-            if len(y.shape) != 2:
-                raise ValueError(
-                    "`y` must be an array-like of shape "
-                    "`(n_samples, n_annotators)`."
-                )
             self.n_annotators_ = y.shape[1]
         else:
             if self.n_annotators is None:

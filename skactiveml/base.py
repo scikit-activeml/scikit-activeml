@@ -489,15 +489,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             y = check_array(
                 y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
             )
-            if y.ndim != 2:
-                raise ValueError(
-                    "Multi-label targets must be two-dimensional."
-                )
             resolved_target_type = "multi-label"
         elif target_type == "single-output":
-            y = column_or_1d(y, warn=True)
-            resolved_target_type = "single-output"
-        else:
             y = column_or_1d(y, warn=True)
             resolved_target_type = "single-output"
 
@@ -1472,11 +1465,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             )
         elif self.target_spec_.target_type == "multi-label":
             y_pred = (P >= 0.5).astype(int, copy=False)
-        else:
-            raise ValueError(
-                f"{type(self).__name__} cannot predict for resolved "
-                f"target type {self.target_spec_.target_type!r}."
-            )
 
         # Transform labels and append extra outputs.
         y_pred = self._le.inverse_transform(y_pred)
@@ -1571,8 +1559,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             y = self._le.fit_transform(y)
             if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")
-            if len(self._le.classes_) == 0:
-                raise ValueError(error_msg)
         else:
             if self.classes is None:
                 raise ValueError(error_msg)

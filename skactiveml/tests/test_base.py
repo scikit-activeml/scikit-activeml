@@ -17,6 +17,7 @@ from skactiveml.base import (
     ProbabilisticRegressor,
 )
 from skactiveml.exceptions import MappingError
+from skactiveml.pool import RandomSampling
 from skactiveml.utils import MISSING_LABEL, is_unlabeled
 
 successful_skorch_torch_import = False
@@ -58,6 +59,7 @@ class DummySkactivemlClassifier(SkactivemlClassifier):
         self.probas = probas
 
     def fit(self, X, y, sample_weight=None):
+        self._initialize_label_state(y)
         self.validated_ = self._validate_data(
             X=X,
             y=y,
@@ -65,10 +67,57 @@ class DummySkactivemlClassifier(SkactivemlClassifier):
         )
         return self
 
+    def partial_fit(self, X, y, sample_weight=None):
+        target_spec = self._resolve_target_spec_for_fit(
+            y,
+            is_incremental=hasattr(self, "target_spec_"),
+        )
+        self.validated_ = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            target_spec=target_spec,
+        )
+        return self
+
     def predict_proba(self, X, **kwargs):
         if self.probas is None:
             raise NotImplementedError
         return self.probas
+
+
+class DummyMultiAnnotatorClassifier(DummySkactivemlClassifier):
+    _annotation_type = "multi-annotator"
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
+
+
+class DummySingleAnnotatorPoolQueryStrategy(SingleAnnotatorPoolQueryStrategy):
+    def query(
+        self,
+        X,
+        y,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
+        return self._validate_data(
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
+
+
+class DummyRegressionPoolQueryStrategy(DummySingleAnnotatorPoolQueryStrategy):
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
 
 
 class DummyClassFrequencyEstimator(ClassFrequencyEstimator):
@@ -79,6 +128,11 @@ class DummyClassFrequencyEstimator(ClassFrequencyEstimator):
         self.freq = freq
 
     def fit(self, X, y, sample_weight=None):
+        self.validated_ = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+        )
         return self
 
     def predict_freq(self, X):
@@ -130,6 +184,26 @@ class DummyProbabilisticRegressor(ProbabilisticRegressor):
             mean=np.resize(self.mean_, n),
             std=np.resize(self.std_, n),
             entropy=np.resize(self.entropy_, n),
+        )
+
+
+class DummyMultiAnnotatorPoolQueryStrategy(MultiAnnotatorPoolQueryStrategy):
+    def query(
+        self,
+        X,
+        y,
+        candidates=None,
+        annotators=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
+        return self._validate_data(
+            X=X,
+            y=y,
+            candidates=candidates,
+            annotators=annotators,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
         )
 
 
@@ -239,6 +313,57 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
         self.assertEqual(batch_size_v, 1)
         self.assertFalse(return_utilities_v)
 
+    def test_public_query_resolves_target_capabilities(self):
+        X = np.arange(8).reshape(4, 2)
+        y_single_output = np.array([0, 1, -1, -1])
+        y_multi_label = np.array([[0, 1], [1, 0], [-1, -1], [-1, -1]])
+
+        single_output_indices = RandomSampling(
+            missing_label=-1,
+            random_state=0,
+            target_type="single-output",
+        ).query(X, y_single_output, batch_size=1)
+        multi_label_indices = RandomSampling(
+            missing_label=-1,
+            random_state=0,
+            target_type="multi-label",
+        ).query(X, y_multi_label, batch_size=1)
+
+        self.assertEqual(single_output_indices.shape, (1,))
+        self.assertEqual(multi_label_indices.shape, (1,))
+
+    def test_public_query_uses_default_single_output_capability(self):
+        strategy = DummySingleAnnotatorPoolQueryStrategy(
+            missing_label=-1, random_state=0
+        )
+
+        validated = strategy.query(
+            X=np.arange(8).reshape(4, 2),
+            y=np.array([0, 1, -1, -1]),
+            batch_size=1,
+        )
+
+        self.assertEqual(validated[3], 1)
+
+        strategy.classes = [0, 1]
+        validated_with_classes = strategy.query(
+            X=np.arange(8).reshape(4, 2),
+            y=np.array([0, 1, -1, -1]),
+            batch_size=1,
+        )
+        self.assertEqual(validated_with_classes[3], 1)
+
+    def test_public_query_resolves_regression_capability(self):
+        validated = DummyRegressionPoolQueryStrategy(
+            missing_label=-1, random_state=0
+        ).query(
+            X=np.arange(8).reshape(4, 2),
+            y=np.array([0.0, 1.0, -1.0, -1.0]),
+            batch_size=1,
+        )
+
+        self.assertEqual(validated[3], 1)
+
 
 class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
     @patch.multiple(MultiAnnotatorPoolQueryStrategy, __abstractmethods__=set())
@@ -259,6 +384,24 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
                 ]
             ),
         )
+
+    def test_public_query_allows_initially_unobserved_targets(self):
+        strategy = DummyMultiAnnotatorPoolQueryStrategy(
+            missing_label=-1, random_state=0
+        )
+        validated = strategy.query(
+            X=np.zeros((2, 1)),
+            y=np.full((2, 2), -1),
+            batch_size=1,
+        )
+
+        self.assertEqual(validated[4], 1)
+        with self.assertRaises(ValueError):
+            strategy.query(
+                X=np.zeros((2, 1)),
+                y=np.zeros((2, 2, 1)),
+                batch_size=1,
+            )
 
     def test__validate_data(self):
         self.assertRaises(
@@ -502,6 +645,64 @@ class SkactivemlClassifierTest(unittest.TestCase):
         self.assertEqual(clf.target_spec_.target_type, "multi-label")
         self.assertIsNone(clf.cost_matrix_)
 
+    def test_public_fit_handles_empty_data_and_incremental_target_specs(self):
+        empty_clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
+        empty_clf.fit(np.empty((0, 2)), np.empty(0, dtype=int))
+        self.assertEqual(empty_clf.classes_.tolist(), [0, 1])
+
+        clf = DummySkactivemlClassifier(missing_label=-1)
+        X = np.arange(4).reshape(2, 2)
+        clf.fit(X, np.array([0, 1]))
+        clf.partial_fit(X, np.array([0, 1]))
+        with self.assertRaisesRegex(ValueError, "No class label is known"):
+            clf.partial_fit(np.empty((0, 2)), np.empty(0, dtype=int))
+        clf.classes = [0, 1, 2]
+        with self.assertRaisesRegex(ValueError, "cannot change"):
+            clf.partial_fit(X, np.array([0, 1, 2]))
+
+        multi_annotator_clf = DummyMultiAnnotatorClassifier(
+            classes=[0, 1], missing_label=-1
+        )
+        multi_annotator_clf.fit(np.empty((0, 2)), np.empty(0, dtype=int))
+        self.assertEqual(
+            multi_annotator_clf.target_spec_.annotation_type, "multi-annotator"
+        )
+
+    def test_public_fit_validates_weights_and_orders_cost_matrix(self):
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([0, 1])
+        clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
+
+        with self.assertRaises(ValueError):
+            clf.fit(X, y, sample_weight=np.ones(1))
+        with self.assertRaises(ValueError):
+            clf.fit(X, y, sample_weight=np.ones((2, 1)))
+
+        clf = DummySkactivemlClassifier(
+            classes=[1, 0],
+            cost_matrix=[[0, 2], [3, 0]],
+            missing_label=-1,
+        )
+        clf.fit(X, y)
+        np.testing.assert_array_equal(
+            clf.cost_matrix_, np.array([[0, 3], [2, 0]])
+        )
+
+    def test_public_predict_preserves_extra_probability_outputs(self):
+        clf = DummySkactivemlClassifier(
+            classes=[0, 1],
+            missing_label=-1,
+            probas=(np.array([[0.9, 0.1], [0.1, 0.9]]), "extra"),
+            random_state=0,
+        )
+        X = np.arange(4).reshape(2, 2)
+        clf.fit(X, np.array([0, 1]))
+
+        prediction = clf.predict(X)
+
+        self.assertEqual(prediction[1], "extra")
+        np.testing.assert_array_equal(prediction[0], [0, 1])
+
     def test__validate_data_multilabel_invalid_rows(self):
         X = np.arange(6).reshape(3, 2)
         y = np.array([[0, 1], [-1, 1], [1, 0]])
@@ -541,6 +742,13 @@ class SkactivemlClassifierTest(unittest.TestCase):
             X,
             y,
             sample_weight="invalid",
+        )
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X,
+            y,
+            sample_weight=np.ones((len(y) - 1, y.shape[1])),
         )
 
     def test__validate_data_multilabel_binary_enforcement(self):
@@ -605,6 +813,11 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
 
     def test_predict_freq(self):
         self.assertRaises(NotImplementedError, self.clf.predict_freq, X=None)
+
+    def test_public_fit_validates_class_prior(self):
+        clf = DummyClassFrequencyEstimator(class_prior=1.0)
+        clf.fit(np.zeros((2, 1)), np.array([0, 1]))
+        np.testing.assert_array_equal(clf.class_prior_, [1.0, 1.0])
 
     def test_predict_proba(self):
         clf = DummyClassFrequencyEstimator(
@@ -814,6 +1027,84 @@ if successful_skorch_torch_import:
                 X=None,
                 y=None,
             )
+
+        def test_public_initialize_builds_a_neural_net(self):
+            self.sk._net_parts = lambda X=None, y=None: (
+                torch.nn.Linear,
+                torch.nn.MSELoss,
+                {
+                    "module__in_features": 1,
+                    "module__out_features": 1,
+                },
+            )
+            self.sk._validate_data_kwargs = lambda: {}
+            self.sk._validate_data = lambda X, y, **kwargs: (
+                np.asarray(X),
+                np.asarray(y),
+                None,
+            )
+            self.sk._return_training_data = lambda X, y: (X, y)
+
+            initialized = self.sk.initialize()
+            initialized_with_data = self.sk.initialize(
+                X=np.zeros((1, 1)),
+                y=np.zeros(1),
+                enforce_check_X_y=True,
+            )
+
+            self.assertIs(initialized, self.sk)
+            self.assertIs(initialized_with_data[0], self.sk)
+            self.assertEqual(initialized_with_data[1].shape, (1, 1))
+
+            self.sk._net_parts = lambda X=None, y=None: (
+                torch.nn.Linear,
+                torch.nn.MSELoss,
+                {"module": torch.nn.Linear},
+            )
+            with self.assertRaisesRegex(ValueError, "module"):
+                self.sk.initialize()
+
+        def test_public_fit_initializes_and_reuses_a_neural_net(self):
+            class PublicSkorchEstimator(SkorchMixin):
+                def _net_parts(self, X=None, y=None):
+                    return (
+                        torch.nn.Linear,
+                        torch.nn.MSELoss,
+                        {
+                            "module__in_features": 1,
+                            "module__out_features": 1,
+                            "max_epochs": 1,
+                            "train_split": None,
+                            "verbose": 0,
+                        },
+                    )
+
+                def _validate_data_kwargs(self):
+                    return {}
+
+                def _validate_data(self, X, y, **kwargs):
+                    return (
+                        np.asarray(X, dtype=np.float32),
+                        np.asarray(y, dtype=np.float32),
+                        None,
+                    )
+
+                def _return_training_data(self, X, y):
+                    return X, y
+
+                def fit(self, X, y):
+                    return self._fit("fit", X, y)
+
+            estimator = PublicSkorchEstimator()
+            X = np.array([[0.0], [1.0]])
+            y = np.array([[0.0], [1.0]])
+
+            estimator.fit(X, y)
+            estimator.target_spec_ = "established"
+            estimator.neural_net_.warm_start = True
+            estimator.fit(X, y)
+
+            self.assertIsNotNone(estimator.neural_net_)
 
         def test___forward_with_named_outputs(self):
             # Single-output tests.

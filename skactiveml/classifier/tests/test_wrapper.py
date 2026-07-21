@@ -293,6 +293,19 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         np.testing.assert_array_equal(clf.estimator_.classes_, [0, 1])
         self.assertTrue(clf.is_fitted_)
 
+    def test_partial_fit_validates_configured_class_vocabulary(self):
+        clf = SklearnClassifier(
+            estimator=SGDClassifier(loss="log_loss", random_state=0),
+            classes=[0, 1],
+            missing_label=-1,
+        )
+        X = np.array([[0.0], [1.0]])
+
+        clf.partial_fit(X, np.array([0, 1]), classes=[0, 1])
+
+        self.assertTrue(clf.is_fitted_)
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+
     def test_partial_fit_rejects_unseen_class_before_mutating_state(self):
         clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
         X = np.array([[0.0], [1.0], [2.0], [3.0]])
@@ -1327,6 +1340,17 @@ class TestSlidingWindowClassifier(
         )
         self.assertRaises(ValueError, clf.fit, [[0], [1]], [0, 1])
 
+    def test_fit_rejects_mismatched_estimator_classes(self):
+        estimator = SklearnClassifier(
+            GaussianNB(), classes=[0, 1], missing_label=-1
+        )
+        clf = SlidingWindowClassifier(
+            estimator=estimator, classes=[0, 2], missing_label=-1
+        )
+
+        with self.assertRaises(ValueError):
+            clf.fit([[0.0], [1.0]], [0, 0])
+
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -2186,6 +2210,36 @@ if successful_skorch_torch_import:
             )
             P = clf.predict_proba(self.X_ml)
             self.assertEqual(P.shape, self.y_ml.shape)
+
+        def test_fit_infers_multilabel_target_from_public_input(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(
+                {
+                    "classes": None,
+                    "missing_label": -1,
+                    "target_type": "multi-label",
+                }
+            )
+            init_params["neural_net_param_dict"]["max_epochs"] = 1
+            clf = SkorchClassifier(**init_params)
+
+            clf.fit(self.X_ml, self.y_ml)
+
+            self.assertEqual(clf.target_spec_.target_type, "multi-label")
+            self.assertEqual(
+                clf.predict_proba(self.X_ml).shape, self.y_ml.shape
+            )
+
+        def test_predict_proba_initializes_public_fallback_cost_matrix(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["classes"] = [0, 1]
+            clf = SkorchClassifier(**init_params)
+
+            clf.predict_proba(self.X)
+
+            np.testing.assert_array_equal(
+                clf.cost_matrix_, 1 - np.eye(len(clf.classes_))
+            )
 
         def test_multilabel_public_fallback_preserves_predictions(self):
             init_params = deepcopy(self.init_default_params)

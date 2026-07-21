@@ -5,9 +5,11 @@ import numpy as np
 from copy import deepcopy
 
 from sklearn import clone
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
+from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVC
 from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.pipeline import Pipeline
@@ -36,6 +38,21 @@ try:
     successful_skorch_torch_import = True
 except ImportError:
     pass  # pragma: no cover
+
+
+class MetadataFreeRegressor(RegressorMixin, BaseEstimator):
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.target_tags.multi_output = True
+        tags.target_tags.single_output = True
+        return tags
+
+    def fit(self, X, y):
+        self.fitted_ = True
+        return self
+
+    def predict(self, X):
+        return np.zeros(len(X))
 
 
 class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
@@ -160,6 +177,60 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             check_is_fitted(reg)
 
         self.assertFalse(hasattr(reg, "target_spec_"))
+
+    def test_prefitted_multi_output_estimator_tags_are_rejected(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.column_stack(
+            (np.arange(8, dtype=float), np.arange(8, dtype=float) ** 2)
+        )
+        estimator = MultiOutputRegressor(LinearRegression()).fit(X, y)
+        reg = SklearnRegressor(estimator)
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            check_is_fitted(reg)
+
+    def test_prefitted_estimator_n_outputs_metadata_is_used(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = LinearRegression().fit(X, y)
+        estimator.n_outputs_ = 1
+        reg = SklearnRegressor(estimator)
+
+        check_is_fitted(reg)
+
+        self.assertEqual(reg.target_spec_.target_type, "single-output")
+
+    def test_prefitted_estimator_coefficient_shape_is_used(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = LinearRegression().fit(X, y)
+        estimator.coef_ = np.asarray(estimator.coef_).reshape(1, -1)
+        reg = SklearnRegressor(estimator)
+
+        check_is_fitted(reg)
+
+        self.assertEqual(reg.target_spec_.target_type, "single-output")
+
+    def test_prefitted_pipeline_without_target_metadata_is_rejected(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = Pipeline([("regressor", MetadataFreeRegressor())]).fit(
+            X, y
+        )
+        reg = SklearnRegressor(estimator)
+
+        with self.assertRaisesRegex(ValueError, "Cannot establish"):
+            check_is_fitted(reg)
+
+    def test_prefitted_estimator_rejects_invalid_target_spec(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = MetadataFreeRegressor().fit(X, y)
+        estimator.target_spec_ = "invalid"
+        reg = SklearnRegressor(estimator)
+
+        with self.assertRaisesRegex(ValueError, "must be a.*TargetSpec"):
+            check_is_fitted(reg)
 
     def test_prefitted_column_vector_matches_direct_prediction_shape(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)

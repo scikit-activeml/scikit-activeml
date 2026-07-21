@@ -22,11 +22,11 @@ class TargetSpec:
 
     Parameters
     ----------
-    task : {"classification", "regression"}
+    task : "classification" or "regression"
         The prediction task.
     target_type : "single-output" or "multi-label" or "multi-output"
         The resolved structure of one sample's target.
-    annotation_type : {"single-annotator", "multi-annotator"}
+    annotation_type : "single-annotator" or "multi-annotator"
         Whether observations come from one or multiple annotators.
     classes : tuple or None
         The normalized immutable class vocabulary for classification, or
@@ -123,10 +123,7 @@ def _class_vocabulary_hash_key(classes):
 
 
 def _is_nan_class(value):
-    try:
-        return bool(value != value)
-    except (TypeError, ValueError):
-        return False
+    return bool(value != value)
 
 
 def _validate_target_semantics(
@@ -216,12 +213,12 @@ def resolve_target_spec(
     ----------
     y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Target observations, including values equal to `missing_label`.
-    task : {"classification", "regression"}
+    task : "classification" or "regression"
         The prediction task.
     target_type : "auto" or "single-output" or "multi-label" or \
             "multi-output", default="auto"
         Declared target type. The returned specification is always concrete.
-    annotation_type : {"single-annotator", "multi-annotator"}, \
+    annotation_type : "single-annotator" or "multi-annotator", \
             default="single-annotator"
         Declared annotation type.
     classes : array-like or tuple of array-like, default=None
@@ -293,9 +290,6 @@ def resolve_target_spec(
             classes=classes,
             missing_label=missing_label,
         )
-    if target_type != "single-output":
-        raise ValueError(f"Cannot resolve `target_type='{target_type}'`.")
-
     _validate_single_output_shape(y, task, annotation_type)
 
     normalized_classes = None

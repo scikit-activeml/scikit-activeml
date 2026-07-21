@@ -318,6 +318,9 @@ class TestValidation(unittest.TestCase):
         X = [[1, 2], [3, 4]]
         y = [1, 0]
         X_cand = [[5, 6]]
+        with self.assertRaisesRegex(ValueError, "target_type.*one of"):
+            check_X_y(X, y, target_type="invalid")
+
         X, y, sample_weight = check_X_y(X, y)
         np.testing.assert_array_equal(sample_weight, np.array([1.0, 1.0]))
         X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(

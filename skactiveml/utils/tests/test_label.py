@@ -25,6 +25,17 @@ class TestLabel(unittest.TestCase):
         self.y9 = [[0, 0, 1], [1, 1, 1], [1, 0, 1], [-1, 0, -1]]
 
     def test_is_unlabeled(self):
+        self.assertRaises(ValueError, is_unlabeled, y=[0], target_type="auto")
+        self.assertRaises(
+            ValueError, is_unlabeled, y=[0], target_type="multi-output"
+        )
+        self.assertRaises(
+            ValueError, is_unlabeled, y=[], target_type="multi-label"
+        )
+        np.testing.assert_array_equal(
+            np.array([], dtype=bool),
+            is_unlabeled(np.empty((0, 2)), target_type="multi-label"),
+        )
         self.assertRaises(
             TypeError, is_unlabeled, y=self.y1, missing_label="2"
         )

@@ -222,6 +222,93 @@ class TestSubSamplingWrapper(
 
         assert_no_query_state(self, wrapper)
 
+    def test_conflicting_fitted_estimators_fail_before_wrapper_state(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        clf_01 = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
+            X, [0, 1, 0, 1]
+        )
+        clf_02 = SklearnClassifier(GaussianNB(), classes=[0, 2]).fit(
+            X, [0, 2, 0, 2]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(), max_candidates=2
+        )
+
+        with self.assertRaisesRegex(ValueError, "conflicting target"):
+            wrapper.query(
+                X,
+                np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+                ensemble=[clf_01, clf_02],
+                fit_ensemble=False,
+            )
+
+        assert_no_query_state(self, wrapper)
+
+    def test_explicit_estimator_target_types_conflict_before_query(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array(
+            [
+                [0, 1],
+                [1, 0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(),
+            max_candidates=2,
+            target_type="multi-label",
+        )
+        clf = SklearnClassifier(
+            GaussianNB(), classes=[0, 1], target_type="single-output"
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "target declaration conflicts"
+        ):
+            wrapper.query(X, y, ensemble=clf, fit_ensemble=False)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_classifier_and_regressor_estimators_conflict_before_query(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(), max_candidates=2
+        )
+        estimators = [
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+            SklearnRegressor(RandomForestRegressor(random_state=0)),
+        ]
+
+        with self.assertRaisesRegex(
+            ValueError, "conflicting classification and regression"
+        ):
+            wrapper.query(X, y, ensemble=estimators, fit_ensemble=False)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_wrapper_rejects_unsupported_explicit_target_type(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array(
+            [
+                [0, 1],
+                [1, 0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(),
+            target_type="multi-label",
+            max_candidates=2,
+        )
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            wrapper.query(X, y, ensemble=None)
+
+        assert_no_query_state(self, wrapper)
+
     def test_resolved_target_type_reaches_auto_and_nested_strategies(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(

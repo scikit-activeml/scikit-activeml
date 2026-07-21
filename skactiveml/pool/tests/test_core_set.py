@@ -160,6 +160,16 @@ class TestKGreedyCenter(unittest.TestCase):
     def test_param_y(self):
         self.assertRaises(TypeError, k_greedy_center, X=[[1, 1]], y=1)
 
+    def test_param_target_type(self):
+        self.assertRaisesRegex(
+            ValueError,
+            "target_type",
+            k_greedy_center,
+            X=self.X,
+            y=self.y,
+            target_type="multi-output",
+        )
+
     def test_param_batch_size(self):
         self.assertRaises(
             TypeError, k_greedy_center, X=self.X, y=self.y, batch_size="string"

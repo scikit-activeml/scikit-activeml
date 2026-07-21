@@ -243,6 +243,22 @@ class TestUncertaintySampling(
         self.assertEqual(utilities.shape, (2, len(query_params["X"])))
         self.assertTrue(np.isnan(utilities[:, :2]).all())
 
+    def test_query_passes_sample_weight_to_classifier_fit(self):
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        clf = ParzenWindowClassifier(classes=[0, 1])
+
+        query_indices = UncertaintySampling().query(
+            X=X,
+            y=y,
+            clf=clf,
+            fit_clf=True,
+            sample_weight=np.ones(len(y)),
+            candidates=X[2:],
+        )
+
+        self.assertEqual(query_indices.shape, (1,))
+
     def test_query_reuses_fitted_multilabel_target_spec(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y_fit = np.array(

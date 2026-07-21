@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.exceptions import NotFittedError
 from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import ParzenWindowClassifier
@@ -219,6 +220,15 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
 
         self.assertEqual(query_indices.shape, (2, 2))
         self.assertEqual(utilities.shape, (2, len(self.X), y.shape[1]))
+
+    def test_unfitted_classifier_without_target_spec_is_rejected(self):
+        with self.assertRaises(NotFittedError):
+            IntervalEstimationThreshold().query(
+                X=self.X,
+                y=self.y,
+                clf=AnnotatorLogisticRegression(),
+                fit_clf=False,
+            )
 
     def test_query_rejects_unsupported_classifier_before_query_state(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)

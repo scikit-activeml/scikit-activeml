@@ -218,3 +218,33 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, message):
                         strategy.query(X, y, **extra)
                     assert_no_query_state(self, strategy)
+
+    def test_explicit_target_types_validate_public_shapes(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+
+        result = RandomSampling(
+            target_type="single-output", missing_label=-1, random_state=0
+        ).query(
+            X,
+            np.array([[0], [1], [-1], [-1]]),
+            batch_size=1,
+        )
+        self.assertEqual(result.shape, (1,))
+
+        invalid_cases = (
+            (
+                "single-output",
+                np.array([[0, 1], [1, 0], [-1, -1], [-1, -1]]),
+                "one-dimensional or a column",
+            ),
+            ("multi-label", np.array([0, 1, -1, -1]), "two-dimensional"),
+            ("multi-output", np.array([[0], [1], [-1], [-1]]), "at least two"),
+        )
+        for target_type, y, message in invalid_cases:
+            with self.subTest(target_type=target_type):
+                with self.assertRaisesRegex(ValueError, message):
+                    RandomSampling(
+                        target_type=target_type,
+                        missing_label=-1,
+                        random_state=0,
+                    ).query(X, y, batch_size=1)

@@ -105,6 +105,39 @@ class TestTargetSpec(unittest.TestCase):
         self.assertEqual(direct, resolved)
         self.assertEqual(hash(direct), hash(resolved))
 
+    def test_equality_and_hashing_handle_empty_and_different_vocabularies(
+        self,
+    ):
+        regression = TargetSpec(
+            task="regression",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=None,
+        )
+        same_regression = TargetSpec(
+            task="regression",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=None,
+        )
+        classification = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=(0, 1),
+        )
+        other_classification = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=(0, 1, 2),
+        )
+
+        self.assertEqual(regression, same_regression)
+        self.assertEqual(hash(regression), hash(same_regression))
+        self.assertNotEqual(classification, other_classification)
+        self.assertFalse(classification == object())
+
     def test_rejects_unresolved_or_unknown_semantic_values(self):
         invalid_specs = [
             (
@@ -243,6 +276,82 @@ class TestResolveTargetSpec(unittest.TestCase):
             multi_output.classes,
             ((0, 1), (0, 1, 2)),
         )
+
+        inferred_single_output = resolve_target_spec(
+            [0, 1], task="classification"
+        )
+        self.assertEqual(inferred_single_output.target_type, "single-output")
+
+    def test_public_resolution_validates_shapes_and_metadata(self):
+        with self.assertRaisesRegex(ValueError, "Nested class vocabularies"):
+            resolve_target_spec(
+                [[0, 1], [1, 0]],
+                task="classification",
+                annotation_type="multi-annotator",
+                classes=[[0, 1], [0, 1]],
+            )
+
+        with self.assertRaisesRegex(ValueError, "No class label is observed"):
+            resolve_target_spec(
+                [np.nan, np.nan], task="classification", missing_label=np.nan
+            )
+
+        with self.assertRaisesRegex(TypeError, "one- or two-dimensional"):
+            resolve_target_spec(1, task="regression")
+
+        with self.assertRaisesRegex(ValueError, "two-dimensional"):
+            resolve_target_spec(
+                [0, 1],
+                task="classification",
+                annotation_type="multi-annotator",
+                classes=[0, 1],
+            )
+
+        with self.assertRaisesRegex(
+            ValueError, "one-dimensional or a column vector"
+        ):
+            resolve_target_spec(
+                [[1.0, 2.0], [3.0, 4.0]],
+                task="regression",
+                target_type="single-output",
+            )
+
+        with self.assertRaisesRegex(ValueError, "No class label is observed"):
+            resolve_target_spec(
+                [[0, np.nan], [1, np.nan], [np.nan, np.nan]],
+                task="classification",
+                target_type="multi-output",
+            )
+
+        with self.assertRaisesRegex(ValueError, "two-dimensional"):
+            resolve_target_spec(
+                [0, 1], task="classification", target_type="multi-label"
+            )
+
+        with self.assertRaisesRegex(ValueError, "one vocabulary per"):
+            resolve_target_spec(
+                [[0, 1], [1, 0]],
+                task="classification",
+                target_type="multi-label",
+                classes=[[0, 1]],
+            )
+
+    def test_public_resolution_reports_unknown_label_types_and_values(self):
+        with self.assertRaisesRegex(TypeError, "not type-compatible"):
+            resolve_target_spec(
+                ["cat"],
+                task="classification",
+                classes=[0, 1],
+                missing_label=None,
+            )
+
+        with self.assertRaisesRegex(ValueError, "outside"):
+            resolve_target_spec(
+                [0, 2],
+                task="classification",
+                classes=[0, 1],
+                missing_label=None,
+            )
 
     def test_auto_classification_rejects_bare_two_dimensional_targets(self):
         with self.assertRaisesRegex(ValueError, "ambiguous"):
