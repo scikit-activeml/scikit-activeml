@@ -666,6 +666,75 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         np.testing.assert_array_equal(clf.classes_, estimator.classes_)
         self.assertEqual(P.shape, (len(self.X_ml), len(estimator.classes_)))
 
+    def _assert_attributes_unchanged(self, clf, attributes_before):
+        self.assertEqual(set(clf.__dict__), set(attributes_before))
+        for name, value in attributes_before.items():
+            self.assertIs(clf.__dict__[name], value)
+
+    def test_prefit_initialization_commits_complete_label_state(self):
+        estimator = MultiOutputClassifier(GaussianNB()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=None, missing_label=-1
+        )
+
+        check_is_fitted(clf)
+
+        self.assertTrue(clf.__dict__["is_fitted_"])
+        self.assertIn("estimator_", clf.__dict__)
+        self.assertIn("check_X_dict_", clf.__dict__)
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
+        self.assertEqual(clf.target_spec_.classes, ((0, 1), (0, 1)))
+        self.assertIsNone(clf.cost_matrix_)
+        for classes_j, expected_classes_j in zip(
+            clf.classes_, estimator.classes_
+        ):
+            np.testing.assert_array_equal(classes_j, expected_classes_j)
+        for counts_j, classes_j in zip(clf._label_counts, clf.classes_):
+            np.testing.assert_array_equal(counts_j, np.zeros(len(classes_j)))
+
+    def test_prefit_target_resolution_failure_commits_no_fitted_state(self):
+        estimator = GaussianNB().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator, missing_label=-1, target_type="multi-label"
+        )
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(
+            ValueError, "nested binary class vocabularies"
+        ):
+            check_is_fitted(clf)
+
+        self._assert_attributes_unchanged(clf, attributes_before)
+
+    def test_prefit_capability_failure_commits_no_fitted_state(self):
+        estimator = Perceptron().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        )
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            check_is_fitted(clf)
+
+        self._assert_attributes_unchanged(clf, attributes_before)
+
+    def test_failed_recheck_preserves_initialized_label_state(self):
+        clf = SklearnClassifier(estimator=Perceptron(), missing_label=-1)
+        clf._initialize_label_state(np.array([0, 1]))
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            clf._initialize_label_state([[0, 1], [0, 1]])
+
+        self._assert_attributes_unchanged(clf, attributes_before)
+        self.assertEqual(clf.target_spec_.target_type, "single-output")
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+
     def test_prefit_single_output_nan_falls_back_to_uniform_prior(self):
         estimator = GaussianNB().fit(self.X_ml, self.y_ml[:, 0])
 

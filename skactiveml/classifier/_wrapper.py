@@ -601,23 +601,29 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         except NotFittedError:
             return False
 
+        fitted_classes = (
+            self.classes
+            if self.classes is not None
+            else getattr(self.estimator, "classes_", None)
+        )
+        estimator = deepcopy(self.estimator)
+
+        # The target specification is resolved and validated before any fitted
+        # attribute is written, such that a failing target contract leaves this
+        # wrapper exactly in its pre-call state.
+        if fitted_classes is not None:
+            self._initialize_label_state(fitted_classes)
+            self._initialize_label_counts_from_classes()
+
         # set attributes that would be set by the fit function
         self.is_fitted_ = True
-        self.estimator_ = deepcopy(self.estimator)
+        self.estimator_ = estimator
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "allow_nd": True,
             "dtype": None,
         }
-        fitted_classes = (
-            self.classes
-            if self.classes is not None
-            else getattr(self.estimator, "classes_", None)
-        )
-        if fitted_classes is not None:
-            self._initialize_label_state(fitted_classes)
-            self._initialize_label_counts_from_classes()
 
         return True
 
@@ -628,7 +634,35 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             return getattr(self.estimator, item)
 
     def _initialize_label_state(self, classes):
-        self.random_state_ = check_random_state(self.random_state)
+        """Resolve and then commit the label state for `classes`.
+
+        Parameters
+        ----------
+        classes : array-like of shape (n_classes,), or a list of such \
+                array-likes
+            Class vocabulary to resolve the target specification from, e.g.,
+            the `classes_` attribute of a pre-fitted `estimator`.
+        """
+        self._commit_label_state(self._resolve_label_state(classes))
+
+    def _resolve_label_state(self, classes):
+        """Resolve the label state for `classes` without committing it.
+
+        Every target resolution and validation step is performed on local
+        state only, such that a failure leaves this wrapper untouched.
+
+        Parameters
+        ----------
+        classes : array-like of shape (n_classes,), or a list of such \
+                array-likes
+            Class vocabulary to resolve the target specification from.
+
+        Returns
+        -------
+        label_state : dict
+            Resolved label state to be committed via `_commit_label_state`.
+        """
+        random_state = check_random_state(self.random_state)
         effective_classes = (
             self.classes if self.classes is not None else classes
         )
@@ -643,25 +677,35 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         target_spec = self._resolve_target_spec(
             y_dummy, classes=effective_classes
         )
-        self.target_spec_ = target_spec
-        self._le = ExtLabelEncoder(
-            classes=self.target_spec_.classes,
+        le = ExtLabelEncoder(
+            classes=target_spec.classes,
             missing_label=self.missing_label,
-            target_type=self.target_spec_.target_type,
+            target_type=target_spec.target_type,
         )
-        self._le.fit(y_dummy)
-        self.classes_ = self._le.classes_
-        if self._is_multilabel_target():
-            self.cost_matrix_ = None
+        le.fit(y_dummy)
+        if target_spec.target_type == "multi-label":
+            cost_matrix = None
         else:
-            self.cost_matrix_ = (
-                1 - np.eye(len(self.classes_))
+            cost_matrix = (
+                1 - np.eye(len(le.classes_))
                 if self.cost_matrix is None
                 else self.cost_matrix
             )
-        check_classifier_params(
-            self.classes_, self.missing_label, self.cost_matrix_
-        )
+        check_classifier_params(le.classes_, self.missing_label, cost_matrix)
+        return {
+            "random_state": random_state,
+            "target_spec": target_spec,
+            "le": le,
+            "cost_matrix": cost_matrix,
+        }
+
+    def _commit_label_state(self, label_state):
+        """Write a label state resolved by `_resolve_label_state`."""
+        self.random_state_ = label_state["random_state"]
+        self.target_spec_ = label_state["target_spec"]
+        self._le = label_state["le"]
+        self.classes_ = self._le.classes_
+        self.cost_matrix_ = label_state["cost_matrix"]
 
     def _initialize_label_counts_from_classes(self):
         """Initialize the per-class label counts with zeros.
