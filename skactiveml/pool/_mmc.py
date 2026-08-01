@@ -13,6 +13,7 @@ from ..utils import (
     simple_batch,
     check_type,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
 from ._target import _fit_and_resolve_estimator_target_spec
 
 
@@ -82,7 +83,9 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             rows indicated by `self.missing_label`). Each row must either
             contain only observed labels or only `missing_label` values, i.e.,
             no mixing within a row. This strategy supports multilabel data
-            only.
+            only. `predict_proba` must return either shape
+            `(n_samples, n_outputs)` or a list of binary probability matrices
+            with shape `(n_samples, 2)` per output.
         discriminator : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
             The parameters `classes` and `missing_label` will be internally
@@ -177,9 +180,18 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             )
         X_unlbld = X_cand[cand_mask]
 
-        probas = clf.predict_proba(X)
+        # Canonicalize both public multilabel probability formats before any
+        # masking or arithmetic is applied.
+        n_outputs = y.shape[1]
+        probas = _canonicalize_multilabel_probas(
+            clf.predict_proba(X), n_samples=len(X), n_outputs=n_outputs
+        )
         lbld_probas = probas[lbld_mask]
-        unlbld_probas = clf.predict_proba(X_unlbld)
+        unlbld_probas = _canonicalize_multilabel_probas(
+            clf.predict_proba(X_unlbld),
+            n_samples=len(X_unlbld),
+            n_outputs=n_outputs,
+        )
         f = unlbld_probas * 2 - 1
 
         lbld_probas = np.flip(np.sort(lbld_probas, axis=1), axis=-1)

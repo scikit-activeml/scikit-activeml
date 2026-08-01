@@ -18,6 +18,7 @@ from ..utils import (
     rand_argmax,
     check_type,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
 from sklearn.cluster import KMeans
 from ._target import _fit_and_resolve_estimator_target_spec
 
@@ -288,14 +289,22 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
                 )
 
         # Use original samples as a fallback.
+        n_cand = len(X_cand)
         X_cand = X_cand if emb is None else emb
 
+        is_multilabel = target_spec.target_type == "multi-label"
         if is_clf and uncertainties is None:
+            if is_multilabel:
+                # Canonicalize both public multilabel probability formats
+                # before the uncertainties are computed.
+                main = _canonicalize_multilabel_probas(
+                    main, n_samples=n_cand, n_outputs=y.shape[1]
+                )
             # Compute uncertainties as a fallback in the classification case.
             uncertainties = uncertainty_scores(
                 probas=main,
                 method=self.method,
-                is_multilabel=target_spec.target_type == "multi-label",
+                is_multilabel=is_multilabel,
                 multilabel_aggregation_fn=self.multilabel_aggregation_fn,
             )
         elif not is_clf and uncertainties is None:

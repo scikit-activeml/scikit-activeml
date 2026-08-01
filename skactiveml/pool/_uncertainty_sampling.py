@@ -264,6 +264,12 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
         # Predict class-membership probabilities.
         probas = clf.predict_proba(X_cand)
+        if target_spec.target_type == "multi-label":
+            # Canonicalize both public multilabel probability formats before
+            # the uncertainties are computed.
+            probas = _canonicalize_multilabel_probas(
+                probas, n_samples=len(X_cand), n_outputs=y.shape[1]
+            )
 
         # Choose the method and calculate corresponding utilities.
         with np.errstate(divide="ignore"):

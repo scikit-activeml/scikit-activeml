@@ -336,8 +336,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         )
 
         # Infer probabilities and if available logits as well as embeddings.
+        n_outputs = y.shape[1] if is_multilabel else None
         probas_cand, logits_cand, X_cand_repr = self._predict_with_extras(
-            clf_eval, X_cand, is_multilabel=is_multilabel
+            clf_eval, X_cand, is_multilabel=is_multilabel, n_outputs=n_outputs
         )
         if X_cand_repr is None:
             X_cand_repr = X_cand
@@ -369,7 +370,10 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         X_labeled_repr = None
         if len(labeled_idx) > 0:
             _, _, X_labeled_repr = self._predict_with_extras(
-                clf_eval, X[labeled_idx], is_multilabel=is_multilabel
+                clf_eval,
+                X[labeled_idx],
+                is_multilabel=is_multilabel,
+                n_outputs=n_outputs,
             )
             if X_labeled_repr is None:
                 X_labeled_repr = X[labeled_idx]
@@ -481,7 +485,10 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         except Exception:
             return self._default_temperature(y, is_multilabel)
         _, logits_val, _ = self._predict_with_extras(
-            clf_cal, X_val, is_multilabel=is_multilabel
+            clf_cal,
+            X_val,
+            is_multilabel=is_multilabel,
+            n_outputs=y.shape[1] if is_multilabel else None,
         )
         if logits_val is None:
             return self._default_temperature(y, is_multilabel)
@@ -549,7 +556,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         metric_dict["gamma"] = 1.0 / (sigma**2)
         return metric_dict
 
-    def _predict_with_extras(self, clf, X, is_multilabel=False):
+    def _predict_with_extras(
+        self, clf, X, is_multilabel=False, n_outputs=None
+    ):
         """
         Helper function to streamline required predictions.
         """
@@ -564,9 +573,19 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if logits is None:
             logits = self._decision_function_logits(clf, X)
         if is_multilabel:
-            probas = _canonicalize_multilabel_probas(probas, allow_none=True)
+            # Canonicalize both public multilabel probability formats before
+            # the acquisition logic consumes them.
+            probas = _canonicalize_multilabel_probas(
+                probas,
+                n_samples=len(X),
+                n_outputs=n_outputs,
+                allow_none=True,
+            )
             logits = _canonicalize_multilabel_probas(
-                logits, n_samples=len(X), allow_none=True
+                logits,
+                n_samples=len(X),
+                n_outputs=n_outputs,
+                allow_none=True,
             )
             if probas is None and logits is not None:
                 probas = expit(logits)

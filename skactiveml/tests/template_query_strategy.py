@@ -630,6 +630,69 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         query_params["sample_weight"] = np.ones(len(y) + 1)
         self.assertRaises(ValueError, qs.query, **query_params)
 
+    def test_query_multilabel_proba_format_contract(self):
+        # The public multilabel probability formats of `SklearnClassifier`
+        # ("array" and "list") must be interchangeable at the acquisition
+        # boundary of a query strategy, i.e., a strategy must never assume the
+        # native representation of the wrapped estimator.
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        base_params = deepcopy(self.query_default_params_clf_multilabel)
+        estimator_key = self._multilabel_proba_format_estimator_key(
+            base_params
+        )
+        if estimator_key is None:
+            return
+
+        proba_formats = ["auto", "array", "list"]
+        results = {}
+        for proba_format in proba_formats:
+            with self.subTest(proba_format=proba_format):
+                query_params = deepcopy(base_params)
+                query_params[estimator_key].set_params(
+                    proba_format=proba_format
+                )
+                query_params["return_utilities"] = True
+                if self.supports_multilabel_batch_variation:
+                    # Cover acquisition logic that indexes probabilities only
+                    # from the second selected sample of a batch onwards.
+                    query_params["batch_size"] = 2
+                qs = self.qs_class(**self._multilabel_init_params())
+                results[proba_format] = qs.query(**query_params)
+        if len(results) < len(proba_formats):
+            # A failing query is already reported by its own subtest.
+            return
+
+        for proba_format in ["array", "list"]:
+            with self.subTest(proba_format=proba_format):
+                np.testing.assert_array_equal(
+                    results["auto"][0],
+                    results[proba_format][0],
+                    err_msg=f"`proba_format='{proba_format}'` selects other "
+                    f"samples than `proba_format='auto'`.",
+                )
+                np.testing.assert_allclose(
+                    results["auto"][1],
+                    results[proba_format][1],
+                    equal_nan=True,
+                    err_msg=f"`proba_format='{proba_format}'` yields other "
+                    f"utilities than `proba_format='auto'`.",
+                )
+
+    @staticmethod
+    def _multilabel_proba_format_estimator_key(query_params):
+        # Locates the wrapper whose public multilabel probability format can
+        # be varied. Strategies without such an estimator, e.g. purely
+        # representation-based ones, are not covered by this contract.
+        for key in ["clf", "estimator"]:
+            candidate = query_params.get(key)
+            if isinstance(candidate, SklearnClassifier) and "proba_format" in (
+                candidate.get_params()
+            ):
+                return key
+        return None
+
     def _multilabel_init_params(self):
         init_params = deepcopy(self.init_default_params)
         if self.init_default_params_multilabel is not None:
