@@ -1,4 +1,5 @@
 import unittest
+import warnings
 from copy import deepcopy
 from unittest.mock import patch
 
@@ -989,6 +990,154 @@ class TestUHerding(
             BadDecisionClassifier(), np.zeros((2, 2))
         )
         self.assertIsNone(logits)
+
+    def test_resolve_metric_dict_uses_labeled_minimum_distance(self):
+        qs = UHerding(random_state=0)
+        X_labeled_repr = np.array([[0.0, 0.0], [3.0, 0.0], [7.0, 0.0]])
+        # Candidate distances of `1.0`, `3.0`, and `2.0` have a median of
+        # `2.0`, so the labeled and the candidate policy disagree here.
+        X_cand_repr = np.array([[0.0, 0.0], [1.0, 0.0], [3.0, 0.0]])
+
+        metric_dict = qs._resolve_metric_dict(
+            X_cand_repr=X_cand_repr,
+            X_labeled_repr=X_labeled_repr,
+            metric_dict={},
+        )
+
+        # Minimum positive labeled distance is `3.0`.
+        self.assertAlmostEqual(metric_dict["gamma"], 1.0 / 9.0)
+
+    def test_resolve_metric_dict_uses_candidate_median_distance(self):
+        qs = UHerding(random_state=0)
+        X_cand_repr = np.array([[0.0, 0.0], [1.0, 0.0], [4.0, 0.0]])
+
+        metric_dict = qs._resolve_metric_dict(
+            X_cand_repr=X_cand_repr, X_labeled_repr=None, metric_dict={}
+        )
+
+        # Positive candidate distances are `1.0`, `4.0`, and `3.0`.
+        self.assertAlmostEqual(metric_dict["gamma"], 1.0 / 9.0)
+
+    def test_resolve_metric_dict_degenerate_distances_use_fallback(self):
+        qs = UHerding(random_state=0)
+        degenerate_cases = [
+            # Fewer than two candidate rows during a cold start.
+            {
+                "X_cand_repr": np.array([[0.0, 0.0]]),
+                "X_labeled_repr": None,
+            },
+            # Fewer than two labeled rows.
+            {
+                "X_cand_repr": np.array([[0.0, 0.0], [1.0, 0.0]]),
+                "X_labeled_repr": np.array([[0.0, 0.0]]),
+            },
+            # Identical candidate representations during a cold start.
+            {
+                "X_cand_repr": np.zeros((3, 2)),
+                "X_labeled_repr": None,
+            },
+            # Identical labeled representations.
+            {
+                "X_cand_repr": np.array([[0.0, 0.0], [1.0, 0.0]]),
+                "X_labeled_repr": np.zeros((3, 2)),
+            },
+            # Identical labeled and candidate representations.
+            {
+                "X_cand_repr": np.zeros((3, 2)),
+                "X_labeled_repr": np.zeros((2, 2)),
+            },
+        ]
+
+        for case in degenerate_cases:
+            with self.subTest(**case):
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    metric_dict = qs._resolve_metric_dict(
+                        metric_dict={}, **case
+                    )
+                self.assertEqual([str(w.message) for w in caught], [])
+                # `sigma=1.0` implies `gamma=1.0`.
+                self.assertEqual(metric_dict["gamma"], 1.0)
+
+    def test_resolve_metric_dict_without_finite_positive_distance(self):
+        qs = UHerding(random_state=0)
+        X_cand_repr = np.array([[0.0, 0.0], [1.0, 0.0]])
+        # Distance collections without any finite positive entry, plus a mixed
+        # collection whose reduction is unaffected by the guard.
+        test_cases = [
+            (None, 1.0),
+            (np.array([]), 1.0),
+            (np.array([np.nan, np.nan]), 1.0),
+            (np.array([np.inf, np.inf]), 1.0),
+            (np.array([1.0, 2.0, np.inf]), 1.0 / 4.0),
+        ]
+
+        for distances, expected_gamma in test_cases:
+            with self.subTest(distances=distances):
+                with patch.object(
+                    UHerding, "_nonzero_distances", return_value=distances
+                ):
+                    metric_dict = qs._resolve_metric_dict(
+                        X_cand_repr=X_cand_repr,
+                        X_labeled_repr=None,
+                        metric_dict={},
+                    )
+                self.assertAlmostEqual(metric_dict["gamma"], expected_gamma)
+
+    def test_resolve_metric_dict_keeps_metric_dict_without_adaptive_sigma(
+        self,
+    ):
+        qs = UHerding(adaptive_sigma=False, random_state=0)
+
+        metric_dict = qs._resolve_metric_dict(
+            X_cand_repr=np.zeros((3, 2)),
+            X_labeled_repr=None,
+            metric_dict={"gamma": 5.0},
+        )
+
+        self.assertEqual(metric_dict, {"gamma": 5.0})
+
+    def test_query_cold_start_single_candidate(self):
+        X = np.array([[0.0, 0.0]])
+        y = np.array([MISSING_LABEL], dtype=float)
+        clf = ParzenWindowClassifier(classes=self.classes, random_state=0)
+
+        query_indices, utilities = UHerding(random_state=0).query(
+            X, y, clf=clf, return_utilities=True
+        )
+
+        np.testing.assert_array_equal(query_indices, [0])
+        self.assertEqual(utilities.shape, (1, 1))
+
+    def test_query_identical_representations(self):
+        X = np.zeros((4, 2))
+        y = np.array([0, 0, MISSING_LABEL, MISSING_LABEL], dtype=float)
+        clf = ParzenWindowClassifier(classes=self.classes, random_state=0)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            query_indices, utilities = UHerding(random_state=0).query(
+                X, y, clf=clf, batch_size=2, return_utilities=True
+            )
+
+        self.assertEqual([str(w.message) for w in caught], [])
+        self.assertEqual(len(query_indices), 2)
+        self.assertEqual(utilities.shape, (2, len(X)))
+
+    def test_query_multilabel_cold_start_single_candidate(self):
+        X = np.array([[0.0, 0.0]])
+        y = np.full((1, 2), MISSING_LABEL, dtype=float)
+        clf = DummyMultilabelLogitClassifier(
+            probas=np.array([0.6, 0.4]),
+            logits=np.array([0.4, -0.4]),
+        )
+
+        query_indices, utilities = UHerding(random_state=0).query(
+            X, y, clf=clf, return_utilities=True
+        )
+
+        np.testing.assert_array_equal(query_indices, [0])
+        self.assertEqual(utilities.shape, (1, 1))
 
     def test_multilabel_helper_edge_cases(self):
         self.assertIsNone(

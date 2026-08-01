@@ -540,16 +540,14 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if X_labeled_repr is not None:
             # If there are labeled samples compute minimum distance as sigma.
             distances = self._nonzero_distances(X_labeled_repr)
-            sigma = np.min(distances)
+            reduce_fn = np.min
         else:
-            # If there are labeled samples compute median distance between
+            # If there are no labeled samples compute median distance between
             # candidate samples as sigma.
             distances = self._nonzero_distances(X_cand_repr)
-            sigma = np.median(distances)
+            reduce_fn = np.median
 
-        if sigma is None or sigma <= 0 or np.isnan(sigma):
-            # Fallback if no valid sigma could be computed.
-            sigma = 1.0
+        sigma = self._reduce_to_sigma(distances, reduce_fn)
 
         # Transform sigma to the gamma parameter expected by the RBF kernel
         # implementation in sklearn.
@@ -698,6 +696,28 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if is_multilabel:
             return np.ones(y.shape[1], dtype=float)
         return 1.0
+
+    @staticmethod
+    def _reduce_to_sigma(distances, reduce_fn):
+        """
+        Helper function reducing a collection of pairwise distances to a
+        positive RBF scale `sigma`.
+
+        Degenerate collections, i.e., `None`, empty ones, and ones without any
+        finite positive entry, admit no estimable scale. Such pools, e.g., a
+        cold start with a single candidate or identical representations, are a
+        valid acquisition state and fall back to `sigma=1.0`.
+        """
+        fallback = 1.0
+        if distances is None:
+            return fallback
+        distances = np.asarray(distances, dtype=float).ravel()
+        # Also drops `nan` entries, since any comparison to `nan` is `False`.
+        distances = distances[distances > 0]
+        if len(distances) == 0:
+            return fallback
+        sigma = float(reduce_fn(distances))
+        return sigma if np.isfinite(sigma) else fallback
 
     @staticmethod
     def _nonzero_distances(X):
