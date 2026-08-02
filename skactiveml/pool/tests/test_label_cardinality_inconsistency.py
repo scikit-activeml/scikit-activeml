@@ -1,5 +1,6 @@
 import unittest
 import warnings
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.multioutput import MultiOutputClassifier
@@ -7,14 +8,17 @@ from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import SklearnClassifier
-from skactiveml.pool import LabelCardinalityInconsistency
+from skactiveml.pool import (
+    LabelCardinalityInconsistency,
+    label_cardinality_inconsistency,
+)
 from skactiveml.pool.tests._multilabel_target_semantics import (
     MultilabelOnlyTargetSemanticsMixin,
 )
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import MISSING_LABEL, unlabeled_indices
+from skactiveml.utils import ExtLabelEncoder, MISSING_LABEL, unlabeled_indices
 
 
 class DummyMultilabelClassifier(SkactivemlClassifier):
@@ -202,6 +206,39 @@ class TestLabelCardinalityInconsistency(
 
         np.testing.assert_allclose(utilities[0, self.unld_idx], 0)
 
+    def test_query_delegates_to_public_utility(self):
+        recorded = {}
+        acquisition_scores = 1.0 + np.arange(len(self.unld_idx), dtype=float)
+
+        def _record(y_pred, y_labeled):
+            recorded["y_pred"] = y_pred
+            recorded["y_labeled"] = y_labeled
+            return acquisition_scores
+
+        with patch(
+            "skactiveml.pool._label_cardinality_inconsistency."
+            "label_cardinality_inconsistency",
+            side_effect=_record,
+        ) as utility_mock:
+            query_indices, utilities = self.qs.query(
+                self.X, self.y, clf=self.clf, return_utilities=True
+            )
+
+        utility_mock.assert_called_once()
+        # The query passes encoded predictions and encoded observed labels.
+        self.assertEqual(np.shape(recorded["y_pred"]), (len(self.unld_idx), 2))
+        self.assertTrue(np.isin(recorded["y_pred"], [0, 1]).all())
+        np.testing.assert_array_equal(
+            recorded["y_labeled"], [[0, 0], [0, 1], [1, 1]]
+        )
+        # The returned acquisition scores drive utilities and selection.
+        np.testing.assert_allclose(
+            utilities[0, self.unld_idx], acquisition_scores
+        )
+        self.assertEqual(
+            query_indices[0], self.unld_idx[np.argmax(acquisition_scores)]
+        )
+
     def test_label_cardinality_uses_positive_class_vocabularies(self):
         missing_label = -1
         y = np.array(
@@ -227,3 +264,104 @@ class TestLabelCardinalityInconsistency(
         )
 
         np.testing.assert_allclose(utilities[0, 3:], 0)
+
+
+class TestLabelCardinalityInconsistencyFunction(unittest.TestCase):
+    def test_label_cardinality_inconsistency(self):
+        # Worked example: the labeled pool contains 0, 1, and 2 positive
+        # labels, i.e., a mean label cardinality of one. The candidates
+        # deviate from it by 1, 1, and 0 positive labels.
+        y_labeled = np.array([[0, 0], [0, 1], [1, 1]])
+        y_pred = np.array([[1, 1], [0, 0], [1, 0]])
+
+        utilities = label_cardinality_inconsistency(y_pred, y_labeled)
+
+        np.testing.assert_allclose(utilities, [1.0, 1.0, 0.0])
+
+    def test_custom_class_vocabularies(self):
+        # Encoded targets carry no trace of the raw class values, so a custom
+        # vocabulary is scored exactly like a `{0, 1}` vocabulary.
+        encoder = ExtLabelEncoder(
+            classes=[[0, 2], [0, 5]],
+            missing_label=-1,
+            target_type="multi-label",
+        ).fit(np.array([[0, 0], [2, 5]]))
+        y_labeled = encoder.transform(np.array([[0, 0], [2, 5]]))
+        y_pred = encoder.transform(np.array([[2, 0], [2, 5]]))
+
+        utilities = label_cardinality_inconsistency(y_pred, y_labeled)
+
+        # Labeled cardinalities are 0 and 2, i.e., a mean of one, while the
+        # candidates have predicted cardinalities of one and two.
+        np.testing.assert_allclose(utilities, [0.0, 1.0])
+
+    def test_without_labeled_samples(self):
+        # An empty labeled pool has a label cardinality of zero, so each
+        # candidate's utility is its own number of predicted positive labels.
+        utilities = label_cardinality_inconsistency(
+            np.array([[1, 1], [0, 0], [0, 1]]), np.empty((0, 2), dtype=int)
+        )
+
+        np.testing.assert_allclose(utilities, [2.0, 0.0, 1.0])
+
+    def test_without_candidates(self):
+        utilities = label_cardinality_inconsistency(
+            np.empty((0, 2), dtype=int), np.array([[0, 1]])
+        )
+
+        self.assertEqual(utilities.shape, (0,))
+
+    def test_param_y_pred(self):
+        y_labeled = np.array([[0, 0], [0, 1], [1, 1]])
+        cases = [
+            (
+                "one-dimensional prediction",
+                np.array([1, 0]),
+                r"`y_pred` must have shape `\(n_samples, n_outputs\)`",
+            ),
+            (
+                "unencoded prediction",
+                np.array([[2, 0]]),
+                r"`y_pred` must contain encoded labels",
+            ),
+            (
+                "raw class vocabulary",
+                np.array([["yes", "no"]]),
+                r"`y_pred` must contain encoded labels",
+            ),
+        ]
+
+        for msg, y_pred, error_regex in cases:
+            with self.subTest(msg=msg):
+                with self.assertRaisesRegex(ValueError, error_regex):
+                    label_cardinality_inconsistency(y_pred, y_labeled)
+
+    def test_param_y_labeled(self):
+        y_pred = np.array([[1, 1], [0, 0]])
+        cases = [
+            (
+                "one-dimensional labels",
+                np.array([1, 0]),
+                r"`y_labeled` must have shape `\(n_samples, n_outputs\)`",
+            ),
+            (
+                "mismatching output counts",
+                np.array([[0, 0, 1]]),
+                r"`y_labeled` has 3 outputs, expected 2",
+            ),
+            (
+                "unlabeled rows",
+                np.array([[-1, -1]]),
+                r"`y_labeled` must contain encoded labels",
+            ),
+            (
+                "raw class vocabulary",
+                np.array([["yes", "no"]]),
+                r"`y_labeled` must contain encoded labels",
+            ),
+        ]
+
+        for msg, y_labeled, error_regex in cases:
+            with self.subTest(msg=msg):
+                with self.assertRaisesRegex(ValueError, error_regex):
+                    label_cardinality_inconsistency(y_pred, y_labeled)

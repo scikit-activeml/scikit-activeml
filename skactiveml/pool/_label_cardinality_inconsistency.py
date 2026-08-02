@@ -171,23 +171,18 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             missing_label=self.missing_label_,
             target_type=target_spec.target_type,
         )
-        n_lbld = int(lbld_mask.sum())
 
+        # Encode targets and predictions so that the acquisition function
+        # never performs arithmetic on raw class values.
         label_encoder = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label_,
             target_type=target_spec.target_type,
         ).fit(y[lbld_mask])
-        y_label_cardinality = 0
-        if n_lbld != 0:
-            y_label_cardinality = (
-                label_encoder.transform(y[lbld_mask]).sum() / n_lbld
-            )
+        y_labeled = label_encoder.transform(y[lbld_mask])
+        y_pred = label_encoder.transform(clf.predict(X_unlbld))
 
-        Y_pred = clf.predict(X_unlbld)
-        pred_mean_cardinality = label_encoder.transform(Y_pred).sum(axis=-1)
-
-        utilities_cand = np.abs(pred_mean_cardinality - y_label_cardinality)
+        utilities_cand = label_cardinality_inconsistency(y_pred, y_labeled)
 
         if mapping is None:
             utilities = utilities_cand
@@ -201,3 +196,101 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+
+def label_cardinality_inconsistency(y_pred, y_labeled):
+    """Calculate the label cardinality inconsistency.
+
+    The label cardinality of a sample is its number of positive labels. This
+    acquisition function scores each candidate sample by the absolute
+    difference between its predicted label cardinality and the mean label
+    cardinality of the labeled samples [1]_. An empty labeled pool is treated
+    as having a label cardinality of zero.
+
+    Both targets must be encoded, i.e., `0` for the negative and `1` for the
+    positive class of each output, so that the acquisition function performs
+    no arithmetic on raw class values. Use
+    `skactiveml.utils.ExtLabelEncoder` with `target_type="multi-label"` to
+    encode raw class vocabularies.
+
+    Parameters
+    ----------
+    y_pred : array-like of shape (n_candidates, n_outputs)
+        Encoded predicted labels of the candidate samples.
+    y_labeled : array-like of shape (n_labeled, n_outputs)
+        Encoded observed labels of the labeled samples. May be empty, i.e.,
+        of shape `(0, n_outputs)`.
+
+    Returns
+    -------
+    utilities : numpy.ndarray of shape (n_candidates,)
+        Absolute difference between each candidate's predicted label
+        cardinality and the mean label cardinality of the labeled samples,
+        i.e., one finite value in `[0, n_outputs]` per candidate. Larger
+        values indicate more useful candidates.
+
+    Raises
+    ------
+    ValueError
+        If `y_pred` or `y_labeled` is not a two-dimensional array with
+        `n_outputs` columns, or if either contains values other than `0` and
+        `1`, e.g., unlabeled rows or raw class values.
+
+    References
+    ----------
+    .. [1] R. Wang and S. Ye (2019). Multi-Label Active Learning Driven by
+       Uncertainty and Inconsistency. In 2019 International Conference on
+       Machine Learning and Cybernetics.
+    """
+    y_pred = _check_encoded_multilabel_targets(y_pred, "y_pred")
+    y_labeled = _check_encoded_multilabel_targets(
+        y_labeled, "y_labeled", n_outputs=y_pred.shape[1]
+    )
+
+    label_cardinality = 0.0
+    if len(y_labeled) > 0:
+        label_cardinality = y_labeled.sum() / len(y_labeled)
+
+    return np.abs(y_pred.sum(axis=1) - label_cardinality)
+
+
+def _check_encoded_multilabel_targets(y, name, n_outputs=None):
+    """Check that `y` is a matrix of encoded multi-label targets.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples, n_outputs)
+        Encoded multi-label targets, i.e., one `0` or `1` per output.
+    name : str
+        Name of `y` used in error messages.
+    n_outputs : int or None, default=None
+        Expected number of outputs. If not `None`, `y` must have this many
+        columns.
+
+    Returns
+    -------
+    y : numpy.ndarray of shape (n_samples, n_outputs)
+        Encoded multi-label targets as an integer array.
+
+    Raises
+    ------
+    ValueError
+        If `y` is not a two-dimensional array of the expected width, or if it
+        contains values other than `0` and `1`.
+    """
+    y = np.asarray(y)
+    if y.ndim != 2:
+        raise ValueError(
+            f"`{name}` must have shape `(n_samples, n_outputs)`, got "
+            f"{y.shape}."
+        )
+    if n_outputs is not None and y.shape[1] != n_outputs:
+        raise ValueError(
+            f"`{name}` has {y.shape[1]} outputs, expected {n_outputs}."
+        )
+    if not np.isin(y, [0, 1]).all():
+        raise ValueError(
+            f"`{name}` must contain encoded labels, i.e., `0` or `1` per "
+            "output. Unlabeled or raw class values are not supported."
+        )
+    return y.astype(int)

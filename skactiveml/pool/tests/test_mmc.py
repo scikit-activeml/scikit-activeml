@@ -9,7 +9,10 @@ from sklearn.multioutput import MultiOutputClassifier
 from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
-from skactiveml.pool import MaxLossReductionMaxConfidence
+from skactiveml.pool import (
+    MaxLossReductionMaxConfidence,
+    max_loss_reduction_max_confidence,
+)
 from skactiveml.pool.tests._multilabel_target_semantics import (
     MultilabelOnlyTargetSemanticsMixin,
 )
@@ -17,6 +20,16 @@ from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
+
+
+class RecordingDiscriminator(ParzenWindowClassifier):
+    """Discriminator recording the label cardinalities it is fitted on."""
+
+    last_y = None
+
+    def fit(self, X, y, sample_weight=None):
+        RecordingDiscriminator.last_y = np.array(y, copy=True)
+        return super().fit(X, y, sample_weight=sample_weight)
 
 
 class TestMaxLossReductionMaxConfidence(
@@ -117,6 +130,85 @@ class TestMaxLossReductionMaxConfidence(
         )
         self.assertEqual(query_idx3.shape, (1,))
         self.assertEqual(utilities3.shape, (1, len(self.unld_idx)))
+
+    def test_query_delegates_to_public_utility(self):
+        recorded = {}
+        acquisition_scores = 1.0 + np.arange(len(self.unld_idx), dtype=float)
+
+        def _record(probas, n_positive_labels):
+            recorded["probas"] = probas
+            recorded["n_positive_labels"] = n_positive_labels
+            return acquisition_scores
+
+        with patch(
+            "skactiveml.pool._mmc.max_loss_reduction_max_confidence",
+            side_effect=_record,
+        ) as utility_mock:
+            query_indices, utilities = self.qs.query(
+                self.X,
+                self.y,
+                discriminator=self.discriminator,
+                clf=self.clf,
+                return_utilities=True,
+            )
+
+        utility_mock.assert_called_once()
+        # The query passes canonical positive-class probabilities of the
+        # candidates and the discriminator's label-cardinality predictions.
+        probas = recorded["probas"]
+        self.assertIsInstance(probas, np.ndarray)
+        self.assertEqual(probas.shape, (len(self.unld_idx), 2))
+        self.assertTrue(((probas >= 0) & (probas <= 1)).all())
+        self.assertEqual(
+            np.shape(recorded["n_positive_labels"]), (len(self.unld_idx),)
+        )
+        self.assertTrue(
+            np.isin(recorded["n_positive_labels"], [0, 1, 2]).all()
+        )
+        # The returned acquisition scores drive utilities and selection.
+        np.testing.assert_allclose(
+            utilities[0, self.unld_idx], acquisition_scores
+        )
+        self.assertEqual(
+            query_indices[0], self.unld_idx[np.argmax(acquisition_scores)]
+        )
+
+    def test_query_encodes_custom_class_vocabularies(self):
+        missing_label = -1
+        y = np.array(
+            [
+                [0, 0],
+                [0, 5],
+                [2, 5],
+                *[[missing_label, missing_label] for _ in range(5)],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 2], [0, 5]],
+            missing_label=missing_label,
+            proba_format="array",
+            random_state=0,
+        )
+        RecordingDiscriminator.last_y = None
+
+        query_indices, utilities = MaxLossReductionMaxConfidence(
+            missing_label=missing_label, random_state=0
+        ).query(
+            self.X,
+            y,
+            discriminator=RecordingDiscriminator(
+                classes=[0, 1, 2], missing_label=missing_label, random_state=0
+            ),
+            clf=clf,
+            return_utilities=True,
+        )
+
+        # The discriminator learns encoded label cardinalities, i.e., 0, 1,
+        # and 2 instead of the raw class value sums 0, 5, and 7.
+        np.testing.assert_array_equal(RecordingDiscriminator.last_y, [0, 1, 2])
+        self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+        self.assertIn(query_indices[0], range(3, len(self.X)))
 
     def test_query_multilabel_list_probas(self):
         # Regression test: `MultiOutputClassifier` natively returns a list of
@@ -255,3 +347,113 @@ class TestMaxLossReductionMaxConfidence(
                 batch_size=len(self.unld_idx) + 1,
             )
             self.assertEqual(len(query_idx), len(self.unld_idx))
+
+
+class TestMaxLossReductionMaxConfidenceFunction(unittest.TestCase):
+    def test_max_loss_reduction_max_confidence(self):
+        # The `n_positive_labels` most probable labels of a candidate are
+        # predicted positive. The loss reduction then sums `1 - p` over these
+        # labels and `p` over the labels predicted negative.
+        probas = np.array([[0.9, 0.2, 0.6], [0.1, 0.4, 0.3]])
+        n_positive_labels = np.array([2, 0])
+
+        utilities = max_loss_reduction_max_confidence(
+            probas, n_positive_labels
+        )
+
+        np.testing.assert_allclose(utilities, [0.7, 0.8])
+
+    def test_extreme_label_cardinalities(self):
+        # Predicting no positive label sums all probabilities, whereas
+        # predicting every label positive sums their complements.
+        probas = np.array([[0.9, 0.2, 0.6], [0.9, 0.2, 0.6]])
+
+        utilities = max_loss_reduction_max_confidence(probas, [0, 3])
+
+        np.testing.assert_allclose(utilities, [1.7, 1.3])
+
+    def test_without_candidates(self):
+        utilities = max_loss_reduction_max_confidence(
+            np.empty((0, 3)), np.empty(0, dtype=int)
+        )
+
+        self.assertEqual(utilities.shape, (0,))
+
+    def test_binary_probability_matrices(self):
+        # The documented list of per-output binary probability matrices is
+        # canonicalized to the same positive-class probabilities.
+        probas = np.array([[0.9, 0.2, 0.6], [0.1, 0.4, 0.3]])
+        probas_list = [
+            np.column_stack([1 - probas[:, j], probas[:, j]])
+            for j in range(probas.shape[1])
+        ]
+
+        utilities = max_loss_reduction_max_confidence(probas_list, [2, 0])
+
+        np.testing.assert_allclose(utilities, [0.7, 0.8])
+
+    def test_param_probas(self):
+        cases = [
+            (
+                "one-dimensional probabilities",
+                np.array([0.9, 0.2]),
+                r"`probas` must have shape `\(n_samples, n_outputs\)`",
+            ),
+            (
+                "mismatching candidate counts",
+                np.array([[0.9, 0.2, 0.6]]),
+                r"`probas` has 1 samples, expected 2",
+            ),
+            (
+                "mismatching candidate counts per output",
+                [np.full((2, 2), 0.5), np.full((3, 2), 0.5)],
+                r"`probas\[1\]` has 3 samples, expected 2",
+            ),
+            (
+                "probabilities outside the unit interval",
+                np.array([[0.9, 1.2, 0.6], [0.1, 0.4, 0.3]]),
+                r"`probas` must contain probabilities within `\[0, 1\]`",
+            ),
+            (
+                "missing probability",
+                np.array([[0.9, np.nan, 0.6], [0.1, 0.4, 0.3]]),
+                r"`probas` must contain probabilities within `\[0, 1\]`",
+            ),
+        ]
+
+        for msg, probas, error_regex in cases:
+            with self.subTest(msg=msg):
+                with self.assertRaisesRegex(ValueError, error_regex):
+                    max_loss_reduction_max_confidence(probas, [1, 1])
+
+    def test_param_n_positive_labels(self):
+        probas = np.array([[0.9, 0.2, 0.6], [0.1, 0.4, 0.3]])
+        cases = [
+            (
+                "two-dimensional label counts",
+                np.array([[1], [1]]),
+                r"`n_positive_labels` must have shape `\(n_candidates,\)`",
+            ),
+            (
+                "too many positive labels",
+                [1, 4],
+                r"`n_positive_labels` must contain integers within `\[0, 3\]`",
+            ),
+            (
+                "negative label count",
+                [1, -1],
+                r"`n_positive_labels` must contain integers within `\[0, 3\]`",
+            ),
+            (
+                "fractional label count",
+                [1, 1.5],
+                r"`n_positive_labels` must contain integers within `\[0, 3\]`",
+            ),
+        ]
+
+        for msg, n_positive_labels, error_regex in cases:
+            with self.subTest(msg=msg):
+                with self.assertRaisesRegex(ValueError, error_regex):
+                    max_loss_reduction_max_confidence(
+                        probas, n_positive_labels
+                    )

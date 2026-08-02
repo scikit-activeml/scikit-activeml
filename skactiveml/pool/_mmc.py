@@ -186,36 +186,31 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         probas = _canonicalize_multilabel_probas(
             clf.predict_proba(X), n_samples=len(X), n_outputs=n_outputs
         )
-        lbld_probas = probas[lbld_mask]
         unlbld_probas = _canonicalize_multilabel_probas(
             clf.predict_proba(X_unlbld),
             n_samples=len(X_unlbld),
             n_outputs=n_outputs,
         )
-        f = unlbld_probas * 2 - 1
 
-        lbld_probas = np.flip(np.sort(lbld_probas, axis=1), axis=-1)
-        lbld_probas /= lbld_probas.sum(axis=1, keepdims=True)
-
-        unlbld_probas_idx = np.flip(np.argsort(unlbld_probas, axis=1), axis=-1)
-        unlbld_probas = np.flip(np.sort(unlbld_probas, axis=1), axis=-1)
-        unlbld_probas /= unlbld_probas.sum(axis=1, keepdims=True)
-
+        # Train the label-cardinality discriminator on the confidence profiles
+        # of the labeled samples and predict the candidates' label
+        # cardinalities.
         label_encoder = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label_,
             target_type=target_spec.target_type,
         )
         y_discriminator = label_encoder.fit_transform(y[lbld_mask]).sum(axis=1)
-        discriminator.fit(lbld_probas, y_discriminator)
+        discriminator.fit(
+            _label_cardinality_features(probas[lbld_mask]), y_discriminator
+        )
+        n_positive_labels = discriminator.predict(
+            _label_cardinality_features(unlbld_probas)
+        )
 
-        unlbld_pred = discriminator.predict(unlbld_probas)
-
-        yhat = -1 * np.ones((len(unlbld_pred), y.shape[1]), dtype=int)
-        for i, p in enumerate(unlbld_pred):
-            yhat[i, unlbld_probas_idx[i, :p]] = 1
-
-        utilities_cand = ((1 - yhat * f) / 2).sum(axis=1)
+        utilities_cand = max_loss_reduction_max_confidence(
+            unlbld_probas, n_positive_labels
+        )
 
         if mapping is None:
             utilities = utilities_cand
@@ -229,3 +224,95 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+
+def max_loss_reduction_max_confidence(probas, n_positive_labels):
+    """Calculate the maximum loss reduction with maximal confidence.
+
+    For each candidate sample, the `n_positive_labels` most probable labels
+    are predicted positive and the remaining ones negative [1]_. The loss
+    reduction of this most confident labeling is the sum of the hinge-style
+    losses `(1 - yhat * (2 * probas - 1)) / 2`, i.e., it sums `1 - probas` for
+    the labels predicted positive and `probas` for the labels predicted
+    negative.
+
+    Parameters
+    ----------
+    probas : array-like of shape (n_candidates, n_outputs)
+        Canonical positive-class probabilities of the candidate samples, i.e.,
+        one probability per output. The equivalent list of `(n_candidates, 2)`
+        binary probability matrices is canonicalized as well, although query
+        strategies are expected to canonicalize at their own boundary.
+    n_positive_labels : array-like of shape (n_candidates,)
+        Predicted number of positive labels per candidate sample, e.g., as
+        predicted by a label-cardinality discriminator. Each entry must be an
+        integer in `[0, n_outputs]`.
+
+    Returns
+    -------
+    utilities : numpy.ndarray of shape (n_candidates,)
+        Loss reduction of each candidate sample under its most confident
+        labeling, i.e., one finite value in `[0, n_outputs]` per candidate.
+        Larger values indicate more useful candidates.
+
+    Raises
+    ------
+    ValueError
+        If `n_positive_labels` is not a one-dimensional array of integers
+        within `[0, n_outputs]`, if `probas` is not a multi-label probability
+        matrix with one row per entry of `n_positive_labels`, or if `probas`
+        contains values outside of `[0, 1]`.
+
+    References
+    ----------
+    .. [1] Li, X., & Guo, Y. (2013). Active Learning with Multi-Label
+       SVM Classification. In IjCAI (Vol. 13, pp. 1479-1485).
+    """
+    n_positive_labels = np.asarray(n_positive_labels)
+    if n_positive_labels.ndim != 1:
+        raise ValueError(
+            "`n_positive_labels` must have shape `(n_candidates,)`, got "
+            f"{n_positive_labels.shape}."
+        )
+
+    # Validating the candidate count here covers the array representation as
+    # well as each per-output matrix of the list representation.
+    probas = _canonicalize_multilabel_probas(
+        probas, n_samples=len(n_positive_labels)
+    )
+    if not ((probas >= 0) & (probas <= 1)).all():
+        raise ValueError(
+            "`probas` must contain probabilities within `[0, 1]`."
+        )
+    n_outputs = probas.shape[1]
+    if not np.isin(n_positive_labels, np.arange(n_outputs + 1)).all():
+        raise ValueError(
+            "`n_positive_labels` must contain integers within "
+            f"`[0, {n_outputs}]`."
+        )
+
+    # Predict the `n_positive_labels` most probable labels as positive.
+    ranking = np.flip(np.argsort(probas, axis=1), axis=-1)
+    ranks = np.argsort(ranking, axis=1)
+    yhat = np.where(ranks < n_positive_labels[:, None], 1, -1)
+
+    margins = probas * 2 - 1
+    return ((1 - yhat * margins) / 2).sum(axis=1)
+
+
+def _label_cardinality_features(probas):
+    """Sort probabilities per sample in decreasing order and normalize them.
+
+    Parameters
+    ----------
+    probas : numpy.ndarray of shape (n_samples, n_outputs)
+        Canonical positive-class probabilities.
+
+    Returns
+    -------
+    features : numpy.ndarray of shape (n_samples, n_outputs)
+        Label-order-independent input representation of the label-cardinality
+        discriminator.
+    """
+    features = np.flip(np.sort(probas, axis=1), axis=-1)
+    return features / features.sum(axis=1, keepdims=True)
