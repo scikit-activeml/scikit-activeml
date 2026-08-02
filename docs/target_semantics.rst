@@ -81,6 +81,32 @@ it is executed as part of the documentation tests.
    >>> assert query_indices.shape == (1,)
    >>> assert query_indices[0] in (4, 5)
 
+Estimator capability for multi-label wrapping
+---------------------------------------------
+
+``SklearnClassifier`` admits an estimator for multi-label classification only
+when it is a ``scikit-learn`` classifier, implements ``predict_proba``, and
+positively declares either ``target_tags.multi_output`` or
+``classifier_tags.multi_label``.  Capability is never discovered by fitting on
+generated data.  An estimator such as plain ``LogisticRegression`` exposes
+``predict_proba`` but declares neither tag, so it is rejected before any
+fitted state is committed instead of silently degrading to prior-only
+predictions.
+
+.. doctest::
+
+   >>> rejected = SklearnClassifier(
+   ...     LogisticRegression(),
+   ...     classes=[[0, 1], [0, 1]],
+   ...     missing_label=-1,
+   ... )
+   >>> try:
+   ...     _ = rejected.fit(np.zeros((2, 2)), np.array([[0, 1], [1, 0]]))
+   ... except ValueError as error:
+   ...     print("target_tags.multi_output" in str(error))
+   True
+   >>> assert not hasattr(rejected, "target_spec_")
+
 Class vocabularies and complete rows
 ------------------------------------
 

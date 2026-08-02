@@ -11,6 +11,7 @@ import inspect
 
 import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
+from sklearn.utils import get_tags
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
@@ -66,6 +67,58 @@ try:
     successful_river_import = True
 except ImportError:  # pragma: no cover
     pass
+
+
+def _declares_multilabel_support(estimator):
+    """Check whether `estimator` declares multi-label classification support.
+
+    The decision is made from the estimator's own declarations only, never by
+    fitting or predicting on synthetic data, because such a probe can mutate
+    the estimator and report false negatives caused by estimator parameters,
+    data constraints, or minimum sample requirements.
+
+    Exposing `predict_proba` is not sufficient, since it says nothing about
+    whether an estimator accepts a two-dimensional target. Neither is the
+    presence of a tags object, because `get_tags` returns default-negative
+    fallbacks for legacy or third-party estimators that predate the current
+    tag protocol. An estimator therefore has to declare its capability
+    positively.
+
+    Parameters
+    ----------
+    estimator : object
+        The estimator whose declared capabilities are inspected.
+
+    Returns
+    -------
+    declares_multilabel_support : bool
+        `True`, if `estimator` is a classifier that exposes `predict_proba`
+        and positively declares either the `scikit-learn` multi-output or the
+        multi-label tag, and `False` otherwise.
+    """
+    if not is_classifier(estimator) or not hasattr(estimator, "predict_proba"):
+        return False
+    tags = get_tags(estimator)
+    return bool(
+        getattr(tags.target_tags, "multi_output", False)
+        or getattr(tags.classifier_tags, "multi_label", False)
+    )
+
+
+def _multilabel_capability_error(component, estimator):
+    """Compose the error message for a rejected multi-label `estimator`."""
+    return (
+        f"'{component}' does not support multi-label classification with "
+        f"the estimator '{estimator}'. A multi-label estimator must be a "
+        f"scikit-learn classifier, implement 'predict_proba', and positively "
+        f"declare either 'target_tags.multi_output' or "
+        f"'classifier_tags.multi_label' through its estimator tags. "
+        f"Estimators declaring neither, including legacy estimators falling "
+        f"back to default tags, are rejected because they are not guaranteed "
+        f"to accept a two-dimensional target. Either wrap the estimator, "
+        f"e.g., via 'sklearn.multioutput.MultiOutputClassifier', or use "
+        f"'target_type=\"single-output\"'."
+    )
 
 
 def _prior_matrix_from_counts(counts, n_samples):
@@ -135,15 +188,29 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
           `P(y=pos_label)`
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Single-output classification is always supported.
-        Multi-label classification requires an estimator with `predict_proba`;
-        an explicit `"multi-label"` can resolve binary per-label vocabularies
-        from observed targets when `classes` is `None`.
+        Multi-label classification requires an estimator that implements
+        `predict_proba` and positively declares either
+        `target_tags.multi_output` or `classifier_tags.multi_label`, e.g.,
+        `sklearn.multioutput.MultiOutputClassifier`,
+        `sklearn.multiclass.OneVsRestClassifier`, or
+        `sklearn.ensemble.RandomForestClassifier`. An explicit
+        `"multi-label"` can resolve binary per-label vocabularies from
+        observed targets when `classes` is `None`.
 
     Attributes
     ----------
     target_spec_ : skactiveml.utils.TargetSpec
         Immutable target specification established by a successful fit. Use
         its `classes` field for canonical class ordering.
+
+    Notes
+    -----
+    Two degenerate training cases are part of this wrapper's contract and make
+    it predict the observed class label distribution instead of raising: an
+    empty labeled training subset, and an `estimator` rejecting a labeled
+    training subset that carries fewer than two distinct classes in at least
+    one output. Both set `is_fitted_` to `False` and emit a warning. Every
+    other `estimator` failure is raised.
 
     References
     ----------
@@ -182,7 +249,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         capabilities = {
             ("classification", "single-output", "single-annotator")
         }
-        if hasattr(self.estimator, "predict_proba"):
+        if _declares_multilabel_support(self.estimator):
             capabilities.add(
                 ("classification", "multi-label", "single-annotator")
             )
@@ -197,6 +264,16 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
         )
+        if target_spec.target_type == "multi-label" and not (
+            _declares_multilabel_support(self.estimator)
+        ):
+            # The generic capability check below reports the unsupported
+            # semantic triple, which does not explain what is missing.
+            raise ValueError(
+                _multilabel_capability_error(
+                    type(self).__name__, self.estimator
+                )
+            )
         check_target_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
@@ -305,7 +382,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
                 if self._is_multilabel_target():
-                    y_pred = np.asarray(y_pred)
+                    y_pred = self._check_multilabel_predictions(y_pred)
                 else:
                     y_pred = y_pred.astype(self.classes_.dtype)
             else:
@@ -392,57 +469,41 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         1 if len(class_indices) == 1 else P
                     )
                     P = P_ext
-                if not np.any(np.isnan(P)):
-                    return P
-
-            # Multi-label targets correspond to a list of class arrays.
-            n_outputs = len(self.classes_)
-
-            if proba_format == "array":
-                # Binary per task: return (n_samples, n_outputs) with P(y=1).
-                if isinstance(P, list):
-                    P_list = self._normalize_multilabel_proba_list(
-                        P, n_samples=n_samples
-                    )
-                    P_ml = np.column_stack(
-                        [P_list[j][:, 1] for j in range(n_outputs)]
-                    )
-                else:
-                    # Wrapped classifier returns desired format.
-                    P_ml = np.asarray(P, dtype=float)
-                    if P_ml.ndim != 2 or P_ml.shape[1] != n_outputs:
-                        raise ValueError(
-                            f"Expected predict_proba to return shape "
-                            f"`(n_samples, {n_outputs})` for multilabel "
-                            f"format, got {P_ml.shape}."
-                        )
                 # Fall through to the label-count prior fallback if the
                 # fitted estimator yielded NaN probabilities.
-                if not np.any(np.isnan(P_ml)):
-                    return P_ml
+                if not np.any(np.isnan(P)):
+                    return P
             else:
+                # Multi-label targets correspond to one binary class
+                # vocabulary per output.
+                n_outputs = len(self.classes_)
                 if isinstance(P, list):
                     P_list = self._normalize_multilabel_proba_list(
                         P, n_samples=n_samples
                     )
-                    if not any(np.any(np.isnan(P_j)) for P_j in P_list):
-                        return P_list
                 else:
-                    P_ml = np.asarray(P, dtype=float)
-                    if P_ml.ndim == 2 and P_ml.shape[1] == n_outputs:
-                        P_list = [
-                            np.column_stack([1 - P_ml[:, j], P_ml[:, j]])
-                            for j in range(n_outputs)
-                        ]
-                        if not any(np.any(np.isnan(P_j)) for P_j in P_list):
-                            return P_list
+                    P_ml = self._check_multilabel_proba_array(P)
+                    P_list = [
+                        np.column_stack([1 - P_ml[:, j], P_ml[:, j]])
+                        for j in range(n_outputs)
+                    ]
+                # Fall through to the label-count prior fallback if the
+                # fitted estimator yielded NaN probabilities.
+                if not any(np.any(np.isnan(P_j)) for P_j in P_list):
+                    if proba_format == "array":
+                        # Binary per output: return positive-class
+                        # probabilities of shape (n_samples, n_outputs).
+                        return np.column_stack(
+                            [P_list[j][:, 1] for j in range(n_outputs)]
+                        )
+                    return P_list
 
         # Fallback, if fitting of the underlying estimator failed.
         warnings.warn(
-            f"Since the 'base_estimator' could not be fitted when"
-            f" calling the `fit` method, the class label "
-            f"distribution`_label_counts={self._label_counts}` is used to "
-            f"make the predictions."
+            f"Since the 'estimator' could not be fitted when calling the "
+            f"`fit` method, the class label distribution "
+            f"`_label_counts={self._label_counts}` is used to make the "
+            f"predictions."
         )
 
         # Fallback for single output.
@@ -465,6 +526,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ]
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        attributes_before = dict(self.__dict__)
         is_incremental = fit_function == "partial_fit"
         supplied_classes = (
             fit_kwargs.get("classes") if is_incremental else None
@@ -558,39 +620,144 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 for c in range(len(self._le.classes_))
             ]
 
+        X_train = X[is_included]
+        y_train = y[is_included].astype(np.int64)
+
+        # Degenerate training cases are part of the wrapper contract, e.g.,
+        # during an active learning cold start. An empty labeled training
+        # subset is recognized before the estimator is called at all.
+        if len(y_train) == 0:
+            self._fall_back_to_label_prior("there is no labeled data")
+            return self
+
+        y_train_inv = self._decode_labeled_targets(y_train)
+        sample_weight_train = (
+            None if sample_weight is None else sample_weight[is_included]
+        )
         try:
-            X_train = X[is_included]
-            y_train = y[is_included].astype(np.int64)
-            y_train_inv = self._le.inverse_transform(y_train)
-            if np.sum(is_included) == 0:
-                raise ValueError("There is no labeled data.")
-            elif sample_weight is None:
-                self._call_estimator_fit(
-                    fit_function=fit_function,
-                    X=X_train,
-                    y=y_train_inv,
-                    **fit_kwargs,
-                )
-            else:
-                self._call_estimator_fit(
-                    fit_function=fit_function,
-                    X=X_train,
-                    y=y_train_inv,
-                    sample_weight=sample_weight[is_included],
-                    **fit_kwargs,
-                )
-            self.is_fitted_ = True
-        except Exception as e:
-            self.is_fitted_ = False
-            warnings.warn(
-                "The 'base_estimator' could not be fitted because of"
-                " '{}'. Therefore, the class labels of the samples "
-                "are counted and will be used to make predictions. "
-                "The class label distribution is `_label_counts={}`.".format(
-                    e, self._label_counts
-                )
+            self._call_estimator_fit(
+                fit_function=fit_function,
+                X=X_train,
+                y=y_train_inv,
+                sample_weight=sample_weight_train,
+                **fit_kwargs,
             )
+        except Exception as error:
+            # Only the second degenerate case is absorbed: many estimators
+            # reject a training subset carrying fewer than two distinct
+            # classes although others fit it, so the failure is discovered
+            # rather than predicted.
+            if self._has_degenerate_training_classes(y_train):
+                self._fall_back_to_label_prior(
+                    f"the estimator raised '{error}' on a labeled training "
+                    f"subset carrying fewer than two classes in at least one "
+                    f"output"
+                )
+                return self
+
+            # Every other failure states a genuinely broken estimator
+            # contract and must not be hidden behind prior-only predictions.
+            message = (
+                f"Calling '{fit_function}' of the estimator "
+                f"'{self.estimator_}' failed on {len(y_train)} labeled "
+                f"samples covering at least two classes per output. This is "
+                f"not one of the degenerate training cases for which the "
+                f"class label distribution is used as a fallback."
+            )
+            self._restore_attributes(attributes_before)
+            raise RuntimeError(message) from error
+
+        self.is_fitted_ = True
         return self
+
+    def _restore_attributes(self, attributes):
+        """Restore every attribute of this wrapper to a pre-call snapshot.
+
+        A failing fit must not leave a wrapper that reports fitted state it
+        cannot serve. Because the attributes are restored as a whole rather
+        than selectively deleted, an already fitted wrapper keeps exactly its
+        pre-call values, and a previously unfitted one stays unfitted.
+
+        Note that this restores this wrapper only. A `partial_fit` mutates
+        `estimator_` in place, so a failing incremental update can leave the
+        wrapped estimator itself in an implementation-defined state.
+
+        Parameters
+        ----------
+        attributes : dict
+            Snapshot of `self.__dict__` taken before the failing call.
+        """
+        self.__dict__.clear()
+        self.__dict__.update(attributes)
+
+    def _decode_labeled_targets(self, y_train):
+        """Decode a labeled training subset into its declared class dtype.
+
+        The label encoder decodes into a dtype that can also represent
+        `missing_label`, e.g., `object` for `missing_label=None`. A labeled
+        training subset never carries `missing_label`, so its decoded labels
+        are narrowed back to the dtype of the declared classes. Without this
+        narrowing, a wrapped estimator rejects an `object` target that only
+        contains ordinary class labels.
+
+        Parameters
+        ----------
+        y_train : numpy.ndarray of shape (n_labeled,) or \
+                (n_labeled, n_outputs)
+            The encoded class labels of the labeled training subset.
+
+        Returns
+        -------
+        y_train_inv : numpy.ndarray of shape (n_labeled,) or \
+                (n_labeled, n_outputs)
+            The decoded class labels passed on to the wrapped estimator.
+        """
+        y_train_inv = self._le.inverse_transform(y_train)
+        if self._is_multilabel_target():
+            class_dtypes = [classes_j.dtype for classes_j in self.classes_]
+        else:
+            class_dtypes = [self.classes_.dtype]
+        return y_train_inv.astype(np.result_type(*class_dtypes), copy=False)
+
+    def _has_degenerate_training_classes(self, y_train):
+        """Check whether an encoded training subset lacks two classes.
+
+        Parameters
+        ----------
+        y_train : numpy.ndarray of shape (n_labeled,) or \
+                (n_labeled, n_outputs)
+            The encoded class labels of the labeled training subset.
+
+        Returns
+        -------
+        is_degenerate : bool
+            `True`, if fewer than two distinct classes are observed, for
+            multi-label classification in at least one output, and `False`
+            otherwise.
+        """
+        if self._is_multilabel_target():
+            return any(
+                len(np.unique(y_train[:, j])) < 2
+                for j in range(y_train.shape[1])
+            )
+        return len(np.unique(y_train)) < 2
+
+    def _fall_back_to_label_prior(self, reason):
+        """Mark this wrapper as unfitted to predict the label distribution.
+
+        Parameters
+        ----------
+        reason : str
+            Description of the degenerate training case, completing the
+            sentence "The 'estimator' could not be fitted because ...".
+        """
+        self.is_fitted_ = False
+        warnings.warn(
+            f"The 'estimator' could not be fitted because {reason}. "
+            f"Therefore, the class labels of the samples are counted and "
+            f"will be used to make predictions. The class label distribution "
+            f"is `_label_counts={self._label_counts}`."
+        )
 
     def __sklearn_is_fitted__(self):
         if hasattr(self, "is_fitted_"):
@@ -764,6 +931,66 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             call_kwargs["sample_weight"] = sample_weight
 
         return fit_method(**call_kwargs)
+
+    def _check_multilabel_predictions(self, y_pred):
+        """Validate the class label predictions of a multi-label estimator.
+
+        Parameters
+        ----------
+        y_pred : array-like
+            The predictions returned by the wrapped estimator's `predict`.
+
+        Returns
+        -------
+        y_pred : numpy.ndarray of shape (n_samples, n_outputs)
+            The validated predictions.
+
+        Raises
+        ------
+        ValueError
+            If the predictions do not describe one class label per output.
+        """
+        n_outputs = len(self.classes_)
+        y_pred = np.asarray(y_pred)
+        if y_pred.ndim != 2 or y_pred.shape[1] != n_outputs:
+            raise ValueError(
+                f"Expected `predict` of the wrapped estimator to return "
+                f"shape `(n_samples, {n_outputs})` for multi-label "
+                f"classification, got {y_pred.shape}."
+            )
+        return y_pred
+
+    def _check_multilabel_proba_array(self, P):
+        """Validate a positive-class probability array of a multi-label fit.
+
+        Parameters
+        ----------
+        P : array-like
+            The probabilities returned by the wrapped estimator's
+            `predict_proba`, which are not given as one matrix per output.
+
+        Returns
+        -------
+        P_ml : numpy.ndarray of shape (n_samples, n_outputs)
+            The validated positive-class probabilities.
+
+        Raises
+        ------
+        ValueError
+            If the probabilities follow neither documented multi-label
+            probability contract.
+        """
+        n_outputs = len(self.classes_)
+        P_ml = np.asarray(P, dtype=float)
+        if P_ml.ndim != 2 or P_ml.shape[1] != n_outputs:
+            raise ValueError(
+                f"Expected `predict_proba` of the wrapped estimator to "
+                f"return positive-class probabilities of shape "
+                f"`(n_samples, {n_outputs})`, or one `(n_samples, 2)` array "
+                f"per output, for multi-label classification, got "
+                f"{P_ml.shape}."
+            )
+        return P_ml
 
     def _normalize_multilabel_proba_list(self, P, n_samples):
         """Align a list of per-output probability matrices to `classes_`.

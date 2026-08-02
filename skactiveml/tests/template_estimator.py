@@ -318,6 +318,11 @@ class TemplateEstimator:
 
 
 class TemplateSkactivemlClassifier(TemplateEstimator):
+    # Error expected when fitting on non-integral float class labels. Wrappers
+    # forwarding the declared class labels to a `scikit-learn` estimator have
+    # to report the estimator's rejection of such a continuous target.
+    non_integral_classes_error = None
+
     def setUp(
         self,
         estimator_class,
@@ -456,7 +461,10 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             # id_offset=5,
         )
 
-        test_cases = [("state", TypeError), (0.0, None)]
+        test_cases = [
+            ("state", TypeError),
+            (0.0, self.non_integral_classes_error),
+        ]
         replace_init_params["classes"] = [0.5, 1.4]
         replace_fit_params = {"y": [0.5, 0, 1.4], "X": np.zeros((3, 1))}
         self._test_param(

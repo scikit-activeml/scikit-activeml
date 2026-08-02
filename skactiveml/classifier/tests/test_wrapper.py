@@ -5,6 +5,7 @@ import inspect
 
 from copy import deepcopy
 import numpy as np
+from sklearn.base import BaseEstimator, ClassifierMixin, is_classifier
 from sklearn.datasets import make_blobs
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import StandardScaler
@@ -20,7 +21,9 @@ from sklearn.linear_model import (
     SGDClassifier,
 )
 from sklearn.pipeline import Pipeline
+from sklearn.utils import get_tags
 from sklearn.naive_bayes import GaussianNB
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.semi_supervised import SelfTrainingClassifier
 from sklearn.utils.validation import NotFittedError, check_is_fitted
@@ -69,6 +72,8 @@ successful_capymoa_import = spec is not None
 
 
 class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
+    non_integral_classes_error = RuntimeError
+
     def setUp(self):
         estimator_class = SklearnClassifier
         init_default_params = {
@@ -126,12 +131,84 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         def predict(self, X, **kwargs):
             return np.zeros((len(X),), dtype=int)
 
+    class _TwoOutputEstimator(ClassifierMixin, BaseEstimator):
+        """Classifier for two binary outputs, declaring no capability tag."""
+
+        def fit(self, X, y):
+            self.classes_ = [np.array([0, 1]), np.array([0, 1])]
+            return self
+
+        def predict(self, X):
+            return np.zeros((len(X), 2), dtype=int)
+
+        def predict_proba(self, X):
+            return np.full((len(X), 2), 0.5)
+
+    class _MultiOutputTaggedEstimator(_TwoOutputEstimator):
+        """Two-output classifier declaring `target_tags.multi_output`."""
+
+        def __sklearn_tags__(self):
+            tags = super().__sklearn_tags__()
+            tags.target_tags.multi_output = True
+            return tags
+
+    class _MultiLabelTaggedEstimator(_TwoOutputEstimator):
+        """Two-output classifier declaring only `classifier_tags.multi_label`.
+
+        This isolates the second admission tag, which the `scikit-learn`
+        estimators declaring `target_tags.multi_output` cannot exercise.
+        """
+
+        def __sklearn_tags__(self):
+            tags = super().__sklearn_tags__()
+            tags.classifier_tags.multi_label = True
+            return tags
+
+    class _CallRecordingEstimator(_MultiOutputTaggedEstimator):
+        """Admitted classifier recording every fit and inference call."""
+
+        def __init__(self):
+            self.calls = []
+
+        def fit(self, X, y):
+            self.calls.append("fit")
+            return super().fit(X, y)
+
+        def predict(self, X):
+            self.calls.append("predict")
+            return super().predict(X)
+
+        def predict_proba(self, X):
+            self.calls.append("predict_proba")
+            return super().predict_proba(X)
+
+    class _LegacyEstimator:
+        """Classifier predating the `scikit-learn` estimator tag protocol."""
+
+        _estimator_type = "classifier"
+
+        def fit(self, X, y):
+            self.classes_ = [np.array([0, 1]), np.array([0, 1])]
+            return self
+
+        def predict(self, X):
+            return np.zeros((len(X), 2), dtype=int)
+
+        def predict_proba(self, X):
+            return np.full((len(X), 2), 0.5)
+
+    class _BrokenEstimator(_MultiOutputTaggedEstimator):
+        """Admitted classifier whose fit always fails unexpectedly."""
+
+        def fit(self, X, y):
+            raise RuntimeError("the estimator is broken")
+
     @staticmethod
     def _prefit_multilabel_clf(proba_format="array", classes=None):
         if classes is None:
             classes = [[0, 1], [0, 1]]
         clf = SklearnClassifier(
-            estimator=GaussianNB(),
+            estimator=MultiOutputClassifier(GaussianNB()),
             classes=classes,
             missing_label=-1,
             proba_format=proba_format,
@@ -558,6 +635,264 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertFalse(hasattr(clf, "classes_"))
         self.assertFalse(hasattr(clf, "estimator_"))
 
+    MULTILABEL_CAPABILITY = (
+        "classification",
+        "multi-label",
+        "single-annotator",
+    )
+
+    def test_predict_proba_alone_does_not_advertise_multilabel(self):
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
+
+        self.assertTrue(hasattr(clf.estimator, "predict_proba"))
+        self.assertNotIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
+
+    def test_multi_output_tag_advertises_multilabel(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()), missing_label=-1
+        )
+
+        self.assertIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
+
+    def test_multi_label_tag_alone_advertises_multilabel(self):
+        estimator = self._MultiLabelTaggedEstimator()
+        clf = SklearnClassifier(estimator=estimator, missing_label=-1)
+
+        self.assertFalse(get_tags(estimator).target_tags.multi_output)
+        self.assertTrue(get_tags(estimator).classifier_tags.multi_label)
+        self.assertIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
+
+    def test_missing_predict_proba_revokes_multilabel_capability(self):
+        clf = SklearnClassifier(estimator=Perceptron(), missing_label=-1)
+
+        self.assertNotIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
+
+    def test_legacy_estimator_tags_do_not_advertise_multilabel(self):
+        clf = SklearnClassifier(
+            estimator=self._LegacyEstimator(), missing_label=-1
+        )
+
+        self.assertNotIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
+
+    def test_capability_detection_never_fits_or_predicts(self):
+        estimator = self._CallRecordingEstimator()
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+        )
+
+        self.assertIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
+        clf._resolve_target_spec(self.y_ml)
+        self.assertEqual(estimator.calls, [])
+
+    def test_legacy_estimator_is_rejected_by_its_tags(self):
+        # The rejection has to come from the default-negative tags, not from
+        # a missing classifier role or a missing `predict_proba`.
+        estimator = self._LegacyEstimator()
+
+        self.assertTrue(is_classifier(estimator))
+        self.assertTrue(hasattr(estimator, "predict_proba"))
+        self.assertFalse(get_tags(estimator).target_tags.multi_output)
+        self.assertFalse(get_tags(estimator).classifier_tags.multi_label)
+
+    def _assert_multilabel_rejection(self, clf, action):
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(
+            ValueError, "does not support multi-label classification"
+        ) as context:
+            action()
+
+        self.assertIn("multi_output", str(context.exception))
+        self.assertIn("multi_label", str(context.exception))
+        self._assert_attributes_unchanged(clf, attributes_before)
+
+    def test_unfitted_multilabel_rejects_undeclared_estimator(self):
+        for estimator in [LogisticRegression(), GaussianNB()]:
+            with self.subTest(estimator=type(estimator).__name__):
+                clf = SklearnClassifier(
+                    estimator=estimator,
+                    classes=[[0, 1], [0, 1]],
+                    missing_label=-1,
+                )
+
+                self._assert_multilabel_rejection(
+                    clf, lambda: clf.fit(self.X_ml, self.y_ml)
+                )
+
+    def test_unfitted_multilabel_rejects_legacy_estimator(self):
+        clf = SklearnClassifier(
+            estimator=self._LegacyEstimator(),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+        )
+
+        self._assert_multilabel_rejection(
+            clf, lambda: clf.fit(self.X_ml, self.y_ml)
+        )
+
+    def test_prefit_multilabel_rejects_undeclared_estimator(self):
+        estimator = LogisticRegression().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+        )
+
+        self._assert_multilabel_rejection(clf, lambda: check_is_fitted(clf))
+
+    def _assert_multilabel_contract(self, estimator, proba_format):
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format=proba_format,
+        ).fit(self.X_ml, self.y_ml)
+
+        P = clf.predict_proba(self.X_ml)
+
+        self.assertTrue(clf.is_fitted_)
+        self.assertEqual(clf.predict(self.X_ml).shape, self.y_ml.shape)
+        if proba_format == "array":
+            self.assertEqual(P.shape, self.y_ml.shape)
+        else:
+            self.assertEqual(len(P), self.y_ml.shape[1])
+            for P_j in P:
+                self.assertEqual(P_j.shape, (len(self.X_ml), 2))
+
+    def test_tagged_estimators_remain_supported(self):
+        # `MultiOutputClassifier` and `RandomForestClassifier` natively return
+        # one probability matrix per output, `OneVsRestClassifier` returns one
+        # positive-class probability array, and both public `proba_format`
+        # values have to be served from either representation.
+        estimators = {
+            "MultiOutputClassifier": MultiOutputClassifier(GaussianNB()),
+            "OneVsRestClassifier": OneVsRestClassifier(LogisticRegression()),
+            "RandomForestClassifier": RandomForestClassifier(
+                n_estimators=5, random_state=0
+            ),
+        }
+        for name, estimator in estimators.items():
+            for proba_format in ["array", "list"]:
+                with self.subTest(estimator=name, proba_format=proba_format):
+                    self._assert_multilabel_contract(estimator, proba_format)
+
+    def test_no_labeled_data_falls_back_to_prior_without_fitting(self):
+        estimator = self._CallRecordingEstimator()
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format="array",
+        )
+        y_unlabeled = np.full_like(self.y_ml, -1)
+
+        with self.assertWarnsRegex(UserWarning, "no labeled data"):
+            clf.fit(self.X_ml, y_unlabeled)
+
+        self.assertFalse(clf.is_fitted_)
+        self.assertEqual(clf.estimator_.calls, [])
+        np.testing.assert_allclose(clf.predict_proba(self.X_ml), 0.5)
+
+    def test_degenerate_class_fit_failure_falls_back_to_prior(self):
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            missing_label="nan",
+            classes=["tokyo", "paris"],
+            random_state=0,
+        )
+
+        with self.assertWarnsRegex(UserWarning, "fewer than two"):
+            clf.fit(self.fit_default_params["X"], self.y2)
+
+        self.assertFalse(clf.is_fitted_)
+
+    def test_unexpected_fit_failure_propagates_with_context(self):
+        clf = SklearnClassifier(
+            estimator=self._BrokenEstimator(),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+        )
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaises(RuntimeError) as context:
+            clf.fit(self.X_ml, self.y_ml)
+
+        self.assertIn("_BrokenEstimator", str(context.exception))
+        self.assertIn("fit", str(context.exception))
+        self.assertIsInstance(context.exception.__cause__, RuntimeError)
+        self.assertEqual(
+            "the estimator is broken", str(context.exception.__cause__)
+        )
+        # A suppressed failure must not leave a wrapper that passes the fitted
+        # check and then silently serves prior-only predictions.
+        self._assert_attributes_unchanged(clf, attributes_before)
+        self.assertRaises(NotFittedError, check_is_fitted, clf)
+
+    def test_failed_refit_preserves_previously_fitted_state(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+        ).fit(self.X_ml, self.y_ml)
+        attributes_before = dict(clf.__dict__)
+        expected_probabilities = clf.predict_proba(self.X_ml)
+
+        clf.estimator = self._BrokenEstimator()
+        with self.assertRaises(RuntimeError):
+            clf.fit(self.X_ml, self.y_ml)
+
+        self.assertEqual(
+            set(clf.__dict__) - {"estimator"},
+            set(attributes_before) - {"estimator"},
+        )
+        for name, value in attributes_before.items():
+            if name != "estimator":
+                self.assertIs(clf.__dict__[name], value)
+        np.testing.assert_allclose(
+            clf.predict_proba(self.X_ml), expected_probabilities
+        )
+
+    def test_object_encoded_targets_reach_the_estimator(self):
+        # `missing_label=None` decodes into an `object` array that a
+        # `scikit-learn` estimator rejects, which used to be swallowed by the
+        # prior-only fallback instead of fitting the estimator.
+        clf = SklearnClassifier(
+            estimator=GaussianNB(), classes=[0, 1], missing_label=None
+        )
+
+        clf.fit(np.zeros((3, 1)), [0, None, 1])
+
+        self.assertTrue(clf.is_fitted_)
+        np.testing.assert_array_equal(clf.estimator_.classes_, [0, 1])
+
+    def test_multilabel_predict_rejects_single_output_predictions(self):
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=np.full((len(self.X_ml), 2), 0.5)
+        )
+
+        self.assertRaisesRegex(
+            ValueError,
+            r"`\(n_samples, 2\)`",
+            clf.predict,
+            self.X_ml,
+        )
+
+    def test_multilabel_predict_proba_list_rejects_malformed_array(self):
+        clf = self._prefit_multilabel_clf(proba_format="list")
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=np.full((len(self.X_ml), 3), 1 / 3)
+        )
+
+        self.assertRaisesRegex(
+            ValueError,
+            r"`\(n_samples, 2\)`",
+            clf.predict_proba,
+            self.X_ml,
+        )
+
     def test_explicit_multilabel_uses_resolved_order_for_public_outputs(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.array(
@@ -587,35 +922,38 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         )
         self.assertEqual(clf.score(X[:4], y[:4]), 0.75)
 
-    def test_explicit_multilabel_fallback_uses_resolved_class_order(self):
+    def test_degenerate_multilabel_fallback_uses_declared_class_order(self):
+        # The second output carries a single observed class, which
+        # `GaussianProcessClassifier` rejects, so the wrapper degrades to the
+        # class label distribution of the declared class vocabularies.
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.array(
             [
                 [7.0, 4.0],
-                [3.0, -2.0],
-                [7.0, -2.0],
+                [3.0, 4.0],
+                [7.0, 4.0],
                 [7.0, 4.0],
                 [np.nan, np.nan],
                 [np.nan, np.nan],
             ]
         )
         clf = SklearnClassifier(
-            estimator=GaussianProcessClassifier(),
-            target_type="multi-label",
+            estimator=MultiOutputClassifier(GaussianProcessClassifier()),
+            classes=[[3.0, 7.0], [-2.0, 4.0]],
             proba_format="array",
             random_state=0,
         )
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with self.assertWarnsRegex(UserWarning, "fewer than two"):
             clf.fit(X, y)
-            probabilities = clf.predict_proba(X)
-            predictions = clf.predict(X)
+        probabilities = clf.predict_proba(X)
+        predictions = clf.predict(X)
 
+        self.assertFalse(clf.is_fitted_)
         np.testing.assert_allclose(probabilities[:, 0], 0.75)
-        np.testing.assert_allclose(probabilities[:, 1], 0.5)
+        np.testing.assert_allclose(probabilities[:, 1], 1.0)
         self.assertTrue(np.isin(predictions[:, 0], [3.0, 7.0]).all())
-        self.assertTrue(np.isin(predictions[:, 1], [-2.0, 4.0]).all())
+        np.testing.assert_allclose(predictions[:, 1], 4.0)
 
     def test_multilabel_signature_uses_Y(self):
         clf = SklearnClassifier(
@@ -1242,6 +1580,8 @@ class TestSlidingWindowClassifier(
     TemplateSkactivemlClassifier,
     unittest.TestCase,
 ):
+    non_integral_classes_error = RuntimeError
+
     def setUp(self):
         estimator_class = SlidingWindowClassifier
         init_default_params = {
@@ -1344,7 +1684,12 @@ class TestSlidingWindowClassifier(
             replace_fit_params=replace_fit_params,
         )
 
-        test_cases = [("state", TypeError), (0.0, None)]
+        # The wrapped `SklearnClassifier` forwards the non-integral float
+        # class labels, which `LogisticRegression` rejects as continuous.
+        test_cases = [
+            ("state", TypeError),
+            (0.0, self.non_integral_classes_error),
+        ]
         replace_init_params["classes"] = [0.5, 1.4]
         replace_init_params["estimator"] = SklearnClassifier(
             LogisticRegression(), missing_label=0.0
