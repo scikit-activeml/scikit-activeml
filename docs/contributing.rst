@@ -227,9 +227,9 @@ label helpers, or multi-annotator components. In particular:
   array shape or values alone;
 - declare the exact target combinations a component supports through its
   ``_target_capabilities``;
-- preserve the fitted ``target_spec_`` on estimators and wrappers that retain
-  fitted target state; query strategies resolve each query and do not retain a
-  last-query specification;
+- preserve the fitted ``target_spec_`` on estimators and wrappers that retain a
+  fitted target specification; query strategies resolve each query and do not
+  retain a last-query specification;
 - add tests for every supported target combination and for invalid or
   unsupported combinations, including ambiguous two-dimensional targets and
   complete-row requirements for multi-label data.
