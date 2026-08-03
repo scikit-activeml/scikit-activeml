@@ -81,6 +81,12 @@ _TASK_AGNOSTIC_TARGET_CAPABILITIES = frozenset(
 )
 _TARGET_SPEC_NOT_PROVIDED = object()
 
+# Canonical names of `query` parameters carrying an estimator whose target
+# semantics describe the queried targets `y`. Estimators passed under any other
+# name (e.g. the labeled-vs-unlabeled `discriminator` of `DiscriminativeAL`)
+# solve an auxiliary problem and are therefore no semantic authority for `y`.
+_TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
+
 
 def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
     y_array = np.asarray(y)
@@ -286,6 +292,24 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return frozenset(
             {("classification", "single-output", "single-annotator")}
         )
+
+    @property
+    def _target_authority_params(self):
+        """Names of `query` parameters carrying a target authority.
+
+        This is the narrow interface through which a strategy declares which
+        of its `query` arguments hold an estimator whose target semantics are
+        authoritative for `y`. Wrappers use it instead of inspecting arbitrary
+        query arguments. Strategies naming such an estimator differently, or
+        accepting estimators that describe an auxiliary problem rather than
+        `y`, override this property.
+
+        Returns
+        -------
+        authority_params : tuple of str
+            The declared parameter names in deterministic resolution order.
+        """
+        return _TARGET_AUTHORITY_QUERY_PARAMS
 
     def _resolve_query_target_type(self, y):
         tasks = {capability[0] for capability in self._target_capabilities}

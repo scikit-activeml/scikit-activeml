@@ -4,6 +4,7 @@ from ..utils import (
     check_random_state,
     check_equal_missing_label,
     is_labeled,
+    is_unlabeled,
     labeled_indices,
     unlabeled_indices,
     check_scalar,
@@ -15,17 +16,74 @@ import numpy as np
 from joblib import Parallel, delayed, cpu_count
 from sklearn import clone
 import warnings
-from ._target import _resolve_wrapper_target_type
+from ._target import (
+    _check_resolved_target_capability,
+    _collect_declared_authorities,
+    _reconcile_target_declarations,
+)
 
 
 class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
+    """Base class for wrappers preserving the wrapped target semantics.
+
+    A wrapper owns the reconciliation of its own target declaration with the
+    declarations of the strategies it wraps and with the estimators passed as
+    query arguments. It therefore keeps every step that depends on wrapper
+    internals, i.e., traversing the wrapped strategy chain, discovering
+    declared authorities among the query arguments, and validating the wrapped
+    capabilities. The wrapper-agnostic steps, i.e., comparing target
+    declarations, resolving target specifications, and checking capabilities,
+    are shared through :mod:`skactiveml.pool._target`.
+    """
+
     @property
     def _target_capabilities(self):
         return getattr(
             self.query_strategy, "_target_capabilities", frozenset()
         )
 
+    @property
+    def _target_authority_params(self):
+        """Delegate the declared authority roles to the wrapped strategy."""
+        return getattr(self.query_strategy, "_target_authority_params", ())
+
     def _resolve_wrapped_target_type(self, y, query_kwargs):
+        """Resolve the target type this wrapper must preserve.
+
+        This is the entry point of the wrapper's target reconciliation. It
+        fails before any query state is committed.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `self.missing_label`).
+        query_kwargs : dict
+            The keyword arguments forwarded to the wrapped query strategy.
+
+        Returns
+        -------
+        target_type : str
+            The resolved target type.
+        """
+        self._check_wrapped_strategy()
+        target_type, target_spec = _reconcile_target_declarations(
+            self._collect_target_declarations(),
+            self._collect_target_authorities(query_kwargs),
+            y,
+            missing_label=self.missing_label,
+            owner_name=type(self).__name__,
+        )
+        self._check_wrapped_target_capability(target_type, target_spec)
+        is_unlabeled(
+            y,
+            missing_label=self.missing_label,
+            target_type=target_type,
+        )
+        return target_type
+
+    def _check_wrapped_strategy(self):
+        """Check the wrapped strategy's type and missing label."""
         if not isinstance(
             self.query_strategy, SingleAnnotatorPoolQueryStrategy
         ):
@@ -36,7 +94,47 @@ class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
         check_equal_missing_label(
             self.query_strategy.missing_label, self.missing_label
         )
-        return _resolve_wrapper_target_type(self, y, query_kwargs)
+
+    def _collect_target_declarations(self):
+        """Collect the target declarations along the wrapped chain.
+
+        Returns
+        -------
+        declarations : list of (str, str)
+            The declared target types with their declaring component's name,
+            ordered from this wrapper to the innermost wrapped strategy. A
+            cyclic chain is traversed only once per strategy.
+        """
+        declarations = [(self.target_type, type(self).__name__)]
+        seen_strategies = {id(self)}
+        strategy = self.query_strategy
+        while strategy is not None and id(strategy) not in seen_strategies:
+            seen_strategies.add(id(strategy))
+            declarations.append(
+                (
+                    getattr(strategy, "target_type", "auto"),
+                    type(strategy).__name__,
+                )
+            )
+            strategy = getattr(strategy, "query_strategy", None)
+        return declarations
+
+    def _collect_target_authorities(self, query_kwargs):
+        """Discover the target authorities among the query arguments."""
+        return _collect_declared_authorities(
+            self._target_authority_params, query_kwargs
+        )
+
+    def _check_wrapped_target_capability(self, target_type, target_spec):
+        """Check the resolved target against the wrapped capabilities."""
+        capabilities = self._target_capabilities
+        if capabilities:
+            _check_resolved_target_capability(
+                type(self.query_strategy).__name__,
+                target_type,
+                target_spec,
+                capabilities,
+            )
 
     def _query_strategy_for_target_type(self, target_type):
         query_strategy = self.query_strategy

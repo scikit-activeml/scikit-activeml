@@ -1,3 +1,15 @@
+"""Shared target reconciliation helpers for pool-based query strategies.
+
+Every helper in this module operates on plain values only, i.e., target
+declarations, estimators, and capability sets. Helpers that would need to know
+how a component stores those values (for instance how a wrapper reaches its
+wrapped strategy or its query arguments) belong to that component instead. The
+orchestration of wrapper target reconciliation is therefore owned by
+`skactiveml.pool._wrapper._TargetPreservingWrapper`, which collects its own
+declarations and authorities and then delegates the wrapper-agnostic
+resolution, comparison, and capability checks to this module.
+"""
+
 from sklearn import clone
 
 from ..base import SkactivemlClassifier, SkactivemlRegressor
@@ -8,9 +20,14 @@ from ..utils import (
     resolve_target_spec,
 )
 from ..utils._target import (
+    _class_vocabulary_key,
     _resolve_task_agnostic_target_type,
     _validate_target_semantics,
     check_target_capability,
+)
+
+_ALLOWED_DECLARED_TARGET_TYPES = frozenset(
+    {"auto", "single-output", "multi-label", "multi-output"}
 )
 
 
@@ -124,52 +141,87 @@ def _fit_and_resolve_estimator_target_spec(
     return estimator, target_spec
 
 
-def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
-    """Resolve the target structure a strategy wrapper must preserve."""
-    allowed_target_types = {
-        "auto",
-        "single-output",
-        "multi-label",
-        "multi-output",
-    }
-    target_declarations = [(wrapper.target_type, type(wrapper).__name__)]
-    wrapped_strategy = wrapper.query_strategy
-    seen_strategies = set()
-    while (
-        wrapped_strategy is not None
-        and id(wrapped_strategy) not in seen_strategies
-    ):
-        seen_strategies.add(id(wrapped_strategy))
-        target_declarations.append(
-            (
-                getattr(wrapped_strategy, "target_type", "auto"),
-                type(wrapped_strategy).__name__,
-            )
-        )
-        wrapped_strategy = getattr(wrapped_strategy, "query_strategy", None)
+def _collect_declared_authorities(authority_params, query_kwargs):
+    """Discover the estimators declared as target authorities.
 
-    for target_type, _ in target_declarations:
-        if target_type not in allowed_target_types:
-            raise ValueError(
-                "`target_type` must be one of {'auto', 'single-output', "
-                "'multi-label', 'multi-output'}."
-            )
+    Discovery is deliberately restricted to the parameter names a strategy
+    declares through `_target_authority_params`, so that query arguments
+    holding an estimator for an auxiliary problem are never mistaken for a
+    semantic authority for `y`.
 
-    estimators = []
-    for value in query_kwargs.values():
+    Parameters
+    ----------
+    authority_params : iterable of str
+        Declared names of `query` parameters carrying a target authority.
+    query_kwargs : dict
+        The keyword arguments forwarded to the wrapped query strategy.
+
+    Returns
+    -------
+    authorities : list of skactiveml estimators
+        The discovered estimators, ordered by declaration and, for sequence
+        valued arguments, by position.
+    """
+    authorities = []
+    seen_authorities = set()
+    for name in authority_params:
+        if name not in query_kwargs:
+            continue
+        value = query_kwargs[name]
         values = value if isinstance(value, (list, tuple)) else (value,)
-        estimators.extend(
-            item
-            for item in values
-            if isinstance(item, (SkactivemlClassifier, SkactivemlRegressor))
-        )
+        for item in values:
+            is_authority = isinstance(
+                item, (SkactivemlClassifier, SkactivemlRegressor)
+            )
+            if is_authority and id(item) not in seen_authorities:
+                seen_authorities.add(id(item))
+                authorities.append(item)
+    return authorities
+
+
+def _reconcile_target_declarations(
+    declarations, authorities, y, *, missing_label, owner_name
+):
+    """Reconcile target declarations and authorities into one target type.
+
+    This helper is shared because it consumes already collected declarations
+    and authorities, i.e., it never asks how a component stores them. Only the
+    collection of both is component specific and therefore owned by the
+    caller.
+
+    Parameters
+    ----------
+    declarations : list of (str, str)
+        Declared target types with the name of their declaring component, in
+        deterministic order.
+    authorities : list of skactiveml estimators
+        The estimators whose target semantics are authoritative for `y`, in
+        deterministic order.
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        Target observations, including values equal to `missing_label`.
+    missing_label : scalar or str or None
+        Value representing a missing target observation.
+    owner_name : str
+        Name of the component reporting declaration conflicts.
+
+    Returns
+    -------
+    target_type : str
+        The resolved target type.
+    target_spec : TargetSpec or None
+        The resolved target specification, or `None` if no authority assigned
+        a prediction task.
+    """
+    _check_declared_target_types(declarations)
 
     fitted_specs = [
-        estimator.target_spec_
-        for estimator in estimators
-        if hasattr(estimator, "target_spec_")
+        authority.target_spec_
+        for authority in authorities
+        if hasattr(authority, "target_spec_")
     ]
     if fitted_specs:
+        # Fitted specifications outrank every declaration, so conflicting
+        # declarations are reported against the resolved specification below.
         target_spec = fitted_specs[0]
         if any(spec != target_spec for spec in fitted_specs[1:]):
             raise ValueError(
@@ -182,37 +234,19 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
             target_type=target_spec.target_type,
             annotation_type=target_spec.annotation_type,
             classes=target_spec.classes,
-            missing_label=wrapper.missing_label,
+            missing_label=missing_label,
         )
         target_type = target_spec.target_type
-        task = target_spec.task
     else:
-        estimator_target_types = [
-            getattr(estimator, "target_type", "auto")
-            for estimator in estimators
-        ]
-        tasks = {
-            (
-                "classification"
-                if isinstance(estimator, SkactivemlClassifier)
-                else "regression"
-            )
-            for estimator in estimators
-        }
-        explicit_target_types = {
-            target_type
-            for target_type in (
-                *(value for value, _ in target_declarations),
-                *estimator_target_types,
-            )
-            if target_type != "auto"
-        }
-        if len(explicit_target_types) > 1:
+        declared_target_type = _resolve_declared_target_type(
+            declarations, authorities, owner_name
+        )
+        tasks = {_authority_task(authority) for authority in authorities}
+        if len(tasks) > 1:
             raise ValueError(
-                f"{type(wrapper).__name__}'s target declaration conflicts "
-                "with the wrapped strategy or supplied estimator."
+                "Supplied estimators have conflicting classification and "
+                "regression tasks."
             )
-        declared_target_type = next(iter(explicit_target_types), "auto")
         if len(tasks) == 1:
             task = next(iter(tasks))
             _validate_target_semantics(
@@ -221,35 +255,28 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
                 "single-annotator",
                 allow_auto=True,
             )
-            estimator = estimators[0]
             target_spec = resolve_target_spec(
                 y,
                 task=task,
                 target_type=declared_target_type,
                 annotation_type="single-annotator",
                 classes=(
-                    getattr(estimator, "classes_", estimator.classes)
+                    _resolve_authority_classes(authorities)
                     if task == "classification"
                     else None
                 ),
-                missing_label=wrapper.missing_label,
+                missing_label=missing_label,
             )
             target_type = target_spec.target_type
-        elif len(tasks) > 1:
-            raise ValueError(
-                "Supplied estimators have conflicting classification and "
-                "regression tasks."
-            )
         else:
-            task = None
             target_type = _resolve_task_agnostic_target_type(
                 y,
                 target_type=declared_target_type,
-                missing_label=wrapper.missing_label,
+                missing_label=missing_label,
             )
             target_spec = None
 
-    for component_target_type, component_name in target_declarations:
+    for component_target_type, component_name in declarations:
         if component_target_type != "auto" and (
             component_target_type != target_type
         ):
@@ -258,29 +285,98 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
                 "the resolved target specification."
             )
 
-    capabilities = wrapper._target_capabilities
-    if capabilities:
-        if target_spec is not None:
-            check_target_capability(
-                type(wrapper.query_strategy).__name__,
-                target_spec,
-                capabilities,
-            )
-        elif not any(
-            capability[1] == target_type for capability in capabilities
-        ):
-            supported = ", ".join(
-                repr(value) for value in sorted(capabilities)
-            )
+    return target_type, target_spec
+
+
+def _check_declared_target_types(declarations):
+    """Raise for a declared target type outside the accepted vocabulary."""
+    for target_type, _ in declarations:
+        if target_type not in _ALLOWED_DECLARED_TARGET_TYPES:
             raise ValueError(
-                f"{type(wrapper.query_strategy).__name__} does not support "
-                f"target type {target_type!r}. Supported capabilities are: "
-                f"{supported}."
+                "`target_type` must be one of {'auto', 'single-output', "
+                "'multi-label', 'multi-output'}."
             )
 
-    is_unlabeled(
-        y,
-        missing_label=wrapper.missing_label,
-        target_type=target_type,
+
+def _resolve_declared_target_type(declarations, authorities, owner_name):
+    """Resolve one explicit target type from declarations and authorities."""
+    explicit_target_types = {
+        target_type
+        for target_type in (
+            *(value for value, _ in declarations),
+            *(
+                getattr(authority, "target_type", "auto")
+                for authority in authorities
+            ),
+        )
+        if target_type != "auto"
+    }
+    if len(explicit_target_types) > 1:
+        conflicting = ", ".join(
+            repr(value) for value in sorted(explicit_target_types)
+        )
+        raise ValueError(
+            f"{owner_name}'s target declaration conflicts with another "
+            f"declared or supplied `target_type`: {conflicting}."
+        )
+    return next(iter(explicit_target_types), "auto")
+
+
+def _authority_task(authority):
+    """Return the prediction task an estimator authority implies."""
+    return (
+        "classification"
+        if isinstance(authority, SkactivemlClassifier)
+        else "regression"
     )
-    return target_type
+
+
+def _resolve_authority_classes(authorities):
+    """Resolve one class vocabulary shared by all classifier authorities."""
+    resolved_classes = None
+    resolved_key = None
+    for authority in authorities:
+        classes = getattr(authority, "classes_", authority.classes)
+        if classes is None:
+            continue
+        key = _class_vocabulary_key(classes)
+        if resolved_key is None:
+            resolved_classes, resolved_key = classes, key
+        elif key != resolved_key:
+            raise ValueError(
+                "Supplied estimators have conflicting class vocabularies: "
+                f"{resolved_classes!r} and {classes!r}."
+            )
+    return resolved_classes
+
+
+def _check_resolved_target_capability(
+    component, target_type, target_spec, capabilities
+):
+    """Check a resolved target against a component's capabilities.
+
+    This helper is shared because it needs the resolved target and the
+    capability set only, both of which every component already exposes. It
+    covers the task-agnostic case as well, where no authority assigned a
+    prediction task and therefore no exact semantic triple exists.
+
+    Parameters
+    ----------
+    component : str
+        Name of the component whose capabilities are checked.
+    target_type : str
+        The resolved target type.
+    target_spec : TargetSpec or None
+        The resolved target specification, or `None` for a task-agnostic
+        resolution.
+    capabilities : set of (str, str, str)
+        The component's declared target capabilities.
+    """
+    if target_spec is not None:
+        check_target_capability(component, target_spec, capabilities)
+    elif not any(capability[1] == target_type for capability in capabilities):
+        supported = ", ".join(repr(value) for value in sorted(capabilities))
+        raise ValueError(
+            f"{component} does not support target type {target_type!r}. "
+            f"Supported capabilities are: {supported}."
+        )

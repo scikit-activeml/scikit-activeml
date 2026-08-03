@@ -109,6 +109,40 @@ def _class_vocabularies_equal(classes_a, classes_b):
     )
 
 
+def _class_vocabulary_key(classes):
+    """Return a comparable key for a declared class vocabulary.
+
+    Unlike `_class_vocabulary_hash_key`, this helper also accepts the not yet
+    normalized vocabularies that estimators expose through `classes` or
+    `classes_`, i.e., arbitrarily nested sequences and arrays.
+
+    Parameters
+    ----------
+    classes : array-like or tuple of array-like or None
+        The declared class vocabulary.
+
+    Returns
+    -------
+    key : tuple or None
+        A key comparing equal exactly for equal vocabularies.
+    """
+    if classes is None:
+        return None
+    return _class_vocabulary_hash_key(_as_nested_tuple(classes))
+
+
+def _as_nested_tuple(values):
+    """Convert nested sequences of class labels into nested tuples."""
+    return tuple(
+        (
+            _as_nested_tuple(value)
+            if isinstance(value, (list, tuple, np.ndarray))
+            else value
+        )
+        for value in values
+    )
+
+
 def _class_vocabulary_hash_key(classes):
     if classes is None:
         return None

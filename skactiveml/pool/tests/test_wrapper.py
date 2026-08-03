@@ -14,6 +14,7 @@ from skactiveml.regressor import SklearnRegressor
 from skactiveml.pool import (
     SubSamplingWrapper,
     ParallelUtilityEstimationWrapper,
+    DiscriminativeAL,
     QueryByCommittee,
     UncertaintySampling,
     RandomSampling,
@@ -351,6 +352,156 @@ class TestSubSamplingWrapper(
 
         self.assertIn(nested_idx[0], [2, 3, 4, 5])
         self.assertTrue(np.isnan(nested_utilities[0, :2]).all())
+
+    def test_target_type_declarations_conflict_before_query(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=RandomSampling(target_type="single-output"),
+            max_candidates=4,
+            target_type="multi-label",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "target declaration conflicts"
+        ):
+            wrapper.query(X, y)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_wrapper_without_estimator_argument_resolves_declarations(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=RandomSampling(target_type="multi-label"),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        target_type = wrapper._resolve_wrapped_target_type(y, {})
+
+        self.assertEqual(target_type, "multi-label")
+        self.assertEqual(wrapper.query(X, y).shape, (1,))
+
+    def test_estimator_like_argument_is_no_target_authority(self):
+        X = np.arange(24, dtype=float).reshape(12, 2)
+        y_discriminator = np.array([0.0, 1.0] + [MISSING_LABEL] * 10)
+        # The discriminator separates labeled from unlabeled samples such that
+        # its target semantics do not describe `y`.
+        discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
+            X, y_discriminator
+        )
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0]]
+            + [[MISSING_LABEL, MISSING_LABEL] for _ in range(10)]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=DiscriminativeAL(random_state=0),
+            max_candidates=4,
+            target_type="multi-label",
+            random_state=0,
+        )
+
+        self.assertEqual(
+            wrapper._collect_target_authorities(
+                {"discriminator": discriminator}
+            ),
+            [],
+        )
+        query_indices = wrapper.query(X, y, discriminator=discriminator)
+
+        self.assertNotIn(query_indices[0], [0, 1])
+
+    def test_estimator_authorities_are_collected_deterministically(self):
+        clf_0 = SklearnClassifier(GaussianNB(), classes=[0, 1])
+        clf_1 = SklearnClassifier(GaussianNB(), classes=[0, 1])
+        clf_2 = SklearnClassifier(GaussianNB(), classes=[0, 1])
+        wrapper = SubSamplingWrapper(query_strategy=QueryByCommittee())
+
+        authorities = wrapper._collect_target_authorities(
+            {
+                "ensemble": [clf_1, clf_2, clf_1],
+                "clf": clf_0,
+                "discriminator": SklearnClassifier(
+                    GaussianNB(), classes=[0, 1]
+                ),
+                "fit_ensemble": True,
+                "sample_weight": None,
+            }
+        )
+
+        self.assertEqual(
+            [id(a) for a in authorities],
+            [id(clf_0), id(clf_1), id(clf_2)],
+        )
+
+    def test_authority_params_delegate_to_wrapped_strategy(self):
+        wrapped = DiscriminativeAL()
+        nested = SubSamplingWrapper(
+            query_strategy=SubSamplingWrapper(query_strategy=wrapped)
+        )
+
+        self.assertEqual(
+            nested._target_authority_params, wrapped._target_authority_params
+        )
+        self.assertNotIn("discriminator", wrapped._target_authority_params)
+        self.assertEqual(SubSamplingWrapper()._target_authority_params, ())
+
+    def test_conflicting_estimator_vocabularies_fail_before_query(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0.0, 1.0, MISSING_LABEL, MISSING_LABEL])
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(random_state=0),
+            max_candidates=2,
+            random_state=0,
+        )
+        conflicting = [
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+            SklearnClassifier(GaussianNB(), classes=[0, 2]),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "class vocabularies"):
+            wrapper.query(X, y, ensemble=conflicting, fit_ensemble=True)
+        assert_no_query_state(self, wrapper)
+
+        agreeing = [
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+        ]
+        query_indices = wrapper.query(
+            X, y, ensemble=agreeing, fit_ensemble=True
+        )
+
+        self.assertIn(query_indices[0], [2, 3])
+
+    def test_cyclic_wrapper_chain_terminates(self):
+        inner = SubSamplingWrapper(query_strategy=RandomSampling())
+        outer = SubSamplingWrapper(
+            query_strategy=inner, target_type="multi-label"
+        )
+        inner.query_strategy = outer
+
+        declarations = outer._collect_target_declarations()
+
+        self.assertEqual(
+            declarations,
+            [
+                ("multi-label", "SubSamplingWrapper"),
+                ("auto", "SubSamplingWrapper"),
+            ],
+        )
 
     def test_init_param_max_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
