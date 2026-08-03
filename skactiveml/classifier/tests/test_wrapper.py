@@ -144,6 +144,34 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         def predict_proba(self, X):
             return np.full((len(X), 2), 0.5)
 
+    class _ReorderedClassesEstimator(ClassifierMixin, BaseEstimator):
+        """Classifier publishing its learned classes in unsorted order."""
+
+        def fit(self, X, y):
+            self.classes_ = np.array([1, 0])
+            self.n_features_in_ = np.shape(X)[1]
+            return self
+
+        def predict(self, X):
+            return np.zeros(len(X), dtype=int)
+
+        def predict_proba(self, X):
+            # `0.8` is the probability of class `1` and `0.2` of class `0`.
+            return np.tile([0.8, 0.2], (len(X), 1))
+
+    class _NoClassesEstimator(ClassifierMixin, BaseEstimator):
+        """Fitted classifier publishing no learned class vocabulary."""
+
+        def fit(self, X, y):
+            self.n_features_in_ = np.shape(X)[1]
+            return self
+
+        def predict(self, X):
+            return np.zeros(len(X), dtype=int)
+
+        def predict_proba(self, X):
+            return np.tile([0.4, 0.6], (len(X), 1))
+
     class _MultiOutputTaggedEstimator(_TwoOutputEstimator):
         """Two-output classifier declaring `target_tags.multi_output`."""
 
@@ -1008,6 +1036,319 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(set(clf.__dict__), set(attributes_before))
         for name, value in attributes_before.items():
             self.assertIs(clf.__dict__[name], value)
+
+    def _assert_prefit_rejection(self, clf, expected_message):
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(ValueError, expected_message):
+            check_is_fitted(clf)
+
+        self._assert_attributes_unchanged(clf, attributes_before)
+
+    def test_prefit_rejects_disjoint_equal_width_class_vocabulary(self):
+        # Both vocabularies are two classes wide, so the contradiction cannot
+        # be found by comparing their widths.
+        estimator = LogisticRegression().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[2, 3], missing_label=-1
+        )
+
+        self._assert_prefit_rejection(clf, "learned the class labels")
+
+    def test_prefit_rejects_learned_classes_outside_configuration(self):
+        estimator = LogisticRegression().fit(
+            np.vstack([self.X_ml, [[3.0]]]), [0, 0, 1, 1, 2]
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1], missing_label=-1
+        )
+
+        self._assert_prefit_rejection(clf, r"learned the class labels \[2\]")
+
+    def _assert_prefit_multilabel_consistency(self, clf, expected_classes):
+        # `predict`, `predict_proba`, `classes_`, and `target_spec_` have to
+        # describe the same vocabularies, column order, and output count.
+        P = clf.predict_proba(self.X_ml)
+        y_pred = clf.predict(self.X_ml)
+
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
+        self.assertEqual(clf.target_spec_.classes, expected_classes)
+        self.assertEqual(len(clf.classes_), len(expected_classes))
+        for classes_j, expected_classes_j in zip(
+            clf.classes_, expected_classes
+        ):
+            np.testing.assert_array_equal(classes_j, expected_classes_j)
+        self.assertEqual(P.shape, (len(self.X_ml), len(expected_classes)))
+        self.assertEqual(y_pred.shape, (len(self.X_ml), len(expected_classes)))
+        for output_idx, expected_classes_j in enumerate(expected_classes):
+            self.assertTrue(
+                np.isin(y_pred[:, output_idx], expected_classes_j).all()
+            )
+
+    def test_prefit_multilabel_accepts_learned_output_vocabularies(self):
+        estimators = {
+            "MultiOutputClassifier": MultiOutputClassifier(GaussianNB()),
+            "RandomForestClassifier": RandomForestClassifier(
+                n_estimators=5, random_state=0
+            ),
+        }
+        for name, estimator in estimators.items():
+            with self.subTest(estimator=name):
+                clf = SklearnClassifier(
+                    estimator=estimator.fit(self.X_ml, self.y_ml),
+                    classes=[[0, 1], [0, 1]],
+                    missing_label=-1,
+                    proba_format="array",
+                )
+
+                self._assert_prefit_multilabel_consistency(
+                    clf, ((0, 1), (0, 1))
+                )
+
+    def test_prefit_multilabel_accepts_declared_label_outputs(self):
+        # `OneVsRestClassifier` publishes flat label-output identifiers plus
+        # explicit multi-label metadata, so the declared vocabularies supply
+        # each output's binary classes.
+        estimator = OneVsRestClassifier(LogisticRegression()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format="array",
+        )
+
+        self._assert_prefit_multilabel_consistency(clf, ((0, 1), (0, 1)))
+
+    def test_prefit_rejects_relabeled_indicator_outputs(self):
+        # The estimator predicts a binary indicator per output, so its outputs
+        # cannot be declared to carry other class labels. Fitting the same
+        # configuration through the wrapper fails as well, because
+        # `OneVsRestClassifier` rejects a two-dimensional string target.
+        estimator = OneVsRestClassifier(LogisticRegression()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[["a", "b"], ["a", "b"]],
+            missing_label="nan",
+        )
+
+        self._assert_prefit_rejection(clf, "binary indicator per label output")
+
+    def test_prefit_flat_classes_identify_label_outputs(self):
+        estimator = OneVsRestClassifier(LogisticRegression()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=None, missing_label=-1
+        )
+
+        # The flat learned classes `[0, 1]` identify two label outputs and
+        # must not be read as one binary class vocabulary.
+        self._assert_prefit_rejection(clf, "2 label outputs")
+
+    def test_prefit_rejects_label_outputs_as_single_output(self):
+        estimator = OneVsRestClassifier(LogisticRegression()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1], missing_label=-1
+        )
+
+        self._assert_prefit_rejection(
+            clf, "cannot be declared as a single-output classifier"
+        )
+
+    def test_prefit_rejects_mismatched_label_output_count(self):
+        y_ml = np.column_stack([self.y_ml, self.y_ml[:, 0]])
+        estimators = {
+            "MultiOutputClassifier": MultiOutputClassifier(GaussianNB()),
+            "OneVsRestClassifier": OneVsRestClassifier(LogisticRegression()),
+        }
+        for name, estimator in estimators.items():
+            with self.subTest(estimator=name):
+                clf = SklearnClassifier(
+                    estimator=estimator.fit(self.X_ml, y_ml),
+                    classes=[[0, 1], [0, 1]],
+                    missing_label=-1,
+                )
+
+                self._assert_prefit_rejection(clf, "3 label outputs")
+
+    def test_prefit_rejects_learned_classes_outside_output_vocabulary(self):
+        estimator = MultiOutputClassifier(GaussianNB()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[[0, 1], [2, 3]], missing_label=-1
+        )
+
+        self._assert_prefit_rejection(
+            clf, "learned the class labels .* for label output 1"
+        )
+
+    def test_prefit_rejects_single_output_estimator_as_multilabel(self):
+        # `RandomForestClassifier` declares both multi-label admission tags,
+        # so only its fitted target evidence reveals the contradiction.
+        estimator = RandomForestClassifier(n_estimators=5, random_state=0).fit(
+            self.X_ml, self.y_ml[:, 0]
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[[0, 1], [0, 1]], missing_label=-1
+        )
+
+        self._assert_prefit_rejection(
+            clf, "one categorical class assignment per sample"
+        )
+
+    def test_prefit_configured_superset_zero_fills_probabilities(self):
+        estimator = LogisticRegression().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1, 2], missing_label=-1
+        )
+
+        P = clf.predict_proba(self.X_ml)
+        y_pred = clf.predict(self.X_ml)
+
+        self.assertEqual(clf.target_spec_.classes, (0, 1, 2))
+        np.testing.assert_array_equal(clf.classes_, [0, 1, 2])
+        self.assertEqual(P.shape, (len(self.X_ml), 3))
+        np.testing.assert_allclose(P[:, 2], 0.0)
+        np.testing.assert_allclose(P.sum(axis=1), 1.0)
+        np.testing.assert_allclose(
+            P[:, :2], estimator.predict_proba(self.X_ml)
+        )
+        self.assertTrue(np.isin(y_pred, clf.classes_).all())
+
+    def test_prefit_discovery_does_not_call_prediction_methods(self):
+        estimator = self._CallRecordingEstimator().fit(self.X_ml, self.y_ml)
+        estimator.calls.clear()
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[[0, 1], [0, 1]], missing_label=-1
+        )
+
+        check_is_fitted(clf)
+
+        self.assertEqual(estimator.calls, [])
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
+
+    def test_prefit_without_learned_classes_requires_declared_classes(self):
+        estimator = self._NoClassesEstimator().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(estimator=estimator, missing_label=-1)
+
+        self._assert_prefit_rejection(
+            clf, "exposes no learned class vocabulary"
+        )
+
+    def test_prefit_without_learned_classes_uses_declared_classes(self):
+        estimator = self._NoClassesEstimator().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1], missing_label=-1
+        )
+
+        P = clf.predict_proba(self.X_ml)
+
+        self.assertEqual(clf.target_spec_.classes, (0, 1))
+        np.testing.assert_allclose(P, np.tile([0.4, 0.6], (len(self.X_ml), 1)))
+
+    def test_unmappable_probability_columns_are_rejected(self):
+        estimator = self._NoClassesEstimator().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1, 2], missing_label=-1
+        )
+
+        self.assertRaisesRegex(
+            ValueError,
+            "does not expose `classes_`",
+            clf.predict_proba,
+            self.X_ml,
+        )
+
+    def _prefit_single_output_clf(self, proba, classes_):
+        """Return a fitted wrapper whose estimator returns `proba`."""
+        clf = SklearnClassifier(
+            estimator=GaussianNB().fit(self.X_ml, self.y_ml[:, 0]),
+            classes=[0, 1],
+            missing_label=-1,
+        )
+        clf.predict_proba(self.X_ml)
+        clf.n_features_in_ = self.X_ml.shape[1]
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=proba, classes_=classes_
+        )
+        return clf
+
+    def test_malformed_single_output_probabilities_are_rejected(self):
+        # The estimator contradicts the requested samples or its own learned
+        # classes, so its columns cannot be mapped to the declared ones.
+        n_samples = len(self.X_ml)
+        malformed = {
+            "too few samples": (np.full((1, 2), 0.5), r"`\(4, n_classes\)`"),
+            "not two-dimensional": (
+                np.full(n_samples, 0.5),
+                r"`\(4, n_classes\)`",
+            ),
+            "column count": (
+                np.full((n_samples, 3), 1 / 3),
+                "reports 2 classes",
+            ),
+        }
+        for reason, (proba, message) in malformed.items():
+            with self.subTest(reason=reason):
+                clf = self._prefit_single_output_clf(
+                    proba=proba, classes_=np.array([0, 1])
+                )
+
+                self.assertRaisesRegex(
+                    ValueError, message, clf.predict_proba, self.X_ml
+                )
+
+    def test_unlearned_probability_column_class_is_rejected(self):
+        clf = self._prefit_single_output_clf(
+            proba=np.full((len(self.X_ml), 1), 1.0), classes_=np.array([5])
+        )
+
+        self.assertRaisesRegex(
+            ValueError,
+            "Class 5 learned by the wrapped estimator is not contained",
+            clf.predict_proba,
+            self.X_ml,
+        )
+
+    def test_prefit_maps_probability_columns_by_class_identity(self):
+        estimator = self._ReorderedClassesEstimator().fit(
+            self.X_ml, self.y_ml[:, 0]
+        )
+        clf = SklearnClassifier(
+            estimator=estimator, classes=None, missing_label=-1
+        )
+
+        P = clf.predict_proba(self.X_ml)
+
+        # The learned order is normalized to the documented class order, so
+        # the estimator's leading column of class 1 becomes the last column.
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+        self.assertEqual(clf.target_spec_.classes, (0, 1))
+        np.testing.assert_allclose(P, np.tile([0.2, 0.8], (len(self.X_ml), 1)))
+
+    def test_prefit_cost_sensitive_prediction_uses_mapped_columns(self):
+        estimator = self._ReorderedClassesEstimator().fit(
+            self.X_ml, self.y_ml[:, 0]
+        )
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[0, 1],
+            cost_matrix=1 - np.eye(2),
+            missing_label=-1,
+        )
+
+        y_pred = clf.predict(self.X_ml)
+
+        # Class `1` carries the estimator's probability of `0.8`, so it has the
+        # lowest expected costs once the columns are mapped by class identity.
+        np.testing.assert_array_equal(y_pred, np.ones(len(self.X_ml)))
 
     def test_prefit_initialization_commits_complete_label_state(self):
         estimator = MultiOutputClassifier(GaussianNB()).fit(

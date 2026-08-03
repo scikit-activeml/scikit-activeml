@@ -107,6 +107,61 @@ predictions.
    True
    >>> assert not hasattr(rejected, "target_spec_")
 
+Pre-fitted estimators
+---------------------
+
+A pre-fitted ``estimator`` already published the target semantics of its own
+predictions, so ``SklearnClassifier`` reconciles the declared semantics with its
+learned classes by class identity before publishing any fitted attribute.
+Declared ``classes`` may extend the learned vocabulary, and the additional
+classes then receive zero-filled probability columns in the declared order.
+They can neither reinterpret learned classes nor change the number of predicted
+outputs, so equally wide but disjoint vocabularies are rejected rather than
+silently relabeled.
+
+.. doctest::
+
+   >>> X_prefit = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+   >>> estimator = LogisticRegression().fit(X_prefit, [0, 0, 1, 1])
+   >>> extended = SklearnClassifier(
+   ...     estimator, classes=[0, 1, 2], missing_label=-1
+   ... )
+   >>> assert np.all(extended.predict_proba(X_prefit)[:, 2] == 0.0)
+   >>> assert extended.target_spec_.classes == (0, 1, 2)
+   >>> relabeled = SklearnClassifier(
+   ...     estimator, classes=[2, 3], missing_label=-1
+   ... )
+   >>> try:
+   ...     _ = relabeled.predict(X_prefit)
+   ... except ValueError as error:
+   ...     print("learned the class labels" in str(error))
+   True
+   >>> assert not hasattr(relabeled, "target_spec_")
+
+A fitted multi-label estimator is accepted when it publishes one binary class
+vocabulary per label output, as ``MultiOutputClassifier`` and a multi-output
+``RandomForestClassifier`` do, or when it publishes explicit multi-label
+metadata whose flat ``classes_`` identifies its label outputs, as
+``OneVsRestClassifier`` does.  In the latter case, the flat classes are output
+identifiers rather than one binary vocabulary, and each output carries a binary
+indicator, so ``[[0, 1], ...]`` has to be declared.  A pre-fitted estimator
+publishing neither representation cannot be declared multi-label at all,
+because a flat learned vocabulary is indistinguishable from single-output
+classification; fit such an estimator through the wrapper instead.
+
+.. doctest::
+
+   >>> from sklearn.multiclass import OneVsRestClassifier
+   >>> y_prefit = np.array([[0, 1], [0, 1], [1, 0], [1, 0]])
+   >>> one_vs_rest = OneVsRestClassifier(LogisticRegression()).fit(
+   ...     X_prefit, y_prefit
+   ... )
+   >>> declared = SklearnClassifier(
+   ...     one_vs_rest, classes=[[0, 1], [0, 1]], missing_label=-1
+   ... )
+   >>> assert declared.predict(X_prefit).shape == (4, 2)
+   >>> assert declared.target_spec_.target_type == "multi-label"
+
 Class vocabularies and complete rows
 ------------------------------------
 

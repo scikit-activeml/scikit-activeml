@@ -7,6 +7,7 @@ from multiple annotators.
 import warnings
 from collections import deque
 from copy import deepcopy
+from dataclasses import dataclass
 import inspect
 
 import numpy as np
@@ -121,6 +122,324 @@ def _multilabel_capability_error(component, estimator):
     )
 
 
+#: The class labels of one binary indicator column of a multi-label target.
+_INDICATOR_CLASSES = (0, 1)
+
+
+@dataclass(frozen=True)
+class _FittedTargetEvidence:
+    """Target evidence that a pre-fitted estimator publishes about itself.
+
+    A pre-fitted estimator's learned class vocabulary determines the meaning
+    of its predictions and probability columns. This value describes that
+    meaning as the estimator itself reports it, so that declared target
+    semantics can be reconciled with it before fitted wrapper state is
+    published. It is read from fitted attributes only, never by calling a
+    prediction method on invented input.
+
+    Parameters
+    ----------
+    kind : str
+        The kind of target evidence the estimator publishes, one of:
+
+        - `"single-output"`: one flat learned class vocabulary, describing one
+          categorical assignment per sample;
+        - `"label-vocabularies"`: one learned class vocabulary per label
+          output, as published by `sklearn.multioutput.MultiOutputClassifier`
+          and a multi-output `sklearn.ensemble.RandomForestClassifier`;
+        - `"label-outputs"`: flat learned classes identifying label outputs,
+          published together with explicit fitted multi-label metadata as by
+          `sklearn.multiclass.OneVsRestClassifier`; or
+        - `"unknown"`: no learned class vocabulary at all.
+    classes : numpy.ndarray or tuple of numpy.ndarray or None
+        The learned class vocabulary for `"single-output"`, one learned class
+        vocabulary per label output for `"label-vocabularies"`, and `None`
+        otherwise, because flat label-output identifiers are no class
+        vocabulary and an unknown vocabulary cannot be described.
+    n_label_outputs : int or None
+        The number of label outputs for `"label-vocabularies"` and
+        `"label-outputs"`, and `None` otherwise.
+    """
+
+    kind: str
+    classes: np.ndarray | tuple | None
+    n_label_outputs: int | None
+
+    @property
+    def describes_label_outputs(self):
+        """Whether the estimator's metadata describes several label outputs."""
+        return self.kind in {"label-vocabularies", "label-outputs"}
+
+
+def _discover_fitted_target_evidence(estimator):
+    """Read the target evidence a pre-fitted `estimator` publishes.
+
+    Parameters
+    ----------
+    estimator : object
+        The pre-fitted estimator whose fitted attributes are inspected.
+
+    Returns
+    -------
+    evidence : _FittedTargetEvidence
+        The target evidence published by `estimator`.
+    """
+    classes = getattr(estimator, "classes_", None)
+    if classes is None:
+        return _FittedTargetEvidence("unknown", None, None)
+    if _has_nested_classes(classes):
+        vocabularies = tuple(np.asarray(classes_j) for classes_j in classes)
+        return _FittedTargetEvidence(
+            "label-vocabularies", vocabularies, len(vocabularies)
+        )
+    classes = np.asarray(classes)
+    if bool(getattr(estimator, "multilabel_", False)):
+        # A fitted multi-label estimator such as `OneVsRestClassifier`
+        # publishes one flat identifier per label output instead of one class
+        # vocabulary per output.
+        return _FittedTargetEvidence("label-outputs", None, len(classes))
+    return _FittedTargetEvidence("single-output", classes, None)
+
+
+def _class_column(class_label, declared_classes):
+    """Locate one class label in a declared class vocabulary.
+
+    A learned class label is never `numpy.nan`, because `scikit-learn` rejects
+    such a target, so the labels are compared by plain equality.
+
+    Parameters
+    ----------
+    class_label : scalar
+        The class label to locate, e.g., one an estimator learned during its
+        own fitting.
+    declared_classes : array-like of shape (n_classes,)
+        The class vocabulary of one output declared through the wrapper.
+
+    Returns
+    -------
+    class_index : int or None
+        The column `class_label` occupies in `declared_classes`, or `None` if
+        that vocabulary does not contain it.
+    """
+    for class_index, declared_class in enumerate(declared_classes):
+        if bool(declared_class == class_label):
+            return class_index
+    return None
+
+
+def _format_class(class_label):
+    """Render one class label readably for an error message."""
+    return (
+        class_label.item()
+        if isinstance(class_label, np.generic)
+        else class_label
+    )
+
+
+def _format_classes(classes):
+    """Render a class vocabulary readably for an error message."""
+    return [_format_class(class_label) for class_label in classes]
+
+
+def _classes_missing_from(class_labels, declared_classes):
+    """Collect class labels that a declared class vocabulary lacks.
+
+    Parameters
+    ----------
+    class_labels : array-like of shape (n_class_labels,)
+        The class labels an estimator predicts for one output.
+    declared_classes : array-like of shape (n_classes,)
+        The class vocabulary of the same output declared through the wrapper.
+
+    Returns
+    -------
+    missing_classes : list
+        The class labels that `declared_classes` does not contain, compared by
+        class identity rather than position or count.
+    """
+    return [
+        class_label
+        for class_label in class_labels
+        if _class_column(class_label, declared_classes) is None
+    ]
+
+
+def _map_proba_columns(P, learned_classes, declared_classes, output_idx=None):
+    """Map probability columns onto a declared class vocabulary.
+
+    An estimator's probability columns follow its own learned class vocabulary,
+    which may be ordered differently from the declared one and may omit
+    declared classes. The columns are therefore mapped by class identity rather
+    than by position, so that equally wide vocabularies are never silently
+    reinterpreted. Declared classes the estimator never learned receive
+    zero-filled columns.
+
+    Parameters
+    ----------
+    P : numpy.ndarray of shape (n_samples, n_learned_classes)
+        The probabilities of one output as returned by the wrapped estimator.
+    learned_classes : array-like of shape (n_learned_classes,)
+        The class labels the estimator learned for that output, in the order of
+        its probability columns.
+    declared_classes : array-like of shape (n_classes,)
+        The class vocabulary of the same output declared through the wrapper.
+    output_idx : int or None, default=None
+        Index of the label output, or `None` for single-output classification.
+
+    Returns
+    -------
+    P_mapped : numpy.ndarray of shape (n_samples, n_classes)
+        The probabilities in the column order of `declared_classes`.
+
+    Raises
+    ------
+    ValueError
+        If the columns of `P` do not correspond to `learned_classes`, or if a
+        learned class label is not contained in `declared_classes`.
+    """
+    name = "`predict_proba`" if output_idx is None else f"P[{output_idx}]"
+    output = "" if output_idx is None else f" of output {output_idx}"
+    if P.shape[1] != len(learned_classes):
+        raise ValueError(
+            f"{name} has {P.shape[1]} columns but the fitted estimator "
+            f"reports {len(learned_classes)} classes{output}."
+        )
+    P_mapped = np.zeros((len(P), len(declared_classes)), dtype=float)
+    for column, learned_class in enumerate(learned_classes):
+        class_index = _class_column(learned_class, declared_classes)
+        if class_index is None:
+            raise ValueError(
+                f"Class {_format_class(learned_class)!r} learned by the "
+                f"wrapped estimator is not contained in the declared "
+                f"classes{output}."
+            )
+        P_mapped[:, class_index] = P[:, column]
+    return P_mapped
+
+
+def _check_fitted_target_evidence(estimator, evidence, target_spec):
+    """Reconcile a target specification with a pre-fitted estimator.
+
+    Declared target semantics may extend a pre-fitted estimator's learned
+    class vocabulary, but they can neither reinterpret its learned classes nor
+    change the number of outputs it predicts.
+
+    An estimator publishing no learned class vocabulary is accepted, because
+    its own metadata then contradicts nothing. The structure of what it
+    predicts is validated where it becomes observable, i.e., when `predict` or
+    `predict_proba` is called.
+
+    Parameters
+    ----------
+    estimator : object
+        The pre-fitted estimator, named in the raised errors.
+    evidence : _FittedTargetEvidence
+        The target evidence published by `estimator`.
+    target_spec : skactiveml.utils.TargetSpec
+        The resolved target specification that is about to be published.
+
+    Raises
+    ------
+    ValueError
+        If the resolved target semantics contradict the target evidence.
+    """
+    if evidence.kind == "unknown":
+        return
+    if target_spec.target_type != "multi-label":
+        if evidence.describes_label_outputs:
+            raise ValueError(
+                f"The pre-fitted estimator '{estimator}' predicts "
+                f"{evidence.n_label_outputs} label outputs, so it cannot be "
+                f"declared as a single-output classifier with the class "
+                f"vocabulary {_format_classes(target_spec.classes)}. Declare "
+                f"one binary class vocabulary per label output."
+            )
+        _check_learned_classes(
+            estimator, evidence.classes, target_spec.classes
+        )
+        return
+
+    n_outputs = len(target_spec.classes)
+    if not evidence.describes_label_outputs:
+        raise ValueError(
+            f"The pre-fitted estimator '{estimator}' learned one categorical "
+            f"class assignment per sample from the class vocabulary "
+            f"{_format_classes(evidence.classes)}, so it cannot be declared "
+            f"as a multi-label classifier with {n_outputs} label outputs. A "
+            f"pre-fitted multi-label estimator has to publish either one "
+            f"class vocabulary per label output, e.g., "
+            f"`sklearn.multioutput.MultiOutputClassifier`, or explicit fitted "
+            f"multi-label metadata, e.g., "
+            f"`sklearn.multiclass.OneVsRestClassifier`. Otherwise, fit the "
+            f"estimator through this wrapper, or declare "
+            f"`target_type='single-output'`."
+        )
+    if evidence.n_label_outputs != n_outputs:
+        raise ValueError(
+            f"The pre-fitted estimator '{estimator}' learned "
+            f"{evidence.n_label_outputs} label outputs, but {n_outputs} class "
+            f"vocabularies are declared. A pre-fitted estimator's number of "
+            f"outputs cannot be changed through `classes`."
+        )
+    if evidence.kind == "label-vocabularies":
+        for output_idx, learned_classes in enumerate(evidence.classes):
+            _check_learned_classes(
+                estimator,
+                learned_classes,
+                target_spec.classes[output_idx],
+                output_idx=output_idx,
+            )
+        return
+    # A fitted multi-label estimator publishing label-output identifiers
+    # predicts one binary indicator per output, so its outputs cannot carry
+    # declared class labels other than the indicator values themselves.
+    for output_idx, declared_classes in enumerate(target_spec.classes):
+        if _classes_missing_from(_INDICATOR_CLASSES, declared_classes):
+            raise ValueError(
+                f"The pre-fitted estimator '{estimator}' predicts a binary "
+                f"indicator per label output, so every declared class "
+                f"vocabulary has to consist of the indicator values "
+                f"{list(_INDICATOR_CLASSES)}. Output {output_idx} declares "
+                f"{_format_classes(declared_classes)}."
+            )
+
+
+def _check_learned_classes(
+    estimator, learned_classes, declared_classes, output_idx=None
+):
+    """Check that a declared class vocabulary contains the learned classes.
+
+    Parameters
+    ----------
+    estimator : object
+        The pre-fitted estimator, named in the raised error.
+    learned_classes : array-like of shape (n_learned_classes,)
+        The class labels `estimator` learned for one output.
+    declared_classes : tuple
+        The class vocabulary of the same output declared through the wrapper.
+    output_idx : int or None, default=None
+        Index of the label output, or `None` for single-output classification.
+
+    Raises
+    ------
+    ValueError
+        If a learned class label is missing from `declared_classes`.
+    """
+    missing_classes = _classes_missing_from(learned_classes, declared_classes)
+    if not missing_classes:
+        return
+    output = "" if output_idx is None else f" for label output {output_idx}"
+    raise ValueError(
+        f"The pre-fitted estimator '{estimator}' learned the class labels "
+        f"{_format_classes(missing_classes)}{output} that are not contained "
+        f"in the declared class vocabulary "
+        f"{_format_classes(declared_classes)}. Its learned classes determine "
+        f"the meaning of its predictions and probability columns, so "
+        f"`classes` can only extend them with additional classes, which then "
+        f"receive zero-filled probability columns."
+    )
+
+
 def _prior_matrix_from_counts(counts, n_samples):
     counts = np.asarray(counts, dtype=float)
     total = counts.sum()
@@ -205,6 +524,21 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     Notes
     -----
+    A pre-fitted `estimator` already published the target semantics of its own
+    predictions, so its learned classes are reconciled with the declared ones
+    by class identity before any fitted attribute of this wrapper is published.
+    Declared `classes` may extend the learned class vocabulary, whose
+    additional classes then receive zero-filled probability columns in the
+    declared order, but they can neither reinterpret learned classes nor change
+    the number of predicted outputs. A flat `classes_` published together with
+    fitted multi-label metadata, e.g., by
+    `sklearn.multiclass.OneVsRestClassifier`, identifies binary indicator
+    outputs instead of describing one class vocabulary, so one binary indicator
+    vocabulary per output has to be declared through `classes`. A pre-fitted
+    estimator publishing neither one class vocabulary per label output nor
+    such metadata cannot be declared multi-label, because its flat learned
+    vocabulary is indistinguishable from single-output classification.
+
     Two degenerate training cases are part of this wrapper's contract and make
     it predict the observed class label distribution instead of raising: an
     empty labeled training subset, and an `estimator` rejecting a labeled
@@ -453,22 +787,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
             if not self._is_multilabel_target():
                 # Single output classification.
-                if P.shape[1] != len(self.classes_):
-                    # Map the predicted classes to self.classes.
-                    P_ext = np.zeros(
-                        (n_samples, len(self.classes_)), dtype=float
-                    )
-                    est_classes = self.estimator_.classes_
-                    indices_est = np.flatnonzero(
-                        np.isin(est_classes, self.classes_)
-                    )
-                    class_indices = np.searchsorted(
-                        self.classes_, est_classes[indices_est]
-                    )
-                    P_ext[:, class_indices] = (
-                        1 if len(class_indices) == 1 else P
-                    )
-                    P = P_ext
+                P = self._normalize_single_output_proba(P, n_samples=n_samples)
                 # Fall through to the label-count prior fallback if the
                 # fitted estimator yielded NaN probabilities.
                 if not np.any(np.isnan(P)):
@@ -768,19 +1087,19 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         except NotFittedError:
             return False
 
-        fitted_classes = (
-            self.classes
-            if self.classes is not None
-            else getattr(self.estimator, "classes_", None)
-        )
         estimator = deepcopy(self.estimator)
+        evidence = _discover_fitted_target_evidence(self.estimator)
 
-        # The target specification is resolved and validated before any fitted
-        # attribute is written, such that a failing target contract leaves this
-        # wrapper exactly in its pre-call state.
-        if fitted_classes is not None:
-            self._initialize_label_state(fitted_classes)
-            self._initialize_label_counts_from_classes()
+        # The target specification is resolved, validated, and reconciled with
+        # the pre-fitted estimator before any fitted attribute is written, such
+        # that a failing target contract leaves this wrapper exactly in its
+        # pre-call state.
+        label_state = self._resolve_label_state(self._prefit_classes(evidence))
+        _check_fitted_target_evidence(
+            self.estimator, evidence, label_state["target_spec"]
+        )
+        self._commit_label_state(label_state)
+        self._initialize_label_counts_from_classes()
 
         # set attributes that would be set by the fit function
         self.is_fitted_ = True
@@ -799,6 +1118,54 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             return getattr(self.estimator_, item)
         else:
             return getattr(self.estimator, item)
+
+    def _prefit_classes(self, evidence):
+        """Determine the class vocabulary of a pre-fitted `estimator`.
+
+        The declared `classes` take precedence, because the label state is
+        resolved from the returned vocabulary and also validated against it.
+        Reconciliation with the estimator's own learned classes is a separate
+        step, so that it can report their contradiction rather than a generic
+        unknown-class error.
+
+        Parameters
+        ----------
+        evidence : _FittedTargetEvidence
+            The target evidence published by the pre-fitted `estimator`.
+
+        Returns
+        -------
+        classes : array-like of shape (n_classes,), or a list of such \
+                array-likes
+            The declared `classes` if they are given, and the estimator's
+            learned class vocabulary otherwise.
+
+        Raises
+        ------
+        ValueError
+            If neither this wrapper nor the pre-fitted `estimator` declares a
+            class vocabulary, because the estimator's predictions cannot be
+            interpreted without one.
+        """
+        if self.classes is not None:
+            return self.classes
+        if evidence.classes is not None:
+            return evidence.classes
+        if evidence.kind == "label-outputs":
+            example = [list(_INDICATOR_CLASSES)] * evidence.n_label_outputs
+            raise ValueError(
+                f"The pre-fitted estimator '{self.estimator}' declares "
+                f"multi-label classification with "
+                f"{evidence.n_label_outputs} label outputs, so its flat "
+                f"learned classes identify those outputs instead of one class "
+                f"vocabulary. Declare one binary indicator vocabulary per "
+                f"label output, i.e., `classes={example}`."
+            )
+        raise ValueError(
+            f"The pre-fitted estimator '{self.estimator}' exposes no learned "
+            f"class vocabulary through `classes_`, so its predictions cannot "
+            f"be interpreted. Declare `classes`."
+        )
 
     def _initialize_label_state(self, classes):
         """Resolve and then commit the label state for `classes`.
@@ -992,6 +1359,58 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             )
         return P_ml
 
+    def _normalize_single_output_proba(self, P, n_samples):
+        """Align a single-output probability array to `classes_`.
+
+        The wrapped estimator's probability columns follow its own learned
+        class vocabulary, which may be ordered differently from `classes_` and
+        may omit declared classes. The columns are therefore mapped by class
+        identity rather than by position, so that equally wide vocabularies
+        are not silently reinterpreted. Declared classes the estimator never
+        learned receive zero-filled columns.
+
+        Parameters
+        ----------
+        P : array-like
+            The probabilities returned by the wrapped estimator's
+            `predict_proba`.
+        n_samples : int
+            Number of samples the probabilities are expected to have.
+
+        Returns
+        -------
+        P : numpy.ndarray of shape (n_samples, n_classes)
+            The probabilities in the column order of `classes_`.
+
+        Raises
+        ------
+        ValueError
+            If the probabilities can be reconciled with neither the learned
+            nor the declared class vocabulary.
+        """
+        P = np.asarray(P, dtype=float)
+        if P.ndim != 2 or P.shape[0] != n_samples:
+            raise ValueError(
+                f"Expected `predict_proba` of the wrapped estimator to return "
+                f"shape `({n_samples}, n_classes)` for single-output "
+                f"classification, got {P.shape}."
+            )
+
+        est_classes = getattr(self.estimator_, "classes_", None)
+        if est_classes is None:
+            if P.shape[1] != len(self.classes_):
+                raise ValueError(
+                    f"`predict_proba` returned {P.shape[1]} columns but "
+                    f"{len(self.classes_)} classes are declared, and the "
+                    f"wrapped estimator does not expose `classes_` to map "
+                    f"them. Provide an estimator exposing its learned "
+                    f"classes, declare `classes` matching the estimator, or "
+                    f"return probabilities for all declared classes."
+                )
+            return P
+
+        return _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+
     def _normalize_multilabel_proba_list(self, P, n_samples):
         """Align a list of per-output probability matrices to `classes_`.
 
@@ -1058,26 +1477,14 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 P_list.append(P_j)
                 continue
 
-            est_classes_j = np.asarray(est_classes_j)
-            if P_j.shape[1] != len(est_classes_j):
-                raise ValueError(
-                    f"P[{j}] has {P_j.shape[1]} columns but the fitted "
-                    f"estimator reports {len(est_classes_j)} classes."
+            P_list.append(
+                _map_proba_columns(
+                    P_j,
+                    np.asarray(est_classes_j),
+                    classes_j,
+                    output_idx=j,
                 )
-
-            class_indices = []
-            for est_class in est_classes_j:
-                indices = np.flatnonzero(classes_j == est_class)
-                if len(indices) != 1:
-                    raise ValueError(
-                        f"Class {est_class!r} of output {j} is not contained "
-                        "in the declared classes."
-                    )
-                class_indices.append(indices[0])
-
-            P_ext = np.zeros((n_samples, len(classes_j)), dtype=float)
-            P_ext[:, class_indices] = P_j
-            P_list.append(P_ext)
+            )
 
         return P_list
 
