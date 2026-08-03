@@ -232,7 +232,15 @@ label helpers, or multi-annotator components. In particular:
   retain a last-query specification;
 - add tests for every supported target combination and for invalid or
   unsupported combinations, including ambiguous two-dimensional targets and
-  complete-row requirements for multi-label data.
+  complete-row requirements for multi-label data;
+- operate on encoded targets for multi-label data, because each label output
+  may declare its own binary class vocabulary, e.g.
+  ``[["no", "yes"], ["off", "on"]]``. A pool strategy test supplying
+  ``query_default_params_clf_multilabel`` runs the shared custom class
+  vocabulary contract automatically. If its acquisition path needs auxiliary
+  inputs, override ``_multilabel_custom_vocabulary_params`` and record the
+  override in ``skactiveml/pool/tests/test_multilabel_vocabulary_contract.py``
+  instead of skipping the contract.
 
 Single-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

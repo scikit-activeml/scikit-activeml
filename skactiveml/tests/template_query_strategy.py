@@ -21,16 +21,107 @@ from skactiveml.utils import (
     MISSING_LABEL,
     is_unlabeled,
     is_labeled,
+    labeled_indices,
+    resolve_target_spec,
     unlabeled_indices,
     call_func,
 )
+from skactiveml.utils._target import _class_vocabulary_key
+from skactiveml.utils._validation import _has_nested_classes
 
+from sklearn.base import BaseEstimator
 from sklearn.naive_bayes import GaussianNB
+
+# Distinct binary class vocabularies covering the shared custom-vocabulary
+# contract of multi-label pool query strategies. Each vocabulary is given in
+# canonical, i.e. sorted, order, so that its second entry is the positive
+# class of the corresponding label output.
+_MULTILABEL_STRING_VOCABULARIES = (
+    ("no", "yes"),
+    ("off", "on"),
+)
 
 
 class Dummy:
     def __init__(self):
         pass
+
+
+def _relabel_multilabel_target(
+    y, source_classes, vocabularies, *, missing_label
+):
+    """Relabel a multi-label target into other binary class vocabularies.
+
+    Each observation is mapped by its position in the source vocabulary of its
+    label output onto the canonically, i.e. sorted, ordered target vocabulary.
+    Canonically ordered source classes therefore preserve the meaning of every
+    observation, i.e. negative stays negative and positive stays positive.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples, n_outputs)
+        The multi-label target to relabel.
+    source_classes : tuple of tuple
+        The binary class vocabulary of `y` per label output.
+    vocabularies : tuple of tuple
+        The binary class vocabulary to relabel onto per label output.
+    missing_label : scalar or str or None
+        Value representing a missing observation in `y`.
+
+    Returns
+    -------
+    y_relabeled : numpy.ndarray of shape (n_samples, n_outputs)
+        The object-valued relabeled target, using `None` as its missing label.
+    """
+    y = np.asarray(y)
+    is_lbld = is_labeled(y, missing_label, target_type="multi-label")
+    y_relabeled = np.full(y.shape, None, dtype=object)
+    for output_idx, source_classes_i in enumerate(source_classes):
+        target_classes_i = sorted(vocabularies[output_idx])
+        for class_idx, class_label in enumerate(source_classes_i):
+            is_class = is_lbld & (y[:, output_idx] == class_label)
+            y_relabeled[is_class, output_idx] = target_classes_i[class_idx]
+    return y_relabeled
+
+
+def _with_component_params(params, *, missing_label, classes=None):
+    """Apply a missing label and class vocabularies to all components.
+
+    Every component carried by the parameters, e.g. a wrapped query strategy
+    or a classifier query argument, must agree with the strategy about the
+    missing label. Class vocabularies are replaced only where a component
+    declares one vocabulary per label output, so that a vocabulary of an
+    auxiliary single-output problem is never overwritten.
+    """
+    params = deepcopy(params)
+    for key, value in params.items():
+        if key == "missing_label":
+            params[key] = missing_label
+        else:
+            params[key] = _component_with_params(value, missing_label, classes)
+    return params
+
+
+def _component_with_params(value, missing_label, classes):
+    """Return one component with the given declarations applied.
+
+    Only the parameters a component declares itself are replaced. A component
+    nested more deeply, e.g. the strategy wrapped by a wrapped strategy, or a
+    collection of components is not covered by any current fixture and fails
+    loudly through the missing-label checks, so such a fixture requires an
+    explicit override.
+    """
+    if not isinstance(value, BaseEstimator):
+        return value
+    component_params = value.get_params(deep=False)
+    replacements = {}
+    if "missing_label" in component_params:
+        replacements["missing_label"] = missing_label
+    if classes is not None and _has_nested_classes(
+        component_params.get("classes")
+    ):
+        replacements["classes"] = [list(classes_i) for classes_i in classes]
+    return clone(value).set_params(**replacements)
 
 
 class TemplateQueryStrategy:
@@ -600,15 +691,36 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_allclose(u1, u2)
 
     def test_query_multilabel_invalid_rows(self):
+        # Partially observed multi-label rows are rejected, for the ordinary
+        # as well as for a custom class vocabulary.
         if self.query_default_params_clf_multilabel is None:
             return
 
-        query_params = deepcopy(self.query_default_params_clf_multilabel)
-        y = np.array(query_params["y"], copy=True)
-        y[1, 0] = self.init_default_params["missing_label"]
-        query_params["y"] = y
-        qs = self.qs_class(**self._multilabel_init_params())
-        self.assertRaises(ValueError, qs.query, **query_params)
+        fixtures = [
+            (
+                "default",
+                self._multilabel_init_params(),
+                deepcopy(self.query_default_params_clf_multilabel),
+            ),
+            (
+                "custom-vocabulary",
+                *self._multilabel_custom_vocabulary_params(
+                    self._multilabel_string_vocabularies()
+                ),
+            ),
+        ]
+        for name, init_params, query_params in fixtures:
+            with self.subTest(vocabularies=name):
+                missing_label = init_params["missing_label"]
+                y = np.array(query_params["y"], copy=True)
+                observed_idx = labeled_indices(
+                    y, missing_label, target_type="multi-label"
+                )
+                y[observed_idx[0], 0] = missing_label
+                query_params["y"] = y
+
+                qs = self.qs_class(**init_params)
+                self.assertRaises(ValueError, qs.query, **query_params)
 
     def test_query_param_sample_weight_multilabel(self):
         if self.query_default_params_clf_multilabel is None:
@@ -703,6 +815,162 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         ):
             init_params["target_type"] = "multi-label"
         return init_params
+
+    def test_query_multilabel_custom_class_vocabularies(self):
+        # A multi-label target may use its own binary class vocabulary per
+        # label output, including string labels. Every strategy must therefore
+        # operate on encoded targets instead of assuming that raw labels are
+        # numeric or that they are `{0, 1}`.
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        vocabulary_cases = [
+            ("numeric", self._multilabel_numeric_vocabularies()),
+            ("string", self._multilabel_string_vocabularies()),
+        ]
+        results = {}
+        for name, vocabularies in vocabulary_cases:
+            with self.subTest(vocabularies=name):
+                init_params, query_params = (
+                    self._multilabel_custom_vocabulary_params(vocabularies)
+                )
+                y = query_params["y"]
+                missing_label = init_params["missing_label"]
+                unld_idx = unlabeled_indices(
+                    y, missing_label, target_type="multi-label"
+                )
+                lbld_idx = labeled_indices(
+                    y, missing_label, target_type="multi-label"
+                )
+                query_params["return_utilities"] = True
+
+                qs = self.qs_class(**init_params)
+                query_indices, utilities = qs.query(**query_params)
+
+                self.assertIn(query_indices[0], unld_idx)
+                self.assertTrue(
+                    np.isfinite(utilities[0, query_indices[0]]),
+                    msg=f"Non-finite utility of the selected candidate for "
+                    f"the {name}-valued class vocabularies {vocabularies}.",
+                )
+                # Only labeled samples are excluded via `np.nan`, i.e. a
+                # candidate that a strategy deliberately excludes must remain
+                # comparable through `-np.inf` instead of becoming invalid.
+                self.assertFalse(np.isnan(utilities[0, unld_idx]).any())
+                self.assertFalse(np.isposinf(utilities).any())
+                self.assertTrue(np.isnan(utilities[0, lbld_idx]).all())
+                results[name] = (query_indices, utilities)
+
+        if len(results) < len(vocabulary_cases):
+            # A failing query is already reported by its own subtest.
+            return
+
+        # Semantically equivalent vocabularies must not change acquisition.
+        np.testing.assert_array_equal(
+            results["numeric"][0],
+            results["string"][0],
+            err_msg="String-valued class vocabularies select other samples "
+            "than their equivalent numeric encoding.",
+        )
+        np.testing.assert_allclose(
+            results["numeric"][1],
+            results["string"][1],
+            equal_nan=True,
+            err_msg="String-valued class vocabularies yield other utilities "
+            "than their equivalent numeric encoding.",
+        )
+
+    def _multilabel_n_outputs(self):
+        """Return the number of label outputs of the multi-label fixture."""
+        return np.asarray(self.query_default_params_clf_multilabel["y"]).shape[
+            1
+        ]
+
+    def _multilabel_string_vocabularies(self):
+        """Return one distinct string class vocabulary per label output."""
+        return tuple(
+            (
+                _MULTILABEL_STRING_VOCABULARIES[output_idx]
+                if output_idx < len(_MULTILABEL_STRING_VOCABULARIES)
+                else (f"neg-{output_idx}", f"pos-{output_idx}")
+            )
+            for output_idx in range(self._multilabel_n_outputs())
+        )
+
+    def _multilabel_numeric_vocabularies(self):
+        """Return the ordinary numeric class vocabulary per label output."""
+        return tuple((0, 1) for _ in range(self._multilabel_n_outputs()))
+
+    def _multilabel_custom_vocabulary_params(self, vocabularies):
+        """Build the multi-label fixture of one custom class vocabulary.
+
+        The default implementation relabels the target of
+        `query_default_params_clf_multilabel` into the given per-output binary
+        class vocabularies and adapts the declared vocabularies and the missing
+        label of every component. An object-valued target is used, which
+        requires `missing_label=None` for the strategy as well as for each of
+        its components.
+
+        Override this hook if a strategy needs auxiliary inputs, e.g.
+        embeddings, logits, or a discriminator, that cannot be derived from the
+        default multi-label query parameters. Overriding replaces the fixture;
+        it must never skip the custom-vocabulary contract.
+
+        Parameters
+        ----------
+        vocabularies : tuple of tuple
+            One binary class vocabulary per label output in canonical, i.e.
+            sorted, order.
+
+        Returns
+        -------
+        init_params : dict
+            Initialization parameters of the query strategy.
+        query_params : dict
+            Query parameters using the given class vocabularies.
+        """
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params["y"] = _relabel_multilabel_target(
+            query_params["y"],
+            source_classes=self._multilabel_source_classes(query_params),
+            vocabularies=vocabularies,
+            missing_label=self.init_default_params["missing_label"],
+        )
+        # An object-valued target admits `None` as its only missing label.
+        init_params = _with_component_params(
+            self._multilabel_init_params(), missing_label=None
+        )
+        query_params = _with_component_params(
+            query_params, missing_label=None, classes=vocabularies
+        )
+        return init_params, query_params
+
+    def _multilabel_source_classes(self, query_params):
+        """Resolve the class vocabularies of the default fixture."""
+        declared_classes = None
+        for value in query_params.values():
+            classes = getattr(value, "classes", None)
+            if not _has_nested_classes(classes):
+                continue
+            if declared_classes is not None and _class_vocabulary_key(
+                classes
+            ) != _class_vocabulary_key(declared_classes):
+                raise AssertionError(
+                    "The default multi-label query parameters declare "
+                    "conflicting class vocabularies, so they cannot be "
+                    "relabeled. Override "
+                    "`_multilabel_custom_vocabulary_params`."
+                )
+            declared_classes = classes
+        target_spec = resolve_target_spec(
+            query_params["y"],
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=declared_classes,
+            missing_label=self.init_default_params["missing_label"],
+        )
+        return target_spec.classes
 
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):

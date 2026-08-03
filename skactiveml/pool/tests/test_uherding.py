@@ -15,6 +15,7 @@ from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import MaxHerding, UHerding
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
+    _relabel_multilabel_target,
 )
 from skactiveml.tests.utils import (
     ParzenWindowClassifierLogitsEmbedding,
@@ -22,8 +23,17 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierLogitsOnly,
     ParzenWindowClassifierWeirdTuple,
 )
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, TargetSpec, resolve_target_spec
 from skactiveml.utils._validation import _canonicalize_multilabel_probas
+
+# Semantically equivalent binary class vocabularies per label output. The
+# reversed declaration must resolve to the same canonical, i.e. sorted,
+# ordering as its counterpart.
+_VOCABULARY_CASES = (
+    ("numeric", [[0, 1], [0, 1]]),
+    ("string", [["no", "yes"], ["off", "on"]]),
+    ("string-reversed", [["yes", "no"], ["on", "off"]]),
+)
 
 
 class DummyMultilabelLogitClassifier(SkactivemlClassifier):
@@ -34,11 +44,12 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
         probas=None,
         logits=None,
         return_as_list=False,
+        classes=((0, 1), (0, 1)),
         missing_label=MISSING_LABEL,
         target_type="multi-label",
     ):
         super().__init__(
-            classes=[[0, 1], [0, 1]],
+            classes=classes,
             missing_label=missing_label,
             target_type=target_type,
         )
@@ -627,6 +638,7 @@ class TestUHerding(
             self.query_default_params_clf["y"],
             self.query_default_params_clf["clf"],
             temperatures=0.5,
+            target_spec=self._single_output_spec(),
         )
         self.assertEqual(tau_scalar, 0.5)
 
@@ -635,6 +647,7 @@ class TestUHerding(
             self.query_default_params_clf["y"],
             self.query_default_params_clf["clf"],
             temperatures=np.array([0.25]),
+            target_spec=self._single_output_spec(),
         )
         self.assertEqual(tau_len_one, 0.25)
 
@@ -766,7 +779,11 @@ class TestUHerding(
             side_effect=[ValueError("fail 1"), ValueError("fail 2")],
         ):
             tau = qs._select_temperature(
-                X, y, clf, temperatures=np.array([0.5, 1.0])
+                X,
+                y,
+                clf,
+                temperatures=np.array([0.5, 1.0]),
+                target_spec=self._single_output_spec(),
             )
         self.assertEqual(tau, 1.0)
 
@@ -783,7 +800,11 @@ class TestUHerding(
             return_value=(np.array([], dtype=int), np.array([0], dtype=int)),
         ):
             tau = qs._select_temperature(
-                X, y, clf, temperatures=np.array([0.5, 1.0])
+                X,
+                y,
+                clf,
+                temperatures=np.array([0.5, 1.0]),
+                target_spec=self._single_output_spec(),
             )
         self.assertEqual(tau, 1.0)
 
@@ -796,7 +817,11 @@ class TestUHerding(
             return_value=FailingClone(),
         ):
             tau = qs._select_temperature(
-                X, y, clf, temperatures=np.array([0.5, 1.0])
+                X,
+                y,
+                clf,
+                temperatures=np.array([0.5, 1.0]),
+                target_spec=self._single_output_spec(),
             )
         self.assertEqual(tau, 1.0)
 
@@ -813,7 +838,7 @@ class TestUHerding(
             query_params["y"],
             query_params["clf"],
             temperatures=np.array([0.5, 1.0]),
-            is_multilabel=True,
+            target_spec=self._multilabel_spec(),
         )
         np.testing.assert_array_equal(tau, np.ones(2))
 
@@ -830,7 +855,7 @@ class TestUHerding(
             y_small,
             clf,
             temperatures=np.array([0.5, 1.0]),
-            is_multilabel=True,
+            target_spec=self._multilabel_spec(),
         )
         np.testing.assert_array_equal(tau_small, np.ones(2))
 
@@ -858,7 +883,7 @@ class TestUHerding(
                 y,
                 clf,
                 temperatures=np.array([0.5, 1.0, 2.0]),
-                is_multilabel=True,
+                target_spec=self._multilabel_spec(),
             )
 
         self.assertEqual(tau.shape, (2,))
@@ -896,11 +921,224 @@ class TestUHerding(
                 y,
                 clf,
                 temperatures=np.array([0.5, 1.0, 2.0]),
-                is_multilabel=True,
+                target_spec=self._multilabel_spec(),
             )
 
         self.assertEqual(tau.shape, (2,))
         self.assertTrue(np.isin(tau, [0.5, 1.0, 2.0]).all())
+
+    @staticmethod
+    def _single_output_spec(classes=(0.0, 1.0)):
+        return TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=classes,
+        )
+
+    @staticmethod
+    def _multilabel_spec(classes=((0.0, 1.0), (0.0, 1.0))):
+        return TargetSpec(
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=classes,
+        )
+
+    def _multilabel_custom_vocabulary_params(self, vocabularies):
+        # The default multi-label fixture provides no logits, so its query
+        # never reaches temperature calibration. This specialized fixture
+        # supplies a logits-capable classifier, a multi-element temperature
+        # candidate grid, and enough labeled samples for a calibration split,
+        # i.e. the path inspecting the raw validation labels.
+        X = np.array(
+            [
+                [0.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.2, 0.2],
+                [0.2, 0.8],
+                [0.8, 0.2],
+                [0.8, 0.8],
+                [0.4, 0.4],
+                [0.4, 0.6],
+                [0.6, 0.4],
+                [0.6, 0.6],
+            ]
+        )
+        # Every fixture is semantically equivalent, i.e. code `0` denotes the
+        # negative and code `1` the positive class of each output. The first
+        # output agrees with the logits of the classifier, while the second one
+        # is deliberately underconfident, so that the two outputs disagree
+        # about their best temperature.
+        codes = np.array(
+            [
+                [0, 1],
+                [0, 1],
+                [1, 1],
+                [1, 0],
+                [0, 1],
+                [0, 1],
+                [1, 1],
+                [1, 0],
+                *[[None, None] for _ in range(4)],
+            ],
+            dtype=object,
+        )
+        y = _relabel_multilabel_target(
+            codes,
+            source_classes=((0, 1),) * codes.shape[1],
+            vocabularies=vocabularies,
+            missing_label=None,
+        )
+        init_params = {
+            "predict_proba_dict": {"extra_outputs": ["logits"]},
+            "temperatures": [0.1, 0.5, 1.0, 2.0, 10.0],
+            "validation_size": 0.5,
+            "missing_label": None,
+            "random_state": 0,
+            "target_type": "multi-label",
+        }
+        query_params = {
+            "X": X,
+            "y": y,
+            "clf": DummyMultilabelLogitClassifier(
+                classes=vocabularies, missing_label=None
+            ),
+        }
+        return init_params, query_params
+
+    def _multilabel_calibration_setup(self, vocabularies):
+        """Prepares the specialized fixture for direct calibration calls."""
+        init_params, query_params = self._multilabel_custom_vocabulary_params(
+            vocabularies
+        )
+        qs = UHerding(**init_params)
+        qs.missing_label_ = qs.missing_label
+        qs.random_state_ = np.random.RandomState(0)
+        target_spec = resolve_target_spec(
+            query_params["y"],
+            task="classification",
+            target_type="multi-label",
+            classes=vocabularies,
+            missing_label=None,
+        )
+        return qs, query_params, target_spec
+
+    def test_query_multilabel_custom_vocabularies_with_temperature_grid(self):
+        # A valid multi-label target may use its own binary class vocabulary
+        # per output. The searched-temperature path inspects the validation
+        # labels and must therefore encode them instead of coercing them.
+        results = {}
+        for name, vocabularies in _VOCABULARY_CASES:
+            with self.subTest(vocabularies=name):
+                init_params, query_params = (
+                    self._multilabel_custom_vocabulary_params(vocabularies)
+                )
+                qs = UHerding(**init_params)
+                query_indices, utilities = qs.query(
+                    **query_params, batch_size=2, return_utilities=True
+                )
+                n_labeled = 8
+                self.assertEqual(query_indices.shape, (2,))
+                self.assertTrue(
+                    set(query_indices)
+                    <= set(range(n_labeled, len(query_params["X"])))
+                )
+                self.assertTrue(np.isfinite(utilities[0, n_labeled:]).all())
+                self.assertTrue(np.isnan(utilities[0, :n_labeled]).all())
+                results[name] = (query_indices, utilities)
+
+        for name, _ in _VOCABULARY_CASES[1:]:
+            with self.subTest(vocabularies=name):
+                np.testing.assert_array_equal(
+                    results["numeric"][0], results[name][0]
+                )
+                np.testing.assert_allclose(
+                    results["numeric"][1], results[name][1], equal_nan=True
+                )
+
+    def test_select_temperature_multilabel_custom_vocabularies(self):
+        # The searched grid is evaluated independently per output, so the
+        # equivalence must hold for the selected temperatures themselves.
+        taus = {}
+        for name, vocabularies in _VOCABULARY_CASES:
+            qs, query_params, target_spec = self._multilabel_calibration_setup(
+                vocabularies
+            )
+            taus[name] = qs._select_temperature(
+                query_params["X"],
+                query_params["y"],
+                query_params["clf"],
+                temperatures=np.array([0.1, 0.5, 1.0, 2.0, 10.0]),
+                target_spec=target_spec,
+            )
+
+        # One selected temperature per output, searched independently, i.e.
+        # the outputs of this setup disagree about their calibration.
+        self.assertEqual(taus["numeric"].shape, (2,))
+        self.assertNotEqual(taus["numeric"][0], taus["numeric"][1])
+        for name, _ in _VOCABULARY_CASES[1:]:
+            with self.subTest(vocabularies=name):
+                np.testing.assert_allclose(taus["numeric"], taus[name])
+
+    def test_select_temperature_multilabel_uses_positive_class_column(self):
+        # Inverting the observed labels must change the calibration outcome,
+        # i.e. the encoded positive class must match the positive-class
+        # probability column of the corresponding output.
+        vocabularies = [["no", "yes"], ["off", "on"]]
+        qs, query_params, target_spec = self._multilabel_calibration_setup(
+            vocabularies
+        )
+        y = query_params["y"]
+        # Relabeling from reversed source vocabularies onto the canonical ones
+        # swaps the negative and the positive class of every output.
+        y_inverted = _relabel_multilabel_target(
+            y,
+            source_classes=tuple(
+                tuple(sorted(classes, reverse=True))
+                for classes in vocabularies
+            ),
+            vocabularies=vocabularies,
+            missing_label=None,
+        )
+
+        taus = []
+        for y_case in [y, y_inverted]:
+            qs.random_state_ = np.random.RandomState(0)
+            taus.append(
+                qs._select_temperature(
+                    query_params["X"],
+                    y_case,
+                    query_params["clf"],
+                    temperatures=np.array([0.1, 0.5, 1.0, 2.0, 10.0]),
+                    target_spec=target_spec,
+                )
+            )
+
+        self.assertFalse(np.allclose(taus[0], taus[1]))
+
+    def test_select_temperature_multilabel_fixed_temperature_is_shared(self):
+        # A scalar or length-one `temperatures` is one fixed temperature
+        # shared by every output, i.e. no per-output grid is searched and no
+        # calibration refit takes place.
+        qs, query_params, target_spec = self._multilabel_calibration_setup(
+            [["no", "yes"], ["off", "on"]]
+        )
+        DummyMultilabelLogitClassifier.reset_fit_calls()
+
+        for temperatures in [0.5, np.array([0.25])]:
+            with self.subTest(temperatures=temperatures):
+                tau = qs._select_temperature(
+                    query_params["X"],
+                    query_params["y"],
+                    query_params["clf"],
+                    temperatures=temperatures,
+                    target_spec=target_spec,
+                )
+                self.assertIsInstance(tau, float)
+                self.assertEqual(DummyMultilabelLogitClassifier.fit_calls, 0)
 
     def test_predict_with_extras_multilabel_logits_only(self):
         qs = UHerding(

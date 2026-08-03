@@ -20,9 +20,7 @@ contract test `test_query_multilabel_proba_format_contract` of
 `TemplatePoolQueryStrategy`.
 """
 
-import importlib
 import inspect
-import pkgutil
 import unittest
 from copy import deepcopy
 from unittest.mock import patch
@@ -30,7 +28,6 @@ from unittest.mock import patch
 import numpy as np
 
 import skactiveml.pool
-import skactiveml.pool.tests
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import (
@@ -52,8 +49,8 @@ from skactiveml.pool import (
     UHerding,
     UncertaintySampling,
 )
-from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+from skactiveml.pool.tests._multilabel_target_semantics import (
+    collect_pool_template_test_cases,
 )
 
 MULTILABEL_CAPABILITY = ("classification", "multi-label", "single-annotator")
@@ -139,18 +136,8 @@ def _multilabel_capable_strategies():
 def _multilabel_test_cases():
     """Collects the test cases reusing the shared pool strategy template."""
     test_cases = {}
-    for module_info in pkgutil.iter_modules(skactiveml.pool.tests.__path__):
-        module = importlib.import_module(
-            f"{skactiveml.pool.tests.__name__}.{module_info.name}"
-        )
-        for _, test_class in inspect.getmembers(module, inspect.isclass):
-            if not issubclass(
-                test_class, TemplateSingleAnnotatorPoolQueryStrategy
-            ) or not issubclass(test_class, unittest.TestCase):
-                continue
-            test_case = test_class("runTest")
-            test_case.setUp()
-            test_cases.setdefault(test_case.qs_class, []).append(test_case)
+    for test_case in collect_pool_template_test_cases():
+        test_cases.setdefault(test_case.qs_class, []).append(test_case)
     return test_cases
 
 
@@ -183,7 +170,7 @@ class TestMultilabelProbaFormatContract(unittest.TestCase):
                 self.assertTrue(
                     strategy_test_cases,
                     msg=f"{strategy.__name__} has no test case reusing "
-                    f"`TemplateSingleAnnotatorPoolQueryStrategy`.",
+                    f"`TemplatePoolQueryStrategy`.",
                 )
                 for test_case in strategy_test_cases:
                     query_params = (

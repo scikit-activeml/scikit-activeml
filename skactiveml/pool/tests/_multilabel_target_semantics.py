@@ -1,10 +1,50 @@
+import importlib
+import inspect
+import pkgutil
+import unittest
+
 import numpy as np
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.naive_bayes import GaussianNB
 
+import skactiveml.pool.tests
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
+from skactiveml.tests.template_query_strategy import (
+    TemplatePoolQueryStrategy,
+)
 from skactiveml.tests.utils import assert_no_query_state
+
+
+def collect_pool_template_test_cases():
+    """Collect the pool test cases reusing the shared query-strategy template.
+
+    Contract inventories use this collection to keep track of the pool query
+    strategies covered by a shared template test, so that a newly added
+    strategy cannot pass an inventory unnoticed.
+
+    Returns
+    -------
+    test_cases : list of unittest.TestCase
+        One set-up test case per test class defined in `skactiveml.pool.tests`
+        that reuses `TemplatePoolQueryStrategy`.
+    """
+    test_cases = []
+    for module_info in pkgutil.iter_modules(skactiveml.pool.tests.__path__):
+        module = importlib.import_module(
+            f"{skactiveml.pool.tests.__name__}.{module_info.name}"
+        )
+        for _, test_class in inspect.getmembers(module, inspect.isclass):
+            if (
+                not issubclass(test_class, TemplatePoolQueryStrategy)
+                or not issubclass(test_class, unittest.TestCase)
+                or test_class.__module__ != module.__name__
+            ):
+                continue
+            test_case = test_class("runTest")
+            test_case.setUp()
+            test_cases.append(test_case)
+    return test_cases
 
 
 class MultilabelOnlyTargetSemanticsMixin:
