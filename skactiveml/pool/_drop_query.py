@@ -23,9 +23,21 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     batch. For this purpose, unlabeled samples are filtered according to a
     disagreement-based measure via dropout such that only the unlabeled samples
     with a disagreement above a threshold are clustered for selecting the
-    unlabeled samples nearest to the respective clusters. For resolved
-    multi-label targets, per-label disagreement scores are reduced by
-    `multilabel_aggregation_fn`.
+    unlabeled samples nearest to the respective clusters.
+
+    DropQuery was proposed for single-output classification. Multi-label
+    support in this implementation is an extension and not part of the original
+    proposal in [1]_. For resolved multi-label targets, the disagreement is
+    counted per label output, i.e., the per-label score of the label output `j`
+    is the number of the `n_dropout_samples` dropout predictions whose label
+    `j` differs from the label `j` predicted without dropout, and is therefore
+    an integer in `[0, n_dropout_samples]`. `multilabel_aggregation_fn` reduces
+    these per-label counts along the label axis, and the reduced count is
+    divided by `n_dropout_samples` to obtain the disagreement rate compared
+    with `disagreement_threshold`. This per-output decomposition ignores
+    correlations between label outputs, i.e., a dropout prediction flipping
+    several labels jointly is indistinguishable from independent flips of the
+    same labels.
 
     Parameters
     ----------
@@ -65,15 +77,23 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn : callable, default=np.mean
-        Callable used only for resolved multi-label classification targets.
-        It must accept `axis` as a keyword argument and reduce the per-label
-        disagreement counts along that axis. Common choices are `np.mean`,
-        `np.min`, `np.max`, or quantiles.
+        Callable reducing the per-label disagreement counts of one sample to
+        one count. It is only used for resolved multi-label classification
+        targets. It is called with the per-label scores of shape
+        `(n_samples, n_outputs)` and the label axis passed as the `axis`
+        keyword argument, and must return one score per sample within the
+        range of that sample's per-label scores, e.g. `np.mean`, `np.average`,
+        `np.median`, `np.min`, `np.max`, or a quantile. `np.sum` is not
+        supported, because its result grows with the number of label outputs.
+        Only the callability of the reduction is validated at runtime, so a
+        violating reduction silently changes the acquisition scale.
     disagreement_threshold : float, default=0.5
         Threshold used to filter candidate samples based on their disagreement
-        score. For multi-label targets, the disagreement scores are first
-        aggregated by `multilabel_aggregation_fn`, such that valid threshold
-        values depend on the chosen aggregation function.
+        score. For multi-label targets, the per-label disagreement counts are
+        first reduced by `multilabel_aggregation_fn` before being divided by
+        `n_dropout_samples`. A scale-preserving reduction therefore keeps the
+        resulting rate in `[0, 1]`, but the multi-label path does not restrict
+        the threshold to that interval.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. The strategy supports single-output and
         multi-label classification. A fitted classifier's target specification

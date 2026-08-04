@@ -23,9 +23,26 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     space using a self-adjusting mix of uncertainty and diversity. By operating
     only on low-dimensional class-probability outputs rather than deep
     embeddings, it achieves fast acquisitions while retaining strong label
-    efficiency. For resolved multi-label targets, the per-label uncertainty
-    scores are reduced by
-    `multilabel_aggregation_fn`.
+    efficiency.
+
+    The distances in probability space are initialized with the uncertainty
+    scores themselves (cf. Eq. (3) in [1]_), so the first sample of a batch is
+    sampled with a probability proportional to `(2 * uncertainty) ** gamma`
+    and thus carries no diversity information. At `batch_size=1`, the
+    acquisition is therefore gamma-tempered probabilistic margin sampling.
+
+    FALCUN was proposed for single-output classification. Multi-label support
+    in this implementation is an extension and not part of the original
+    proposal in [1]_. For resolved multi-label targets, the paper's top-two
+    margin is applied to each label output independently, i.e., the per-label
+    uncertainty of the label output `j` is the binary margin
+    `1 - |2 * p_j - 1|` of its positive-class probability `p_j`, and
+    `multilabel_aggregation_fn` reduces these per-label margins along the
+    label axis to the uncertainty of one sample. The diversity term stays the
+    L1 distance in probability space, which for multi-label targets is taken
+    between the independent per-output positive-class probabilities, i.e.,
+    `sum_j |p_j(x) - p_j(x_query)|`. Correlations between label outputs
+    therefore influence neither term.
 
     Parameters
     ----------
@@ -38,9 +55,19 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn : callable, default=np.mean
-        Callable that takes `axis` as keyword argument and reduces the
-        per-label uncertainty scores for multilabel classification. This is
-        only used for resolved multi-label classification targets.
+        Callable reducing the per-label uncertainty scores of one sample to
+        one uncertainty score. It is only used for resolved multi-label
+        classification targets. It is called with the per-label scores of
+        shape `(n_samples, n_outputs)` and the label axis passed as the `axis`
+        keyword argument, and must return one score per sample within the
+        range of that sample's per-label scores, e.g. `np.mean`, `np.average`,
+        `np.median`, `np.min`, `np.max`, or a quantile. `np.sum` is not
+        supported, because its result grows with the number of label outputs.
+        Only the callability of the reduction is validated at runtime, so a
+        violating reduction silently changes the acquisition scale. Here, an
+        inflated uncertainty would dominate the diversity term, which is
+        min-max normalized to `[0, 1]` from the second selection of a batch
+        onward.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. The strategy supports single-output and
         multi-label classification. A fitted classifier's target specification

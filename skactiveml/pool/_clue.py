@@ -32,14 +32,17 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
     result is a diverse set biased toward uncertain regions of representation
     space.
 
-    The original `Clue` query strategy was proposed for classification tasks
-    only and did not include regression or multilabel variants. Support for
-    multilabel classification in this implementation is therefore an
-    extension of the original formulation. In the multilabel case, predictive
-    uncertainties are computed independently per label and then reduced across
-    labels via `multilabel_aggregation_fn`. Support for regression is likewise
-    an extension and relies on user-provided sample-wise uncertainty
-    estimates.
+    The original `Clue` query strategy was proposed for single-output
+    classification tasks only and did not include regression or multi-label
+    variants. Multi-label support in this implementation is an extension and
+    not part of the original proposal in [1]_. For resolved multi-label
+    targets, the per-label score of the label output `j` is computed by
+    `method` from its positive-class probability `p_j` alone (cf.
+    `uncertainty_scores`), and `multilabel_aggregation_fn` reduces these
+    per-label scores along the label axis to the clustering sample weight of
+    one sample. This per-output decomposition ignores correlations between
+    label outputs. Support for regression is likewise an extension and relies
+    on user-provided sample-wise uncertainty estimates.
 
     Parameters
     ----------
@@ -89,12 +92,17 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    multilabel_aggregation_fn: callable, default=np.mean
-        Callable that takes axis as kwarg and reduces along that axis. Common
-        choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while
-        `np.sum` is not allowed. This is only used for the multilabel
-        extension of CLUE and is not part of the original method proposed in
-        [1]_.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable reducing the per-label uncertainty scores of one sample to
+        one clustering sample weight. It is only used for resolved multi-label
+        classification targets. It is called with the per-label scores of
+        shape `(n_samples, n_outputs)` and the label axis passed as the `axis`
+        keyword argument, and must return one score per sample within the
+        range of that sample's per-label scores, e.g. `np.mean`, `np.average`,
+        `np.median`, `np.min`, `np.max`, or a quantile. `np.sum` is not
+        supported, because its result grows with the number of label outputs.
+        Only the callability of the reduction is validated at runtime, so a
+        violating reduction silently changes the acquisition scale.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. The strategy supports single-output
         classification and regression, and multi-label classification. A

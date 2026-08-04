@@ -31,7 +31,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     the original proposal in [1]_. For resolved multi-label targets, BADGE
     assumes independent sigmoid outputs per label and forms a multi-label
     gradient embedding from the binary-cross-entropy-style last-layer
-    gradients.
+    gradients, i.e., the residual of the label output `j` against the model's
+    own pseudo-label is `p_j - 1[p_j >= 0.5]`, and the per-output last-layer
+    gradients obtained by multiplying these residuals with the sample
+    representation are concatenated into one gradient embedding. This
+    per-output decomposition ignores correlations between label outputs.
 
     Parameters
     ----------
@@ -114,12 +118,12 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             indicated by `self.missing_label`). For multi-label targets, a row
             `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row. In this
-            case, BADGE uses a multilabel extension based on independent
-            sigmoid outputs per label. `predict_proba` must then return either
-            one positive-class probability per label with shape
-            `(n_samples, n_outputs)` or a list of binary probability matrices
-            with shape `(n_samples, 2)` per output. This multilabel variant
-            is an extension in `scikit-activeml` and was not proposed in [1]_.
+            case, BADGE uses the multi-label extension described in the class
+            docstring, i.e., independent sigmoid outputs per label.
+            `predict_proba` must then return either one positive-class
+            probability per label with shape `(n_samples, n_outputs)` or a
+            list of binary probability matrices with shape `(n_samples, 2)`
+            per output.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True

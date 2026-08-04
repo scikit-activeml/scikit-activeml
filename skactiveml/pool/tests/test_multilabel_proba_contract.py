@@ -18,6 +18,13 @@ The tests below keep the inventory of multilabel-capable pool strategies
 complete and assert that each probability consumer is covered by the shared
 contract test `test_query_multilabel_proba_format_contract` of
 `TemplatePoolQueryStrategy`.
+
+A strategy added to the inventory below must also be classified in
+`docs/adr/0002-document-non-native-multilabel-acquisition.md`, which records
+whether its multilabel behavior extends a single-output method and therefore
+has to be declared in its docstring. The two partitions do not coincide: the
+buckets below separate strategies by probability consumption, while the ADR
+separates them by whether the cited method covers multilabel targets natively.
 """
 
 import inspect

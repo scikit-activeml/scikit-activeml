@@ -38,6 +38,21 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
       the currently labeled set,
     - adapt the Gaussian kernel radius to the current labeled feature space.
 
+    UHerding was proposed for single-output classification. Multi-label support
+    in this implementation is an extension and not part of the original
+    proposal in [1]_. For resolved multi-label targets, the temperature-scaled
+    probabilities are the per-output sigmoids `expit(logits / tau)` with the
+    per-output temperature `tau` instead of a softmax, whenever logits are
+    available, and the per-label uncertainty of
+    the label output `j` is computed by `method` from its positive-class
+    probability `p_j` alone
+    (cf. `uncertainty_scores`). `multilabel_aggregation_fn` reduces these
+    per-label scores along the label axis to the uncertainty weight of one
+    sample, which then scales that sample's coverage gains. The coverage
+    objective itself is unchanged, because it operates on the sample
+    representations only. Correlations between label outputs therefore
+    influence neither the uncertainty weight nor the coverage objective.
+
     Parameters
     ----------
     method : 'least_confident' or 'margin_sampling' or 'entropy', \
@@ -105,9 +120,16 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn : callable, default=np.mean
-        Callable that takes `axis` as keyword argument and reduces per-label
-        uncertainty scores for multi-label classification. This is only used
-        for resolved multi-label targets.
+        Callable reducing the per-label uncertainty scores of one sample to
+        one uncertainty weight. It is only used for resolved multi-label
+        targets. It is called with the per-label scores of shape
+        `(n_samples, n_outputs)` and the label axis passed as the `axis`
+        keyword argument, and must return one score per sample within the
+        range of that sample's per-label scores, e.g. `np.mean`, `np.average`,
+        `np.median`, `np.min`, `np.max`, or a quantile. `np.sum` is not
+        supported, because its result grows with the number of label outputs.
+        Only the callability of the reduction is validated at runtime, so a
+        violating reduction silently changes the acquisition scale.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. The strategy supports single-output and
         multi-label classification. A fitted classifier's target specification

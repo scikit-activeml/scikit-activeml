@@ -43,6 +43,17 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     uncertainty sampling (DWUS) and the dual strategy for active learning
     (DUAL) [4]_.
 
+    The uncertainty measures were proposed for single-output classification.
+    Multi-label support in this implementation is an extension and not part of
+    the original proposal in [1]_. For resolved multi-label targets, the
+    per-label score of the label output `j` is computed from its positive-class
+    probability `p_j` alone, i.e., `min(p_j, 1 - p_j)` for
+    `'least_confident'`, `1 - |2 * p_j - 1|` for `'margin_sampling'`, and the
+    binary entropy for `'entropy'` (cf. `uncertainty_scores`).
+    `multilabel_aggregation_fn` reduces these per-label scores along the label
+    axis to the utility of one sample. This per-output decomposition ignores
+    correlations between label outputs.
+
     Parameters
     ----------
     method : 'least_confident' or 'margin_sampling' or 'entropy' or \
@@ -58,15 +69,18 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState
         The random state to use.
-    multilabel_aggregation_fn: callable, default=np.mean
-        Callable that takes axis as kwarg and reduces along that axis.
-        Common choices are `np.mean`, `np.sum`, `np.min`, `np.max`, or
-        quantiles. This is only used when
-        `method in ['least_confident', 'margin_sampling', 'entropy']` and
-        multilabel targets are provided. For multilabel classification,
-        `predict_proba` may return either shape `(n_samples, n_outputs)` or a
-        list of binary probability matrices with shape `(n_samples, 2)` per
-        output.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable reducing the per-label uncertainty scores of one sample to
+        one utility. It is only used for resolved multi-label targets and
+        `method in ['least_confident', 'margin_sampling', 'entropy']`. It is
+        called with the per-label scores of shape `(n_samples, n_outputs)` and
+        the label axis passed as the `axis` keyword argument, and must return
+        one score per sample within the range of that sample's per-label
+        scores, e.g. `np.mean`, `np.average`, `np.median`, `np.min`, `np.max`,
+        or a quantile. `np.sum` is not supported, because its result grows with
+        the number of label outputs. Only the callability of the reduction is
+        validated at runtime, so a violating reduction silently changes the
+        acquisition scale.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Single-output classification is always supported.
         Multi-label classification is supported only when `cost_matrix=None`
@@ -149,7 +163,11 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
+            Model implementing the methods `fit` and `predict_proba`. For
+            multi-label classification, `predict_proba` may return either
+            positive-class probabilities of shape `(n_samples, n_outputs)` or
+            a list of binary probability matrices with shape `(n_samples, 2)`
+            per label output.
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -325,10 +343,30 @@ def uncertainty_scores(
     only 'least_confident', 'margin_sampling', and 'entropy' are
     supported.
 
+    The three uncertainty measures were proposed for single-output
+    classification. Multi-label support in this implementation is an extension
+    and not part of the original proposal in [1]_. It decomposes the target
+    per label output, i.e., the per-label score of the label output `j` is
+    computed from its positive-class probability `p_j` alone,
+
+    - `min(p_j, 1 - p_j)` for `'least_confident'`,
+    - `1 - |2 * p_j - 1|` for `'margin_sampling'`, i.e., the margin between
+      the two classes of the label output, and
+    - `-(p_j * log(p_j) + (1 - p_j) * log(1 - p_j))` for `'entropy'`, i.e.,
+      the binary entropy of the label output, computed with an additive
+      `1e-10` inside both logarithms,
+
+    and `multilabel_aggregation_fn` then reduces these per-label scores along
+    the label axis to one score per sample. Correlations between label outputs
+    are ignored by construction.
+
     Parameters
     ----------
     probas : array-like of shape (n_samples, n_classes)
-        Class membership probabilities for each sample.
+        Class membership probabilities for each sample. If
+        `is_multilabel=True`, positive-class probabilities of shape
+        `(n_samples, n_outputs)` or a list of binary probability matrices with
+        shape `(n_samples, 2)` per label output are expected instead.
     cost_matrix : array-like pf shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for
@@ -338,12 +376,19 @@ def uncertainty_scores(
         The method to calculate the uncertainty. For multilabel data, only
         `'least_confident'`, `'margin_sampling'`, and `'entropy'` are
         supported.
-    is_multilabel: bool, default=False
-        indicates if provided probas should be multilabel
-    multilabel_aggregation_fn: callable, default=np.mean
-        Callable that takes axis as kwarg and reduces along that axis.
-        Common choices are `np.mean`, `np.sum`, `np.min`, `np.max`, or
-        quantiles.
+    is_multilabel : bool, default=False
+        Flag whether `probas` are multi-label positive-class probabilities.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable reducing the per-label uncertainty scores of one sample to
+        one uncertainty score. It is only used if `is_multilabel=True`. It is
+        called with the per-label scores of shape `(n_samples, n_outputs)` and
+        the label axis passed as the `axis` keyword argument, and must return
+        one score per sample within the range of that sample's per-label
+        scores, e.g. `np.mean`, `np.average`, `np.median`, `np.min`, `np.max`,
+        or a quantile. `np.sum` is not supported, because its result grows with
+        the number of label outputs. Only the callability of the reduction is
+        validated at runtime, so a violating reduction silently changes the
+        acquisition scale.
 
 
     References

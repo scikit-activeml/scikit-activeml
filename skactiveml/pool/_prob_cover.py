@@ -31,6 +31,13 @@ class ProbCover(_TaskAgnosticPoolQueryStrategy):
     classification tasks. Nevertheless, this implementation can handle class
     labels and multilabel targets represented by a two-dimensional `y`.
 
+    Multi-label support in this implementation is an extension and not part of
+    the original proposal in [1]_. Coverage is computed in the embedding space
+    and is therefore independent of the target structure, but the `delta`
+    default depends on a class count. For resolved multi-label targets with
+    `n_classes=None`, that count is the number of distinct observed label
+    rows, i.e., the number of distinct multi-label combinations.
+
     Parameters
     ----------
     n_classes : None or int, default=None

@@ -120,7 +120,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             indexing refers to samples in `X`.
             If `candidates` is of shape `(n_candidates, n_features)`, the
             indexing refers to samples in `candidates`.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
                 numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
