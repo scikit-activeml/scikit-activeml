@@ -80,10 +80,10 @@ class TestSubSamplingWrapper(
             "random_state": 0,
             "missing_label": MISSING_LABEL,
         }
+        # The wrapped strategy is estimator-backed, so that the multi-label
+        # fixture carries a class vocabulary the wrapper must preserve.
         init_default_params_multilabel = {
-            "query_strategy": RandomSampling(
-                random_state=0, target_type="multi-label"
-            ),
+            "query_strategy": UncertaintySampling(random_state=0),
             "max_candidates": 20,
         }
         params_clf_multilabel = {
@@ -97,6 +97,12 @@ class TestSubSamplingWrapper(
                         for _ in range(18)
                     ],
                 ]
+            ),
+            "clf": SklearnClassifier(
+                MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                random_state=0,
             ),
         }
 
@@ -747,10 +753,10 @@ class TestParallelUtilityEstimationWrapper(
                 "query_strategy": QueryByCommittee(random_state=0),
                 "n_jobs": 2,
             },
+            # The wrapped strategy is estimator-backed, so that the multi-label
+            # fixture carries a class vocabulary the wrapper must preserve.
             init_default_params_multilabel={
-                "query_strategy": RandomSampling(
-                    random_state=0, target_type="multi-label"
-                ),
+                "query_strategy": UncertaintySampling(random_state=0),
                 "n_jobs": 2,
             },
             query_default_params_clf=query_default_params_clf,
@@ -766,6 +772,12 @@ class TestParallelUtilityEstimationWrapper(
                             for _ in range(18)
                         ],
                     ]
+                ),
+                "clf": SklearnClassifier(
+                    MultiOutputClassifier(GaussianNB()),
+                    classes=[[0, 1], [0, 1]],
+                    missing_label=MISSING_LABEL,
+                    random_state=0,
                 ),
             },
         )
