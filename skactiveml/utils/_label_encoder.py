@@ -78,12 +78,23 @@ class ExtLabelEncoder(BaseEstimator):
         )
         if self.target_type == "multi-label":
             classes_outer = list(self.classes)
-            self.n_labels_ = len(classes_outer)
-            if y.ndim != 2 or y.shape[1] != self.n_labels_:
+            if not all(len(classes_t) == 2 for classes_t in classes_outer):
                 raise ValueError(
-                    f"Expected y with shape `(n_samples, {self.n_labels_})` "
+                    "Each multi-label class vocabulary must contain exactly "
+                    "two classes."
+                )
+            n_labels = len(classes_outer)
+            if y.ndim != 2 or y.shape[1] != n_labels:
+                raise ValueError(
+                    f"Expected y with shape `(n_samples, {n_labels})` "
                     f"for multi-label targets, got {y.shape}."
                 )
+            is_labeled(
+                y,
+                missing_label=self.missing_label,
+                target_type="multi-label",
+            )
+            self.n_labels_ = n_labels
             self._le = []
             self.classes_ = []
             self._dtype = []
@@ -147,7 +158,6 @@ class ExtLabelEncoder(BaseEstimator):
             ensure_min_samples=0,
             dtype=None,
         )
-        is_lbld = is_labeled(y, missing_label=self.missing_label)
         y_enc = np.full_like(y, -1, dtype=int)
 
         if self.target_type == "multi-label":
@@ -156,13 +166,19 @@ class ExtLabelEncoder(BaseEstimator):
                     f"Expected y with shape `(n_samples, {self.n_labels_})` "
                     f"for multi-label targets, got {y.shape}."
                 )
-            for t in range(self.n_labels_):
-                y_t = y[:, t]
-                is_lbld_t = is_lbld[:, t]
-                if is_lbld_t.any():
-                    y_enc[is_lbld_t, t] = self._le[t].transform(y_t[is_lbld_t])
+            # A multi-label row is either fully observed or fully missing, so
+            # one row mask covers every label output.
+            is_lbld = is_labeled(
+                y,
+                missing_label=self.missing_label,
+                target_type="multi-label",
+            )
+            if is_lbld.any():
+                for t in range(self.n_labels_):
+                    y_enc[is_lbld, t] = self._le[t].transform(y[is_lbld, t])
             return y_enc
 
+        is_lbld = is_labeled(y, missing_label=self.missing_label)
         if is_lbld.any():
             y_enc[is_lbld] = self._le.transform(y[is_lbld].ravel())
         return y_enc
@@ -186,9 +202,8 @@ class ExtLabelEncoder(BaseEstimator):
             ensure_2d=False,
             ensure_all_finite=False,
             ensure_min_samples=0,
-            dtype=int,
+            dtype=None,
         )
-        is_lbld = is_labeled(y, missing_label=-1)
         y_dec = np.full_like(
             y, dtype=self._dtype, fill_value=self.missing_label
         )
@@ -199,15 +214,21 @@ class ExtLabelEncoder(BaseEstimator):
                     f"Expected y with shape `(n_samples, {self.n_labels_})` "
                     f"for multi-label targets, got {y.shape}."
                 )
-            for t in range(self.n_labels_):
-                y_t = y[:, t]
-                is_lbld_t = is_lbld[:, t]
-                if is_lbld_t.any():
-                    y_dec[is_lbld_t, t] = self._le[t].inverse_transform(
-                        y_t[is_lbld_t]
+            # A multi-label row is either fully observed or fully missing, so
+            # one row mask covers every label output.
+            is_lbld = is_labeled(
+                y,
+                missing_label=-1,
+                target_type="multi-label",
+            )
+            if is_lbld.any():
+                for t in range(self.n_labels_):
+                    y_dec[is_lbld, t] = self._le[t].inverse_transform(
+                        y[is_lbld, t]
                     )
             return y_dec
 
+        is_lbld = is_labeled(y, missing_label=-1)
         if is_lbld.any():
             y_dec[is_lbld] = self._le.inverse_transform(y[is_lbld].ravel())
         return y_dec

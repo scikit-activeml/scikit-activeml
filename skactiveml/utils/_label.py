@@ -134,7 +134,7 @@ def is_unlabeled(
         missing_label
     )
     if missing_is_nan:
-        is_missing = np.isnan(y.astype(float))
+        is_missing = np.isnan(y)
     else:
         y = y.astype(y_dtype)
         is_missing = y == missing_label
