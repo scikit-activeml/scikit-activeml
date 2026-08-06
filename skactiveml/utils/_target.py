@@ -114,7 +114,9 @@ def _class_vocabulary_key(classes):
 
     Unlike `_class_vocabulary_hash_key`, this helper also accepts the not yet
     normalized vocabularies that estimators expose through `classes` or
-    `classes_`, i.e., arbitrarily nested sequences and arrays.
+    `classes_`, i.e., arbitrarily nested sequences and arrays. The classes of
+    one output are normalized as `TargetSpec` normalizes them, so that the same
+    vocabulary declared in a different order yields the same key.
 
     Parameters
     ----------
@@ -128,19 +130,18 @@ def _class_vocabulary_key(classes):
     """
     if classes is None:
         return None
-    return _class_vocabulary_hash_key(_as_nested_tuple(classes))
-
-
-def _as_nested_tuple(values):
-    """Convert nested sequences of class labels into nested tuples."""
-    return tuple(
-        (
-            _as_nested_tuple(value)
-            if isinstance(value, (list, tuple, np.ndarray))
-            else value
+    if _has_nested_classes(classes):
+        # The order of the label outputs is meaningful, whereas the order of
+        # the classes within one output is not.
+        return _class_vocabulary_hash_key(
+            tuple(_sorted_classes(classes_j) for classes_j in classes)
         )
-        for value in values
-    )
+    return _class_vocabulary_hash_key(_sorted_classes(classes))
+
+
+def _sorted_classes(classes):
+    """Normalize one output's class vocabulary into sorted unique classes."""
+    return tuple(LabelEncoder().fit(classes).classes_)
 
 
 def _class_vocabulary_hash_key(classes):

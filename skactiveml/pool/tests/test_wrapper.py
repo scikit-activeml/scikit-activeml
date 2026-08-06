@@ -289,6 +289,26 @@ class TestSubSamplingWrapper(
 
         assert_no_query_state(self, wrapper)
 
+    def test_reordered_estimator_class_vocabularies_are_equivalent(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        # The same class vocabulary declared in a different order describes the
+        # same targets, so wrapping must not change the selected candidates.
+        estimators = [
+            SklearnClassifier(GaussianNB(), classes=[1, 0]),
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+        ]
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(random_state=0),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        np.testing.assert_array_equal(
+            wrapper.query(X, y, ensemble=estimators),
+            QueryByCommittee(random_state=0).query(X, y, ensemble=estimators),
+        )
+
     def test_wrapper_rejects_unsupported_explicit_target_type(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.array(
