@@ -216,9 +216,10 @@ def _canonicalize_multilabel_probas(
     ----------
     probas : array-like of shape (n_samples, n_outputs) or list of \
             array-like of shape (n_samples, 2), or None
-        Multilabel probabilities. Array input is interpreted as one
-        positive-class probability per label. List input is interpreted as one
-        binary probability matrix per label.
+        Multilabel probabilities. A two-dimensional array-like is interpreted
+        as one positive-class probability per label. A list whose entries are
+        two-dimensional is interpreted as one binary probability matrix per
+        label.
     n_samples : int or None, default=None
         Expected number of samples. If not `None`, the returned array must
         have this many rows.
@@ -245,7 +246,10 @@ def _canonicalize_multilabel_probas(
             return None
         raise ValueError("`probas` must not be `None`.")
 
-    if isinstance(probas, list):
+    is_per_output_list = isinstance(probas, list) and any(
+        np.asarray(probas_j).ndim == 2 for probas_j in probas
+    )
+    if is_per_output_list:
         if n_outputs is not None and len(probas) != n_outputs:
             raise ValueError(
                 f"`probas` contains {len(probas)} outputs, expected "

@@ -36,6 +36,14 @@ class TestValidation(unittest.TestCase):
             ),
             probas_array,
         )
+        np.testing.assert_allclose(
+            _canonicalize_multilabel_probas(
+                [[0.2, 0.8], [0.7, 0.3]],
+                n_samples=2,
+                n_outputs=2,
+            ),
+            probas_array,
+        )
 
         probas_list = [
             np.array([[0.8, 0.2], [0.3, 0.7]]),
