@@ -1167,18 +1167,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             f"be interpreted. Declare `classes`."
         )
 
-    def _initialize_label_state(self, classes):
-        """Resolve and then commit the label state for `classes`.
-
-        Parameters
-        ----------
-        classes : array-like of shape (n_classes,), or a list of such \
-                array-likes
-            Class vocabulary to resolve the target specification from, e.g.,
-            the `classes_` attribute of a pre-fitted `estimator`.
-        """
-        self._commit_label_state(self._resolve_label_state(classes))
-
     def _resolve_label_state(self, classes):
         """Resolve the label state for `classes` without committing it.
 

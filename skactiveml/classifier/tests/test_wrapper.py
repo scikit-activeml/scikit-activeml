@@ -245,7 +245,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf.check_X_dict_ = {"ensure_min_samples": 0, "ensure_min_features": 0}
         clf.n_features_in_ = 1
         dummy_classes = np.array([[classes[0][0], classes[1][0]]], dtype=int)
-        clf._initialize_label_state(dummy_classes)
+        clf._commit_label_state(clf._resolve_label_state(dummy_classes))
         clf.is_fitted_ = True
         return clf
 
@@ -1404,11 +1404,11 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
     def test_failed_recheck_preserves_initialized_label_state(self):
         clf = SklearnClassifier(estimator=Perceptron(), missing_label=-1)
-        clf._initialize_label_state(np.array([0, 1]))
+        clf._commit_label_state(clf._resolve_label_state(np.array([0, 1])))
         attributes_before = dict(clf.__dict__)
 
         with self.assertRaisesRegex(ValueError, "does not support"):
-            clf._initialize_label_state([[0, 1], [0, 1]])
+            clf._commit_label_state(clf._resolve_label_state([[0, 1], [0, 1]]))
 
         self._assert_attributes_unchanged(clf, attributes_before)
         self.assertEqual(clf.target_spec_.target_type, "single-output")
