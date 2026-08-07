@@ -25,10 +25,10 @@ try:
 
         Annot-Mix [1]_ trains a multi-annotator classifier using an extension
         of MixUp [2]_. The main idea is to apply MixUp not only to samples
-        and class labels, but to sample–annotator pairs: it convexly combines
+        and class labels, but to sample-annotator pairs: it convexly combines
         inputs and their annotator-specific noisy labels and trains a one-stage
         model that jointly estimates the true label distribution and each
-        annotator’s reliability. In this way, Annot-Mix can handle multiple,
+        annotator's reliability. In this way, Annot-Mix can handle multiple,
         potentially conflicting labels per sample while using MixUp-style
         regularization to become more robust to label noise.
 

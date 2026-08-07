@@ -10,7 +10,7 @@ Overview
 
 Our philosophy is to extend the ``sklearn`` ecosystem with the most relevant
 query strategies for active learning and to implement tools for working with
-partially unlabeled data. An overview of our repository’s structure is provided
+partially unlabeled data. An overview of our repository's structure is provided
 in the image below. Each node represents a class or interface, and the arrows
 illustrate the inheritance hierarchy among them. Dashed nodes indicate
 functionality that is not yet available in our library. `scikit-learn`
@@ -22,7 +22,7 @@ is used in this image for identification only and does not imply endorsement.
 In our package ``skactiveml``, there are three major components:
 ``SkactivemlClassifier``, ``SkactivemlRegressor``, and ``QueryStrategy``.
 The classifier and regressor modules are necessary to handle partially unlabeled
-data and to implement active-learning–specific estimators. This way, an active
+data and to implement active-learning-specific estimators. This way, an active
 learning cycle can be easily implemented starting with zero initial labels.
 Regarding active learning query strategies, we currently differentiate between
 the pool-based paradigm (a large pool of unlabeled samples is available) and the
@@ -328,7 +328,7 @@ Returns:
 +-----------------------------------+----------------------------------------------+
 | Parameter                         | Description                                  |
 +===================================+==============================================+
-| ``query_indices``                 | Indices indicating which candidate sample’s  |
+| ``query_indices``                 | Indices indicating which candidate sample's  |
 |                                   | label is to be queried. For example,         |
 |                                   | ``query_indices[0]`` indicates the first     |
 |                                   | selected sample. Depending on the shape of   |
@@ -830,7 +830,7 @@ Required Parameters:
 |                                   | annotator classifiers, which expect a matrix |
 |                                   | with columns for each annotator.             |
 +-----------------------------------+----------------------------------------------+
-| ``sample_weight``, optional       | Contains weights for the training samples’   |
+| ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | class labels. Must have the same shape as    |
 |                                   | ``y``.                                       |
 +-----------------------------------+----------------------------------------------+
@@ -1025,7 +1025,7 @@ Required Parameters:
 |                                   | target regressors, which expect a matrix     |
 |                                   | with columns for each target type.           |
 +-----------------------------------+----------------------------------------------+
-| ``sample_weight``, optional       | Contains weights for the training samples’   |
+| ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | targets. Must have the same shape as ``y``.  |
 +-----------------------------------+----------------------------------------------+
 
@@ -1134,7 +1134,7 @@ Examples
 --------
 
 Two of our main goals are to make active learning more understandable and
-improve our framework’s usability. Therefore, we require an example for each
+improve our framework's usability. Therefore, we require an example for each
 query strategy. Add a JSON file to the appropriate scenario directory under
 ``docs/examples/``. Each scenario directory must contain a ``README.rst``;
 the documentation generator recursively scans these directories and creates
@@ -1147,11 +1147,11 @@ Each JSON file contains a list of example entries with the following fields:
 +------------------+----------------------------------------------------------+
 | Entry            | Description                                              |
 +==================+==========================================================+
-| ``class``        | Query strategy’s class name.                             |
+| ``class``        | Query strategy's class name.                             |
 +------------------+----------------------------------------------------------+
 | ``package``      | Name of the sub-package (e.g., pool).                    |
 +------------------+----------------------------------------------------------+
-| ``method``       | Query strategy’s official name.                          |
+| ``method``       | Query strategy's official name.                          |
 +------------------+----------------------------------------------------------+
 | ``category``     | The methodological category of this query strategy, e.g.,|
 |                  | Expected Error Reduction, Model Change,                  |
@@ -1254,7 +1254,7 @@ Use the following labels when reporting an issue:
 +------------------+-------------------------------------------+
 | Label            | Use Case                                  |
 +==================+===========================================+
-| ``bug``          | Something isn’t working                   |
+| ``bug``          | Something isn't working                   |
 +------------------+-------------------------------------------+
 | ``enhancement``  | Request for a new feature                 |
 +------------------+-------------------------------------------+

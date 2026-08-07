@@ -722,8 +722,8 @@ def check_X_y(
         )
         if X is not None and X_cand.shape[1] != X.shape[1]:
             raise ValueError(
-                "The number of features of candidates does not match"
-                "the number of features of X"
+                "The number of features of candidates does not match "
+                "the number of features of `X`."
             )
 
         if sample_weight_cand is None:

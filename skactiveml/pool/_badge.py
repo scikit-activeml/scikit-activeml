@@ -23,7 +23,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     running k-means++ on per-sample gradient embeddings, which combine
     uncertainty and diversity. For each unlabeled sample, it forms the gradient
     of the cross-entropy loss with respect to the last linear layer using the
-    model’s pseudo-label. Large gradient norms indicate uncertainty, while
+    model's pseudo-label. Large gradient norms indicate uncertainty, while
     k-means++ spreads selections to avoid redundancy.
 
     The original BADGE method was proposed for multiclass classification. The
