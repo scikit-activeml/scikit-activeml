@@ -23,7 +23,7 @@ from sklearn.utils.validation import (
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
-from ..base import SkactivemlClassifier
+from ..base import SkactivemlClassifier, _resolve_own_fitted_attribute
 from ..utils._target import _check_target_capability, check_target_capability
 from ..utils import (
     rand_argmin,
@@ -537,6 +537,14 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     such metadata cannot be declared multi-label, because its flat learned
     vocabulary is indistinguishable from single-output classification.
 
+    Attributes this wrapper does not hold itself are read from the wrapped
+    `estimator`. The fitted attributes it resolves itself, e.g. `classes_` and
+    `target_spec_`, never are: around a pre-fitted `estimator` they resolve
+    this wrapper's own target semantics on first access, and they raise the
+    usual not-fitted error while no such semantics exist. A pre-fitted
+    estimator's learned classes stay readable as `estimator.classes_`, which
+    states whose vocabulary they are.
+
     Two degenerate training cases are part of this wrapper's contract and make
     it predict the observed class label distribution instead of raising: an
     empty labeled training subset, and an `estimator` rejecting a labeled
@@ -553,6 +561,25 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
        Duchesnay. 2011. Scikit-learn: Machine Learning in Python. J. Mach.
        Learn. Res. 12, 2011, 2825–2830.
     """
+
+    #: Fitted attributes this wrapper resolves itself, which `__getattr__`
+    #: therefore never forwards to the wrapped `estimator`. `n_features_in_`
+    #: is deliberately absent: it describes the input data rather than the
+    #: target, both objects agree on it, and `partial_fit` reads it through
+    #: `hasattr` to decide whether to reset the feature count.
+    _own_fitted_attributes = frozenset(
+        {
+            "_label_counts",
+            "_le",
+            "check_X_dict_",
+            "classes_",
+            "cost_matrix_",
+            "estimator_",
+            "is_fitted_",
+            "random_state_",
+            "target_spec_",
+        }
+    )
 
     def __init__(
         self,
@@ -1077,7 +1104,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
     def __sklearn_is_fitted__(self):
-        if hasattr(self, "is_fitted_"):
+        if "is_fitted_" in self.__dict__:
             return True
 
         try:
@@ -1112,6 +1139,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return True
 
     def __getattr__(self, item):
+        if item in self._own_fitted_attributes:
+            return _resolve_own_fitted_attribute(self, item)
         if "estimator_" in self.__dict__:
             return getattr(self.estimator_, item)
         else:
@@ -1574,7 +1603,33 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         Declared target type. It must remain compatible with the wrapped
         estimator across incremental updates. The wrapper supports only
         single-output classification.
+
+    Notes
+    -----
+    Attributes this wrapper does not hold itself are read from the wrapped
+    `estimator`, `classes_` among them: the wrapper resolves no class
+    vocabulary of its own, so the one its `SkactivemlClassifier` resolved is
+    the wrapper's own answer. The fitted attributes it does hold itself, e.g.
+    `target_spec_` and the sliding window in `X_train_`, are never read from
+    the `estimator` and raise the usual not-fitted error before a fit.
     """
+
+    #: Fitted attributes this wrapper holds itself, which `__getattr__`
+    #: therefore never forwards to the wrapped `estimator`. `classes_` is
+    #: deliberately absent: this wrapper resolves no class vocabulary of its
+    #: own, so the one its `SkactivemlClassifier` estimator resolved is the
+    #: wrapper's own answer.
+    _own_fitted_attributes = frozenset(
+        {
+            "X_train_",
+            "check_X_dict_",
+            "estimator_",
+            "random_state_",
+            "sample_weight_train_",
+            "target_spec_",
+            "y_train_",
+        }
+    )
 
     def __init__(
         self,
@@ -1927,6 +1982,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return freq
 
     def __getattr__(self, item):
+        if item in self._own_fitted_attributes:
+            return _resolve_own_fitted_attribute(self, item)
         if "estimator_" in self.__dict__ and hasattr(self.estimator_, item):
             return getattr(self.estimator_, item)
         else:

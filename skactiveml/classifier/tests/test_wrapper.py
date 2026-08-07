@@ -37,7 +37,7 @@ from skactiveml.classifier import (
 )
 from skactiveml.classifier._wrapper import _prior_matrix_from_counts
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, TargetSpec
 
 import importlib.util
 
@@ -164,6 +164,26 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         def fit(self, X, y):
             self.n_features_in_ = np.shape(X)[1]
+            return self
+
+        def predict(self, X):
+            return np.zeros(len(X), dtype=int)
+
+        def predict_proba(self, X):
+            return np.tile([0.4, 0.6], (len(X), 1))
+
+    class _TargetSpecEstimator(ClassifierMixin, BaseEstimator):
+        """Fitted classifier publishing a target specification of its own."""
+
+        def fit(self, X, y):
+            self.classes_ = np.array([0, 1])
+            self.n_features_in_ = np.shape(X)[1]
+            self.target_spec_ = TargetSpec(
+                task="classification",
+                target_type="single-output",
+                annotation_type="single-annotator",
+                classes=(0, 1),
+            )
             return self
 
         def predict(self, X):
@@ -1210,6 +1230,120 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(clf.target_spec_.classes, (0, 1))
         np.testing.assert_allclose(P, np.tile([0.4, 0.6], (len(self.X_ml), 1)))
 
+    def _prefit_binary_estimator(self):
+        return LogisticRegression().fit(self.X_ml, self.y_ml[:, 0])
+
+    def test_prefit_classes_are_read_before_any_fitted_call(self):
+        estimator = self._prefit_binary_estimator()
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1], missing_label=-1
+        )
+
+        classes = clf.classes_
+        target_spec = clf.target_spec_
+        clf.predict_proba(self.X_ml)
+
+        np.testing.assert_array_equal(classes, [0, 1])
+        self.assertEqual(target_spec.classes, (0, 1))
+        np.testing.assert_array_equal(clf.classes_, classes)
+        self.assertEqual(clf.target_spec_, target_spec)
+
+    def test_prefit_wider_classes_are_read_before_any_fitted_call(self):
+        estimator = self._prefit_binary_estimator()
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1, 2], missing_label=-1
+        )
+
+        # The estimator's learned vocabulary is narrower than the declared
+        # one, so delegating `classes_` would answer with the wrong width.
+        np.testing.assert_array_equal(estimator.classes_, [0, 1])
+        np.testing.assert_array_equal(clf.classes_, [0, 1, 2])
+        self.assertEqual(clf.target_spec_.classes, (0, 1, 2))
+        self.assertEqual(clf.predict_proba(self.X_ml).shape[1], 3)
+
+    def test_prefit_rejected_classes_never_answer_as_a_valid_vocabulary(self):
+        estimator = self._prefit_binary_estimator()
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[2, 3], missing_label=-1
+        )
+
+        for item in ("classes_", "target_spec_"):
+            with self.subTest(item=item):
+                with self.assertRaisesRegex(
+                    AttributeError, "learned the class labels"
+                ):
+                    getattr(clf, item)
+                self.assertFalse(hasattr(clf, item))
+
+    def test_prefit_rejected_classes_fall_back_to_the_declared_ones(self):
+        # The pool target preflight reads the vocabulary through this idiom.
+        # A rejected resolution has to leave it with the declared vocabulary,
+        # which is what a subsequent `fit` would establish, rather than with
+        # the estimator's learned one, which the wrapper does not accept.
+        estimator = self._prefit_binary_estimator()
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[2, 3], missing_label=-1
+        )
+
+        classes = getattr(clf, "classes_", clf.classes)
+
+        np.testing.assert_array_equal(classes, [2, 3])
+        clf.fit(self.X_ml, np.array([2, 3, 2, 3]))
+        np.testing.assert_array_equal(clf.classes_, [2, 3])
+
+    def test_prefit_estimator_target_spec_does_not_shadow_the_wrappers(self):
+        estimator = self._TargetSpecEstimator().fit(self.X_ml, self.y_ml[:, 0])
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1, 2], missing_label=-1
+        )
+
+        self.assertEqual(estimator.target_spec_.classes, (0, 1))
+        self.assertEqual(clf.target_spec_.classes, (0, 1, 2))
+
+    def test_prefit_delegates_estimator_owned_attributes(self):
+        estimator = self._prefit_binary_estimator()
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1, 2], missing_label=-1
+        )
+
+        np.testing.assert_array_equal(clf.coef_, estimator.coef_)
+        self.assertEqual(clf.n_features_in_, estimator.n_features_in_)
+
+    def test_unfitted_wrapper_refuses_its_own_fitted_attributes(self):
+        clf = SklearnClassifier(
+            estimator=LogisticRegression(), classes=[0, 1], missing_label=-1
+        )
+
+        for item in SklearnClassifier._own_fitted_attributes:
+            with self.subTest(item=item):
+                self.assertFalse(hasattr(clf, item))
+                with self.assertRaises(NotFittedError):
+                    getattr(clf, item)
+
+    def test_prefit_estimator_marker_does_not_skip_wrapper_contract(self):
+        estimator = self._prefit_binary_estimator()
+        estimator.is_fitted_ = True
+        clf = SklearnClassifier(
+            estimator=estimator, classes=[0, 1, 2], missing_label=-1
+        )
+
+        np.testing.assert_array_equal(clf.classes_, [0, 1, 2])
+        self.assertTrue(clf.is_fitted_)
+        self.assertIn("estimator_", clf.__dict__)
+
+    def test_prefit_nested_wrapper_resolves_its_own_vocabulary(self):
+        inner = SklearnClassifier(
+            estimator=LogisticRegression(), classes=[0, 1], missing_label=-1
+        ).fit(self.X_ml, self.y_ml[:, 0])
+        outer = SklearnClassifier(
+            estimator=inner, classes=[0, 1, 2], missing_label=-1
+        )
+
+        np.testing.assert_array_equal(inner.classes_, [0, 1])
+        np.testing.assert_array_equal(outer.classes_, [0, 1, 2])
+        self.assertEqual(inner.target_spec_.classes, (0, 1))
+        self.assertEqual(outer.target_spec_.classes, (0, 1, 2))
+
     def test_unmappable_probability_columns_are_rejected(self):
         estimator = self._NoClassesEstimator().fit(self.X_ml, self.y_ml[:, 0])
         clf = SklearnClassifier(
@@ -2062,6 +2196,33 @@ class TestSlidingWindowClassifier(
 
         with self.assertRaises(ValueError):
             clf.fit([[0.0], [1.0]], [0, 0])
+
+    def test_unfitted_wrapper_refuses_its_own_fitted_attributes(self):
+        clf = SlidingWindowClassifier(
+            estimator=SklearnClassifier(
+                GaussianNB(), classes=[0, 1], missing_label=-1
+            ),
+            missing_label=-1,
+        )
+
+        for item in SlidingWindowClassifier._own_fitted_attributes:
+            with self.subTest(item=item):
+                self.assertFalse(hasattr(clf, item))
+                with self.assertRaises(NotFittedError):
+                    getattr(clf, item)
+
+    def test_classes_stay_delegated_to_the_wrapped_classifier(self):
+        # This wrapper resolves no class vocabulary of its own, so `classes_`
+        # is not among its own fitted attributes and keeps being answered by
+        # the `SkactivemlClassifier` it wraps.
+        estimator = SklearnClassifier(
+            GaussianNB(), classes=[0, 1], missing_label=-1
+        ).fit([[0.0], [1.0]], [0, 1])
+        clf = SlidingWindowClassifier(estimator=estimator, missing_label=-1)
+        clf.fit([[0.0], [1.0]], [0, 1])
+
+        self.assertNotIn("classes_", clf.__dict__)
+        np.testing.assert_array_equal(clf.classes_, clf.estimator_.classes_)
 
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
         test_cases = [] if test_cases is None else test_cases

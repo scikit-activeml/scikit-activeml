@@ -232,6 +232,49 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must be a.*TargetSpec"):
             check_is_fitted(reg)
 
+    def test_prefitted_target_spec_is_read_before_any_fitted_call(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        reg = SklearnRegressor(LinearRegression().fit(X, y))
+
+        target_spec = reg.target_spec_
+        reg.predict([[8.0]])
+
+        self.assertEqual(target_spec.target_type, "single-output")
+        self.assertEqual(reg.target_spec_, target_spec)
+
+    def test_prefitted_estimator_target_spec_does_not_shadow_the_wrappers(
+        self,
+    ):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = MetadataFreeRegressor().fit(X, y)
+        estimator.target_spec_ = "invalid"
+        reg = SklearnRegressor(estimator)
+
+        with self.assertRaisesRegex(AttributeError, "must be a.*TargetSpec"):
+            reg.target_spec_
+
+        self.assertFalse(hasattr(reg, "target_spec_"))
+
+    def test_prefitted_delegates_estimator_owned_attributes(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = LinearRegression().fit(X, y)
+        reg = SklearnRegressor(estimator)
+
+        np.testing.assert_allclose(reg.coef_, estimator.coef_)
+        self.assertEqual(reg.n_features_in_, estimator.n_features_in_)
+
+    def test_unfitted_wrapper_refuses_its_own_fitted_attributes(self):
+        reg = SklearnRegressor(LinearRegression())
+
+        for item in SklearnRegressor._own_fitted_attributes:
+            with self.subTest(item=item):
+                self.assertFalse(hasattr(reg, item))
+                with self.assertRaises(NotFittedError):
+                    getattr(reg, item)
+
     def test_prefitted_column_vector_matches_direct_prediction_shape(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)
         y = np.arange(8, dtype=float).reshape(-1, 1)

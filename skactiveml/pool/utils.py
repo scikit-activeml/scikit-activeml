@@ -14,6 +14,7 @@ from sklearn.utils.validation import check_array, check_consistent_length
 from ..base import (
     SkactivemlClassifier,
     ProbabilisticRegressor,
+    _resolve_own_fitted_attribute,
 )
 from ..classifier import ParzenWindowClassifier
 from ..utils import (
@@ -69,7 +70,39 @@ class IndexClassifierWrapper:
         implemented for `skactiveml.classifier.ParzenWindowClassifier`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
+
+    Notes
+    -----
+    Attributes this wrapper does not hold itself are read from the wrapped
+    `clf`, `classes_` among them: the wrapper resolves no target semantics of
+    its own, so those its `SkactivemlClassifier` resolved are the wrapper's own
+    answer. The fitted attributes it does hold itself, e.g. `clf_` and `idx_`,
+    are never read from `clf` and raise the usual not-fitted error before a
+    fit.
     """
+
+    #: Fitted attributes this wrapper holds itself, which `__getattr__`
+    #: therefore never forwards to the wrapped `clf`. `classes_` and
+    #: `target_spec_` are deliberately absent: this wrapper resolves no target
+    #: semantics of its own, so those the wrapped `SkactivemlClassifier`
+    #: resolved are the wrapper's own answer. `missing_label_` is the one name
+    #: here that `__init__` already sets, so it never reaches `__getattr__`.
+    _own_fitted_attributes = frozenset(
+        {
+            "base_clf_",
+            "base_idx_",
+            "base_sample_weight_",
+            "base_y_",
+            "clf_",
+            "idx_",
+            "missing_label_",
+            "pwc_K_",
+            "pwc_metric_",
+            "pwc_metric_dict_",
+            "sample_weight_",
+            "y_",
+        }
+    )
 
     def __init__(
         self,
@@ -590,6 +623,8 @@ class IndexClassifierWrapper:
             return False
 
     def __getattr__(self, item):
+        if item in self._own_fitted_attributes:
+            return _resolve_own_fitted_attribute(self, item)
         if "clf_" in self.__dict__ and hasattr(self.clf_, item):
             return getattr(self.clf_, item)
         else:

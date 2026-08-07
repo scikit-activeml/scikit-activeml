@@ -13,7 +13,11 @@ from sklearn.utils.validation import (
     check_random_state,
 )
 
-from ..base import SkactivemlRegressor, ProbabilisticRegressor
+from ..base import (
+    SkactivemlRegressor,
+    ProbabilisticRegressor,
+    _resolve_own_fitted_attribute,
+)
 from ..utils import (
     is_labeled,
     match_signature,
@@ -71,7 +75,32 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Immutable target specification established by a successful fit. Its
         `target_type` is `"single-output"` and its `classes` field is `None`
         for supported version 1.1 execution.
+
+    Notes
+    -----
+    Attributes this wrapper does not hold itself are read from the wrapped
+    `estimator`. The fitted attributes it resolves itself, e.g. `target_spec_`,
+    never are: around a pre-fitted `estimator` they resolve this wrapper's own
+    target semantics on first access, and they raise the usual not-fitted error
+    while no such semantics exist. A pre-fitted estimator's own target
+    specification stays readable as `estimator.target_spec_`.
     """
+
+    #: Fitted attributes this wrapper resolves itself, which `__getattr__`
+    #: therefore never forwards to the wrapped `estimator`. `n_features_in_`
+    #: is deliberately absent: it describes the input data rather than the
+    #: target, both objects agree on it, and `partial_fit` reads it through
+    #: `hasattr` to decide whether to reset the feature count.
+    _own_fitted_attributes = frozenset(
+        {
+            "_label_mean",
+            "_label_std",
+            "check_X_dict_",
+            "estimator_",
+            "is_fitted_",
+            "target_spec_",
+        }
+    )
 
     def __init__(
         self,
@@ -487,6 +516,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         return None
 
     def __getattr__(self, item):
+        if item in self._own_fitted_attributes:
+            return _resolve_own_fitted_attribute(self, item)
         if "estimator_" in self.__dict__:
             return getattr(self.estimator_, item)
         else:
