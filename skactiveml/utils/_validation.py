@@ -1,5 +1,6 @@
 import copy
 import warnings
+from collections.abc import Iterator
 import numbers
 import numpy as np
 
@@ -122,6 +123,9 @@ def _has_nested_classes(classes):
 
     Raises
     ------
+    TypeError
+        If `classes` or one of its nested class vocabularies is a one-shot
+        iterator.
     ValueError
         If `classes` is an empty iterable.
     """
@@ -129,8 +133,11 @@ def _has_nested_classes(classes):
         return False
     if not _is_nonstring_iterable(classes):
         return False
+    if isinstance(classes, Iterator):
+        raise TypeError(
+            "`classes` must be a reusable iterable, not a one-shot iterator."
+        )
 
-    # Materialize once (handles generators).
     outer = list(classes)
     if len(outer) == 0:
         raise ValueError("`classes` must not be empty.")
@@ -141,6 +148,12 @@ def _has_nested_classes(classes):
             "`classes` must be uniformly flat or nested; mixed class "
             "vocabularies are not supported."
         )
+    for output_idx, value in enumerate(outer):
+        if isinstance(value, Iterator):
+            raise TypeError(
+                f"`classes[{output_idx}]` must be a reusable iterable, not a "
+                "one-shot iterator."
+            )
     return all(nested)
 
 
@@ -663,6 +676,16 @@ def check_X_y(
                 ensure_2d=False,
                 dtype=None,
             )
+            if y.ndim != 2:
+                raise ValueError(
+                    f"`target_type='{target_type}'` requires a "
+                    "two-dimensional `y`."
+                )
+            if target_type == "multi-output" and y.shape[1] < 2:
+                raise ValueError(
+                    "`target_type='multi-output'` requires `y` with at least "
+                    "two target columns."
+                )
         else:
             y = column_or_1d(y, warn=True)
             assert_all_finite(y, allow_nan=allow_nan)

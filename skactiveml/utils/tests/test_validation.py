@@ -219,6 +219,10 @@ class TestValidation(unittest.TestCase):
             check_classes([])
         with self.assertRaisesRegex(ValueError, "uniformly flat or nested"):
             check_classes([[0, 1], 0])
+        with self.assertRaisesRegex(TypeError, "reusable iterable"):
+            check_classes(iter([0, 1]))
+        with self.assertRaisesRegex(TypeError, r"classes\[0\].*reusable"):
+            check_classes([iter([0, 1]), [0, 1]])
         self.assertIsNone(check_classes(None))
 
     def test_private_class_validation_helpers(self):
@@ -328,6 +332,16 @@ class TestValidation(unittest.TestCase):
         X_cand = [[5, 6]]
         with self.assertRaisesRegex(ValueError, "target_type.*one of"):
             check_X_y(X, y, target_type="invalid")
+        with self.assertRaisesRegex(
+            ValueError, "multi-label.*two-dimensional"
+        ):
+            check_X_y(X, y, target_type="multi-label")
+        with self.assertRaisesRegex(
+            ValueError, "multi-output.*two-dimensional"
+        ):
+            check_X_y(X, y, target_type="multi-output")
+        with self.assertRaisesRegex(ValueError, "at least two target columns"):
+            check_X_y(X, [[1], [0]], target_type="multi-output")
 
         X, y, sample_weight = check_X_y(X, y)
         np.testing.assert_array_equal(sample_weight, np.array([1.0, 1.0]))
@@ -343,6 +357,12 @@ class TestValidation(unittest.TestCase):
             X, y, X_cand, sample_weight, target_type="multi-label"
         )
         self.assertTrue(isinstance(y, np.ndarray))
+        _, y_multi_output, _ = check_X_y(
+            X, [[1, 0], [0, 1]], target_type="multi-output"
+        )
+        np.testing.assert_array_equal(
+            y_multi_output, np.array([[1, 0], [0, 1]])
+        )
         y = np.array([1, 0], dtype=object)
         X, y, X_cand, sample_weight, _ = check_X_y(
             X, y, X_cand, sample_weight, y_numeric=True
