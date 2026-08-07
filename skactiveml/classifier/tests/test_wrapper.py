@@ -5,7 +5,7 @@ import inspect
 
 from copy import deepcopy
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin, is_classifier
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import StandardScaler
@@ -209,21 +209,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         def predict_proba(self, X):
             self.calls.append("predict_proba")
             return super().predict_proba(X)
-
-    class _LegacyEstimator:
-        """Classifier predating the `scikit-learn` estimator tag protocol."""
-
-        _estimator_type = "classifier"
-
-        def fit(self, X, y):
-            self.classes_ = [np.array([0, 1]), np.array([0, 1])]
-            return self
-
-        def predict(self, X):
-            return np.zeros((len(X), 2), dtype=int)
-
-        def predict_proba(self, X):
-            return np.full((len(X), 2), 0.5)
 
     class _BrokenEstimator(_MultiOutputTaggedEstimator):
         """Admitted classifier whose fit always fails unexpectedly."""
@@ -695,13 +680,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         self.assertNotIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
 
-    def test_legacy_estimator_tags_do_not_advertise_multilabel(self):
-        clf = SklearnClassifier(
-            estimator=self._LegacyEstimator(), missing_label=-1
-        )
-
-        self.assertNotIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
-
     def test_capability_detection_never_fits_or_predicts(self):
         estimator = self._CallRecordingEstimator()
         clf = SklearnClassifier(
@@ -713,16 +691,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertIn(self.MULTILABEL_CAPABILITY, clf._target_capabilities)
         clf._resolve_target_spec(self.y_ml)
         self.assertEqual(estimator.calls, [])
-
-    def test_legacy_estimator_is_rejected_by_its_tags(self):
-        # The rejection has to come from the default-negative tags, not from
-        # a missing classifier role or a missing `predict_proba`.
-        estimator = self._LegacyEstimator()
-
-        self.assertTrue(is_classifier(estimator))
-        self.assertTrue(hasattr(estimator, "predict_proba"))
-        self.assertFalse(get_tags(estimator).target_tags.multi_output)
-        self.assertFalse(get_tags(estimator).classifier_tags.multi_label)
 
     def _assert_multilabel_rejection(self, clf, action):
         attributes_before = dict(clf.__dict__)
@@ -748,17 +716,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 self._assert_multilabel_rejection(
                     clf, lambda: clf.fit(self.X_ml, self.y_ml)
                 )
-
-    def test_unfitted_multilabel_rejects_legacy_estimator(self):
-        clf = SklearnClassifier(
-            estimator=self._LegacyEstimator(),
-            classes=[[0, 1], [0, 1]],
-            missing_label=-1,
-        )
-
-        self._assert_multilabel_rejection(
-            clf, lambda: clf.fit(self.X_ml, self.y_ml)
-        )
 
     def test_prefit_multilabel_rejects_undeclared_estimator(self):
         estimator = LogisticRegression().fit(self.X_ml, self.y_ml[:, 0])

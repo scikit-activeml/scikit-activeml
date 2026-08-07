@@ -80,10 +80,8 @@ def _declares_multilabel_support(estimator):
 
     Exposing `predict_proba` is not sufficient, since it says nothing about
     whether an estimator accepts a two-dimensional target. Neither is the
-    presence of a tags object, because `get_tags` returns default-negative
-    fallbacks for legacy or third-party estimators that predate the current
-    tag protocol. An estimator therefore has to declare its capability
-    positively.
+    presence of a tags object, because both tags default to negative. An
+    estimator therefore has to declare its capability positively.
 
     Parameters
     ----------
@@ -114,10 +112,10 @@ def _multilabel_capability_error(component, estimator):
         f"scikit-learn classifier, implement 'predict_proba', and positively "
         f"declare either 'target_tags.multi_output' or "
         f"'classifier_tags.multi_label' through its estimator tags. "
-        f"Estimators declaring neither, including legacy estimators falling "
-        f"back to default tags, are rejected because they are not guaranteed "
-        f"to accept a two-dimensional target. Either wrap the estimator, "
-        f"e.g., via 'sklearn.multioutput.MultiOutputClassifier', or use "
+        f"Estimators declaring neither are rejected because they are not "
+        f"guaranteed to accept a two-dimensional target. Either wrap the "
+        f"estimator, e.g., via 'sklearn.multioutput.MultiOutputClassifier', "
+        f"or use "
         f"'target_type=\"single-output\"'."
     )
 
