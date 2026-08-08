@@ -870,7 +870,61 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ]
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        """Fit or partially fit this wrapper as a single transaction.
+
+        The snapshot taken here covers the entire fit, not only the estimator
+        call: a rejection raised while validating the estimator, the class
+        vocabulary, or the target specification rolls the wrapper back just as
+        a failing estimator fit does. Without that, a failing re-fit would
+        leave an already fitted wrapper reporting metadata from the abandoned
+        attempt, e.g. an `n_features_in_` that contradicts its `estimator_`.
+
+        The degenerate training cases are not failures and keep their state,
+        because `_validate_and_fit` returns `self` for them rather than
+        raising. The transaction also covers this wrapper only: as
+        `_restore_attributes` documents, a `partial_fit` that already mutated
+        `estimator_` in place cannot be rolled back.
+
+        Parameters
+        ----------
+        fit_function : "fit" or "partial_fit"
+            Name of the estimator method to call.
+        X : array-like of shape (n_samples, ...)
+            The feature matrix representing the samples.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set, possibly including unlabeled ones.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
+        fit_kwargs : dict-like
+            Further parameters as input to `fit_function` of the `estimator`.
+
+        Returns
+        -------
+        self : SklearnClassifier
+            The wrapper fitted on the training data.
+        """
         attributes_before = dict(self.__dict__)
+        try:
+            return self._validate_and_fit(
+                fit_function=fit_function,
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                **fit_kwargs,
+            )
+        except Exception:
+            self._restore_attributes(attributes_before)
+            raise
+
+    def _validate_and_fit(
+        self, fit_function, X, y, sample_weight=None, **fit_kwargs
+    ):
+        """Validate the inputs and fit the estimator, committing state freely.
+
+        This method may write fitted attributes before a later step rejects
+        the call, because its only caller `_fit` rolls them back. See `_fit`
+        for the parameters and the transactional guarantee.
+        """
         is_incremental = fit_function == "partial_fit"
         supplied_classes = (
             fit_kwargs.get("classes") if is_incremental else None
@@ -1001,6 +1055,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
             # Every other failure states a genuinely broken estimator
             # contract and must not be hidden behind prior-only predictions.
+            # The message is built before propagating, because `_fit` restores
+            # the pre-call state and with it the reported `estimator_`.
             message = (
                 f"Calling '{fit_function}' of the estimator "
                 f"'{self.estimator_}' failed on {len(y_train)} labeled "
@@ -1008,7 +1064,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 f"not one of the degenerate training cases for which the "
                 f"class label distribution is used as a fallback."
             )
-            self._restore_attributes(attributes_before)
             raise RuntimeError(message) from error
 
         self.is_fitted_ = True

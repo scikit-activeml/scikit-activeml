@@ -848,15 +848,138 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         with self.assertRaises(RuntimeError):
             clf.fit(self.X_ml, self.y_ml)
 
-        self.assertEqual(
-            set(clf.__dict__) - {"estimator"},
-            set(attributes_before) - {"estimator"},
+        self._assert_attributes_unchanged(
+            clf, attributes_before, ignored={"estimator"}
         )
-        for name, value in attributes_before.items():
-            if name != "estimator":
-                self.assertIs(clf.__dict__[name], value)
         np.testing.assert_allclose(
             clf.predict_proba(self.X_ml), expected_probabilities
+        )
+
+    def test_rejections_before_the_estimator_fit_are_transactional(self):
+        # The snapshot taken by `_fit` has to cover every rejection raised
+        # between the snapshot and the estimator call, not only a failing
+        # estimator fit. The target specification is resolved before the first
+        # attribute is written, so the first three cases were already safe and
+        # are covered here against regression. The last four each used to
+        # commit fitted attributes, the final three including `n_features_in_`.
+        multilabel_params = {"classes": [[0, 1], [0, 1]], "missing_label": -1}
+        cases = {
+            "rejected class vocabulary": {
+                "fit_params": {
+                    "X": self.fit_default_params["X"],
+                    "y": ["tokyo", "paris", "nan", "berlin"],
+                },
+                "error": ValueError,
+                "message": "outside",
+            },
+            "rejected target specification": {
+                "init_params": multilabel_params,
+                "fit_params": {"X": self.X_ml, "y": self.y_ml},
+                "error": ValueError,
+                "message": "does not support multi-label classification",
+            },
+            "one-dimensional multi-label target": {
+                "init_params": multilabel_params,
+                "fit_params": {"X": self.X_ml, "y": self.y_ml[:, 0]},
+                "error": ValueError,
+                "message": "must be two-dimensional",
+            },
+            "inconsistent sample counts": {
+                "fit_params": {
+                    "X": self.fit_default_params["X"],
+                    "y": self.fit_default_params["y"][:-1],
+                },
+                "error": ValueError,
+                "message": "inconsistent numbers of samples",
+            },
+            "non-classifier estimator": {
+                "init_params": {"estimator": LinearRegression()},
+                "error": TypeError,
+                "message": "must be a scikit-learn",
+            },
+            "non-boolean flag": {
+                "init_params": {"include_unlabeled_samples": "yes"},
+                "error": TypeError,
+                "message": "include_unlabeled_samples",
+            },
+            "cost matrix without probabilities": {
+                "init_params": {
+                    "estimator": Perceptron(),
+                    "cost_matrix": [[0, 1], [1, 0]],
+                },
+                "error": ValueError,
+                "message": "'cost_matrix' can be only set",
+            },
+        }
+        default_init_params = {
+            "estimator": GaussianNB(),
+            "classes": ["tokyo", "paris"],
+            "missing_label": "nan",
+        }
+        for name, case in cases.items():
+            with self.subTest(case=name):
+                clf = SklearnClassifier(
+                    **{**default_init_params, **case.get("init_params", {})}
+                )
+                fit_params = case.get("fit_params", self.fit_default_params)
+
+                self._assert_fit_failure_is_transactional(
+                    clf,
+                    lambda: clf.fit(**fit_params),
+                    case["error"],
+                    case["message"],
+                )
+                self.assertRaises(NotFittedError, check_is_fitted, clf)
+
+    def test_failed_validation_refit_preserves_previously_fitted_state(self):
+        # A rejection raised after `_validate_data` used to leave the widened
+        # `n_features_in_` behind. Because `is_fitted_` had been committed by
+        # the earlier successful fit, the wrapper stayed fitted and could no
+        # longer predict on the data it was trained on.
+        clf = SklearnClassifier(
+            estimator=GaussianNB(),
+            classes=["tokyo", "paris"],
+            missing_label="nan",
+        ).fit(**self.fit_default_params)
+        expected_predictions = clf.predict(**self.predict_default_params)
+
+        clf.set_params(estimator=LinearRegression())
+        self._assert_fit_failure_is_transactional(
+            clf,
+            lambda: clf.fit(np.zeros((4, 3)), self.fit_default_params["y"]),
+            TypeError,
+            "must be a scikit-learn",
+        )
+
+        self.assertTrue(clf.is_fitted_)
+        self.assertEqual(clf.n_features_in_, 1)
+        np.testing.assert_array_equal(
+            clf.predict(**self.predict_default_params), expected_predictions
+        )
+
+    def test_failed_validation_partial_fit_preserves_fitted_state(self):
+        # `partial_fit` reaches the same rejections through its own entry
+        # point, and keeps `n_features_in_` because it does not reset the
+        # feature count. The equal-valued `check_X_dict_` it writes is a new
+        # object, so only the restored snapshot satisfies the identity check.
+        clf = SklearnClassifier(
+            estimator=GaussianNB(),
+            classes=["tokyo", "paris"],
+            missing_label="nan",
+        ).partial_fit(**self.fit_default_params)
+        expected_predictions = clf.predict(**self.predict_default_params)
+
+        clf.set_params(include_unlabeled_samples="yes")
+        self._assert_fit_failure_is_transactional(
+            clf,
+            lambda: clf.partial_fit(**self.fit_default_params),
+            TypeError,
+            "include_unlabeled_samples",
+        )
+
+        self.assertTrue(clf.is_fitted_)
+        np.testing.assert_array_equal(
+            clf.predict(**self.predict_default_params), expected_predictions
         )
 
     def test_object_encoded_targets_reach_the_estimator(self):
@@ -1009,10 +1132,28 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         np.testing.assert_array_equal(clf.classes_, estimator.classes_)
         self.assertEqual(P.shape, (len(self.X_ml), len(estimator.classes_)))
 
-    def _assert_attributes_unchanged(self, clf, attributes_before):
-        self.assertEqual(set(clf.__dict__), set(attributes_before))
+    def _assert_attributes_unchanged(self, clf, attributes_before, ignored=()):
+        # `ignored` names attributes the caller changed after taking the
+        # snapshot, e.g. an `estimator` replaced to make a re-fit fail.
+        self.assertEqual(
+            set(clf.__dict__) - set(ignored),
+            set(attributes_before) - set(ignored),
+        )
         for name, value in attributes_before.items():
-            self.assertIs(clf.__dict__[name], value)
+            if name not in ignored:
+                self.assertIs(clf.__dict__[name], value)
+
+    def _assert_fit_failure_is_transactional(
+        self, clf, action, expected_error, expected_message
+    ):
+        # Snapshots `clf` itself, so a caller that mutates `clf` beforehand
+        # still gets the full identity comparison over every attribute.
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(expected_error, expected_message):
+            action()
+
+        self._assert_attributes_unchanged(clf, attributes_before)
 
     def _assert_prefit_rejection(self, clf, expected_message):
         attributes_before = dict(clf.__dict__)
