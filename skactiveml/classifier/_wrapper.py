@@ -23,7 +23,11 @@ from sklearn.utils.validation import (
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
-from ..base import SkactivemlClassifier, _resolve_own_fitted_attribute
+from ..base import (
+    SkactivemlClassifier,
+    _resolve_own_fitted_attribute,
+    _restore_wrapper_attributes,
+)
 from ..utils._target import _check_target_capability, check_target_capability
 from ..utils import (
     rand_argmin,
@@ -882,8 +886,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         The degenerate training cases are not failures and keep their state,
         because `_validate_and_fit` returns `self` for them rather than
         raising. The transaction also covers this wrapper only: as
-        `_restore_attributes` documents, a `partial_fit` that already mutated
-        `estimator_` in place cannot be rolled back.
+        `_restore_wrapper_attributes` documents, a `partial_fit` that already
+        mutated `estimator_` in place cannot be rolled back.
 
         Parameters
         ----------
@@ -913,7 +917,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 **fit_kwargs,
             )
         except Exception:
-            self._restore_attributes(attributes_before)
+            _restore_wrapper_attributes(self, attributes_before)
             raise
 
     def _validate_and_fit(
@@ -1068,26 +1072,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         self.is_fitted_ = True
         return self
-
-    def _restore_attributes(self, attributes):
-        """Restore every attribute of this wrapper to a pre-call snapshot.
-
-        A failing fit must not leave a wrapper that reports fitted state it
-        cannot serve. Because the attributes are restored as a whole rather
-        than selectively deleted, an already fitted wrapper keeps exactly its
-        pre-call values, and a previously unfitted one stays unfitted.
-
-        Note that this restores this wrapper only. A `partial_fit` mutates
-        `estimator_` in place, so a failing incremental update can leave the
-        wrapped estimator itself in an implementation-defined state.
-
-        Parameters
-        ----------
-        attributes : dict
-            Snapshot of `self.__dict__` taken before the failing call.
-        """
-        self.__dict__.clear()
-        self.__dict__.update(attributes)
 
     def _decode_labeled_targets(self, y_train):
         """Decode a labeled training subset into its declared class dtype.
@@ -1667,6 +1651,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     the wrapper's own answer. The fitted attributes it does hold itself, e.g.
     `target_spec_` and the sliding window in `X_train_`, are never read from
     the `estimator` and raise the usual not-fitted error before a fit.
+
+    A `fit` or `partial_fit` that raises leaves this wrapper exactly as it
+    was, the sliding window included. The window therefore never advances past
+    what the wrapped `estimator` was trained on, and a rejected update leaves a
+    previously fitted wrapper able to predict as before.
     """
 
     #: Fitted attributes this wrapper holds itself, which `__getattr__`
@@ -1685,6 +1674,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "y_train_",
         }
     )
+
+    #: Fitted attributes holding the sliding window, which a fit updates in
+    #: place and `_snapshot_attributes` therefore copies rather than
+    #: referencing.
+    _window_attributes = ("X_train_", "y_train_", "sample_weight_train_")
 
     def __init__(
         self,
@@ -1729,40 +1723,15 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self: SlidingWindowClassifier,
             The `SlidingWindowClassifier` is fitted on the training data.
         """
-        # Check whether estimator is a valid classifier.
+        # Check whether estimator is a valid classifier. This precedes the
+        # transaction `_fit` opens, because it writes nothing itself.
         if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
                 "'{}' must be a SkactivemlClassifier"
                 "classifier.".format(self.estimator)
             )
-        self.check_X_dict_ = {
-            "ensure_min_samples": 0,
-            "ensure_min_features": 0,
-            "allow_nd": True,
-            "dtype": None,
-        }
-        X, y, sample_weight = self._validate_data(
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
-            check_X_dict=self.check_X_dict_,
-            established_spec=None,
-        )
 
-        self._add_samples("fit", X, y, sample_weight)
-        X_train = np.array(self.X_train_)
-        y_train = np.array(self.y_train_)
-        sample_weight_train = None
-        if self.sample_weight_train_ is not None:
-            sample_weight_train = np.array(
-                self.sample_weight_train_, dtype=float
-            )
-        return self._fit(
-            X=X_train,
-            y=y_train,
-            sample_weight=sample_weight_train,
-            **fit_kwargs,
-        )
+        return self._fit("fit", X, y, sample_weight, **fit_kwargs)
 
     @match_signature("estimator", "fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -1787,27 +1756,86 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self : SlidingWindowClassifier,
             The SlidingWindowClassifier is fitted on the training data.
         """
-        # Check whether estimator is a valid classifier.
+        # Check whether estimator is a valid classifier. This precedes the
+        # transaction `_fit` opens, because it writes nothing itself.
         if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
                 "'{}' must be a SkactivemlClassifier.".format(self.estimator)
             )
+
+        return self._fit("partial_fit", X, y, sample_weight, **fit_kwargs)
+
+    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        """Fit or partially fit this wrapper as a single transaction.
+
+        The snapshot taken here covers the entire fit, including the sliding
+        window: `_validate_and_fit` extends the window before it trains, so a
+        later rejection — a `cost_matrix` without `predict_proba`, or the
+        wrapped estimator's own failure — would otherwise leave the window
+        carrying samples the estimator was never trained on.
+
+        The transaction covers this wrapper only. The wrapped estimator is
+        re-created from `estimator` on every fit, so a failing fit leaves no
+        half-trained estimator behind, but a snapshot cannot undo what that
+        estimator did to state of its own.
+
+        Parameters
+        ----------
+        fit_function : "fit" or "partial_fit"
+            Whether the window is replaced by `X` and `y` or extended by them.
+        X : array-like of shape (n_samples, ...)
+            The feature matrix representing the samples.
+        y : array-like of shape (n_samples,)
+            It contains the class labels of the training samples. Missing
+            labels are represented by the attribute `self.missing_label_`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
+        fit_kwargs : dict-like
+            Further parameters as input to the `fit` method of the `estimator`.
+
+        Returns
+        -------
+        self : SlidingWindowClassifier
+            The wrapper fitted on the sliding window.
+        """
+        snapshot_before = self._snapshot_attributes()
+        try:
+            return self._validate_and_fit(
+                fit_function, X, y, sample_weight, **fit_kwargs
+            )
+        except Exception:
+            self._restore_snapshot(snapshot_before)
+            raise
+
+    def _validate_and_fit(
+        self, fit_function, X, y, sample_weight=None, **fit_kwargs
+    ):
+        """Validate the inputs, fill the window, and fit the estimator.
+
+        This method may write fitted attributes and extend the sliding window
+        before a later step rejects the call, because its only caller `_fit`
+        rolls both back. See `_fit` for the parameters and the transactional
+        guarantee.
+        """
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "allow_nd": True,
             "dtype": None,
         }
-
         X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
-            established_spec=getattr(self, "target_spec_", None),
+            established_spec=(
+                getattr(self, "target_spec_", None)
+                if fit_function == "partial_fit"
+                else None
+            ),
         )
 
-        self._add_samples("partial_fit", X, y, sample_weight)
+        self._add_samples(fit_function, X, y, sample_weight)
         X_train = np.array(self.X_train_)
         y_train = np.array(self.y_train_)
         sample_weight_train = None
@@ -1815,12 +1843,69 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             sample_weight_train = np.array(
                 self.sample_weight_train_, dtype=float
             )
-        return self._fit(
-            X=X_train,
-            y=y_train,
-            sample_weight=sample_weight_train,
-            **fit_kwargs,
-        )
+
+        # Check whether estimator can deal with cost matrix.
+        if self.cost_matrix is not None and not hasattr(
+            self.estimator, "predict_proba"
+        ):
+            raise ValueError(
+                "'cost_matrix' can be only set, if 'estimator'"
+                "implements 'predict_proba'."
+            )
+
+        self.estimator_ = deepcopy(self.estimator)
+        if self.estimator_.classes is None:
+            self.estimator_.set_params(classes=self.target_spec_.classes)
+        if has_fit_parameter(self.estimator, "sample_weight"):
+            fit_kwargs["sample_weight"] = sample_weight_train
+        self.estimator_.fit(X=X_train, y=y_train, **fit_kwargs)
+
+        return self
+
+    def _snapshot_attributes(self):
+        """Snapshot this wrapper's attributes, sliding window included.
+
+        A plain `dict(self.__dict__)` is not enough here, because
+        `_add_samples` extends the window `deque`s in place: the snapshot would
+        hold the very objects the fit mutates. The window contents are
+        therefore copied alongside the attribute mapping.
+
+        The copy costs `O(window_size)` per fit, which is the cost every fit
+        already pays to hand the window to the wrapped estimator as an array.
+
+        Returns
+        -------
+        attributes : dict
+            Snapshot of `self.__dict__`.
+        window_contents : dict
+            Copied contents of each sliding window present in `attributes`.
+        """
+        attributes = dict(self.__dict__)
+        window_contents = {
+            name: list(attributes[name])
+            for name in self._window_attributes
+            if isinstance(attributes.get(name), deque)
+        }
+        return attributes, window_contents
+
+    def _restore_snapshot(self, snapshot):
+        """Restore this wrapper, sliding window included, to a snapshot.
+
+        The windows are refilled rather than replaced, so that a caller
+        holding a reference to `X_train_` observes the rollback as well.
+
+        Parameters
+        ----------
+        snapshot : tuple
+            Return value of `_snapshot_attributes`, taken before the failing
+            call.
+        """
+        attributes, window_contents = snapshot
+        _restore_wrapper_attributes(self, attributes)
+        for name, contents in window_contents.items():
+            window = attributes[name]
+            window.clear()
+            window.extend(contents)
 
     def _add_samples(self, fit_func, X, y, sample_weight=None):
         if not hasattr(self, "X_train_"):
@@ -1849,31 +1934,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.sample_weight_train_.extend(sample_weight)
         else:
             self.sample_weight_train_ = None
-
-    def _fit(self, X, y, sample_weight=None, **fit_kwargs):
-        # Check whether estimator can deal with cost matrix.
-        if self.cost_matrix is not None and not hasattr(
-            self.estimator, "predict_proba"
-        ):
-            raise ValueError(
-                "'cost_matrix' can be only set, if 'estimator'"
-                "implements 'predict_proba'."
-            )
-
-        if hasattr(self, "estimator_"):
-            self.estimator_ = deepcopy(self.estimator)
-        else:
-            self.estimator_ = deepcopy(self.estimator)
-
-        if self.estimator_.classes is None:
-            self.estimator_.set_params(classes=self.target_spec_.classes)
-
-        if has_fit_parameter(self.estimator, "sample_weight"):
-            fit_kwargs["sample_weight"] = sample_weight
-
-        self.estimator_.fit(X=X, y=y, **fit_kwargs)
-
-        return self
 
     def _validate_data(
         self,
@@ -2894,6 +2954,50 @@ if successful_capymoa_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
+            """Fit or partially fit this wrapper as a single transaction.
+
+            This wrapper absorbs every estimator failure into its prior-only
+            fallback, which returns `self` and is therefore never rolled back.
+            The rejection of an `estimator_class` that is no capymoa
+            classifier does raise, though, and used to leave the fitted
+            attributes of the abandoned attempt behind — `n_features_in_`
+            among them, so that an already fitted wrapper could no longer
+            predict on the data it was trained on.
+
+            Parameters
+            ----------
+            fit_function : "fit" or "partial_fit"
+                Whether the estimator is re-created or updated incrementally.
+            X : matrix-like of shape (n_samples, n_features)
+                Training data set, usually complete, i.e. including the labeled
+                and unlabeled samples.
+            y : array-like of shape (n_samples,)
+                Labels of the training data set, possibly including unlabeled
+                ones indicated by `self.missing_label`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                It contains the weights of the training samples' class labels.
+
+            Returns
+            -------
+            self : CapyMOAClassifier
+                The wrapper fitted on the training data.
+            """
+            attributes_before = dict(self.__dict__)
+            try:
+                return self._validate_and_fit(
+                    fit_function, X, y, sample_weight
+                )
+            except Exception:
+                _restore_wrapper_attributes(self, attributes_before)
+                raise
+
+        def _validate_and_fit(self, fit_function, X, y, sample_weight=None):
+            """Validate the inputs and train, committing state freely.
+
+            This method may write fitted attributes before a later step
+            rejects the call, because its only caller `_fit` rolls them back.
+            See `_fit` for the parameters and the transactional guarantee.
+            """
             import capymoa
             import capymoa.base
             import capymoa.instance
@@ -3200,6 +3304,49 @@ if successful_river_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
+            """Fit or partially fit this wrapper as a single transaction.
+
+            This wrapper absorbs almost every estimator failure into its
+            prior-only fallback, which returns `self` and is therefore never
+            rolled back. The rejection of an `estimator` that is no river
+            classifier does raise, as does an unsupported `sample_weight`, and
+            those used to leave the fitted attributes of the abandoned attempt
+            behind — `n_features_in_` among them, so that an already fitted
+            wrapper could no longer predict on the data it was trained on.
+
+            Parameters
+            ----------
+            fit_function : "fit" or "partial_fit"
+                Whether the estimator is re-created or updated incrementally.
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+                It contains the class labels of the training samples. Missing
+                labels are represented by the attribute `self.missing_label_`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                It contains the weights of the training samples' class labels.
+
+            Returns
+            -------
+            self : RiverClassifier
+                The wrapper fitted on the training data.
+            """
+            attributes_before = dict(self.__dict__)
+            try:
+                return self._validate_and_fit(
+                    fit_function, X, y, sample_weight
+                )
+            except Exception:
+                _restore_wrapper_attributes(self, attributes_before)
+                raise
+
+        def _validate_and_fit(self, fit_function, X, y, sample_weight=None):
+            """Validate the inputs and train, committing state freely.
+
+            This method may write fitted attributes before a later step
+            rejects the call, because its only caller `_fit` rolls them back.
+            See `_fit` for the parameters and the transactional guarantee.
+            """
             target_spec = self._resolve_target_spec_for_fit(
                 y, is_incremental=fit_function == "partial_fit"
             )

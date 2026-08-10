@@ -21,6 +21,72 @@ def assert_no_query_state(test_case, strategy):
         )
 
 
+def assert_attributes_unchanged(
+    test_case, estimator, attributes_before, ignored=()
+):
+    """Assert that `estimator` holds exactly the snapshotted attributes.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case reporting the failure.
+    estimator : object
+        The estimator to compare against the snapshot.
+    attributes_before : dict
+        Snapshot of `estimator.__dict__` taken before the failing call.
+    ignored : iterable of str, default=()
+        Names of attributes the caller changed after taking the snapshot,
+        e.g. an `estimator` replaced to make a re-fit fail.
+    """
+    test_case.assertEqual(
+        set(estimator.__dict__) - set(ignored),
+        set(attributes_before) - set(ignored),
+    )
+    for name, value in attributes_before.items():
+        if name not in ignored:
+            test_case.assertIs(estimator.__dict__[name], value)
+
+
+def assert_fit_failure_is_transactional(
+    test_case, estimator, action, expected_error, expected_message
+):
+    """Assert that a rejected fit raises as expected and commits no state.
+
+    This is the counterpart of `assert_no_query_state` for a fit, and is
+    strictly stronger: it compares the full `__dict__` by identity rather than
+    three named absences, so it holds for an already fitted estimator as well
+    as an unfitted one, and a same-valued replacement object fails it.
+
+    Comparing by identity is also its one blind spot: an estimator holding
+    fitted state that its fit updates in place, e.g. a sliding window, passes
+    this assertion while carrying mutated contents. Assert those contents
+    separately.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case reporting the failure.
+    estimator : object
+        The estimator whose fit is expected to be rejected. It is snapshotted
+        here, so a caller that mutated it beforehand still gets the full
+        identity comparison over every attribute. There is deliberately no
+        `ignored` parameter for that reason: it could only weaken the
+        comparison.
+    action : callable
+        Zero-argument callable performing the rejected fit.
+    expected_error : type
+        Exception type the rejection is expected to raise.
+    expected_message : str
+        Pattern the raised message is expected to match.
+    """
+    attributes_before = dict(estimator.__dict__)
+
+    with test_case.assertRaisesRegex(expected_error, expected_message):
+        action()
+
+    assert_attributes_unchanged(test_case, estimator, attributes_before)
+
+
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = []

@@ -188,6 +188,35 @@ def _resolve_own_fitted_attribute(wrapper, item):
     )
 
 
+def _restore_wrapper_attributes(wrapper, attributes):
+    """Restore every attribute of a wrapper to a pre-call snapshot.
+
+    A failing fit must not leave a wrapper that reports fitted state it cannot
+    serve. Because the attributes are restored as a whole rather than
+    selectively deleted, an already fitted wrapper keeps exactly its pre-call
+    values, and a previously unfitted one stays unfitted.
+
+    Note that this restores the wrapper only. A `partial_fit` mutates the
+    wrapped estimator in place, so a failing incremental update can leave that
+    estimator itself in an implementation-defined state.
+
+    A wrapper holding mutable fitted state that its fit updates in place, e.g.
+    a sliding window, needs more than this: the snapshot holds the same object
+    the fit mutated, so restoring the mapping alone does not undo the update.
+    Such a wrapper has to copy that state when it snapshots and roll it back
+    itself in addition to calling this function.
+
+    Parameters
+    ----------
+    wrapper : object
+        The wrapper to roll back.
+    attributes : dict
+        Snapshot of `wrapper.__dict__` taken before the failing call.
+    """
+    wrapper.__dict__.clear()
+    wrapper.__dict__.update(attributes)
+
+
 class QueryStrategy(ABC, BaseEstimator):
     """Base class for all query strategies in scikit-activeml.
 

@@ -37,6 +37,10 @@ from skactiveml.classifier import (
 )
 from skactiveml.classifier._wrapper import _prior_matrix_from_counts
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
+from skactiveml.tests.utils import (
+    assert_attributes_unchanged,
+    assert_fit_failure_is_transactional,
+)
 from skactiveml.utils import MISSING_LABEL, TargetSpec
 
 import importlib.util
@@ -722,7 +726,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         self.assertIn("multi_output", str(context.exception))
         self.assertIn("multi_label", str(context.exception))
-        self._assert_attributes_unchanged(clf, attributes_before)
+        assert_attributes_unchanged(self, clf, attributes_before)
 
     def test_unfitted_multilabel_rejects_undeclared_estimator(self):
         for estimator in [LogisticRegression(), GaussianNB()]:
@@ -832,7 +836,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         )
         # A suppressed failure must not leave a wrapper that passes the fitted
         # check and then silently serves prior-only predictions.
-        self._assert_attributes_unchanged(clf, attributes_before)
+        assert_attributes_unchanged(self, clf, attributes_before)
         self.assertRaises(NotFittedError, check_is_fitted, clf)
 
     def test_failed_refit_preserves_previously_fitted_state(self):
@@ -848,8 +852,8 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         with self.assertRaises(RuntimeError):
             clf.fit(self.X_ml, self.y_ml)
 
-        self._assert_attributes_unchanged(
-            clf, attributes_before, ignored={"estimator"}
+        assert_attributes_unchanged(
+            self, clf, attributes_before, ignored={"estimator"}
         )
         np.testing.assert_allclose(
             clf.predict_proba(self.X_ml), expected_probabilities
@@ -923,7 +927,8 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 )
                 fit_params = case.get("fit_params", self.fit_default_params)
 
-                self._assert_fit_failure_is_transactional(
+                assert_fit_failure_is_transactional(
+                    self,
                     clf,
                     lambda: clf.fit(**fit_params),
                     case["error"],
@@ -944,7 +949,8 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         expected_predictions = clf.predict(**self.predict_default_params)
 
         clf.set_params(estimator=LinearRegression())
-        self._assert_fit_failure_is_transactional(
+        assert_fit_failure_is_transactional(
+            self,
             clf,
             lambda: clf.fit(np.zeros((4, 3)), self.fit_default_params["y"]),
             TypeError,
@@ -970,7 +976,8 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         expected_predictions = clf.predict(**self.predict_default_params)
 
         clf.set_params(include_unlabeled_samples="yes")
-        self._assert_fit_failure_is_transactional(
+        assert_fit_failure_is_transactional(
+            self,
             clf,
             lambda: clf.partial_fit(**self.fit_default_params),
             TypeError,
@@ -1132,36 +1139,13 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         np.testing.assert_array_equal(clf.classes_, estimator.classes_)
         self.assertEqual(P.shape, (len(self.X_ml), len(estimator.classes_)))
 
-    def _assert_attributes_unchanged(self, clf, attributes_before, ignored=()):
-        # `ignored` names attributes the caller changed after taking the
-        # snapshot, e.g. an `estimator` replaced to make a re-fit fail.
-        self.assertEqual(
-            set(clf.__dict__) - set(ignored),
-            set(attributes_before) - set(ignored),
-        )
-        for name, value in attributes_before.items():
-            if name not in ignored:
-                self.assertIs(clf.__dict__[name], value)
-
-    def _assert_fit_failure_is_transactional(
-        self, clf, action, expected_error, expected_message
-    ):
-        # Snapshots `clf` itself, so a caller that mutates `clf` beforehand
-        # still gets the full identity comparison over every attribute.
-        attributes_before = dict(clf.__dict__)
-
-        with self.assertRaisesRegex(expected_error, expected_message):
-            action()
-
-        self._assert_attributes_unchanged(clf, attributes_before)
-
     def _assert_prefit_rejection(self, clf, expected_message):
         attributes_before = dict(clf.__dict__)
 
         with self.assertRaisesRegex(ValueError, expected_message):
             check_is_fitted(clf)
 
-        self._assert_attributes_unchanged(clf, attributes_before)
+        assert_attributes_unchanged(self, clf, attributes_before)
 
     def test_prefit_rejects_disjoint_equal_width_class_vocabulary(self):
         # Both vocabularies are two classes wide, so the contradiction cannot
@@ -1617,7 +1601,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         ):
             check_is_fitted(clf)
 
-        self._assert_attributes_unchanged(clf, attributes_before)
+        assert_attributes_unchanged(self, clf, attributes_before)
 
     def test_prefit_capability_failure_commits_no_fitted_state(self):
         estimator = Perceptron().fit(self.X_ml, self.y_ml[:, 0])
@@ -1632,7 +1616,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not support"):
             check_is_fitted(clf)
 
-        self._assert_attributes_unchanged(clf, attributes_before)
+        assert_attributes_unchanged(self, clf, attributes_before)
 
     def test_failed_recheck_preserves_initialized_label_state(self):
         clf = SklearnClassifier(estimator=Perceptron(), missing_label=-1)
@@ -1642,7 +1626,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not support"):
             clf._commit_label_state(clf._resolve_label_state([[0, 1], [0, 1]]))
 
-        self._assert_attributes_unchanged(clf, attributes_before)
+        assert_attributes_unchanged(self, clf, attributes_before)
         self.assertEqual(clf.target_spec_.target_type, "single-output")
         np.testing.assert_array_equal(clf.classes_, [0, 1])
 
@@ -2719,6 +2703,103 @@ class TestSlidingWindowClassifier(
         )
         self.assertTrue(clf.is_fitted_)
 
+    def _fitted_window_classifier(self):
+        # `Perceptron` has no `predict_proba`, which the wrapped
+        # `SklearnClassifier` forwards, so a `cost_matrix` set afterwards is
+        # rejected inside `_fit`, after `_add_samples` extended the window.
+        clf = SlidingWindowClassifier(
+            estimator=SklearnClassifier(
+                Perceptron(), classes=[0, 1], missing_label=-1
+            ),
+            classes=[0, 1],
+            missing_label=-1,
+            window_size=10,
+        )
+        return clf.fit(np.arange(8.0).reshape(4, 2), np.array([0, 1, 0, 1]))
+
+    def test_failing_partial_fit_rolls_back_the_sliding_window(self):
+        # `partial_fit` extends the window before it fits, so a rejection
+        # inside `_fit` used to leave the window carrying samples the
+        # estimator was never trained on. The rejected update carries labels
+        # the previous window does not, so a window that kept them fails here.
+        X = np.arange(8.0).reshape(4, 2)
+        clf = self._fitted_window_classifier()
+        X_window_before = [np.copy(x) for x in clf.X_train_]
+        y_window_before = list(clf.y_train_)
+        clf.cost_matrix = [[0, 1], [1, 0]]
+
+        assert_fit_failure_is_transactional(
+            self,
+            clf,
+            lambda: clf.partial_fit(X, np.array([1, 1, 1, 1])),
+            ValueError,
+            "cost_matrix",
+        )
+
+        np.testing.assert_array_equal(list(clf.X_train_), X_window_before)
+        np.testing.assert_array_equal(list(clf.y_train_), y_window_before)
+
+    def test_failing_fit_rolls_back_the_sliding_window(self):
+        # `fit` replaces the window rather than extending it, so the rollback
+        # has to put the previous window back as well.
+        X = np.arange(8.0).reshape(4, 2)
+        clf = self._fitted_window_classifier()
+        window_before = [np.copy(x) for x in clf.X_train_]
+        clf.cost_matrix = [[0, 1], [1, 0]]
+
+        assert_fit_failure_is_transactional(
+            self,
+            clf,
+            lambda: clf.fit(X[:2], np.array([0, 1])),
+            ValueError,
+            "cost_matrix",
+        )
+
+        np.testing.assert_array_equal(list(clf.X_train_), window_before)
+
+    def test_failing_estimator_fit_rolls_back_the_sliding_window(self):
+        # The wrapped estimator's own failure is rolled back the same way.
+        class FailingClassifier(ParzenWindowClassifier):
+            def fit(self, X, y, sample_weight=None):
+                raise RuntimeError("the wrapped classifier is broken")
+
+        X = np.arange(8.0).reshape(4, 2)
+        y = np.array([0, 1, 0, 1])
+        clf = SlidingWindowClassifier(
+            estimator=ParzenWindowClassifier(classes=[0, 1], missing_label=-1),
+            classes=[0, 1],
+            missing_label=-1,
+            window_size=10,
+        ).fit(X, y)
+        window_before = [np.copy(x) for x in clf.X_train_]
+        clf.estimator = FailingClassifier(classes=[0, 1], missing_label=-1)
+
+        assert_fit_failure_is_transactional(
+            self,
+            clf,
+            lambda: clf.partial_fit(X, y),
+            RuntimeError,
+            "the wrapped classifier is broken",
+        )
+
+        np.testing.assert_array_equal(list(clf.X_train_), window_before)
+
+    def test_window_rollback_keeps_the_window_objects_themselves(self):
+        # The rollback refills the deques rather than replacing them, so a
+        # caller holding a reference to `X_train_` sees the rollback too.
+        X = np.arange(8.0).reshape(4, 2)
+        y = np.array([0, 1, 0, 1])
+        clf = self._fitted_window_classifier()
+        window = clf.X_train_
+        clf.cost_matrix = [[0, 1], [1, 0]]
+
+        with self.assertRaises(ValueError):
+            clf.partial_fit(X, y)
+
+        self.assertIs(clf.X_train_, window)
+        self.assertEqual(len(window), 4)
+        self.assertEqual(window.maxlen, 10)
+
     def test_predict_proba(self):
         clf = SlidingWindowClassifier(
             SklearnClassifier(
@@ -3631,6 +3712,50 @@ if successful_river_import:
         def test_fit(self):
             self._test_fit("fit")
 
+        def test_wrong_estimator_rejection_is_transactional(self):
+            # This wrapper absorbs every estimator failure into its prior-only
+            # fallback, so the wrong-estimator rejection is nearly its only
+            # raising path. It used to leak all seven fitted attributes,
+            # `n_features_in_` among them.
+            X = np.zeros((4, 2))
+            y = np.array([0, 1, 0, 1])
+            clf = RiverClassifier(
+                estimator=LinearRegression(), classes=[0, 1], missing_label=-1
+            )
+
+            assert_fit_failure_is_transactional(
+                self,
+                clf,
+                lambda: clf.fit(X, y),
+                TypeError,
+                "must be a river classifier",
+            )
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+
+        def test_wrong_estimator_refit_preserves_fitted_state(self):
+            X = np.arange(8.0).reshape(4, 2)
+            y = np.array([0, 1, 0, 1])
+            clf = RiverClassifier(
+                estimator=river.naive_bayes.GaussianNB(),
+                classes=[0, 1],
+                missing_label=-1,
+            ).fit(X, y)
+            expected_probabilities = clf.predict_proba(X)
+
+            clf.estimator = LinearRegression()
+            assert_fit_failure_is_transactional(
+                self,
+                clf,
+                lambda: clf.fit(np.zeros((4, 3)), y),
+                TypeError,
+                "must be a river classifier",
+            )
+
+            self.assertEqual(clf.n_features_in_, 2)
+            np.testing.assert_allclose(
+                clf.predict_proba(X), expected_probabilities
+            )
+
         def test_partial_fit(self):
             self._test_fit("partial_fit")
             clfs = {
@@ -4110,6 +4235,50 @@ if successful_capymoa_import:
 
         def test_fit(self):
             self._test_fit("fit")
+
+        def test_wrong_estimator_class_rejection_is_transactional(self):
+            # As for `RiverClassifier`, this rejection is nearly the only
+            # raising path and used to leak all seven fitted attributes.
+            X = np.zeros((4, 2))
+            y = np.array([0, 1, 0, 1])
+            clf = CapyMOAClassifier(
+                estimator_class=LinearRegression,
+                classes=[0, 1],
+                missing_label=-1,
+            )
+
+            assert_fit_failure_is_transactional(
+                self,
+                clf,
+                lambda: clf.fit(X, y),
+                TypeError,
+                "must be a capymoa",
+            )
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+
+        def test_wrong_estimator_class_refit_preserves_fitted_state(self):
+            from capymoa.classifier import NaiveBayes
+
+            X = np.arange(8.0).reshape(4, 2)
+            y = np.array([0, 1, 0, 1])
+            clf = CapyMOAClassifier(
+                estimator_class=NaiveBayes, classes=[0, 1], missing_label=-1
+            ).fit(X, y)
+            expected_probabilities = clf.predict_proba(X)
+
+            clf.estimator_class = LinearRegression
+            assert_fit_failure_is_transactional(
+                self,
+                clf,
+                lambda: clf.fit(np.zeros((4, 3)), y),
+                TypeError,
+                "must be a capymoa",
+            )
+
+            self.assertEqual(clf.n_features_in_, 2)
+            np.testing.assert_allclose(
+                clf.predict_proba(X), expected_probabilities
+            )
 
         def test_partial_fit(self):
             self._test_fit("partial_fit")

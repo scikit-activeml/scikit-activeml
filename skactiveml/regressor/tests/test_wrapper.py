@@ -26,6 +26,7 @@ from skactiveml.tests.template_estimator import (
     TemplateSkactivemlRegressor,
     TemplateProbabilisticRegressor,
 )
+from skactiveml.tests.utils import assert_fit_failure_is_transactional
 
 successful_skorch_torch_import = False
 try:
@@ -389,6 +390,147 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertIsNot(reg.target_spec_, established_spec)
         self.assertIsNot(reg.estimator_, established_estimator)
 
+    def test_rejections_before_the_estimator_fit_are_transactional(self):
+        # The snapshot `_fit` takes has to cover every rejection raised
+        # between the snapshot and the estimator call, not only a failing
+        # estimator fit. The estimator type and `include_unlabeled_samples`
+        # are checked before the first attribute is written, so those two were
+        # already safe and are covered here against regression. The other
+        # three did commit fitted attributes, the last one including
+        # `n_features_in_`.
+        default_fit_params = {
+            "X": np.zeros((4, 1)),
+            "y": [0.0, 1.0, 2.0, 3.0],
+        }
+        cases = {
+            "non-regressor estimator": {
+                "init_params": {"estimator": SVC()},
+                "error": TypeError,
+                "message": "must be a scikit-learn regressor",
+            },
+            "non-boolean include_unlabeled_samples": {
+                "init_params": {"include_unlabeled_samples": "yes"},
+                "error": TypeError,
+                "message": "include_unlabeled_samples",
+            },
+            "rejected target specification": {
+                "fit_params": {"X": np.zeros((4, 2)), "y": np.zeros((4, 2))},
+                "error": ValueError,
+                "message": "does not support target capability",
+            },
+            "inconsistent sample counts": {
+                "fit_params": {"X": np.zeros((4, 1)), "y": [0.0, 1.0, 2.0]},
+                "error": ValueError,
+                "message": "inconsistent numbers of samples",
+            },
+            "incompatible missing label": {
+                "fit_params": {
+                    "X": np.zeros((4, 3)),
+                    "y": ["a", "b", "c", "d"],
+                },
+                "error": TypeError,
+                "message": "is not compatible to the type",
+            },
+        }
+
+        for name, case in cases.items():
+            with self.subTest(rejection=name):
+                init_params = {
+                    "estimator": LinearRegression(),
+                    "missing_label": np.nan,
+                } | case.get("init_params", {})
+                fit_params = case.get("fit_params", default_fit_params)
+                reg = SklearnRegressor(**init_params)
+
+                assert_fit_failure_is_transactional(
+                    self,
+                    reg,
+                    lambda: reg.fit(**fit_params),
+                    case["error"],
+                    case["message"],
+                )
+                self.assertRaises(NotFittedError, check_is_fitted, reg)
+
+    def test_failed_first_fit_leaves_no_fitted_attribute(self):
+        reg = SklearnRegressor(LinearRegression(), missing_label=np.nan)
+
+        with self.assertRaises(TypeError):
+            reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"])
+
+        for attribute in [
+            "check_X_dict_",
+            "missing_label_",
+            "n_features_in_",
+            "random_state_",
+            "target_spec_",
+        ]:
+            self.assertFalse(hasattr(reg, attribute), msg=attribute)
+
+    def test_failed_validation_refit_preserves_previously_fitted_state(self):
+        # A rejection raised inside `_validate_data` used to leave the widened
+        # `n_features_in_` behind, so a regressor that stayed `is_fitted_`
+        # could no longer predict on the data it was trained on.
+        X = np.arange(4.0).reshape(-1, 1)
+        reg = SklearnRegressor(LinearRegression(), missing_label=np.nan).fit(
+            X, [0.0, 1.0, 2.0, 3.0]
+        )
+        established_spec = reg.target_spec_
+        expected_predictions = reg.predict(X)
+
+        assert_fit_failure_is_transactional(
+            self,
+            reg,
+            lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
+            TypeError,
+            "is not compatible to the type",
+        )
+
+        self.assertEqual(reg.n_features_in_, 1)
+        self.assertIs(reg.target_spec_, established_spec)
+        self.assertTrue(np.isnan(reg.missing_label_))
+        np.testing.assert_allclose(reg.predict(X), expected_predictions)
+
+    def test_failed_validation_partial_fit_preserves_fitted_state(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        reg = SklearnRegressor(
+            SGDRegressor(random_state=0), missing_label=np.nan
+        )
+        reg.partial_fit(X, [0.0, 1.0, 2.0, 3.0])
+        expected_predictions = reg.predict(X)
+
+        assert_fit_failure_is_transactional(
+            self,
+            reg,
+            lambda: reg.partial_fit(X, ["a", "b", "c", "d"]),
+            TypeError,
+            "is not compatible to the type",
+        )
+
+        np.testing.assert_allclose(reg.predict(X), expected_predictions)
+
+    def test_label_mean_fallback_keeps_its_state(self):
+        # The fallback is not a failure: it warns, keeps the empirical label
+        # statistics it just computed, and returns `self` rather than raising,
+        # so the transaction never rolls it back.
+        class FailingRegressor(SkactivemlRegressor):
+            def fit(self, X, y, sample_weight=None):
+                raise ValueError("the estimator refuses to fit")
+
+            def predict(self, X):
+                raise NotFittedError()
+
+        reg = SklearnRegressor(FailingRegressor(), missing_label=np.nan)
+        X = np.arange(4.0).reshape(-1, 1)
+        y = np.array([1.0, 3.0, np.nan, 5.0])
+
+        with self.assertWarns(Warning):
+            fitted_reg = reg.fit(X, y)
+
+        self.assertIs(fitted_reg, reg)
+        self.assertFalse(reg.is_fitted_)
+        self.assertEqual(reg._label_mean, 3.0)
+        self.assertAlmostEqual(reg._label_std, np.std([1.0, 3.0, 5.0]))
+
     def test_predict(self):
         reg = SklearnRegressor(
             estimator=ARDRegression(),
@@ -563,6 +705,54 @@ class TestSklearnNormalRegressor(
             test_cases,
             replace_init_params=replace_init_params,
         )
+
+    def test_return_std_rejection_writes_nothing(self):
+        # This wrapper's own rejection precedes the inherited transaction, so
+        # it has to write nothing itself, before and after a successful fit.
+        X = np.arange(4.0).reshape(-1, 1)
+        y = np.array([0.0, 1.0, 2.0, 3.0])
+        unfitted_reg = SklearnNormalRegressor(LinearRegression())
+
+        assert_fit_failure_is_transactional(
+            self,
+            unfitted_reg,
+            lambda: unfitted_reg.fit(X, y),
+            ValueError,
+            "must have keyword argument",
+        )
+
+        fitted_reg = SklearnNormalRegressor(GaussianProcessRegressor()).fit(
+            X, y
+        )
+        fitted_reg.estimator = LinearRegression()
+
+        assert_fit_failure_is_transactional(
+            self,
+            fitted_reg,
+            lambda: fitted_reg.fit(X, y),
+            ValueError,
+            "must have keyword argument",
+        )
+
+    def test_failed_validation_refit_preserves_previously_fitted_state(self):
+        # The transaction is inherited from `SklearnRegressor._fit`, which
+        # this wrapper's `_fit` delegates to after its own rejection.
+        X = np.arange(4.0).reshape(-1, 1)
+        reg = SklearnNormalRegressor(
+            GaussianProcessRegressor(), missing_label=np.nan
+        ).fit(X, [0.0, 1.0, 2.0, 3.0])
+        expected_predictions = reg.predict(X)
+
+        assert_fit_failure_is_transactional(
+            self,
+            reg,
+            lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
+            TypeError,
+            "is not compatible to the type",
+        )
+
+        self.assertEqual(reg.n_features_in_, 1)
+        np.testing.assert_allclose(reg.predict(X), expected_predictions)
 
     def test_predict_target_distribution(self):
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())

@@ -17,6 +17,7 @@ from ..base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
     _resolve_own_fitted_attribute,
+    _restore_wrapper_attributes,
 )
 from ..utils import (
     is_labeled,
@@ -181,6 +182,62 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
+        """Fit or partially fit this wrapper as a single transaction.
+
+        The snapshot taken here covers the entire fit, not only the estimator
+        call: a rejection raised while validating the estimator, the inputs,
+        or the target specification rolls the wrapper back just as a failing
+        estimator fit would. Without that, a failing re-fit would leave an
+        already fitted wrapper reporting metadata from the abandoned attempt,
+        e.g. an `n_features_in_` that contradicts its `estimator_`, so that it
+        could no longer predict on the data it was trained on.
+
+        The label-mean fallback is not a failure and keeps its state, because
+        `_validate_and_fit` returns `self` for it rather than raising. The
+        transaction also covers this wrapper only: as
+        `_restore_wrapper_attributes` documents, a `partial_fit` that already
+        mutated `estimator_` in place cannot be rolled back.
+
+        Parameters
+        ----------
+        fit_function : "fit" or "partial_fit"
+            Name of the estimator method to call.
+        X : matrix-like of shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like of shape (n_samples,)
+            It contains the numeric target values of the training samples.
+        sample_weight : array-like of shape (n_samples,)
+            It contains the weights of the training samples' labels.
+        fit_kwargs : dict-like
+            Further parameters as input to `fit_function` of the `estimator`.
+
+        Returns
+        -------
+        self : SklearnRegressor
+            The wrapper fitted on the training data.
+        """
+        attributes_before = dict(self.__dict__)
+        try:
+            return self._validate_and_fit(
+                fit_function=fit_function,
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                **fit_kwargs,
+            )
+        except Exception:
+            _restore_wrapper_attributes(self, attributes_before)
+            raise
+
+    def _validate_and_fit(
+        self, fit_function, X, y, sample_weight, **fit_kwargs
+    ):
+        """Validate the inputs and fit the estimator, committing state freely.
+
+        This method may write fitted attributes before a later step rejects
+        the call, because its only caller `_fit` rolls them back. See `_fit`
+        for the parameters and the transactional guarantee.
+        """
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
                 "'{}' must be a scikit-learn "
@@ -564,6 +621,13 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
+        """Reject an estimator without `return_std`, then fit as usual.
+
+        The rejection precedes `SklearnRegressor._fit` and therefore the
+        transaction it opens. It writes nothing itself, so the wrapper is
+        equally untouched by it, and every later failure is rolled back by the
+        inherited transaction. See `SklearnRegressor._fit` for the parameters.
+        """
         if (
             hasattr(self.estimator, "predict")
             and "return_std"
