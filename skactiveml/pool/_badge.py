@@ -4,13 +4,11 @@ Diverse Gradient Embedding (BADGE).
 """
 
 import numpy as np
-from sklearn.metrics import pairwise_distances_argmin_min
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     check_type,
-    unlabeled_indices,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
 from ._target import _fit_and_resolve_estimator_target_spec
@@ -26,6 +24,16 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     model's pseudo-label. Large gradient norms indicate uncertainty, while
     k-means++ spreads selections to avoid redundancy.
 
+    The gradient embedding of a sample is the Kronecker product
+    `g = kron(q, v)` of its probability residual `q` and its (learned) sample
+    representation `v`. Since inner products factorize as
+    `<g_i, g_j> = <q_i, q_j> * <v_i, v_j>` [2]_, the
+    `(n_samples, n_classes * n_features)` embedding matrix is never
+    materialized. Each k-means++ round only requires two matrix-vector
+    products, which reduces the space complexity from
+    `O(n_samples * n_classes * n_features)` to
+    `O(n_samples * (n_classes + n_features))`.
+
     The original BADGE method was proposed for multiclass classification. The
     multi-label support in this implementation is an extension and not part of
     the original proposal in [1]_. For resolved multi-label targets, BADGE
@@ -35,7 +43,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     own pseudo-label is `p_j - 1[p_j >= 0.5]`, and the per-output last-layer
     gradients obtained by multiplying these residuals with the sample
     representation are concatenated into one gradient embedding. This
-    per-output decomposition ignores correlations between label outputs.
+    per-output decomposition ignores correlations between label outputs. The
+    factorization above applies unchanged, since the multi-label residual is
+    also a per-output vector `q`.
 
     Parameters
     ----------
@@ -71,6 +81,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     .. [1] J. T. Ash, C. Zhang, A. Krishnamurthy, J. Langford, and A. Agarwal.
        Deep Batch Active Learning by Diverse, Uncertain Gradient Lower Bounds.
        In Int. Conf. Learn. Represent., 2020.
+    .. [2] J. Zhang, Y. Chen, G. Canal, S. Mussmann, A. M. Das, G. Bhatt,
+       Y. Zhu, J. Bilmes, S. S. Du, K. Jamieson, and R. D. Nowak. LabelBench:
+       A Comprehensive Framework for Benchmarking Adaptive Label-Efficient
+       Learning. J. Data-centric Mach. Learn. Res., 2024.
     """
 
     def __init__(
@@ -145,8 +159,14 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
+
+            A given `candidates` is authoritative, i.e., an index array is
+            taken as given, such that labeled samples remain candidates, e.g.,
+            to relabel them or to recompute their utilities.
         batch_size : int, default=1
-            The number of samples to be selected in one AL cycle.
+            The number of samples to be selected in one AL cycle. If it
+            exceeds the number of candidates, it is reduced to that number and
+            a warning is raised.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
@@ -155,7 +175,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         query_indices : numpy.ndarray of shape (batch_size,)
             The query indices indicate for which candidate sample a label is
             to be queried, e.g., `query_indices[0]` indicates the first
-            selected sample.
+            selected sample. A sample is selected at most once per batch.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in
@@ -167,7 +187,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
+            Each row is the k-means++ sampling distribution of the respective
+            round, i.e., its `nansum` is one. Utilities for samples that are
+            no candidates and for candidates that have already been selected
+            in an earlier round will be set to np.nan.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in
@@ -217,42 +240,50 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
 
-        # find the unlabeled dataset
-        if candidates is None:
-            X_unlbld = X_cand
-            unlbld_mapping = mapping
-        elif mapping is not None:
-            unlbld_mapping = unlabeled_indices(
-                y[mapping],
-                missing_label=self.missing_label_,
-                target_type=target_spec.target_type,
-            )
-            X_unlbld = X_cand[unlbld_mapping]
-            unlbld_mapping = mapping[unlbld_mapping]
-
+        # `candidates` is authoritative, i.e., an index array is taken as
+        # given, such that labeled samples remain candidates, e.g., to relabel
+        # them or to recompute their utilities. For `candidates=None`,
+        # `mapping` already refers to the unlabeled samples only.
+        if mapping is not None:
+            cand_mapping = mapping
         else:
-            X_unlbld = X_cand
-            unlbld_mapping = np.arange(len(X_cand))
+            cand_mapping = np.arange(len(X_cand))
+        n_cand = len(X_cand)
+        if n_cand == 0:
+            raise ValueError(
+                "There are no candidate samples to select from. For "
+                "'candidates=None', this means that there is no unlabeled "
+                "sample left in `(X, y)`."
+            )
 
         # gradient embedding, aka predict class membership probabilities
-        probas = clf.predict_proba(X_unlbld, **predict_proba_kwargs)
+        V = X_cand
+        probas = clf.predict_proba(X_cand, **predict_proba_kwargs)
         if isinstance(probas, tuple):
-            probas, X_unlbld = probas
+            probas, V = probas
         if target_spec.target_type == "multi-label":
             probas = _canonicalize_multilabel_probas(
                 probas,
-                n_samples=len(X_unlbld),
+                n_samples=n_cand,
                 n_outputs=y.shape[1],
             )
 
+        # Factorized gradient embedding `g_i = kron(q_i, v_i)`, where `q_i` is
+        # the probability residual against the model's own pseudo-label and
+        # `v_i` the sample representation. `float64` is required because the
+        # accumulation error of `float32` changes the sampling.
+        probas = np.asarray(probas, dtype=np.float64)
+        V = np.asarray(V, dtype=np.float64)
         if target_spec.target_type == "multi-label":
-            y_pred = (probas >= 0.5).astype(float)
-            proba_factor = probas - y_pred
+            # Independent sigmoid outputs, i.e., the pseudo-label of the label
+            # output `j` is `1[p_j >= 0.5]`.
+            Q = probas - (probas >= 0.5)
         else:
+            # Softmax outputs, i.e., `q_i = probas_i - e_{y_pred_i}`.
             y_pred = probas.argmax(axis=-1)
-            proba_factor = probas - np.eye(probas.shape[1])[y_pred]
-        g_x = proba_factor[:, :, None] * X_unlbld[:, None, :]
-        g_x = g_x.reshape(*g_x.shape[:-2], -1)
+            Q = probas.copy()
+            Q[np.arange(n_cand), y_pred] -= 1
+        g_norm_2 = np.einsum("ij,ij->i", Q, Q) * np.einsum("ij,ij->i", V, V)
 
         # init the utilities
         if mapping is not None:
@@ -265,73 +296,57 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             )
 
         # sampling with kmeans++
-        query_indicies = []
-        query_indicies_in_unlbld = []
-        idx_in_unlbld = []
-        d_2_s = []
+        query_indices = []
+        query_indices_in_cand = []
+        # In the first round, `d_2` holds the squared gradient norms, which
+        # only serve to determine the first center. Afterwards, it is replaced
+        # by the squared distances to that center, such that the origin does
+        # not act as a permanent ghost center in the running minimum.
+        d_2 = g_norm_2.copy()
         for i in range(batch_size):
-            if i == 0:
-                d_2 = _d_2(g_x, idx_in_unlbld)
+            # Zeroing the distances of the already selected centers gives them
+            # zero probability, so that they cannot be drawn a second time.
+            d_2[query_indices_in_cand] = 0
+            d_2_sum = d_2.sum()
+            if d_2_sum > 0:
+                d_probas = d_2 / d_2_sum
             else:
-                d_2 = _d_2(g_x, [idx_in_unlbld], d_2_s[i - 1])
-            d_2_s.append(d_2)
+                # Degenerate case of exclusively zero gradient embeddings,
+                # e.g., for the one-hot probabilities of a single-class cold
+                # start. Then, sample uniformly among the remaining samples.
+                d_probas = np.full(n_cand, 1 / (n_cand - i))
+                d_probas[query_indices_in_cand] = 0
 
-            d_2_sum = np.sum(d_2)
-            if d_2_sum == 0:
-                d_2_s[-1] = np.full(shape=len(g_x), fill_value=np.inf)
-                d_2 = np.ones(shape=len(g_x))
-                d_2[query_indicies_in_unlbld] = 0
-                d_2_sum = np.sum(d_2)
+            utilities[i, cand_mapping] = d_probas
+            utilities[i, query_indices] = np.nan
 
-            d_probas = d_2 / d_2_sum
-
-            utilities[i, unlbld_mapping] = d_probas
-            utilities[i, query_indicies] = np.nan
-
-            if i == 0 and d_2_sum != 0:
-                idx_in_unlbld = np.argmax(d_2, axis=-1)
+            if i == 0 and d_2_sum > 0:
+                idx_in_cand = int(np.argmax(d_2))
             else:
-                idx_in_unlbld_array = self.random_state_.choice(
-                    len(d_probas), 1, replace=False, p=d_probas
+                idx_in_cand = int(
+                    self.random_state_.choice(
+                        n_cand, 1, replace=False, p=d_probas
+                    )[0]
                 )
-                idx_in_unlbld = idx_in_unlbld_array[0]
-            query_indicies_in_unlbld.append(idx_in_unlbld)
+            query_indices_in_cand.append(idx_in_cand)
+            query_indices.append(cand_mapping[idx_in_cand])
 
-            idx = unlbld_mapping[idx_in_unlbld]
-            query_indicies.append(idx)
+            # Squared distance to the newest center via the factorization:
+            # `||g_i - g_c||^2 = ||g_i||^2 + ||g_c||^2
+            #  - 2 * <q_i, q_c> * <v_i, v_c>`. Rounding may produce tiny
+            # negative values, which are rejected by `choice(p=...)`, such
+            # that they are clipped.
+            if i + 1 < batch_size:
+                cross = (Q @ Q[idx_in_cand]) * (V @ V[idx_in_cand])
+                d_2_new = g_norm_2 + g_norm_2[idx_in_cand] - 2 * cross
+                np.maximum(d_2_new, 0, out=d_2_new)
+                if i == 0:
+                    d_2 = d_2_new
+                else:
+                    np.minimum(d_2, d_2_new, out=d_2)
 
-        query_indicies = np.asarray(query_indicies, dtype=int)
-
+        query_indices = np.asarray(query_indices, dtype=int)
         if return_utilities:
-            return query_indicies, utilities
+            return query_indices, utilities
         else:
-            return query_indicies
-
-
-def _d_2(g_x, query_indices, d_latest=None):
-    """
-    Calculates the D^2 value of the embedding features of unlabeled data.
-
-    Parameters
-    ----------
-    g_x : np.ndarray of shape (n_unlabeled_samples, n_features)
-        The results after gradient embedding
-    query_indices : numpy.ndarray of shape (n_query_indices,)
-        the query indications that correspond to the unlabeled samples.
-    d_latest : np.ndarray of shape (n_unlabeled_samples,) default=None
-        The distance between each data point and its nearest centre.
-        This is used to simplify the calculation of the later distances for the
-        next selected sample.
-
-    Returns
-    -------
-    D2 : numpy.ndarray of shape (n_unlabeled_samples,)
-        The D^2 value, for the first sample, is the value inf.
-    """
-    if len(query_indices) == 0:
-        return np.sum(g_x**2, axis=-1)
-    query_indices = g_x[query_indices]
-    _, D = pairwise_distances_argmin_min(X=g_x, Y=query_indices)
-    if d_latest is not None:
-        D2 = np.minimum(d_latest, np.square(D))
-    return D2
+            return query_indices
