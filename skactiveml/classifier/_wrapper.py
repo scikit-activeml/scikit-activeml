@@ -1770,8 +1770,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         The snapshot taken here covers the entire fit, including the sliding
         window: `_validate_and_fit` extends the window before it trains, so a
-        later rejection — a `cost_matrix` without `predict_proba`, or the
-        wrapped estimator's own failure — would otherwise leave the window
+        later rejection (a `cost_matrix` without `predict_proba`, or the
+        wrapped estimator's own failure) would otherwise leave the window
         carrying samples the estimator was never trained on.
 
         The transaction covers this wrapper only. The wrapped estimator is
@@ -2959,10 +2959,10 @@ if successful_capymoa_import:
             This wrapper absorbs every estimator failure into its prior-only
             fallback, which returns `self` and is therefore never rolled back.
             The rejection of an `estimator_class` that is no capymoa
-            classifier does raise, though, and used to leave the fitted
-            attributes of the abandoned attempt behind — `n_features_in_`
-            among them, so that an already fitted wrapper could no longer
-            predict on the data it was trained on.
+            classifier does raise, though. The transaction ensures that such a
+            rejection leaves none of the fitted attributes of the abandoned
+            attempt behind, `n_features_in_` among them, so that an already
+            fitted wrapper keeps predicting on the data it was trained on.
 
             Parameters
             ----------
@@ -3309,10 +3309,11 @@ if successful_river_import:
             This wrapper absorbs almost every estimator failure into its
             prior-only fallback, which returns `self` and is therefore never
             rolled back. The rejection of an `estimator` that is no river
-            classifier does raise, as does an unsupported `sample_weight`, and
-            those used to leave the fitted attributes of the abandoned attempt
-            behind — `n_features_in_` among them, so that an already fitted
-            wrapper could no longer predict on the data it was trained on.
+            classifier does raise, as does an unsupported `sample_weight`. The
+            transaction ensures that such a rejection leaves none of the
+            fitted attributes of the abandoned attempt behind, `n_features_in_`
+            among them, so that an already fitted wrapper keeps predicting on
+            the data it was trained on.
 
             Parameters
             ----------
