@@ -4,7 +4,6 @@ from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     ExtLabelEncoder,
     MISSING_LABEL,
-    is_unlabeled,
     is_labeled,
     simple_batch,
 )
@@ -99,6 +98,10 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
               `(X, y)`.
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the candidates are directly given in `candidates`.
+
+            A given `candidates` is authoritative, i.e., an index array is
+            taken as given, such that labeled samples remain candidates, e.g.,
+            to relabel them or to recompute their utilities.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -120,7 +123,8 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
+            Utilities for samples that are no candidates will be set to
+            np.nan.
 
             - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to the samples in `X`.
@@ -155,17 +159,6 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             candidates, X, y, target_type=target_spec.target_type
         )
 
-        # Determine candidate samples that are currently unlabeled.
-        if mapping is None:
-            cand_mask = np.ones(len(X_cand), dtype=bool)
-        else:
-            cand_mask = is_unlabeled(
-                y[mapping],
-                missing_label=self.missing_label_,
-                target_type=target_spec.target_type,
-            )
-        X_unlbld = X_cand[cand_mask]
-
         lbld_mask = is_labeled(
             y,
             missing_label=self.missing_label_,
@@ -180,7 +173,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             target_type=target_spec.target_type,
         ).fit(y[lbld_mask])
         y_labeled = label_encoder.transform(y[lbld_mask])
-        y_pred = label_encoder.transform(clf.predict(X_unlbld))
+        y_pred = label_encoder.transform(clf.predict(X_cand))
 
         utilities_cand = label_cardinality_inconsistency(y_pred, y_labeled)
 
@@ -188,7 +181,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             utilities = utilities_cand
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping[cand_mask]] = utilities_cand
+            utilities[mapping] = utilities_cand
 
         return simple_batch(
             utilities,

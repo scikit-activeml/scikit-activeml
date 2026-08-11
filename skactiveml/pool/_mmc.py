@@ -105,6 +105,10 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
+
+            A given `candidates` is authoritative, i.e., an index array is
+            taken as given, such that labeled samples remain candidates, e.g.,
+            to relabel them or to recompute their utilities.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -125,7 +129,8 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
+            Utilities for samples that are no candidates will be set to
+            np.nan.
             If `candidates` is `None` or of shape `(n_candidates,)`, the
             indexing refers to samples in `X`.
             If `candidates` is of shape `(n_candidates, n_features)`, the
@@ -164,21 +169,12 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         discriminator.classes = list(range(y.shape[1] + 1))
         discriminator.missing_label = -1
 
-        # Determine unlabeled vs. labeled samples.
+        # Determine the labeled samples, which train the discriminator.
         lbld_mask = ~is_unlabeled(
             y,
             missing_label=self.missing_label_,
             target_type=target_spec.target_type,
         )
-        if mapping is None:
-            cand_mask = np.ones(len(X_cand), dtype=bool)
-        else:
-            cand_mask = is_unlabeled(
-                y[mapping],
-                missing_label=self.missing_label_,
-                target_type=target_spec.target_type,
-            )
-        X_unlbld = X_cand[cand_mask]
 
         # Canonicalize both public multilabel probability formats before any
         # masking or arithmetic is applied.
@@ -186,9 +182,9 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         probas = _canonicalize_multilabel_probas(
             clf.predict_proba(X), n_samples=len(X), n_outputs=n_outputs
         )
-        unlbld_probas = _canonicalize_multilabel_probas(
-            clf.predict_proba(X_unlbld),
-            n_samples=len(X_unlbld),
+        cand_probas = _canonicalize_multilabel_probas(
+            clf.predict_proba(X_cand),
+            n_samples=len(X_cand),
             n_outputs=n_outputs,
         )
 
@@ -205,18 +201,18 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             _label_cardinality_features(probas[lbld_mask]), y_discriminator
         )
         n_positive_labels = discriminator.predict(
-            _label_cardinality_features(unlbld_probas)
+            _label_cardinality_features(cand_probas)
         )
 
         utilities_cand = max_loss_reduction_max_confidence(
-            unlbld_probas, n_positive_labels
+            cand_probas, n_positive_labels
         )
 
         if mapping is None:
             utilities = utilities_cand
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping[cand_mask]] = utilities_cand
+            utilities[mapping] = utilities_cand
 
         return simple_batch(
             utilities,
