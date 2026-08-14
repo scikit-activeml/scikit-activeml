@@ -544,6 +544,131 @@ class TestResolveTargetSpec(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             target_spec.target_type = "auto"
 
+    def test_multilabel_rejects_heterogeneous_output_dtypes(self):
+        # A multi-label target is one array, so its outputs cannot carry
+        # different dtypes. Rejecting at resolution keeps the failure ahead of
+        # any fitted state.
+        y = np.empty((2, 2), dtype=object)
+        y[:] = [["no", 0], ["yes", 1]]
+        # The platform decides the width of a default integer.
+        int_dtype = str(np.asarray([0, 1]).dtype)
+        bool_dtype = str(np.asarray([False, True]).dtype)
+
+        for classes, dtypes in (
+            ((("no", "yes"), (0, 1)), ("<U3", int_dtype)),
+            ((("no", "yes"), (0.0, 1.0)), ("<U3", "float64")),
+            (((0, 1), (0.0, 1.0)), (int_dtype, "float64")),
+            # Booleans coerce to integers without changing which class an
+            # observation denotes, but the contract is dtype kind equality,
+            # so the pair is rejected like any other.
+            (((False, True), (0, 1)), (bool_dtype, int_dtype)),
+        ):
+            with self.subTest(classes=classes):
+                with self.assertRaisesRegex(
+                    ValueError, "one dtype across all label outputs"
+                ) as raised:
+                    resolve_target_spec(
+                        y,
+                        task="classification",
+                        target_type="multi-label",
+                        classes=classes,
+                        missing_label=None,
+                    )
+                message = str(raised.exception)
+                for output_idx, dtype in enumerate(dtypes):
+                    self.assertIn(dtype, message)
+                    self.assertIn(f"output {output_idx}", message)
+
+    def test_multilabel_names_every_offending_output_dtype(self):
+        # With three outputs, the message groups the outputs by dtype so that
+        # the single deviating one is identifiable.
+        y = np.empty((2, 3), dtype=object)
+        y[:] = [[0, 0, "no"], [1, 1, "yes"]]
+
+        with self.assertRaisesRegex(
+            ValueError, "one dtype across all label outputs"
+        ) as raised:
+            resolve_target_spec(
+                y,
+                task="classification",
+                target_type="multi-label",
+                classes=((0, 1), (0, 1), ("no", "yes")),
+                missing_label=None,
+            )
+
+        message = str(raised.exception)
+        self.assertIn("outputs 0, 1", message)
+        self.assertIn("output 2", message)
+        self.assertIn(str(np.asarray([0, 1]).dtype), message)
+        self.assertIn("<U3", message)
+
+    def test_multilabel_accepts_homogeneous_output_dtypes(self):
+        # Homogeneous vocabularies stay valid, including non-numeric ones of
+        # differing width and unordered declarations.
+        y = np.array([["no", "maybe"], ["yes", "definitely"]])
+
+        target_spec = resolve_target_spec(
+            y,
+            task="classification",
+            target_type="multi-label",
+            classes=(("yes", "no"), ("definitely", "maybe")),
+            missing_label=None,
+        )
+
+        self.assertEqual(
+            target_spec.classes, (("no", "yes"), ("definitely", "maybe"))
+        )
+
+    def test_multioutput_names_its_outputs_without_calling_them_labels(self):
+        # The same contract holds for multi-output targets, whose outputs are
+        # not label outputs.
+        with self.assertRaisesRegex(
+            ValueError, "one dtype across all outputs"
+        ) as raised:
+            TargetSpec(
+                task="classification",
+                target_type="multi-output",
+                annotation_type="single-annotator",
+                classes=(("a", "b", "c"), (0, 1, 2)),
+            )
+
+        self.assertNotIn("label outputs", str(raised.exception))
+
+    def test_multilabel_reads_output_dtypes_from_the_class_labels(self):
+        # The dtype kind comes from the class labels, not from the container
+        # holding them, so an object-valued array of strings agrees with a
+        # list of the same strings rather than being read as a third dtype.
+        y = np.array([["no", "off"], ["yes", "always"]])
+
+        target_spec = resolve_target_spec(
+            y,
+            task="classification",
+            target_type="multi-label",
+            classes=(np.array(["no", "yes"], dtype=object), ["always", "off"]),
+            missing_label=None,
+        )
+
+        self.assertEqual(
+            target_spec.classes, (("no", "yes"), ("always", "off"))
+        )
+
+    def test_multilabel_without_classes_rejects_heterogeneous_columns(self):
+        # The `classes=None` path derives one vocabulary per column, so the
+        # same contract has to hold for what it derives.
+        y = np.empty((2, 2), dtype=object)
+        y[:] = [["no", 0], ["yes", 1]]
+
+        with self.assertRaisesRegex(
+            ValueError, "one dtype across all label outputs"
+        ):
+            resolve_target_spec(
+                y,
+                task="classification",
+                target_type="multi-label",
+                classes=None,
+                missing_label=None,
+            )
+
     def test_reordered_multilabel_declarations_resolve_equally(self):
         y = np.array([["yes", "cold"], ["no", "warm"]])
 

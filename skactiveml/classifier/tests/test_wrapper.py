@@ -1167,6 +1167,58 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         self._assert_prefit_rejection(clf, r"learned the class labels \[2\]")
 
+    def _multilabel_object_targets(self, output_values):
+        """Build an object-valued multi-label target from per-output values."""
+        y = np.empty(self.y_ml.shape, dtype=object)
+        for output_idx, values in enumerate(output_values):
+            y[:, output_idx] = [
+                values[label] for label in self.y_ml[:, output_idx]
+            ]
+        return y
+
+    def test_fit_rejects_heterogeneous_output_vocabularies(self):
+        # A multi-label target is one array, so outputs declaring different
+        # dtypes cannot be represented. The rejection precedes any comparison
+        # against `y`, and above all any fitted state.
+        y = self._multilabel_object_targets((("no", "yes"), (0, 1)))
+
+        for classes in (
+            [["no", "yes"], [0, 1]],
+            [["no", "yes"], [0.0, 1.0]],
+            [[0, 1], [0.0, 1.0]],
+        ):
+            with self.subTest(classes=classes):
+                clf = SklearnClassifier(
+                    MultiOutputClassifier(LogisticRegression()),
+                    classes=classes,
+                    target_type="multi-label",
+                    missing_label=None,
+                )
+
+                assert_fit_failure_is_transactional(
+                    self,
+                    clf,
+                    lambda: clf.fit(self.X_ml, y),
+                    ValueError,
+                    "one dtype across all label outputs",
+                )
+
+    def test_fit_accepts_homogeneous_non_numeric_vocabularies(self):
+        # Homogeneous string vocabularies of differing width stay valid, and
+        # an unordered declaration resolves to the canonical order.
+        y = self._multilabel_object_targets((("no", "yes"), ("off", "always")))
+
+        clf = SklearnClassifier(
+            MultiOutputClassifier(LogisticRegression()),
+            classes=[["yes", "no"], ["off", "always"]],
+            target_type="multi-label",
+            missing_label=None,
+        ).fit(self.X_ml, y)
+
+        self._assert_prefit_multilabel_consistency(
+            clf, (("no", "yes"), ("always", "off"))
+        )
+
     def _assert_prefit_multilabel_consistency(self, clf, expected_classes):
         # `predict`, `predict_proba`, `classes_`, and `target_spec_` have to
         # describe the same vocabularies, column order, and output count.

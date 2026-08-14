@@ -15,6 +15,7 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 
+from skactiveml.base import _TaskAgnosticPoolQueryStrategy
 from skactiveml.exceptions import MappingError
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.utils import (
@@ -928,6 +929,42 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
     def _multilabel_numeric_vocabularies(self):
         """Return the ordinary numeric class vocabulary per label output."""
         return tuple((0, 1) for _ in range(self._multilabel_n_outputs()))
+
+    def _multilabel_heterogeneous_vocabularies(self):
+        """Return per-output vocabularies whose dtypes deliberately differ."""
+        vocabularies = list(self._multilabel_string_vocabularies())
+        vocabularies[-1] = (0, 1)
+        return tuple(vocabularies)
+
+    def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
+        # One array holds every label output, so vocabularies of different
+        # dtypes cannot be represented. A strategy resolving a class
+        # vocabulary has to reject them through the shared resolution, and
+        # must not commit query state while doing so.
+        #
+        # A task-agnostic strategy is exempt by construction rather than by
+        # fixture: it takes no estimator, so it resolves the target type alone
+        # and never receives a class vocabulary to reject. Deriving the
+        # exemption from the class keeps it from widening silently when a
+        # fixture changes where it declares its vocabularies.
+        if self.query_default_params_clf_multilabel is None:
+            return
+        if self._multilabel_n_outputs() < 2:
+            return
+        if issubclass(self.qs_class, _TaskAgnosticPoolQueryStrategy):
+            return
+
+        init_params, query_params = self._multilabel_custom_vocabulary_params(
+            self._multilabel_heterogeneous_vocabularies()
+        )
+        qs = self.qs_class(**init_params)
+
+        with self.assertRaisesRegex(
+            ValueError, "one dtype across all label outputs"
+        ):
+            qs.query(**query_params)
+
+        assert_no_query_state(self, qs)
 
     def _multilabel_custom_vocabulary_params(self, vocabularies):
         """Build the multi-label fixture of one custom class vocabulary.

@@ -187,6 +187,31 @@ fitted ``classes_``.
    ... )
    >>> assert spec.classes == (("absent", "present"), ("no", "yes"))
 
+All label outputs must declare classes of one dtype kind, because one array
+holds every output of a sample.  Outputs may declare different vocabularies
+and different widths of the same kind, e.g. ``("no", "yes")`` beside
+``("off", "always")``.  Mixing kinds is rejected during resolution: strings
+with numbers, integers with floats, and booleans with integers alike.  Were a
+mixture accepted, the array would coerce the outputs to a common dtype, and
+the labels describing a sample would no longer be the labels that were
+declared, e.g. the integer ``0`` of one output would come back as the string
+``'0'``.
+
+.. doctest::
+
+   >>> mixed_y = np.empty((2, 2), dtype=object)
+   >>> mixed_y[:] = [["no", 0], ["yes", 1]]
+   >>> _ = resolve_target_spec(  # doctest: +IGNORE_EXCEPTION_DETAIL
+   ...     mixed_y,
+   ...     task="classification",
+   ...     target_type="multi-label",
+   ...     classes=(("no", "yes"), (0, 1)),
+   ...     missing_label=None,
+   ... )
+   Traceback (most recent call last):
+   ...
+   ValueError:
+
 Without explicit ``classes``, resolution never invents a ``(0, 1)``
 vocabulary.  A column with fewer than two observed classes raises an error.
 

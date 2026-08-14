@@ -203,7 +203,13 @@ def _validate_target_semantics(
 
 
 def _check_class_vocabulary_structure(target_type, classes):
-    """Validate flat or nested classes against a resolved target type."""
+    """Validate nesting, width, and output dtypes against a target type.
+
+    Called both with the vocabularies a caller declares and with the resolved
+    ones a `TargetSpec` is built from, so that every path reaches the same
+    structural contract. Homogeneity *within* one vocabulary is `check_classes`
+    business and is already established by both callers.
+    """
     if classes is None:
         return False
 
@@ -230,7 +236,73 @@ def _check_class_vocabulary_structure(target_type, classes):
                 "Each multi-label class vocabulary must contain exactly two "
                 "classes."
             )
+        _check_homogeneous_output_dtypes(target_type, classes)
     return has_nested_classes
+
+
+def _check_homogeneous_output_dtypes(target_type, classes):
+    """Check that every output declares classes of one dtype kind.
+
+    One sample's outputs are held by one row of a single array, so they cannot
+    carry different dtypes: the array coerces them to a common one, and the
+    labels a sample is then described by are no longer the labels that were
+    declared, e.g. the integer `0` of one output becomes the string `'0'` when
+    another output declares strings. Prediction and probability columns then
+    disagree about the vocabulary of the same output.
+
+    Only the dtype kind has to agree, so outputs may declare different
+    vocabularies and different widths of the same kind, e.g. `("no", "yes")`
+    beside `("off", "always")`. The kind is read from the class labels
+    themselves rather than from their container, so that an object-valued
+    array of strings agrees with a list of the same strings. Mixing kinds
+    *within* one vocabulary is rejected earlier by `check_classes`.
+
+    Parameters
+    ----------
+    target_type : "multi-label" or "multi-output"
+        The resolved target type naming the outputs in the error message.
+    classes : tuple of array-like
+        One class vocabulary per output.
+
+    Raises
+    ------
+    ValueError
+        If the outputs do not share one dtype kind. The message names every
+        output and the dtype it declares, grouped by kind so that a single
+        deviating output stands out.
+    """
+    dtypes = [np.asarray(list(classes_i)).dtype for classes_i in classes]
+
+    outputs_per_kind = {}
+    for output_idx, dtype in enumerate(dtypes):
+        outputs_per_kind.setdefault(dtype.kind, []).append((output_idx, dtype))
+    if len(outputs_per_kind) <= 1:
+        return
+
+    outputs = "label outputs" if target_type == "multi-label" else "outputs"
+    described = " and ".join(
+        _describe_dtype_group(group) for group in outputs_per_kind.values()
+    )
+    raise ValueError(
+        f"Class vocabularies must declare one dtype across all {outputs}, "
+        f"because one array holds every output. Got {described}."
+    )
+
+
+def _describe_dtype_group(group):
+    """Describe the outputs sharing one dtype kind for an error message."""
+    output_indices = [output_idx for output_idx, _ in group]
+    dtype_names = sorted({str(dtype) for _, dtype in group})
+    quoted = ", ".join(repr(name) for name in dtype_names)
+    label = "dtype" if len(dtype_names) == 1 else "dtypes"
+    return f"{label} {quoted} for {_describe_outputs(output_indices)}"
+
+
+def _describe_outputs(output_indices):
+    """Name one or more outputs for an error message."""
+    if len(output_indices) == 1:
+        return f"output {output_indices[0]}"
+    return "outputs " + ", ".join(str(idx) for idx in output_indices)
 
 
 def resolve_target_spec(
