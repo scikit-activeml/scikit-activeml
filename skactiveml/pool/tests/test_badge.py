@@ -529,14 +529,12 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         )
 
         # Without any unlabeled sample, `candidates=None` leaves nothing to
-        # select.
-        self.assertRaises(
-            ValueError,
-            Badge(random_state=0).query,
-            X=X,
-            y=np.tile([0, 1], 5),
-            clf=clf,
-        )
+        # select, which is answered with an empty batch.
+        with self.assertWarnsRegex(UserWarning, "exhausted"):
+            query_indices_exhausted = Badge(random_state=0).query(
+                X=X, y=np.tile([0, 1], 5), clf=clf
+            )
+        self.assertEqual(query_indices_exhausted.shape, (0,))
 
     def test_query_candidates_as_sample_matrix(self):
         # Candidates that are given as a sample matrix are indexed directly.

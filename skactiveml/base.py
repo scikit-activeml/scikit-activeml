@@ -17,7 +17,12 @@ from sklearn.utils.validation import (
     column_or_1d,
 )
 
-from .exceptions import MappingError
+from .exceptions import MappingError, _ExhaustedCandidatePool
+from .utils._functions import _guard_own_query
+from .utils._selection import (
+    _answer_exhausted_candidate_pool,
+    _maps_to_samples,
+)
 from .utils._target import (
     _check_target_capability,
     _resolve_task_agnostic_target_type,
@@ -249,6 +254,12 @@ class PoolQueryStrategy(QueryStrategy):
         Controls the randomness of the estimator.
     """
 
+    def __init_subclass__(cls, **kwargs):
+        # Every `query` is guarded, so that the shared validation can answer an
+        # exhausted candidate pool for all pool strategies at once.
+        super().__init_subclass__(**kwargs)
+        _guard_own_query(cls)
+
     def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
         self.missing_label = missing_label
@@ -349,6 +360,13 @@ class PoolQueryStrategy(QueryStrategy):
             else:
                 check_candidates_dict = deepcopy(check_X_dict)
                 check_candidates_dict["ensure_2d"] = False
+                # An empty candidate matrix is an exhausted candidate pool,
+                # i.e., a valid acquisition state the guarded `query` answers
+                # with an empty batch. Anything without a sample axis at all
+                # stays a rejected input.
+                check_candidates_dict["ensure_min_samples"] = (
+                    0 if np.ndim(candidates) > 0 else 1
+                )
                 candidates = check_array(candidates, **check_candidates_dict)
                 check_n_features(self, candidates, reset=False)
 
@@ -535,6 +553,14 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               `X`.
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
+
+        Notes
+        -----
+        An exhausted candidate pool, i.e., a fully labeled `(X, y)` queried
+        with `candidates=None` or an empty `candidates`, is a valid
+        acquisition state. It is answered with an empty batch of `batch_size`
+        zero and a warning naming the exhaustion, so that a budget loop
+        running one cycle past exhaustion needs no special case.
         """
         raise NotImplementedError
 
@@ -634,6 +660,16 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             n_candidates = int(is_ulbld.sum())
         else:
             n_candidates = len(candidates)
+
+        if n_candidates == 0:
+            # Abort before any strategy code sees the empty candidate slice.
+            raise _ExhaustedCandidatePool(
+                _answer_exhausted_candidate_pool(
+                    (0,),
+                    (0, len(X) if _maps_to_samples(candidates) else 0),
+                    return_utilities,
+                )
+            )
 
         if n_candidates < batch_size:
             warnings.warn(
@@ -889,6 +925,14 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               indexing refers to samples in `X`.
             - If `candidates` is of shape `(n_candidates, n_features)`, the
               indexing refers to samples in `candidates`.
+
+        Notes
+        -----
+        An exhausted candidate pool, i.e., no candidate annotator-sample pair
+        left to be queried, is a valid acquisition state. It is answered with
+        an empty batch of `batch_size` zero and a warning naming the
+        exhaustion, so that a budget loop running one cycle past exhaustion
+        needs no special case.
         """
         raise NotImplementedError
 
@@ -998,14 +1042,23 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
+            # An empty set of available annotators exhausts the candidate
+            # pairs, i.e., a valid acquisition state the guarded `query`
+            # answers with an empty batch. Anything without a sample axis at
+            # all stays a rejected input.
             annotators = check_array(
-                annotators, ensure_2d=False, allow_nd=True
+                annotators,
+                ensure_2d=False,
+                allow_nd=True,
+                ensure_min_samples=0 if np.ndim(annotators) > 0 else 1,
             )
 
             if annotators.ndim == 1:
                 annotators = check_indices(annotators, y, dim=1)
             elif annotators.ndim == 2:
-                annotators = check_array(annotators, dtype=bool)
+                annotators = check_array(
+                    annotators, dtype=bool, ensure_min_samples=0
+                )
                 if candidates is None:
                     check_consistent_length(X, annotators)
                 else:
@@ -1028,6 +1081,17 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 n_candidate_pairs = len(candidates) * len(annotators)
         else:
             n_candidate_pairs = int(np.sum(annotators))
+
+        if n_candidate_pairs == 0:
+            # Abort before any strategy code sees the empty candidate slice.
+            n_rows = len(X) if _maps_to_samples(candidates) else 0
+            raise _ExhaustedCandidatePool(
+                _answer_exhausted_candidate_pool(
+                    (0, 2),
+                    (0, n_rows, len(y.T)),
+                    return_utilities,
+                )
+            )
 
         if n_candidate_pairs < batch_size:
             warnings.warn(

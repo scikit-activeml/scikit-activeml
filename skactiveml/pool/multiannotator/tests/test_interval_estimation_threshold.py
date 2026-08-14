@@ -187,6 +187,59 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.assertEqual(query_indices.shape, (3, 2))
         self.assertEqual(utilities.shape, (3, len(self.X), self.y.shape[1]))
 
+    def test_query_exhausted_candidate_pool(self):
+        # An exhausted candidate pool is a valid acquisition state that is
+        # answered with an empty batch instead of an error about array shapes.
+        ie_thresh = IntervalEstimationThreshold()
+        n_annotators = self.y.shape[1]
+        cases = [
+            (
+                "fully labeled pool",
+                np.zeros_like(self.y),
+                None,
+                None,
+                len(self.X),
+            ),
+            (
+                "empty index array",
+                self.y,
+                np.array([], int),
+                None,
+                len(self.X),
+            ),
+            ("empty candidate array", self.y, np.empty((0, 2)), None, 0),
+            (
+                "no available annotator",
+                self.y,
+                None,
+                np.zeros_like(self.y, dtype=bool),
+                len(self.X),
+            ),
+            (
+                "empty annotator index array",
+                self.y,
+                None,
+                np.array([], int),
+                len(self.X),
+            ),
+        ]
+
+        for name, y, candidates, annotators, n_rows in cases:
+            with self.subTest(case=name):
+                with self.assertWarnsRegex(UserWarning, "exhausted"):
+                    query_indices, utilities = ie_thresh.query(
+                        X=self.X,
+                        y=y,
+                        clf=self.clf,
+                        candidates=candidates,
+                        annotators=annotators,
+                        return_utilities=True,
+                    )
+
+                self.assertEqual(query_indices.shape, (0, 2))
+                self.assertTrue(np.issubdtype(query_indices.dtype, np.integer))
+                self.assertEqual(utilities.shape, (0, n_rows, n_annotators))
+
     def test_explicit_multilabel_intent_fails_before_acquisition_state(self):
         ie_thresh = IntervalEstimationThreshold(target_type="multi-label")
 

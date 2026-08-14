@@ -1023,6 +1023,61 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertEqual((4, 2, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
 
+    def test_query_exhausted_candidate_pool(self):
+        # An exhausted candidate pool is a valid acquisition state that is
+        # answered with an empty batch instead of an error about array shapes.
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            random_state=self.random_state,
+        )
+        n_annotators = self.y.shape[1]
+        cases = [
+            (
+                "fully labeled pool",
+                np.zeros_like(self.y),
+                None,
+                None,
+                len(self.X),
+            ),
+            (
+                "empty index array",
+                self.y,
+                np.array([], int),
+                None,
+                len(self.X),
+            ),
+            ("empty candidate array", self.y, np.empty((0, 2)), None, 0),
+            (
+                "no available annotator",
+                self.y,
+                None,
+                np.zeros((len(self.X), n_annotators), dtype=bool),
+                len(self.X),
+            ),
+            (
+                "empty annotator index array",
+                self.y,
+                None,
+                np.array([], int),
+                len(self.X),
+            ),
+        ]
+
+        for name, y, candidates, annotators, n_rows in cases:
+            with self.subTest(case=name):
+                with self.assertWarnsRegex(UserWarning, "exhausted"):
+                    query_indices, utilities = wrapper.query(
+                        self.X,
+                        y,
+                        candidates=candidates,
+                        annotators=annotators,
+                        return_utilities=True,
+                    )
+
+                self.assertEqual(query_indices.shape, (0, 2))
+                self.assertTrue(np.issubdtype(query_indices.dtype, np.integer))
+                self.assertEqual(utilities.shape, (0, n_rows, n_annotators))
+
     def test_query_external_annotation_matrix(self):
         X, y_true = make_blobs(n_samples=200, random_state=0)
         X = X.astype(np.float32)

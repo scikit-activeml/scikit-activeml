@@ -135,6 +135,13 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             indexing refers to samples in `X`.
             If `candidates` is of shape `(n_candidates, n_features)`, the
             indexing refers to samples in `candidates`.
+
+        Notes
+        -----
+        An exhausted candidate pool, i.e., a fully labeled `(X, y)` queried
+        with `candidates=None` or an empty `candidates`, is a valid
+        acquisition state. It is answered with an empty batch of `batch_size`
+        zero and a warning naming the exhaustion.
         """
         # Resolve through the classifier before acquisition state is changed.
         clf, target_spec = _fit_and_resolve_estimator_target_spec(

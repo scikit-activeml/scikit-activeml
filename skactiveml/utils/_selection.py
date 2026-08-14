@@ -176,6 +176,58 @@ def simple_batch(
         return best_indices
 
 
+def _maps_to_samples(candidates):
+    """Check whether an acquisition result is indexed w.r.t. `X`.
+
+    Parameters
+    ----------
+    candidates : None or numpy.ndarray
+        The checked `candidates` of a `query` call.
+
+    Returns
+    -------
+    maps_to_samples : bool
+        `True`, if the query indices and utilities refer to the samples in `X`,
+        and `False`, if they refer to the directly given candidate samples.
+    """
+    return candidates is None or candidates.ndim == 1
+
+
+def _answer_exhausted_candidate_pool(
+    query_indices_shape, utilities_shape, return_utilities
+):
+    """Warn about an exhausted candidate pool and answer it as an empty batch.
+
+    This is the counterpart of `simple_batch` above for a candidate pool with
+    nothing left to select. The result is shaped like an ordinary one with a
+    batch size of zero, so that a budget loop running one cycle past
+    exhaustion can consume it without a special case. The warning names the
+    exhaustion, so that the empty batch is never mistaken for a defect.
+
+    Parameters
+    ----------
+    query_indices_shape : tuple of int
+        Shape of the empty query indices.
+    utilities_shape : tuple of int
+        Shape of the empty utilities.
+    return_utilities : bool
+        If `True`, the utilities are part of the result.
+
+    Returns
+    -------
+    result : numpy.ndarray or tuple of numpy.ndarray
+        The empty query indices and, if requested, the empty utilities.
+    """
+    warnings.warn(
+        "The candidate pool is exhausted, i.e., there is no candidate left "
+        "to be queried. Instead of a selection, an empty batch is returned."
+    )
+    query_indices = np.empty(query_indices_shape, dtype=int)
+    if return_utilities:
+        return query_indices, np.empty(utilities_shape, dtype=float)
+    return query_indices
+
+
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     """Combine different rankings hierarchically to one ranking assignment.
     A ranking index `i` is ranked higher than index `j` iff

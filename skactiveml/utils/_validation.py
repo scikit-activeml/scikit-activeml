@@ -778,7 +778,8 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     ----------
     indices : array-like of shape (n_indices, n_dim) or (n_indices,)
         The considered indices, where for every `i = 0, ..., n_indices - 1`
-        `indices[i]` is interpreted as an index to the array `A`.
+        `indices[i]` is interpreted as an index to the array `A`. An empty
+        selection is accepted, i.e., `n_indices` may be zero.
     A : array-like
         The array that is indexed.
     dim : int or tuple of ints or 'adaptive', default='adaptive'
@@ -795,7 +796,14 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     indices : tuple of np.ndarray or np.ndarray
         The validated indices.
     """
-    indices = check_array(indices, dtype=int, ensure_2d=False)
+    # An empty selection is valid, whereas a scalar stays a rejected input
+    # because it is no collection of indices at all.
+    indices = check_array(
+        indices,
+        dtype=int,
+        ensure_2d=False,
+        ensure_min_samples=0 if np.ndim(indices) > 0 else 1,
+    )
     A = check_array(
         A, allow_nd=True, ensure_all_finite=False, ensure_2d=False, dtype=None
     )

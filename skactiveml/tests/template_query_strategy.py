@@ -84,6 +84,34 @@ def _relabel_multilabel_target(
     return y_relabeled
 
 
+def _fully_observed_target(y, missing_label, target_type):
+    """Return a copy of `y` in which every observation is observed.
+
+    The missing observations are filled with an already observed value, so
+    that the class vocabulary and, for a multi-label target, the all-or-nothing
+    row contract are preserved.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        The partially observed target to complete.
+    missing_label : scalar or str or None
+        Value representing a missing observation in `y`.
+    target_type : str
+        The resolved target type of `y`.
+
+    Returns
+    -------
+    y_observed : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
+        The completed target, i.e., an exhausted candidate pool.
+    """
+    y_observed = np.array(y, copy=True)
+    is_lbld = is_labeled(y_observed, missing_label, target_type=target_type)
+    is_ulbld = is_unlabeled(y_observed, missing_label, target_type=target_type)
+    y_observed[is_ulbld] = y_observed[is_lbld][0]
+    return y_observed
+
+
 def _with_component_params(params, *, missing_label, classes=None):
     """Apply a missing label and class vocabularies to all components.
 
@@ -1183,6 +1211,76 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                     np.testing.assert_allclose(utils1[0][unld_idx], utils4[0])
                 except MappingError:
                     pass
+
+    def _test_exhausted_candidate_pool(
+        self, init_params, query_params, target_type
+    ):
+        """Check the exhausted-pool contract for one acquisition fixture."""
+        missing_label = self.init_default_params["missing_label"]
+        n_features = np.asarray(query_params["X"]).shape[1]
+        n_samples = len(query_params["X"])
+        y_observed = _fully_observed_target(
+            query_params["y"], missing_label, target_type
+        )
+        cases = [
+            ("fully labeled pool", y_observed, None, n_samples),
+            (
+                "empty index array",
+                query_params["y"],
+                np.array([], int),
+                n_samples,
+            ),
+            (
+                "empty candidate array",
+                query_params["y"],
+                np.empty((0, n_features)),
+                0,
+            ),
+        ]
+
+        for name, y, candidates, n_utilities in cases:
+            with self.subTest(case=name, target_type=target_type):
+                qs = self.qs_class(**deepcopy(init_params))
+                params = deepcopy(query_params)
+                params["y"] = y
+                params["candidates"] = candidates
+                params["return_utilities"] = True
+
+                with self.assertWarnsRegex(UserWarning, "exhausted"):
+                    query_indices, utilities = qs.query(**params)
+
+                self.assertEqual(query_indices.shape, (0,))
+                self.assertTrue(np.issubdtype(query_indices.dtype, np.integer))
+                self.assertEqual(utilities.shape, (0, n_utilities))
+
+                params["return_utilities"] = False
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    query_indices = qs.query(**params)
+                self.assertEqual(query_indices.shape, (0,))
+
+    def test_query_exhausted_candidate_pool(self):
+        # An exhausted candidate pool is a valid acquisition state that is
+        # answered with an empty batch instead of an error about array shapes.
+        init_params = deepcopy(self.init_default_params)
+        for query_params in [
+            self.query_default_params_clf,
+            self.query_default_params_reg,
+        ]:
+            if query_params is not None:
+                self._test_exhausted_candidate_pool(
+                    init_params, query_params, "single-output"
+                )
+
+    def test_query_multilabel_exhausted_candidate_pool(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        self._test_exhausted_candidate_pool(
+            self._multilabel_init_params(),
+            self.query_default_params_clf_multilabel,
+            "multi-label",
+        )
 
     def test_query_multilabel_candidate_variation(self):
         if self.query_default_params_clf_multilabel is None:

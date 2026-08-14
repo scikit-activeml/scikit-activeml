@@ -631,10 +631,14 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
                 **query_kwargs,
             )
 
+        # Never split into more chunks than there are candidates, because an
+        # empty chunk would ask the wrapped strategy to select from an
+        # exhausted candidate pool and contribute no utilities.
         if parallel_dict["n_jobs"] < 0:
-            chunks = np.array_split(X_cand, cpu_count())
+            n_chunks = min(cpu_count(), len(X_cand))
         else:
-            chunks = np.array_split(X_cand, parallel_dict["n_jobs"])
+            n_chunks = parallel_dict["n_jobs"]
+        chunks = np.array_split(X_cand, n_chunks)
         qs_outputs = parallel_pool(
             delayed(query_lambda_func)(c) for c in chunks
         )

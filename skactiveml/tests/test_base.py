@@ -18,7 +18,7 @@ from skactiveml.base import (
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.pool import RandomSampling
-from skactiveml.utils import MISSING_LABEL, is_unlabeled
+from skactiveml.utils import MISSING_LABEL, is_unlabeled, match_signature
 
 successful_skorch_torch_import = False
 try:
@@ -205,6 +205,57 @@ class DummyMultiAnnotatorPoolQueryStrategy(MultiAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+
+class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
+    def test_guard_covers_a_query_published_through_a_descriptor(self):
+        # `match_signature` publishes `query` as a descriptor, which stays in
+        # place while the function it binds carries the guard.
+        class DescriptorPublishingStrategy(SingleAnnotatorPoolQueryStrategy):
+            @match_signature("query_strategy", "query")
+            def query(
+                self,
+                X,
+                y,
+                candidates=None,
+                batch_size=1,
+                return_utilities=False,
+            ):
+                self._validate_data(
+                    X, y, candidates, batch_size, return_utilities
+                )
+                raise AssertionError("The guard did not abort the query.")
+
+            def __init__(self, query_strategy):
+                super().__init__()
+                self.query_strategy = query_strategy
+
+        strategy = DescriptorPublishingStrategy(RandomSampling())
+        with self.assertWarnsRegex(UserWarning, "exhausted"):
+            query_indices = strategy.query(
+                X=np.arange(4).reshape(2, 2),
+                y=np.array([0, 1]),
+            )
+
+        self.assertEqual(query_indices.shape, (0,))
+
+    def test_guard_rejects_an_uncovered_query_publication(self):
+        with self.assertRaisesRegex(TypeError, "publishes `query` as"):
+
+            class PropertyPublishingStrategy(SingleAnnotatorPoolQueryStrategy):
+                query = property(lambda self: None)
+
+    def test_guard_preserves_an_abstract_query(self):
+        # The guard wraps `query` while the class is created, i.e., before the
+        # abstract methods are collected, so it must not hide abstractness.
+        for base in (
+            SingleAnnotatorPoolQueryStrategy,
+            MultiAnnotatorPoolQueryStrategy,
+        ):
+            with self.subTest(base=base.__name__):
+                self.assertEqual(
+                    base.__abstractmethods__, frozenset({"query"})
+                )
 
 
 class QueryStrategyTest(unittest.TestCase):

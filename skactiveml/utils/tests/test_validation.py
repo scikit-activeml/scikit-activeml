@@ -473,6 +473,15 @@ class TestValidation(unittest.TestCase):
         indices_now_unique = check_indices(ind_not_unique, A, unique=True)
         self.assertEqual(len(indices_now_unique), 1)
 
+    def test_check_indices_empty_selection(self):
+        # An empty selection is valid, e.g., an exhausted candidate pool.
+        A = np.array([[4, 5], [6, 1], [3, 4]])
+
+        indices = check_indices(np.array([], dtype=int), A)
+
+        self.assertEqual(indices.shape, (0,))
+        self.assertTrue(np.issubdtype(indices.dtype, np.integer))
+
     def test_check_indices_n_dimensions(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])
         ind = np.array([[0, 1], [2, 0]])

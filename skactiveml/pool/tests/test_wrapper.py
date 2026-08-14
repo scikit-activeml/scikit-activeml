@@ -926,6 +926,29 @@ class TestParallelUtilityEstimationWrapper(
             q_sub = qs_sub.query(**query_params)
             self.assertEqual(len(q_sub), 1)
 
+    def test_query_fewer_candidates_than_jobs(self):
+        # With `n_jobs=-1`, the candidates are split across all available
+        # CPUs. Fewer candidates than CPUs must not produce an empty chunk,
+        # which would ask the wrapped strategy to select from an exhausted
+        # candidate pool and contribute no utilities.
+        query_params = deepcopy(self.query_default_params_clf)
+        candidates = unlabeled_indices(
+            query_params["y"], self.init_default_params["missing_label"]
+        )[:2]
+        query_params["candidates"] = candidates
+        query_params["return_utilities"] = True
+
+        init_params = deepcopy(self.init_default_params)
+        init_params["n_jobs"] = -1
+        query_indices, utilities = self.qs_class(**init_params).query(
+            **query_params
+        )
+
+        self.assertEqual(query_indices.shape, (1,))
+        self.assertIn(query_indices[0], candidates)
+        self.assertEqual(utilities.shape, (1, len(query_params["X"])))
+        self.assertEqual(int((~np.isnan(utilities[0])).sum()), len(candidates))
+
     def test_query_batch_variation(self):
         # The strategy does not support `batch_size > 1` (see documentation)
         pass

@@ -3,6 +3,7 @@ import unittest
 import inspect
 
 from skactiveml.utils import call_func, match_signature
+from skactiveml.utils._functions import _guard_exhausted_candidate_pool
 
 successful_skorch_torch_import = False
 try:
@@ -16,6 +17,16 @@ except ImportError:
 
 
 class TestFunctions(unittest.TestCase):
+    def test_guard_exhausted_candidate_pool_is_applied_once(self):
+        def query(self):
+            pass  # pragma: no cover
+
+        guarded_query = _guard_exhausted_candidate_pool(query)
+
+        self.assertIs(
+            _guard_exhausted_candidate_pool(guarded_query), guarded_query
+        )
+
     def test_call_func(self):
         def dummy_function(a, b=2, c=3):
             return a * b * c
