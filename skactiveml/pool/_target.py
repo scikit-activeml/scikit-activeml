@@ -4,9 +4,10 @@ Every helper in this module operates on plain values only, i.e., target
 declarations, estimators, and capability sets. Helpers that would need to know
 how a component stores those values (for instance how a wrapper reaches its
 wrapped strategy or its query arguments) belong to that component instead. The
-orchestration of wrapper target reconciliation is therefore owned by
-`skactiveml.pool._wrapper._TargetPreservingWrapper`, which collects its own
-declarations and authorities and then delegates the wrapper-agnostic
+orchestration of wrapper target reconciliation is therefore owned by each
+wrapper, i.e., by `skactiveml.pool._wrapper._TargetPreservingWrapper` and by
+`skactiveml.pool.multiannotator._wrapper.SingleAnnotatorWrapper`. Each collects
+its own declarations and authorities and then delegates the wrapper-agnostic
 resolution, comparison, and capability checks to this module.
 """
 
