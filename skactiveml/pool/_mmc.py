@@ -21,10 +21,12 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
     """Maximum Loss Reduction with Maximal Confidence (MMC)
 
     This class implements the query strategy Maximum Loss Reduction with
-    Maximal Confidence (MMC) [1]_ that selects samples based on a combination
-    of a multilabel classifier and a label-cardinality discriminator. This
-    strategy is multilabel-only: `y` must be two-dimensional and each row must
-    be either fully labeled or fully unlabeled.
+    Maximal Confidence (MMC) [1]_ that selects the samples with the largest
+    loss reduction under their most confident label assignment. That label
+    assignment combines a multilabel classifier's label predictions with the
+    number of positive labels predicted by a label-cardinality discriminator.
+    This strategy is multilabel-only: `y` must be two-dimensional and each row
+    must be either fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -39,8 +41,10 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] Li, X., & Guo, Y. (2013). Active Learning with Multi-Label
-       SVM Classification. In IjCAI (Vol. 13, pp. 1479-1485).
+    .. [1] Yang, B., Sun, J.-T., Wang, T., & Chen, Z. (2009). Effective
+       Multi-Label Active Learning for Text Classification. In Proceedings of
+       the 15th ACM SIGKDD International Conference on Knowledge Discovery and
+       Data Mining (pp. 917-926).
     """
 
     def __init__(
@@ -87,9 +91,10 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             `(n_samples, n_outputs)` or a list of binary probability matrices
             with shape `(n_samples, 2)` per output.
         discriminator : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-            The parameters `classes` and `missing_label` will be internally
-            redefined.
+            Model implementing the methods `fit` and `predict_proba`. It
+            predicts a candidate sample's number of positive labels, i.e., its
+            label cardinality. The parameters `classes` and `missing_label`
+            will be internally redefined.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -268,8 +273,10 @@ def max_loss_reduction_max_confidence(probas, n_positive_labels):
 
     References
     ----------
-    .. [1] Li, X., & Guo, Y. (2013). Active Learning with Multi-Label
-       SVM Classification. In IjCAI (Vol. 13, pp. 1479-1485).
+    .. [1] Yang, B., Sun, J.-T., Wang, T., & Chen, Z. (2009). Effective
+       Multi-Label Active Learning for Text Classification. In Proceedings of
+       the 15th ACM SIGKDD International Conference on Knowledge Discovery and
+       Data Mining (pp. 917-926).
     """
     n_positive_labels = np.asarray(n_positive_labels)
     if n_positive_labels.ndim != 1:
