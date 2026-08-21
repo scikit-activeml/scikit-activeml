@@ -5,7 +5,7 @@
     "method" : "Probability Coverage (ProbCover)",
     "category" : "Representativeness",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Probability Coverage (ProbCover)",
     "refs" : ["yehuda2022active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

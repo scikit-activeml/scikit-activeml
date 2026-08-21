@@ -5,7 +5,7 @@
     "method" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
     "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
-    "tags" : ["pool", "classification", "regression", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "classification", "regression", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
     "refs" : ["prabhu2021active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

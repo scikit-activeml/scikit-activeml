@@ -1161,13 +1161,14 @@ Each JSON file contains a list of example entries with the following fields:
 | ``template``     | Defines the general setup/setting of the example.        |
 |                  | Supported templates include:                             |
 |                  | ``examples/template_pool.py``,                           |
+|                  | ``examples/template_pool_multilabel.py``,                |
 |                  | ``examples/template_pool_regression.py``,                |
 |                  | ``examples/template_stream.py``, and                     |
 |                  | ``examples/template_pool_batch.py``.                     |
 +------------------+----------------------------------------------------------+
 | ``tags``         | Search categories. Supported tags include ``pool``,      |
 |                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
-|                  | ``classification``, and ``regression``.                  |
+|                  | ``classification``, ``multi-label``, and ``regression``. |
 +------------------+----------------------------------------------------------+
 | ``title``        | Title of the example, usually named after the query      |
 |                  | strategy.                                                |

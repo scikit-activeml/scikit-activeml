@@ -233,8 +233,9 @@ def generate_strategy_overview_rst(gen_path, json_data):
         file.write("\n")
         file.write(
             "Furthermore, we distinguish between **regression** and "
-            "**classification** as supervised learning tasks, where labels can"
-            "be provided by a **single annotator** or "
+            "**classification** as supervised learning tasks. Classification "
+            "targets may be **multi-label**, and labels can be provided by a "
+            "**single annotator** or "
             "**multiple annotators**. Finally, a strategy builds a "
             "batch of samples by either including the samples with "
             "the **top-k** utilities or by including **diverse** samples "
@@ -252,6 +253,9 @@ def generate_strategy_overview_rst(gen_path, json_data):
             '   <input type="checkbox" class="input-tag" '
             'value="classification">\n '
             "   <label>Classification</label>\n\n"
+            '   <input type="checkbox" class="input-tag" '
+            'value="multi-label">\n '
+            "   <label>Multi-Label</label>\n\n"
             '   <input type="checkbox" class="input-tag" '
             'value="top-k-batch">\n '
             "   <label>Top-k-Batch</label>\n"

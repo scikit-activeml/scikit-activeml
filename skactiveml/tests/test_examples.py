@@ -2,23 +2,24 @@ import inspect
 import json
 import os
 import shutil
+import tempfile
 import unittest
 from os import path
 
-from docs.generate import generate_examples
+from docs.generate import generate_examples, generate_strategy_overview_rst
 from skactiveml import pool, stream
 
-from skactiveml.pool import (
-    ExpectedErrorReduction,
-    LabelCardinalityInconsistency,
-    MaxLossReductionMaxConfidence,
+from skactiveml.pool import ExpectedErrorReduction
+from skactiveml.pool.tests.test_multilabel_proba_contract import (
+    MULTILABEL_DELEGATING_WRAPPERS,
+    MULTILABEL_PREDICTION_CONSUMERS,
+    MULTILABEL_PROBA_CONSUMERS,
+    MULTILABEL_TASK_AGNOSTIC,
 )
 from skactiveml.stream import UncertaintyZliobaite, CognitiveDualQueryStrategy
 
 QUERY_STRATEGY_EXCEPTIONS_LIST = [
     ExpectedErrorReduction,
-    LabelCardinalityInconsistency,
-    MaxLossReductionMaxConfidence,
     UncertaintyZliobaite,
     CognitiveDualQueryStrategy,
 ]
@@ -91,6 +92,63 @@ class TestExamples(unittest.TestCase):
                         f'AL-strategy, add "{item}" to the '
                         f'"exceptions" list in this test class.',
                     )
+
+    def test_multilabel_tags_match_capability_inventory(self):
+        expected_strategies = {
+            strategy.__name__
+            for strategy in (
+                MULTILABEL_PROBA_CONSUMERS
+                | MULTILABEL_PREDICTION_CONSUMERS
+                | MULTILABEL_TASK_AGNOSTIC
+                | MULTILABEL_DELEGATING_WRAPPERS
+            )
+        }
+        examples_by_strategy = {}
+        for root, dirs, files in os.walk(self.json_path, topdown=True):
+            for filename in files:
+                if not filename.endswith(".json"):
+                    continue
+                with open(path.join(root, filename)) as file:
+                    for example in json.load(file):
+                        examples_by_strategy.setdefault(
+                            example["class"], []
+                        ).append(example)
+
+        tagged_strategies = {
+            strategy
+            for strategy, examples in examples_by_strategy.items()
+            if any("multi-label" in example["tags"] for example in examples)
+        }
+        self.assertEqual(expected_strategies, tagged_strategies)
+        for strategy in expected_strategies:
+            with self.subTest(strategy=strategy):
+                self.assertTrue(
+                    all(
+                        "multi-label" in example["tags"]
+                        for example in examples_by_strategy[strategy]
+                    ),
+                    msg=f'Not every "{strategy}" example is tagged '
+                    '"multi-label".',
+                )
+
+    def test_strategy_overview_has_multilabel_filter(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            gen_path = path.join(tmp_dir, "generated")
+            section_path = path.join(tmp_dir, "examples", "section")
+            os.makedirs(gen_path)
+            os.makedirs(section_path)
+            with open(path.join(section_path, "README.rst"), "w") as file:
+                file.write("Section\n")
+
+            generate_strategy_overview_rst(
+                gen_path,
+                {"section": {"data": []}},
+            )
+
+            with open(path.join(gen_path, "strategy_overview.rst")) as file:
+                overview = file.read()
+            self.assertIn('value="multi-label"', overview)
+            self.assertIn("<label>Multi-Label</label>", overview)
 
 
 class Dummy:
