@@ -81,6 +81,53 @@ it is executed as part of the documentation tests.
    >>> assert query_indices.shape == (1,)
    >>> assert query_indices[0] in (4, 5)
 
+.. _multilabel-strategy-inventory:
+
+Multi-label pool strategy capabilities
+--------------------------------------
+
+The following pool strategies accept complete multi-label targets.  This
+categorized inventory is checked against the exact capability inventory in
+``skactiveml/pool/tests/test_multilabel_proba_contract.py``.  That test groups
+strategies by probability consumption, while this user-facing inventory groups
+them by how their acquisition method relates to multi-label data.  Adding a
+multi-label-capable strategy therefore requires classifying it in both places.
+The :doc:`Strategy Overview <generated/strategy_overview>` provides a
+``Multi-Label`` filter and links to the available examples.
+
+**Native multi-label methods**
+    :class:`~skactiveml.pool.MaxLossReductionMaxConfidence` and
+    :class:`~skactiveml.pool.LabelCardinalityInconsistency` cite methods
+    designed for multi-label acquisition.  Maximum Loss Reduction with
+    Maximal Confidence is commonly shortened to **MMC** in the literature and
+    tutorials; the importable class is
+    :class:`~skactiveml.pool.MaxLossReductionMaxConfidence`, and no separate
+    ``MMC`` alias is provided.
+
+**Extensions of single-output methods**
+    :class:`~skactiveml.pool.Badge`, :class:`~skactiveml.pool.Clue`,
+    :class:`~skactiveml.pool.DropQuery`, :class:`~skactiveml.pool.Falcun`,
+    :class:`~skactiveml.pool.ProbCover`,
+    :class:`~skactiveml.pool.UHerding`, and
+    :class:`~skactiveml.pool.UncertaintySampling` document how the library
+    extends their cited single-output method.  Most compute per-label scores
+    and reduce them to one sample utility; ``ProbCover`` instead reads the
+    observed label rows when choosing its default radius.  Follow each class
+    link for the precise extension and reduction contract.
+
+**Representation- and mask-only methods**
+    :class:`~skactiveml.pool.CoreSet`,
+    :class:`~skactiveml.pool.DiscriminativeAL`,
+    :class:`~skactiveml.pool.GreedySamplingX`,
+    :class:`~skactiveml.pool.MaxHerding`,
+    :class:`~skactiveml.pool.RandomSampling`, and
+    :class:`~skactiveml.pool.TypiClust` operate on sample representations and
+    the labeled/unlabeled mask; label values do not enter their acquisition.
+
+:class:`~skactiveml.pool.ParallelUtilityEstimationWrapper` and
+:class:`~skactiveml.pool.SubSamplingWrapper` inherit multi-label behavior from
+their wrapped strategy.
+
 Estimator capability for multi-label wrapping
 ---------------------------------------------
 

@@ -30,8 +30,10 @@ multilabel targets natively.
 """
 
 import inspect
+import re
 import unittest
 from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -142,6 +144,16 @@ def _multilabel_capable_strategies():
     return strategies
 
 
+def _multilabel_inventory():
+    """Returns every strategy classified by the enforced inventory."""
+    return (
+        MULTILABEL_PROBA_CONSUMERS
+        | MULTILABEL_PREDICTION_CONSUMERS
+        | MULTILABEL_TASK_AGNOSTIC
+        | MULTILABEL_DELEGATING_WRAPPERS
+    )
+
+
 def _multilabel_test_cases():
     """Collects the test cases reusing the shared pool strategy template."""
     test_cases = {}
@@ -151,20 +163,36 @@ def _multilabel_test_cases():
 
 
 class TestMultilabelProbaFormatContract(unittest.TestCase):
-    def test_multilabel_capable_strategies_are_inventoried(self):
-        inventory = (
-            MULTILABEL_PROBA_CONSUMERS
-            | MULTILABEL_PREDICTION_CONSUMERS
-            | MULTILABEL_TASK_AGNOSTIC
-            | MULTILABEL_DELEGATING_WRAPPERS
+    def test_target_semantics_inventory_matches_capabilities(self):
+        target_semantics = (
+            Path(__file__).parents[3] / "docs" / "target_semantics.rst"
+        ).read_text()
+        marker = ".. _multilabel-strategy-inventory:"
+        self.assertIn(marker, target_semantics)
+        inventory_section = target_semantics.split(marker, maxsplit=1)[
+            1
+        ].split("Estimator capability for multi-label wrapping", maxsplit=1)[0]
+        documented_strategies = set(
+            re.findall(
+                r":class:`~skactiveml\.pool\.([A-Za-z0-9_]+)`",
+                inventory_section,
+            )
         )
 
+        self.assertEqual(
+            {strategy.__name__ for strategy in _multilabel_inventory()},
+            documented_strategies,
+            msg="The target-semantics reference must categorize every "
+            "multi-label-capable pool strategy from this enforced inventory.",
+        )
+
+    def test_multilabel_capable_strategies_are_inventoried(self):
         self.assertEqual(
             {
                 strategy.__name__
                 for strategy in _multilabel_capable_strategies()
             },
-            {strategy.__name__ for strategy in inventory},
+            {strategy.__name__ for strategy in _multilabel_inventory()},
             msg="A multilabel-capable pool strategy is missing from the "
             "inventory. Classify it as a probability consumer, a prediction "
             "consumer, a task-agnostic strategy, or a delegating wrapper.",
