@@ -4,6 +4,7 @@ from itertools import product
 from unittest.mock import patch
 
 import numpy as np
+from sklearn.utils._testing import assert_allclose
 
 from skactiveml.base import (
     QueryStrategy,
@@ -121,9 +122,19 @@ class DummyRegressionPoolQueryStrategy(DummySingleAnnotatorPoolQueryStrategy):
 
 
 class DummyClassFrequencyEstimator(ClassFrequencyEstimator):
-    def __init__(self, freq=None, class_prior=0):
+    def __init__(
+        self,
+        freq=None,
+        class_prior=0,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        target_type="auto",
+    ):
         super().__init__(
-            classes=None, missing_label=MISSING_LABEL, class_prior=class_prior
+            classes=classes,
+            missing_label=missing_label,
+            class_prior=class_prior,
+            target_type=target_type,
         )
         self.freq = freq
 
@@ -139,6 +150,14 @@ class DummyClassFrequencyEstimator(ClassFrequencyEstimator):
         if self.freq is None:
             raise NotImplementedError
         return self.freq
+
+
+class DummyMultilabelClassFrequencyEstimator(DummyClassFrequencyEstimator):
+    @property
+    def _target_capabilities(self):
+        return super()._target_capabilities | frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
 
 
 class DummyDistribution:
@@ -865,10 +884,50 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
     def test_predict_freq(self):
         self.assertRaises(NotImplementedError, self.clf.predict_freq, X=None)
 
+    def test_base_does_not_advertise_multilabel_capability(self):
+        self.assertNotIn(
+            ("classification", "multi-label", "single-annotator"),
+            self.clf._target_capabilities,
+        )
+
     def test_public_fit_validates_class_prior(self):
         clf = DummyClassFrequencyEstimator(class_prior=1.0)
         clf.fit(np.zeros((2, 1)), np.array([0, 1]))
         np.testing.assert_array_equal(clf.class_prior_, [1.0, 1.0])
+
+    def test_multilabel_fit_validates_class_prior(self):
+        fit_params = {
+            "X": np.zeros((2, 1)),
+            "y": np.array([["no", "on"], ["yes", "off"]]),
+        }
+        classes = [["no", "yes"], ["off", "on"]]
+
+        clf = DummyMultilabelClassFrequencyEstimator(
+            class_prior=1.5,
+            classes=classes,
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(**fit_params)
+        np.testing.assert_array_equal(clf.class_prior_, np.full((2, 2), 1.5))
+
+        clf = DummyMultilabelClassFrequencyEstimator(
+            class_prior=[[1, 2], [3, 4]],
+            classes=classes,
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(**fit_params)
+        np.testing.assert_array_equal(clf.class_prior_, [[1, 2], [3, 4]])
+
+        for invalid_prior in ([1, 2], [1, 2, 3], [[1, 2]], [[1, -1], [2, 3]]):
+            with self.subTest(invalid_prior=invalid_prior):
+                clf = DummyMultilabelClassFrequencyEstimator(
+                    class_prior=invalid_prior,
+                    classes=classes,
+                    missing_label=None,
+                    target_type="multi-label",
+                )
+                with self.assertRaisesRegex(ValueError, "n_outputs, 2"):
+                    clf.fit(**fit_params)
 
     def test_predict_proba(self):
         clf = DummyClassFrequencyEstimator(
@@ -880,6 +939,27 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
         P = clf.predict_proba(np.zeros((2, 1)))
         np.testing.assert_array_equal(P[0], np.array([0.5, 0.5]))
         np.testing.assert_array_equal(P[1], np.array([0.25, 0.75]))
+
+    def test_multilabel_predict_proba_returns_positive_classes(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.array(
+                [
+                    [[0.0, 0.0], [1.0, 3.0]],
+                    [[3.0, 1.0], [0.0, 0.0]],
+                ]
+            ),
+            class_prior=0,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            np.zeros((2, 1)),
+            np.array([["no", "on"], ["yes", "off"]]),
+        )
+
+        P = clf.predict_proba(np.zeros((2, 1)))
+
+        np.testing.assert_array_equal(P, [[0.5, 0.75], [0.25, 0.5]])
 
     def test_sample_proba(self):
         clf = DummyClassFrequencyEstimator(
@@ -902,6 +982,33 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
             clf_zero.sample_proba,
             np.zeros((2, 1)),
         )
+
+    def test_multilabel_sample_proba_returns_full_binary_vectors(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.array(
+                [
+                    [[1.0, 2.0], [3.0, 4.0]],
+                    [[5.0, 6.0], [7.0, 8.0]],
+                ]
+            ),
+            class_prior=1,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            np.zeros((2, 1)),
+            np.array([["no", "on"], ["yes", "off"]]),
+        )
+
+        P = clf.sample_proba(np.zeros((2, 1)), n_samples=3, random_state=0)
+
+        self.assertEqual(P.shape, (3, 2, 2, 2))
+        assert_allclose(P.sum(axis=-1), 1)
+
+        clf.freq = np.zeros((2, 2, 2))
+        clf.class_prior_ = np.zeros((2, 2))
+        with self.assertRaisesRegex(ValueError, "class_prior > 0"):
+            clf.sample_proba(np.zeros((2, 1)), random_state=0)
 
 
 class TestBudgetManager(unittest.TestCase):

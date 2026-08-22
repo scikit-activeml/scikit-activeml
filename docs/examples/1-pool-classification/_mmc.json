@@ -10,7 +10,7 @@
     "refs" : ["yang2009effective"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** MMC queries samples with the largest loss reduction under their most confident label assignment, whose number of positive labels is predicted by a label-cardinality discriminator.",
-    "import_misc" : ["from skactiveml.classifier import ParzenWindowClassifier", "from skactiveml.pool import MaxLossReductionMaxConfidence"],
+    "import_misc" : "from skactiveml.pool import MaxLossReductionMaxConfidence",
     "init_qs" : "MaxLossReductionMaxConfidence(target_type='multi-label', random_state=random_state)",
     "preproc" : "discriminator = ParzenWindowClassifier(class_prior=1e-3, random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf, discriminator=discriminator"

@@ -13,7 +13,6 @@ from sklearn.utils.validation import check_is_fitted, check_scalar
 from ..base import ClassFrequencyEstimator
 from ..utils import (
     MISSING_LABEL,
-    compute_vote_vectors,
     is_labeled,
     check_n_features,
 )
@@ -30,21 +29,25 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes), default=None
-        Holds the label for each class. If `None`, the classes are determined
-        during the fit.
+    classes : array-like of shape (n_classes,) or a list of array-like of \
+            shape (2,), default=None
+        Holds the label for each class. Nested binary vocabularies describe
+        one vocabulary per output for multi-label classification. If `None`,
+        the classes are determined during the fit.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
         `classes` is not `None`.
-    class_prior : float or array-like of shape (n_classes,), default=0
+    class_prior : float or array-like of shape (n_classes,) or \
+            (n_outputs, 2), default=0
         Prior observations of the class frequency estimates. If `class_prior`
-        is an array, the entry `class_prior[i]` indicates the non-negative
-        prior number of samples belonging to class `classes_[i]`. If
-        `class_prior` is a float, `class_prior` indicates the non-negative
-        prior number of samples per class.
+        is an array for single-output classification, `class_prior[i]`
+        indicates the non-negative prior number of samples belonging to class
+        `classes_[i]`. For multi-label classification, an array contains one
+        binary prior per output. If `class_prior` is a float, it indicates the
+        non-negative prior number of samples per class for every output.
     metric : str or callable, default='rbf'
         The metric must be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
@@ -58,27 +61,28 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This estimator supports only single-output
-        classification.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. This estimator supports single-output and
+        multi-label classification.
 
     Attributes
     ----------
-    classes_ : numpy.ndarray of shape (n_classes,)
+    classes_ : numpy.ndarray of shape (n_classes,) or list of numpy.ndarray
         Holds the label for each class after fitting.
-    class_prior : np.ndarray of shape (n_classes,)
-        Prior observations of the class frequency estimates. The entry
-        `class_prior_[i]` indicates the non-negative prior number of samples
-        belonging to class `classes_[i]`.
+    class_prior_ : np.ndarray of shape (n_classes,) or (n_outputs, 2)
+        Prior observations of the class frequency estimates, ordered like
+        `classes_` for single-output targets and like each output's canonical
+        binary vocabulary for multi-label targets.
     cost_matrix_ : np.ndarray of shape (classes, classes)
         Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
         class `classes_[j]` for a sample of class `classes_[i]`.
     X_ : np.ndarray of shape (n_samples, n_features)
         The sample matrix `X` is the feature matrix representing the samples.
-    V_ : np.ndarray of shape (n_samples, classes)
-        The class labels are represented by counting vectors. An entry `V[i,j]`
-        indicates how many class labels of `classes[j]` were provided for
-        training sample `X_[i]`.
+    V_ : np.ndarray of shape (n_samples, n_classes) or \
+            (n_samples, n_outputs, 2)
+        The class labels are represented by counting vectors. For multi-label
+        targets, `V_[i, j, c]` contains the weighted count for class `c` of
+        output `j` at training sample `X_[i]`.
 
     References
     ----------
@@ -92,6 +96,12 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
     """
 
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
+
+    @property
+    def _target_capabilities(self):
+        return super()._target_capabilities | frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
 
     def __init__(
         self,
@@ -124,11 +134,13 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         ----------
         X : array-like of shape (n_samples, n_features)
             The feature matrix representing the samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
-        sample_weight : array-like of shape (n_samples), default=None
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
             It contains the weights of the training samples' class labels.
-            It must have the same shape as `y`.
+            One weight per sample or one weight per target entry can be
+            provided.
 
         Returns
         -------
@@ -171,7 +183,11 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             and self.metric_dict["gamma"] == "mean"
             and self.metric == "rbf"
         ):
-            is_lbld = is_labeled(y, missing_label=1)
+            is_lbld = is_labeled(
+                y,
+                missing_label=-1,
+                target_type=target_spec.target_type,
+            )
             N = np.max([2, np.sum(is_lbld)])
             variance = np.var(X, axis=0)
             n_features = X.shape[1]
@@ -189,12 +205,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         if self.n_features_in_ is None:
             self.V_ = 0
         else:
-            self.V_ = compute_vote_vectors(
-                y=y,
-                w=sample_weight,
-                classes=np.arange(len(self.classes_)),
-                missing_label=-1,
-            )
+            self.V_ = self._compute_class_frequency_vectors(y, sample_weight)
 
         self.target_spec_ = target_spec
 
@@ -211,7 +222,8 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         Returns
         -------
-        F : np.ndarray of shape (n_samples, classes)
+        F : np.ndarray of shape (n_samples, n_classes) or \
+                (n_samples, n_outputs, 2)
             The class frequency estimates of the input samples. Classes are
             ordered according to the attribute `classes_`.
         """
@@ -220,6 +232,8 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         # Predict zeros because of missing training data.
         if self.n_features_in_ is None:
+            if self.target_spec_.target_type == "multi-label":
+                return np.zeros((len(X), len(self.classes_), 2))
             return np.zeros((len(X), len(self.classes_)))
 
         # Compute kernel (metric) matrix.
@@ -240,13 +254,28 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         # computing class frequency estimates
         if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:
-            F = K @ self.V_
+            if self.target_spec_.target_type == "multi-label":
+                F = np.einsum("nm,moc->noc", K, self.V_)
+            else:
+                F = K @ self.V_
         else:
             indices = np.argpartition(K, -self.n_neighbors, axis=1)
             indices = indices[:, -self.n_neighbors :]
-            F = np.empty((np.size(X, 0), len(self.classes_)))
+            output_shape = (
+                (np.size(X, 0), len(self.classes_), 2)
+                if self.target_spec_.target_type == "multi-label"
+                else (np.size(X, 0), len(self.classes_))
+            )
+            F = np.empty(output_shape)
             for i in range(np.size(X, 0)):
-                F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
+                if self.target_spec_.target_type == "multi-label":
+                    F[i] = np.einsum(
+                        "m,moc->oc",
+                        K[i, indices[i]],
+                        self.V_[indices[i]],
+                    )
+                else:
+                    F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
         return F
 
     @staticmethod

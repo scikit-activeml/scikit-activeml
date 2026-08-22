@@ -16,10 +16,9 @@
 import numpy as np
 from matplotlib import animation, pyplot as plt
 from sklearn.datasets import make_blobs
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from skactiveml.classifier import SklearnClassifier
+from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.utils import MISSING_LABEL, labeled_indices
 from skactiveml.visualization import plot_decision_boundary, plot_utilities
 
@@ -54,10 +53,11 @@ X_pool, X_test, y_pool, y_test = train_test_split(
 X = X_pool
 y = np.full(shape=y_pool.shape, fill_value=MISSING_LABEL)
 
-# Initialise a classifier that positively declares multi-output support.
-clf = SklearnClassifier(
-    RandomForestClassifier(n_estimators=20, random_state=random_state),
+# Initialise a native multi-label classifier.
+clf = ParzenWindowClassifier(
     classes=[[0, 1]] * 3,
+    class_prior=1e-3,
+    metric_dict={"gamma": 3},
     target_type="multi-label",
     random_state=random_state,
 )

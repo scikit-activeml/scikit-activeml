@@ -45,6 +45,7 @@ from .utils import (
     check_indices,
     check_n_features,
     check_type,
+    compute_vote_vectors,
 )
 
 __all__ = [
@@ -1820,21 +1821,26 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     Parameters
     ----------
-    classes : array-like, shape (n_classes), default=None
-        Holds the label for each class. If `None`, the classes are determined
-        during the fit.
+    classes : array-like of shape (n_classes,) or a list of array-like of \
+            shape (2,), default=None
+        Holds the label for each class. Nested binary vocabularies describe
+        one vocabulary per output for multi-label classification. If `None`,
+        the classes are determined during the fit.
     missing_label : scalar or str or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
         classes is not `None`.
-    class_prior : float or array-like, shape (n_classes), default=0
+    class_prior : float or array-like of shape (n_classes,) or \
+            (n_outputs, 2), default=0
         Prior observations of the class frequency estimates. If `class_prior`
-        is an array, the entry `class_prior[i]` indicates the non-negative
-        prior number of samples belonging to class `classes_[i]`. If
-        `class_prior` is a float, `class_prior` indicates the non-negative
-        prior number of samples per class.
+        is an array for single-output classification, the entry
+        `class_prior[i]` indicates the non-negative prior number of samples
+        belonging to class `classes_[i]`. For multi-label classification, an
+        array must contain one binary prior per output. If `class_prior` is a
+        float, it indicates the non-negative prior number of samples per class
+        for every output.
     random_state : int or np.RandomState or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
@@ -1842,6 +1848,13 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             "multi-output", default="auto"
         Declared target type. Concrete estimators reject resolved
         specifications outside their exact capabilities.
+
+    Attributes
+    ----------
+    class_prior_ : np.ndarray of shape (n_classes,) or (n_outputs, 2)
+        Validated prior observations. The two-dimensional representation is
+        used only for multi-label targets and follows each output's canonical
+        binary class vocabulary.
     """
 
     def __init__(
@@ -1873,9 +1886,11 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Returns
         -------
-        F: array-like of shape (n_samples, classes)
-            The class frequency estimates of the test samples `X`. Classes are
-            ordered according to attribute `classes_`.
+        F: array-like of shape (n_samples, n_classes) or \
+                (n_samples, n_outputs, 2)
+            The class frequency estimates of the test samples `X`. For
+            multi-label targets, the final axis follows each output's
+            canonical binary class vocabulary.
         """
         raise NotImplementedError
 
@@ -1889,13 +1904,28 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Returns
         -------
-        P : array-like of shape (n_samples, classes)
-            The class probabilities of the test samples. Classes are ordered
-            according to `self.classes_`.
+        P : array-like of shape (n_samples, n_classes) or \
+                (n_samples, n_outputs)
+            The class probabilities of the test samples. For multi-label
+            targets, each entry is the probability of the second class in the
+            corresponding canonical binary class vocabulary. An output with
+            zero estimated frequencies and zero prior has probability `0.5`.
         """
         out = self.predict_freq(X, **kwargs)
         F = out[0] if isinstance(out, tuple) else out
         P = F + self.class_prior_
+        target_type = getattr(
+            getattr(self, "target_spec_", None),
+            "target_type",
+            "single-output",
+        )
+        if target_type == "multi-label":
+            normalizer = np.sum(P, axis=-1)
+            nonzero = normalizer > 0
+            P[nonzero] /= normalizer[nonzero, np.newaxis]
+            P[~nonzero] = 0.5
+            return P[..., 1]
+
         normalizer = np.sum(P, axis=1)
         P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
@@ -1919,12 +1949,42 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Returns
         -------
-        P : array-like of shape (n_samples, n_test_samples, n_classes)
+        P : array-like of shape (n_samples, n_test_samples, n_classes) or \
+                (n_samples, n_test_samples, n_outputs, 2)
             There are `n_samples` class probability vectors for each test
-            sample in `X`. Classes are ordered according to `self.classes_`.
+            sample in `X`. For multi-label targets, the final axis follows
+            each output's canonical binary class vocabulary.
+
+        Raises
+        ------
+        ValueError
+            If any class has zero frequency observations after adding the
+            prior. Set a positive `class_prior` to make every Dirichlet
+            parameter positive.
         """
         random_state = check_random_state(random_state)
         alphas = self.predict_freq(X) + self.class_prior_
+        target_type = getattr(
+            getattr(self, "target_spec_", None),
+            "target_type",
+            "single-output",
+        )
+        if target_type == "multi-label":
+            alphas = np.repeat(alphas[np.newaxis], n_samples, axis=0)
+            if (alphas == 0).any():
+                raise ValueError(
+                    "There are zero frequency observations. "
+                    "Set `class_prior > 0` to avoid this error."
+                )
+            R = random_state.standard_gamma(alphas)
+            R_flat = R.reshape(-1, R.shape[-1])
+            is_zero = R_flat.sum(axis=-1) == 0.0
+            sampled_class_indices = random_state.choice(
+                np.array(R.shape[-1]), size=is_zero.sum()
+            )
+            R_flat[np.flatnonzero(is_zero), sampled_class_indices] = 1.0
+            return R / R.sum(axis=-1, keepdims=True)
+
         alphas = alphas.repeat(repeats=n_samples, axis=0)
         if (alphas == 0).any():
             raise ValueError(
@@ -1963,11 +2023,55 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
 
         # Check class prior.
-        self.class_prior_ = check_class_prior(
-            self.class_prior, len(self.classes_)
-        )
+        if self.target_spec_.target_type == "multi-label":
+            n_outputs = len(self.classes_)
+            if np.isscalar(self.class_prior):
+                check_scalar(
+                    self.class_prior,
+                    name="class_prior",
+                    target_type=(int, float),
+                    min_val=0,
+                )
+                self.class_prior_ = np.full((n_outputs, 2), self.class_prior)
+            else:
+                class_prior = check_array(self.class_prior, ensure_2d=False)
+                if class_prior.shape != (n_outputs, 2) or np.any(
+                    class_prior < 0
+                ):
+                    raise ValueError(
+                        "`class_prior` must be either a non-negative float or "
+                        "an array of shape `(n_outputs, 2)` containing "
+                        "non-negative values."
+                    )
+                self.class_prior_ = class_prior
+        else:
+            self.class_prior_ = check_class_prior(
+                self.class_prior, len(self.classes_)
+            )
 
         return X, y, sample_weight
+
+    def _compute_class_frequency_vectors(self, y, sample_weight):
+        """Convert encoded targets to per-sample class-frequency vectors."""
+        if self.target_spec_.target_type == "single-output":
+            return compute_vote_vectors(
+                y=y,
+                w=sample_weight,
+                classes=np.arange(len(self.classes_)),
+                missing_label=-1,
+            )
+
+        weights = (
+            np.ones_like(y, dtype=float)
+            if sample_weight is None
+            else np.asarray(sample_weight, dtype=float).copy()
+        )
+        if weights.ndim == 1:
+            weights = np.repeat(weights[:, np.newaxis], y.shape[1], axis=1)
+        is_missing = y == -1
+        weights[np.isnan(weights) | is_missing] = 0
+        encoded_y = np.where(is_missing, 0, y).astype(int, copy=False)
+        return np.eye(2)[encoded_y] * weights[..., np.newaxis]
 
 
 class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):

@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
+from sklearn.utils._testing import assert_allclose
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 
 from skactiveml.classifier import MixtureModelClassifier
@@ -111,6 +112,100 @@ class TestMixtureModelClassifier(
             sample_weight=self.w,
         )
         np.testing.assert_array_equal([[0, 1, 2]], cmm.F_components_)
+
+    def test_multilabel_requires_explicit_mixture_before_fitted_state(self):
+        cmm = MixtureModelClassifier(
+            classes=[[0, 1], [0, 1]], target_type="multi-label"
+        )
+
+        with self.assertRaisesRegex(ValueError, "mixture_model.*multi-label"):
+            cmm.fit([[0], [1]], [[0, 1], [1, 0]])
+
+        self.assertFalse(any(name.endswith("_") for name in vars(cmm)))
+
+    def test_multilabel_predictions_in_both_weight_modes(self):
+        X = np.array([[-0.1], [0.0], [0.1]])
+        y = np.array(
+            [["no", "on"], [None, None], ["yes", "off"]],
+            dtype=object,
+        )
+        init_params = {
+            "classes": [["no", "yes"], ["off", "on"]],
+            "missing_label": None,
+            "target_type": "multi-label",
+            "class_prior": [[1, 1], [2, 2]],
+        }
+
+        for weight_mode in ("responsibilities", "similarities"):
+            with self.subTest(weight_mode=weight_mode):
+                mixture = GaussianMixture(n_components=1, random_state=0)
+                cmm = MixtureModelClassifier(
+                    mixture_model=mixture,
+                    weight_mode=weight_mode,
+                    **init_params,
+                ).fit(X, y, sample_weight=[2, np.nan, 3])
+
+                assert_allclose(
+                    cmm.predict_freq([[0]]),
+                    [[[2, 3], [3, 2]]],
+                    atol=1e-10,
+                )
+                assert_allclose(cmm.predict_proba([[0]]), [[4 / 7, 4 / 9]])
+                np.testing.assert_array_equal(
+                    cmm.predict([[0]]), [["yes", "off"]]
+                )
+                self.assertEqual(
+                    cmm.target_spec_.classes,
+                    (("no", "yes"), ("off", "on")),
+                )
+                self.assertIn(
+                    ("classification", "multi-label", "single-annotator"),
+                    cmm._target_capabilities,
+                )
+
+    def test_multilabel_per_entry_weights_with_fitted_mixture(self):
+        X = np.array([[-0.1], [0.0], [0.1]])
+        mixture = GaussianMixture(n_components=1, random_state=0).fit(X)
+        cmm = MixtureModelClassifier(
+            mixture_model=mixture,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            X,
+            np.array(
+                [["no", "on"], [None, None], ["yes", "off"]],
+                dtype=object,
+            ),
+            sample_weight=[[2, 4], [np.nan, np.nan], [3, 5]],
+        )
+
+        assert_allclose(
+            cmm.predict_freq([[0]]), [[[2, 3], [5, 4]]], atol=1e-10
+        )
+
+    def test_multilabel_cold_start_probabilities_in_both_weight_modes(self):
+        X = np.array([[-0.1], [0.0], [0.1]])
+        for weight_mode in ("responsibilities", "similarities"):
+            with self.subTest(weight_mode=weight_mode):
+                cmm = MixtureModelClassifier(
+                    mixture_model=GaussianMixture(
+                        n_components=1, random_state=0
+                    ),
+                    weight_mode=weight_mode,
+                    classes=[[0, 1], [0, 1]],
+                    target_type="multi-label",
+                ).fit(
+                    X,
+                    np.full((3, 2), np.nan),
+                )
+
+                np.testing.assert_array_equal(
+                    cmm.predict_freq([[0], [1]]), np.zeros((2, 2, 2))
+                )
+                np.testing.assert_array_equal(
+                    cmm.predict_proba([[0], [1]]), np.full((2, 2), 0.5)
+                )
 
     def test_predict_freq(self):
         mixture = BayesianGaussianMixture(n_components=1)
