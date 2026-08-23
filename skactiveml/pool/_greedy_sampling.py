@@ -124,7 +124,7 @@ class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        target_type = self._resolve_target_type(y)
+        target_type = self._resolve_query_target_type(y)
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

@@ -119,7 +119,7 @@ class TypiClust(_TaskAgnosticPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-        target_type = self._resolve_target_type(y)
+        target_type = self._resolve_query_target_type(y)
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

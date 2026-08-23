@@ -135,7 +135,7 @@ class DiscriminativeAL(_TaskAgnosticPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        target_type = self._resolve_target_type(y)
+        target_type = self._resolve_query_target_type(y)
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

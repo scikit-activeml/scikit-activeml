@@ -72,6 +72,23 @@ class TargetSpec:
                 )
             object.__setattr__(self, "classes", normalized_classes)
 
+    @classmethod
+    def _from_normalized(
+        cls,
+        *,
+        task,
+        target_type,
+        annotation_type,
+        classes,
+    ):
+        """Construct a target specification from trusted normalized values."""
+        target_spec = object.__new__(cls)
+        object.__setattr__(target_spec, "task", task)
+        object.__setattr__(target_spec, "target_type", target_type)
+        object.__setattr__(target_spec, "annotation_type", annotation_type)
+        object.__setattr__(target_spec, "classes", classes)
+        return target_spec
+
     def __eq__(self, other):
         if not isinstance(other, TargetSpec):
             return NotImplemented
@@ -382,7 +399,8 @@ def resolve_target_spec(
                 "ambiguous; declare `target_type` or `classes`."
             )
 
-    _check_class_vocabulary_structure(target_type, classes)
+    if classes is not None:
+        _check_class_vocabulary_structure(target_type, classes)
 
     if target_type == "multi-label":
         return _resolve_multilabel(
@@ -410,8 +428,10 @@ def resolve_target_spec(
         normalized_classes = _normalize_class_vocabulary(
             declared, observed, "`classes`"
         )
+        if classes is None:
+            check_classes(normalized_classes)
 
-    return TargetSpec(
+    return TargetSpec._from_normalized(
         task=task,
         target_type="single-output",
         annotation_type=annotation_type,
@@ -535,8 +555,13 @@ def _resolve_multioutput(y, *, task, classes, missing_label):
                 )
             )
         normalized_classes = tuple(normalized_classes)
+        if classes is None:
+            check_classes(normalized_classes)
+            _check_class_vocabulary_structure(
+                "multi-output", normalized_classes
+            )
 
-    return TargetSpec(
+    return TargetSpec._from_normalized(
         task=task,
         target_type="multi-output",
         annotation_type="single-annotator",
@@ -583,11 +608,16 @@ def _resolve_multilabel(y, *, classes, missing_label):
             )
             normalized_classes.append(classes_i)
 
-    return TargetSpec(
+    normalized_classes = tuple(normalized_classes)
+    if classes is None:
+        check_classes(normalized_classes)
+        _check_class_vocabulary_structure("multi-label", normalized_classes)
+
+    return TargetSpec._from_normalized(
         task="classification",
         target_type="multi-label",
         annotation_type="single-annotator",
-        classes=tuple(normalized_classes),
+        classes=normalized_classes,
     )
 
 

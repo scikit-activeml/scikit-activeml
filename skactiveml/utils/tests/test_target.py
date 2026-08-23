@@ -1,5 +1,6 @@
 import unittest
 from dataclasses import FrozenInstanceError, fields
+from datetime import date
 from inspect import signature
 
 import numpy as np
@@ -241,6 +242,16 @@ class TestTargetSpec(unittest.TestCase):
 
 
 class TestResolveTargetSpec(unittest.TestCase):
+    def test_rejects_unsupported_inferred_class_types(self):
+        with self.assertRaisesRegex(
+            TypeError, "must contain only strings or numbers"
+        ):
+            resolve_target_spec(
+                [date(2020, 1, 1), date(2020, 1, 2)],
+                task="classification",
+                missing_label=None,
+            )
+
     def test_rejects_empty_or_mixed_class_vocabulary_structure(self):
         for classes, message in (
             ([], "must not be empty"),

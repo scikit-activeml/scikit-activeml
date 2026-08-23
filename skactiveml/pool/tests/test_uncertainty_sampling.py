@@ -134,6 +134,19 @@ class TestUncertaintySampling(
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
+    def test_missing_label_mismatch_precedes_fit_flag_validation(self):
+        query_params = deepcopy(self.query_default_params_clf)
+        query_params["clf"] = ParzenWindowClassifier(
+            classes=self.classes,
+            missing_label=-1,
+        )
+
+        with self.assertRaisesRegex(ValueError, "must be equal"):
+            UncertaintySampling().query(
+                **query_params,
+                fit_clf="invalid",
+            )
+
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         X = self.query_default_params_clf["X"]

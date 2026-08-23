@@ -160,7 +160,7 @@ class ProbCover(_TaskAgnosticPoolQueryStrategy):
             - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to the samples in `X`.
         """
-        target_type = self._resolve_target_type(y)
+        target_type = self._resolve_query_target_type(y)
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

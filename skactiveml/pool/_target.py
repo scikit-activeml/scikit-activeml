@@ -32,7 +32,9 @@ _ALLOWED_DECLARED_TARGET_TYPES = frozenset(
 )
 
 
-def _resolve_estimator_target_spec(strategy, estimator, y):
+def _resolve_estimator_target_spec(
+    strategy, estimator, y, *, missing_label_checked=False
+):
     """Resolve one estimator-backed strategy target specification."""
     if isinstance(estimator, SkactivemlClassifier):
         task = "classification"
@@ -43,7 +45,10 @@ def _resolve_estimator_target_spec(strategy, estimator, y):
     else:  # pragma: no cover - callers validate their estimator type first.
         raise TypeError("`estimator` must be a scikit-activeml estimator.")
 
-    check_equal_missing_label(estimator.missing_label, strategy.missing_label)
+    if not missing_label_checked:
+        check_equal_missing_label(
+            estimator.missing_label, strategy.missing_label
+        )
     strategy_target_type = strategy.target_type
     _validate_target_semantics(
         task,
@@ -132,13 +137,15 @@ def _fit_and_resolve_estimator_target_spec(
     check_type(estimator, estimator_name, *estimator_types)
     check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     check_type(fit_estimator, fit_name, bool)
+    target_spec = _resolve_estimator_target_spec(
+        strategy, estimator, y, missing_label_checked=True
+    )
     if fit_estimator:
-        _resolve_estimator_target_spec(strategy, estimator, y)
         if sample_weight is None:
             estimator = clone(estimator).fit(X, y)
         else:
             estimator = clone(estimator).fit(X, y, sample_weight)
-    target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
+        target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
     return estimator, target_spec
 
 

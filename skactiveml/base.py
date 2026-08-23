@@ -647,16 +647,19 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             y = check_array(
                 y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
             )
-            resolved_target_type = "multi-label"
         elif target_type == "single-output":
             y = column_or_1d(y, warn=True)
-            resolved_target_type = "single-output"
+        else:
+            raise ValueError(
+                "`target_type` must be either 'single-output' or "
+                "'multi-label'."
+            )
 
         if candidates is None:
             is_ulbld = is_unlabeled(
                 y,
                 missing_label=self.missing_label_,
-                target_type=resolved_target_type,
+                target_type=target_type,
             )
             n_candidates = int(is_ulbld.sum())
         else:
@@ -757,24 +760,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 class _TaskAgnosticPoolQueryStrategy(SingleAnnotatorPoolQueryStrategy):
     """Shared target contract for estimator-free, task-agnostic strategies."""
 
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label,
-            random_state=random_state,
-            target_type=target_type,
-        )
-
     @property
     def _target_capabilities(self):
         return _TASK_AGNOSTIC_TARGET_CAPABILITIES
-
-    def _resolve_target_type(self, y):
-        return self._resolve_query_target_type(y)
 
 
 class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
@@ -1703,12 +1691,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         reset=True,
         target_spec=None,
     ):
-        if target_spec is None:
-            target_spec = self._resolve_fitting_target_spec(y)
-        else:
-            target_spec = self._resolve_fitting_target_spec(
-                y, established_spec=target_spec
-            )
+        target_spec = self._resolve_fitting_target_spec(
+            y, established_spec=target_spec
+        )
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
         if check_y_dict is None:
@@ -1721,7 +1706,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             }
 
         # Check common classifier parameters.
-        # TODO: Move after label encoder.
         check_classifier_params(
             self.classes, self.missing_label, self.cost_matrix
         )
@@ -1730,11 +1714,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         self.random_state_ = check_random_state(self.random_state)
 
         # Create label encoder.
-        resolved_classes = (
-            self.classes if target_spec is None else target_spec.classes
-        )
         self._le = ExtLabelEncoder(
-            classes=resolved_classes,
+            classes=target_spec.classes,
             missing_label=self.missing_label,
             target_type=target_spec.target_type,
         )
@@ -1807,8 +1788,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 self.cost_matrix_ = self.cost_matrix_[class_indices]
                 self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 
-        if target_spec is not None:
-            self.target_spec_ = target_spec
+        self.target_spec_ = target_spec
 
         return X, y, sample_weight
 
