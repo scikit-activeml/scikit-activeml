@@ -29,7 +29,7 @@ from ..utils import (
     TargetSpec,
     resolve_target_spec,
 )
-from ..utils._target import check_target_capability
+from ..utils._target import _check_target_spec_capability
 
 successful_skorch_torch_import = False
 try:
@@ -341,7 +341,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
                 classes=None,
                 missing_label=self.missing_label,
             )
-            check_target_capability(
+            _check_target_spec_capability(
                 type(self).__name__,
                 prediction_spec,
                 self._target_capabilities,
@@ -493,7 +493,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             annotation_type="single-annotator",
             classes=None,
         )
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
 
@@ -519,7 +519,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
                 "The pre-fitted estimator's `target_spec_` must be a "
                 "`TargetSpec`."
             )
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__,
             estimator_target_spec,
             self._target_capabilities,

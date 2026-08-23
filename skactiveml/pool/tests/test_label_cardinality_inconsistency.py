@@ -12,11 +12,8 @@ from skactiveml.pool import (
     LabelCardinalityInconsistency,
     label_cardinality_inconsistency,
 )
-from skactiveml.pool.tests._multilabel_target_semantics import (
-    MultilabelOnlyTargetSemanticsMixin,
-)
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import ExtLabelEncoder, MISSING_LABEL, unlabeled_indices
 
@@ -64,8 +61,7 @@ class DummyMultilabelClassifier(SkactivemlClassifier):
 
 
 class TestLabelCardinalityInconsistency(
-    MultilabelOnlyTargetSemanticsMixin,
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy,
     unittest.TestCase,
 ):
     def setUp(self):
@@ -94,8 +90,7 @@ class TestLabelCardinalityInconsistency(
         )
         self.qs = LabelCardinalityInconsistency(random_state=0)
 
-        self.strategy_class = LabelCardinalityInconsistency
-        TemplateSingleAnnotatorPoolQueryStrategy.setUp(
+        TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy.setUp(
             self,
             qs_class=LabelCardinalityInconsistency,
             init_default_params={"random_state": 0},
@@ -105,9 +100,6 @@ class TestLabelCardinalityInconsistency(
                 "clf": self.clf,
             },
         )
-
-    def _query_strategy(self, strategy, y, clf, **kwargs):
-        return strategy.query(self.X, y, clf=clf, **kwargs)
 
     def test_query_param_clf(self):
         super().test_query_param_clf(test_cases=[])

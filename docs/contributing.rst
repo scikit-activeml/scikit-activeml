@@ -165,6 +165,11 @@ code using the following commands:
    black skactiveml
    flake8 skactiveml/ --ignore=E203,W503
 
+For a new strategy module centered on one public strategy class, derive the
+private module name from the class name in snake case and use the same stem for
+its test module. A conceptual or acronym-based filename is appropriate when a
+module intentionally groups a strategy family.
+
 Example for Code Contribution Cycle (C3) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -239,7 +244,7 @@ label helpers, or multi-annotator components. In particular:
   ``query_default_params_clf_multilabel`` runs the shared custom class
   vocabulary contract automatically. If its acquisition path needs auxiliary
   inputs, override ``_multilabel_custom_vocabulary_params`` and record the
-  override in ``skactiveml/pool/tests/test_multilabel_vocabulary_contract.py``
+  override in ``skactiveml/pool/tests/test_multilabel_contracts.py``
   instead of skipping the contract.
 
 Single-annotator Pool-based Query Strategies
@@ -364,6 +369,11 @@ Pool-strategy tests live in ``skactiveml/pool/tests``. Reuse the test template
 Specify ``qs_class`` and ``init_default_params`` in the template setup and,
 depending on the supported task, ``query_default_params_reg`` or
 ``query_default_params_clf``. Refer to the template for the complete contract.
+
+Keep test helpers in the narrowest module that owns them. A helper used by one
+test module stays in that module. Put broadly reused assertions and fixture
+helpers in ``skactiveml.tests.utils``. Put inherited query-strategy contract
+behavior in ``skactiveml.tests.template_query_strategy``.
 
 Single-annotator Stream-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

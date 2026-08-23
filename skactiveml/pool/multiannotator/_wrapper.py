@@ -23,7 +23,7 @@ from ...utils import (
     check_equal_missing_label,
     resolve_target_spec,
 )
-from ...utils._target import check_target_capability
+from ...utils._target import _check_target_spec_capability
 
 
 class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
@@ -274,7 +274,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         if aggregate_target_spec is not None and hasattr(
             self.strategy, "_target_capabilities"
         ):
-            check_target_capability(
+            _check_target_spec_capability(
                 type(self.strategy).__name__,
                 aggregate_target_spec,
                 self.strategy._target_capabilities,

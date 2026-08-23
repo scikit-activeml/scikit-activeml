@@ -44,7 +44,7 @@ from ._prob_cover import ProbCover
 from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
 from ._drop_query import DropQuery
-from ._mmc import (
+from ._max_loss_reduction_max_confidence import (
     MaxLossReductionMaxConfidence,
     max_loss_reduction_max_confidence,
 )

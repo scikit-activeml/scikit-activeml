@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 
+from skactiveml.base import _TaskAgnosticPoolQueryStrategy
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import (
     CoreSet,
@@ -13,16 +14,6 @@ from skactiveml.pool import (
     TypiClust,
 )
 from skactiveml.tests.utils import assert_no_query_state
-
-TASK_AGNOSTIC_STRATEGIES = (
-    RandomSampling,
-    CoreSet,
-    TypiClust,
-    ProbCover,
-    MaxHerding,
-    DiscriminativeAL,
-    GreedySamplingX,
-)
 
 TASK_AGNOSTIC_CAPABILITIES = frozenset(
     {
@@ -69,9 +60,15 @@ def _strategy_cases(target_type="auto"):
 
 class TestTaskAgnosticTargetSemantics(unittest.TestCase):
     def test_public_target_type_and_exact_capabilities(self):
-        for strategy_class in TASK_AGNOSTIC_STRATEGIES:
-            with self.subTest(strategy=strategy_class.__name__):
-                strategy = strategy_class()
+        strategy_cases = _strategy_cases()
+        self.assertEqual(
+            {type(strategy) for strategy, _ in strategy_cases},
+            set(_TaskAgnosticPoolQueryStrategy.__subclasses__()),
+            msg="Every task-agnostic strategy must have a behavioral case.",
+        )
+
+        for strategy, _ in strategy_cases:
+            with self.subTest(strategy=type(strategy).__name__):
                 self.assertEqual(strategy.target_type, "auto")
                 self.assertEqual(
                     strategy._target_capabilities,

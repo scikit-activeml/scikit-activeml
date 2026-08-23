@@ -1,3 +1,5 @@
+"""Implementation of Label Cardinality Inconsistency."""
+
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
@@ -16,7 +18,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
     This class implements the query strategy Label Cardinality Inconsistency
     (LCI) [1]_ that selects samples based on the difference in label
     cardinality between the labeled pool and the predicted number of positive
-    labels in the unlabeled pool. This strategy is multilabel-only: `y` must
+    labels in the unlabeled pool. This strategy is multi-label-only: `y` must
     be two-dimensional and each row must be either fully labeled or fully
     unlabeled.
 
@@ -77,7 +79,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled
             rows indicated by `self.missing_label`). Each row must either
             contain only observed labels or only `missing_label` values, i.e.,
-            no mixing within a row. This strategy supports multilabel data
+            no mixing within a row. This strategy supports multi-label data
             only.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict`.

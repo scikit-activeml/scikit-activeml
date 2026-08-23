@@ -1,6 +1,4 @@
-"""
-Module implementing the multilabel pool-based query strategy MMC.
-"""
+"""Implementation of Maximum Loss Reduction with Maximal Confidence."""
 
 import numpy as np
 from sklearn import clone
@@ -23,9 +21,9 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
     This class implements the query strategy Maximum Loss Reduction with
     Maximal Confidence (MMC) [1]_ that selects the samples with the largest
     loss reduction under their most confident label assignment. That label
-    assignment combines a multilabel classifier's label predictions with the
+    assignment combines a multi-label classifier's label predictions with the
     number of positive labels predicted by a label-cardinality discriminator.
-    This strategy is multilabel-only: `y` must be two-dimensional and each row
+    This strategy is multi-label-only: `y` must be two-dimensional and each row
     must be either fully labeled or fully unlabeled.
 
     Parameters
@@ -86,7 +84,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled
             rows indicated by `self.missing_label`). Each row must either
             contain only observed labels or only `missing_label` values, i.e.,
-            no mixing within a row. This strategy supports multilabel data
+            no mixing within a row. This strategy supports multi-label data
             only. `predict_proba` must return either shape
             `(n_samples, n_outputs)` or a list of binary probability matrices
             with shape `(n_samples, 2)` per output.
@@ -188,7 +186,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             target_type=target_spec.target_type,
         )
 
-        # Canonicalize both public multilabel probability formats before any
+        # Canonicalize both public multi-label probability formats before any
         # masking or arithmetic is applied.
         n_outputs = y.shape[1]
         probas = _canonicalize_multilabel_probas(

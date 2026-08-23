@@ -15,7 +15,7 @@ from skactiveml.utils import (
 )
 from skactiveml.utils._target import (
     _class_vocabulary_key,
-    check_target_capability,
+    _check_target_spec_capability,
 )
 
 
@@ -758,7 +758,7 @@ class TestResolveTargetSpec(unittest.TestCase):
             "ExampleComponent.*multi-output.*Supported "
             "capabilities.*single-output",
         ):
-            check_target_capability(
+            _check_target_spec_capability(
                 "ExampleComponent", target_spec, capabilities
             )
 

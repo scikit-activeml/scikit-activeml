@@ -621,7 +621,7 @@ def _resolve_multilabel(y, *, classes, missing_label):
     )
 
 
-def check_target_capability(component, target_spec, capabilities):
+def _check_target_spec_capability(component, target_spec, capabilities):
     """Raise when a component does not declare an exact target capability."""
     capability = (
         target_spec.task,

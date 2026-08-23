@@ -13,11 +13,8 @@ from skactiveml.pool import (
     MaxLossReductionMaxConfidence,
     max_loss_reduction_max_confidence,
 )
-from skactiveml.pool.tests._multilabel_target_semantics import (
-    MultilabelOnlyTargetSemanticsMixin,
-)
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 
@@ -33,8 +30,7 @@ class RecordingDiscriminator(ParzenWindowClassifier):
 
 
 class TestMaxLossReductionMaxConfidence(
-    MultilabelOnlyTargetSemanticsMixin,
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy,
     unittest.TestCase,
 ):
     def setUp(self):
@@ -66,8 +62,7 @@ class TestMaxLossReductionMaxConfidence(
         )
         self.qs = MaxLossReductionMaxConfidence(random_state=0)
 
-        self.strategy_class = MaxLossReductionMaxConfidence
-        TemplateSingleAnnotatorPoolQueryStrategy.setUp(
+        TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy.setUp(
             self,
             qs_class=MaxLossReductionMaxConfidence,
             init_default_params={"random_state": 0},
@@ -77,15 +72,6 @@ class TestMaxLossReductionMaxConfidence(
                 "discriminator": self.discriminator,
                 "clf": self.clf,
             },
-        )
-
-    def _query_strategy(self, strategy, y, clf, **kwargs):
-        return strategy.query(
-            self.X,
-            y,
-            discriminator=self.discriminator,
-            clf=clf,
-            **kwargs,
         )
 
     def test_query_param_clf(self):
@@ -178,7 +164,8 @@ class TestMaxLossReductionMaxConfidence(
             return acquisition_scores
 
         with patch(
-            "skactiveml.pool._mmc.max_loss_reduction_max_confidence",
+            "skactiveml.pool._max_loss_reduction_max_confidence."
+            "max_loss_reduction_max_confidence",
             side_effect=_record,
         ) as utility_mock:
             query_indices, utilities = self.qs.query(

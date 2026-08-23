@@ -10,7 +10,7 @@ from docs.generate import generate_examples, generate_strategy_overview_rst
 from skactiveml import pool, stream
 
 from skactiveml.pool import ExpectedErrorReduction
-from skactiveml.pool.tests.test_multilabel_proba_contract import (
+from skactiveml.pool.tests.test_multilabel_contracts import (
     MULTILABEL_DELEGATING_WRAPPERS,
     MULTILABEL_PREDICTION_CONSUMERS,
     MULTILABEL_PROBA_CONSUMERS,

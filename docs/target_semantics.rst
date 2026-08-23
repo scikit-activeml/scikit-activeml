@@ -88,7 +88,7 @@ Multi-label pool strategy capabilities
 
 The following pool strategies accept complete multi-label targets.  This
 categorized inventory is checked against the exact capability inventory in
-``skactiveml/pool/tests/test_multilabel_proba_contract.py``.  That test groups
+``skactiveml/pool/tests/test_multilabel_contracts.py``.  That test groups
 strategies by probability consumption, while this user-facing inventory groups
 them by how their acquisition method relates to multi-label data.  Adding a
 multi-label-capable strategy therefore requires classifying it in both places.

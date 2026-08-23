@@ -28,7 +28,10 @@ from ..base import (
     _resolve_own_fitted_attribute,
     _restore_wrapper_attributes,
 )
-from ..utils._target import _check_target_capability, check_target_capability
+from ..utils._target import (
+    _check_target_capability,
+    _check_target_spec_capability,
+)
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
@@ -637,7 +640,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     type(self).__name__, self.estimator
                 )
             )
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
         return target_spec

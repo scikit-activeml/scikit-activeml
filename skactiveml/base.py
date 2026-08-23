@@ -26,8 +26,7 @@ from .utils._selection import (
 from .utils._target import (
     _check_target_capability,
     _resolve_task_agnostic_target_type,
-    check_target_capability,
-    resolve_target_spec,
+    _check_target_spec_capability,
 )
 from .utils import (
     MISSING_LABEL,
@@ -36,6 +35,7 @@ from .utils import (
     unlabeled_indices,
     ExtLabelEncoder,
     rand_argmin,
+    resolve_target_spec,
     check_classifier_params,
     check_random_state,
     check_cost_matrix,
@@ -473,7 +473,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                     classes=None,
                     missing_label=self.missing_label,
                 )
-            check_target_capability(
+            _check_target_spec_capability(
                 type(self).__name__, target_spec, self._target_capabilities
             )
             return target_spec.target_type
@@ -822,7 +822,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             if lacks_class_evidence:
                 return None
             raise
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
         return target_spec
@@ -1525,7 +1525,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
         )
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
         return target_spec
@@ -2101,7 +2101,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
             classes=None,
             missing_label=self.missing_label,
         )
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
         return target_spec

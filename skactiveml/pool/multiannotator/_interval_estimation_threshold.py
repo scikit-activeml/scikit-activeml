@@ -8,7 +8,7 @@ from ...base import (
     SkactivemlClassifier,
     _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES,
 )
-from ...utils._target import check_target_capability
+from ...utils._target import _check_target_spec_capability
 from ...pool._uncertainty_sampling import uncertainty_scores
 from ...utils import (
     check_scalar,
@@ -131,7 +131,7 @@ class IntervalEstimationAnnotModel(BaseEstimator):
             classes=self.classes,
             missing_label=self.missing_label,
         )
-        check_target_capability(
+        _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
         # Check whether alpha is float in (0, 1).
@@ -376,7 +376,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
                     "specification."
                 )
             if fit_clf:
-                check_target_capability(
+                _check_target_spec_capability(
                     type(clf).__name__,
                     query_target_spec,
                     clf._target_capabilities,

@@ -24,7 +24,7 @@ from ..utils._target import (
     _class_vocabulary_key,
     _resolve_task_agnostic_target_type,
     _validate_target_semantics,
-    check_target_capability,
+    _check_target_spec_capability,
 )
 
 _ALLOWED_DECLARED_TARGET_TYPES = frozenset(
@@ -97,7 +97,7 @@ def _resolve_estimator_target_spec(
             missing_label=strategy.missing_label,
         )
 
-    check_target_capability(
+    _check_target_spec_capability(
         type(estimator).__name__,
         target_spec,
         estimator._target_capabilities,
@@ -110,7 +110,7 @@ def _resolve_estimator_target_spec(
             f"{type(strategy).__name__}'s explicit `target_type` conflicts "
             "with the fitted estimator's target specification."
         )
-    check_target_capability(
+    _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )
     is_unlabeled(
@@ -381,7 +381,7 @@ def _check_resolved_target_capability(
         The component's declared target capabilities.
     """
     if target_spec is not None:
-        check_target_capability(component, target_spec, capabilities)
+        _check_target_spec_capability(component, target_spec, capabilities)
     elif not any(capability[1] == target_type for capability in capabilities):
         supported = ", ".join(repr(value) for value in sorted(capabilities))
         raise ValueError(

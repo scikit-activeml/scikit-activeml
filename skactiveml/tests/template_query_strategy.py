@@ -17,7 +17,8 @@ from skactiveml.tests.utils import (
 
 from skactiveml.base import _TaskAgnosticPoolQueryStrategy
 from skactiveml.exceptions import MappingError
-from skactiveml.classifier import SklearnClassifier
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import (
     MISSING_LABEL,
     is_unlabeled,
@@ -1356,6 +1357,204 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
             self.assertEqual(utils4.shape, (1, len(unld_idx)))
         except MappingError:
             pass
+
+
+class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
+    TemplateSingleAnnotatorPoolQueryStrategy
+):
+    """Shared target-contract tests for multi-label-only strategies."""
+
+    def _query_multilabel_only_strategy(self, strategy, y, clf, **kwargs):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params.update(y=y, clf=clf, **kwargs)
+        return strategy.query(**query_params)
+
+    def test_query_requires_multilabel_y(self):
+        y = np.array([0.0, 1.0, 0.0, np.nan, np.nan, np.nan, np.nan, np.nan])
+        clf = SklearnClassifier(estimator=GaussianNB())
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        with self.assertRaisesRegex(
+            ValueError,
+            rf"{type(strategy).__name__} does not support target capability",
+        ):
+            self._query_multilabel_only_strategy(strategy, y, clf)
+
+        assert_no_query_state(self, strategy)
+
+    def test_target_contract(self):
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset({("classification", "multi-label", "single-annotator")}),
+        )
+        self.assertNotIn(
+            ("classification", "multi-label", "multi-annotator"),
+            strategy._target_capabilities,
+        )
+
+    def test_query_rejects_fitted_target_spec_conflict_before_state(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = clone(query_params["clf"]).fit(
+            query_params["X"], query_params["y"]
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params["target_type"] = "single-output"
+        strategy = self.qs_class(**init_params)
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            self._query_multilabel_only_strategy(
+                strategy, query_params["y"], clf, fit_clf=False
+            )
+
+        assert_no_query_state(self, strategy)
+
+    def test_query_reuses_fitted_target_spec_without_class_evidence(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        ).fit(query_params["X"], query_params["y"])
+        established_spec = clf.target_spec_
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                *[[np.nan, np.nan] for _ in range(6)],
+            ]
+        )
+
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        query_idx, utilities = self._query_multilabel_only_strategy(
+            strategy,
+            y_query,
+            clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        self.assertEqual(established_spec.classes, ((0.0, 1.0),) * 2)
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertIn(query_idx[0], range(2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+        self.assertFalse(hasattr(strategy, "target_spec_"))
+
+    def test_query_resolves_explicit_multilabel_without_classes(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        )
+
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        query_idx = self._query_multilabel_only_strategy(
+            strategy, query_params["y"], clf
+        )
+
+        unlabeled_idx = unlabeled_indices(
+            query_params["y"],
+            missing_label=self.init_default_params["missing_label"],
+            target_type="multi-label",
+        )
+        self.assertIn(query_idx[0], unlabeled_idx)
+        self.assertEqual(clf.target_type, "multi-label")
+        self.assertFalse(hasattr(clf, "target_spec_"))
+
+    def test_query_supports_custom_binary_vocabularies(self):
+        missing_label = -1
+        y = np.array(
+            [
+                [0, 0],
+                [0, 5],
+                [2, 5],
+                *[[missing_label, missing_label] for _ in range(5)],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 2], [0, 5]],
+            missing_label=missing_label,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params.update(missing_label=missing_label, random_state=0)
+        strategy = self.qs_class(**init_params)
+
+        query_idx, utilities = self._query_multilabel_only_strategy(
+            strategy, y, clf, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], range(3, len(y)))
+        self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+
+    def test_query_rejects_partially_observed_rows_before_state(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = clone(query_params["clf"]).fit(
+            query_params["X"], query_params["y"]
+        )
+        y = query_params["y"].copy()
+        y[1, 0] = np.nan
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        with self.assertRaisesRegex(ValueError, "no mixing"):
+            self._query_multilabel_only_strategy(
+                strategy, y, clf, fit_clf=False
+            )
+
+        assert_no_query_state(self, strategy)
+
+    def test_query_rejects_other_target_capabilities_before_state(self):
+        query_params = self.query_default_params_clf_multilabel
+        multi_output_y = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [2.0, 0.0],
+                *[[np.nan, np.nan] for _ in range(5)],
+            ]
+        )
+        multi_output_clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1, 2], [0, 1]],
+            target_type="multi-output",
+        )
+        multiannotator_clf = AnnotatorEnsembleClassifier(
+            estimators=[
+                ("pwc-0", ParzenWindowClassifier(classes=[0, 1])),
+                ("pwc-1", ParzenWindowClassifier(classes=[0, 1])),
+            ],
+            classes=[0, 1],
+        ).fit(query_params["X"], query_params["y"])
+
+        cases = [
+            (multi_output_y, multi_output_clf, "SklearnClassifier"),
+            (
+                query_params["y"],
+                multiannotator_clf,
+                self.qs_class.__name__,
+            ),
+        ]
+        for y, clf, component in cases:
+            with self.subTest(component=component):
+                strategy = self.qs_class(**deepcopy(self.init_default_params))
+                with self.assertRaisesRegex(
+                    ValueError,
+                    rf"{component} does not support target capability",
+                ):
+                    self._query_multilabel_only_strategy(
+                        strategy, y, clf, fit_clf=False
+                    )
+                assert_no_query_state(self, strategy)
 
 
 class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
