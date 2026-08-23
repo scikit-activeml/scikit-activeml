@@ -20,7 +20,7 @@ from sklearn.model_selection import train_test_split
 
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.utils import MISSING_LABEL, labeled_indices
-from skactiveml.visualization import plot_decision_boundary, plot_utilities
+from skactiveml.visualization import mesh, plot_decision_boundary
 
 "$import_misc"
 
@@ -67,26 +67,20 @@ qs = "$init_qs"
 "$preproc"
 
 # Preparation for plotting.
-fig, axs = plt.subplots(2, 2, figsize=(1.5 * 6.4, 1.5 * 4.8))
-fig.subplots_adjust(
-    top=0.875, hspace=0.3, left=0.075, right=0.975, bottom=0.075
-)
-axes = axs.flatten()
-label_axes = axes[:3]
-utility_ax = axes[3]
+fig, label_axes = plt.subplots(1, 3, figsize=(1.5 * 6.4, 0.85 * 4.8))
+fig.subplots_adjust(top=0.75, wspace=0.3, left=0.075, right=0.975, bottom=0.15)
 feature_bound = [
     [min(X[:, 0]), min(X[:, 1])],
     [max(X[:, 0]), max(X[:, 1])],
 ]
+res = "$res|25"
+X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 artists = []
 
 for label_idx, label_ax in enumerate(label_axes):
     label_ax.set_title(f"Label {label_idx + 1}")
     label_ax.set_xlabel("Feature 1")
     label_ax.set_ylabel("Feature 2")
-utility_ax.set_title("Acquisition utility")
-utility_ax.set_xlabel("Feature 1")
-utility_ax.set_ylabel("Feature 2")
 
 # Active learning cycle.
 n_cycles = "$n_cycles|20"
@@ -98,25 +92,28 @@ for c in range(n_cycles):
     query_idx = qs.query("$query_params")
 
     # Capture the current plot state.
-    collections_before = [list(ax.collections) for ax in axes]
-    title = fig.text(
+    collections_before = [list(ax.collections) for ax in label_axes]
+    title = label_axes[1].text(
         0.5,
-        0.98,
-        f"Decision boundaries and utility after acquiring {c} labels\n"
-        f"Test Accuracy: {clf.score(X_test, y_test):.4f}",
+        1.18,
+        f"Active learning cycle {c + 1}/{n_cycles} "
+        f"after acquiring {c} label vectors\n"
+        f"Test exact-match accuracy: {clf.score(X_test, y_test):.4f}",
         ha="center",
-        va="top",
+        va="bottom",
         fontsize=14,
+        transform=label_axes[1].transAxes,
     )
 
-    # Plot one decision boundary and one binary target view per label output.
-    plot_decision_boundary(
-        clf,
-        feature_bound,
-        ax=label_axes,
-        res="$res|25",
-        confidence=None,
+    # Evaluate the single per-sample acquisition utility once and reuse the
+    # resulting background for every label output.
+    _, utilities = qs.query(
+        "$query_params",
+        candidates=mesh_samples,
+        return_utilities=True,
     )
+    utility_surface = utilities[0].reshape(X_mesh.shape)
+
     X_labeled = X[
         labeled_indices(
             y,
@@ -125,6 +122,13 @@ for c in range(n_cycles):
         )
     ]
     for label_idx, label_ax in enumerate(label_axes):
+        label_ax.contourf(
+            X_mesh,
+            Y_mesh,
+            utility_surface,
+            cmap="Greens",
+            alpha=0.75,
+        )
         label_ax.scatter(
             X[:, 0],
             X[:, 1],
@@ -140,20 +144,21 @@ for c in range(n_cycles):
             alpha=0.8,
             marker=".",
             s=300,
+            zorder=3,
         )
 
-    # Plot the single per-sample acquisition utility shared by all labels.
-    plot_utilities(
-        qs,
-        "$query_params",
-        "$plot_utility_params|candidates=None",
-        res="$res|25",
-        feature_bound=feature_bound,
-        ax=utility_ax,
+    # Plot one black decision boundary per label output.
+    plot_decision_boundary(
+        clf,
+        feature_bound,
+        ax=label_axes,
+        res=res,
+        boundary_dict={"colors": "black"},
+        confidence=0.75,
     )
 
     new_artists = [title]
-    for ax, old_collections in zip(axes, collections_before):
+    for ax, old_collections in zip(label_axes, collections_before):
         new_artists.extend(
             collection
             for collection in ax.collections

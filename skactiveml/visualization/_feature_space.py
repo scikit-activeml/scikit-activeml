@@ -230,7 +230,10 @@ def plot_decision_boundary(
         at positive-class probabilities `1 - confidence` and `confidence`.
     cmap : str or matplotlib.colors.Colormap, default='coolwarm'
         The colormap for the confidence levels and, unless overridden through
-        `boundary_dict`, the multi-label output boundaries.
+        `boundary_dict`, the multi-label output boundaries. On separate
+        multi-label output axes, the lower and upper confidence contours use
+        the colormap's endpoints. On one overlaid axis, each output's
+        confidence contours use that output's colormap position.
     confidence_dict : dict, default=None
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
@@ -298,6 +301,7 @@ def plot_decision_boundary(
             n_outputs=n_outputs,
         )
         output_axes = [axes[0]] * n_outputs if len(axes) == 1 else axes
+        has_one_axis_per_output = len(axes) == n_outputs
         norm = plt.Normalize(vmin=0, vmax=max(n_outputs - 1, 1))
 
         for output_idx, ax_ in enumerate(output_axes):
@@ -313,12 +317,17 @@ def plot_decision_boundary(
                 **output_boundary_args,
             )
             if confidence is not None:
+                confidence_colors = (
+                    [cmap(0.0), cmap(1.0)]
+                    if has_one_axis_per_output
+                    else [cmap(norm(output_idx))]
+                )
                 ax_.contour(
                     X_mesh,
                     Y_mesh,
                     posteriors,
                     [1 - confidence, confidence],
-                    colors=[cmap(norm(output_idx))],
+                    colors=confidence_colors,
                     **confidence_args,
                 )
         return ax

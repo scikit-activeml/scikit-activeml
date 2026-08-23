@@ -10,6 +10,7 @@ from sklearn.datasets import make_classification, make_blobs
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.svm import LinearSVC
+from sklearn.utils._testing import assert_allclose
 
 from skactiveml import visualization
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
@@ -312,6 +313,34 @@ class TestFeatureSpace(unittest.TestCase):
                 ax.collections[2].get_edgecolor(),
             )
         )
+
+    def test_decision_boundary_multilabel_axes_confidence_colors(self):
+        clf = MultilabelTestClassifier(proba_format="array")
+        _, axes = plt.subplots(1, 2)
+
+        plot_decision_boundary(
+            clf,
+            [[0, 0], [1, 1]],
+            ax=axes,
+            res=5,
+            boundary_dict={"colors": "black"},
+            confidence=0.75,
+        )
+
+        confidence_colors = np.array(
+            [
+                plt.colormaps["coolwarm"](0.0),
+                plt.colormaps["coolwarm"](1.0),
+            ]
+        )
+        confidence_colors[:, 3] = 0.9
+        for ax in axes:
+            assert_allclose(
+                ax.collections[0].get_edgecolor(), [[0.0, 0.0, 0.0, 1.0]]
+            )
+            assert_allclose(
+                ax.collections[1].get_edgecolor(), confidence_colors
+            )
 
     def test_decision_boundary_multilabel_axes_count(self):
         clf = MultilabelTestClassifier(proba_format="array")
