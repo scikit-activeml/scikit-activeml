@@ -1,8 +1,11 @@
+import inspect
 import unittest
 
 import numpy as np
 from sklearn.exceptions import DataConversionWarning
 
+import skactiveml.pool
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import (
     CoreSet,
@@ -13,9 +16,7 @@ from skactiveml.pool import (
     RandomSampling,
     TypiClust,
 )
-from skactiveml.pool.tests.test_multilabel_contracts import (
-    MULTILABEL_TASK_AGNOSTIC,
-)
+from skactiveml.pool.tests.test_multilabel_contracts import _instantiate
 from skactiveml.tests.utils import assert_no_query_state
 
 TASK_AGNOSTIC_CAPABILITIES = frozenset(
@@ -25,6 +26,40 @@ TASK_AGNOSTIC_CAPABILITIES = frozenset(
         ("regression", "single-output", "single-annotator"),
     }
 )
+
+
+def _task_agnostic_strategies():
+    """Collect every estimator-free strategy with these exact capabilities.
+
+    The roster below is written out, so this scan is what keeps it complete.
+    Declaring the capabilities is not sufficient on its own, which is why two
+    kinds of strategy are excluded. A wrapper reports the capabilities of the
+    strategy it wraps rather than its own. An estimator-backed strategy
+    receives a semantic authority for `y` and resolves its target with that
+    estimator, whereas these strategies resolve the target type alone; the
+    auxiliary `discriminator` of `DiscriminativeAL` is no such authority and
+    is therefore not among the authority parameter names.
+
+    `_instantiate` is reused rather than reimplemented, because it already
+    owns how an arbitrary pool strategy is built for capability inspection.
+    """
+    strategies = set()
+    for name in dir(skactiveml.pool):
+        obj = getattr(skactiveml.pool, name)
+        if not inspect.isclass(obj) or not issubclass(
+            obj, SingleAnnotatorPoolQueryStrategy
+        ):
+            continue
+        if "query_strategy" in inspect.signature(obj.__init__).parameters:
+            continue
+        strategy = _instantiate(obj)
+        if strategy._target_capabilities != TASK_AGNOSTIC_CAPABILITIES:
+            continue
+        query_params = inspect.signature(obj.query).parameters
+        if any(p in query_params for p in strategy._target_authority_params):
+            continue
+        strategies.add(obj)
+    return strategies
 
 
 def _strategy_cases(target_type="auto"):
@@ -64,17 +99,11 @@ def _strategy_cases(target_type="auto"):
 class TestTaskAgnosticTargetSemantics(unittest.TestCase):
     def test_public_target_type_and_exact_capabilities(self):
         strategy_cases = _strategy_cases()
-        # The roster is written out, so `MULTILABEL_TASK_AGNOSTIC` is what
-        # keeps it complete: the enforced multi-label inventory discovers
-        # every multi-label-capable pool strategy from its declared
-        # capabilities and forces each one into exactly one bucket. A new
-        # task-agnostic strategy therefore cannot reach that bucket without
-        # also needing a behavioral case here.
         self.assertEqual(
             {type(strategy) for strategy, _ in strategy_cases},
-            set(MULTILABEL_TASK_AGNOSTIC),
-            msg="Every task-agnostic strategy of the enforced multi-label "
-            "inventory must have a behavioral case here.",
+            _task_agnostic_strategies(),
+            msg="Every estimator-free strategy declaring exactly the "
+            "task-agnostic capabilities must have a behavioral case here.",
         )
 
         for strategy, _ in strategy_cases:
