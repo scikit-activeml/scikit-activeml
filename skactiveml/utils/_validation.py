@@ -525,6 +525,7 @@ def check_X_y(
     ensure_2d=True,
     allow_nd=False,
     target_type="single-output",
+    multi_output="deprecated",
     allow_nan=None,
     ensure_min_samples=1,
     ensure_min_features=1,
@@ -590,6 +591,13 @@ def check_X_y(
     target_type : "single-output" or "multi-label" or "multi-output", \
             default="single-output"
         Resolved target type controlling target-array validation.
+    multi_output : boolean, default="deprecated"
+        Deprecated. Use `target_type` instead: `multi_output=True` maps to
+        `target_type="multi-label"` and `multi_output=False` to
+        `target_type="single-output"`. Passing it emits a `FutureWarning`, and
+        the legacy value is ignored unless `target_type` is `"single-output"`.
+        Note that `target_type="multi-label"` requires a two-dimensional `y`,
+        whereas `multi_output=True` also accepted a one-dimensional one.
     allow_nan : boolean, default=None
         Whether to allow np.nan in y.
     ensure_min_samples : int, default=1
@@ -637,6 +645,19 @@ def check_X_y(
        Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
        Res., 12:2825–2830, 2011.
     """
+    if multi_output != "deprecated":
+        warnings.warn(
+            "`multi_output` is deprecated and will be removed in a future "
+            "release. Use `target_type='multi-label'` for multi-label "
+            "targets, `target_type='multi-output'` for multi-output targets, "
+            "and `target_type='single-output'` otherwise. `multi_output=True` "
+            "maps to `target_type='multi-label'`, which requires a "
+            "two-dimensional `y`.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        if multi_output and target_type == "single-output":
+            target_type = "multi-label"
     if allow_nan is None:
         allow_nan = (
             True

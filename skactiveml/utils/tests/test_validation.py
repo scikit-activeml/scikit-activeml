@@ -381,6 +381,51 @@ class TestValidation(unittest.TestCase):
             target_type="multi-label",
         )
 
+    def test_check_X_y_deprecated_multi_output(self):
+        X = [[1, 2], [3, 4]]
+        y_2d = [[1, 0], [0, 1]]
+        y_1d = [1, 0]
+
+        # `multi_output=True` warns and validates `y` as multi-label.
+        with self.assertWarnsRegex(
+            FutureWarning, "multi_output.*deprecated.*target_type"
+        ):
+            _, y_out, _ = check_X_y(X, y_2d, multi_output=True)
+        np.testing.assert_array_equal(y_out, np.array(y_2d))
+
+        # `multi_output=False` warns and validates `y` as single-output.
+        with self.assertWarnsRegex(FutureWarning, "multi_output"):
+            _, y_out, _ = check_X_y(X, y_1d, multi_output=False)
+        np.testing.assert_array_equal(y_out, np.array(y_1d))
+
+        # A `target_type` other than the default wins over the legacy keyword,
+        # which the single-output default alone does not.
+        with self.assertWarnsRegex(FutureWarning, "multi_output"):
+            _, y_out, _ = check_X_y(
+                X, y_2d, target_type="multi-output", multi_output=False
+            )
+        np.testing.assert_array_equal(y_out, np.array(y_2d))
+        with self.assertWarnsRegex(FutureWarning, "multi_output"):
+            _, y_out, _ = check_X_y(
+                X, y_2d, target_type="single-output", multi_output=True
+            )
+        np.testing.assert_array_equal(y_out, np.array(y_2d))
+
+        # Unlike `multi_output=True`, `target_type="multi-label"` requires a
+        # two-dimensional `y`, so a legacy one-dimensional call now fails.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            with self.assertRaisesRegex(
+                ValueError, "multi-label.*two-dimensional"
+            ):
+                check_X_y(X, y_1d, multi_output=True)
+
+        # Omitting the keyword emits no deprecation warning.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            check_X_y(X, y_1d)
+            check_X_y(X, y_2d, target_type="multi-label")
+
     def test_check_random_state(self):
         seed = 12
         self.assertRaises(ValueError, check_random_state, "string")
