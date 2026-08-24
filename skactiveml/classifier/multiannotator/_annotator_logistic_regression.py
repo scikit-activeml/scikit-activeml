@@ -17,10 +17,7 @@ from sklearn.utils.validation import (
     column_or_1d,
 )
 
-from ...base import (
-    SkactivemlClassifier,
-    _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES,
-)
+from ...base import SkactivemlClassifier
 from ...utils import (
     MISSING_LABEL,
     compute_vote_vectors,
@@ -137,7 +134,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
 
     @property
     def _target_capabilities(self):
-        return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
 
     def __init__(
         self,

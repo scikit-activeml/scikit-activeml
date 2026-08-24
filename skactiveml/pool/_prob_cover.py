@@ -8,7 +8,7 @@ from sklearn.metrics import pairwise_distances
 from sklearn.cluster import KMeans
 from sklearn.utils.validation import column_or_1d
 
-from ..base import _TaskAgnosticPoolQueryStrategy
+from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     rand_argmax,
@@ -17,7 +17,7 @@ from ..utils import (
 )
 
 
-class ProbCover(_TaskAgnosticPoolQueryStrategy):
+class ProbCover(SingleAnnotatorPoolQueryStrategy):
     """Probability Coverage (ProbCover)
 
     This class implements the Probability Coverage (ProbCover) query strategy
@@ -81,6 +81,16 @@ class ProbCover(_TaskAgnosticPoolQueryStrategy):
     .. [1] O. Yehuda, A. Dekel, G. Hacohen, and D. Weinshall. Active Learning
        Through a Covering Lens. In Adv. Neural Inf. Process. Syst., 2022.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

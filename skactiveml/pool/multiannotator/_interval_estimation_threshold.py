@@ -6,7 +6,6 @@ from sklearn.utils.validation import check_array, check_is_fitted
 from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
-    _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES,
 )
 from ...utils._target import _check_target_spec_capability
 from ...pool._uncertainty_sampling import uncertainty_scores
@@ -101,7 +100,9 @@ class IntervalEstimationAnnotModel(BaseEstimator):
 
     @property
     def _target_capabilities(self):
-        return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
 
     def fit(self, X, y, sample_weight=None):
         """Fit annotator model for given samples.

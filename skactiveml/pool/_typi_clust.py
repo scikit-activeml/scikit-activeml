@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..base import _TaskAgnosticPoolQueryStrategy
+from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, check_scalar, rand_argmax
 
 from copy import deepcopy
@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
 
-class TypiClust(_TaskAgnosticPoolQueryStrategy):
+class TypiClust(SingleAnnotatorPoolQueryStrategy):
     """Typical Clustering (TypiClust)
 
     This class implements the Typical Clustering (TypiClust) query strategy
@@ -49,6 +49,16 @@ class TypiClust(_TaskAgnosticPoolQueryStrategy):
        Opposite Strategies Suit High and Low Budgets. In Int. Conf. Mach.
        Learn., pages 8175–8195, 2022.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

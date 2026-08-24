@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..base import _TaskAgnosticPoolQueryStrategy
+from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     labeled_indices,
@@ -16,7 +16,7 @@ from sklearn.utils.validation import (
 from sklearn.metrics import pairwise_distances_argmin_min
 
 
-class CoreSet(_TaskAgnosticPoolQueryStrategy):
+class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """Core Set
 
     This class implements the core-set based query strategy, i.e., the
@@ -51,6 +51,16 @@ class CoreSet(_TaskAgnosticPoolQueryStrategy):
     .. [1] O. Sener and S. Savarese. Active Learning for Convolutional Neural
        Networks: A Core-Set Approach. In Int. Conf. Learn. Represent., 2018.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.metrics import pairwise_kernels
 from sklearn.preprocessing import normalize
 
-from ..base import _TaskAgnosticPoolQueryStrategy
+from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     rand_argmax,
@@ -12,7 +12,7 @@ from ..utils import (
 )
 
 
-class MaxHerding(_TaskAgnosticPoolQueryStrategy):
+class MaxHerding(SingleAnnotatorPoolQueryStrategy):
     """MaxHerding
 
     This class implements the MaxHerding query strategy [1]_, which greedily
@@ -50,6 +50,16 @@ class MaxHerding(_TaskAgnosticPoolQueryStrategy):
        Coverage for More Robust Low-Budget Active Learning."
        In Eur. Conf. Comput. Vis. 2024.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

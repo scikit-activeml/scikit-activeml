@@ -1,10 +1,10 @@
 import numpy as np
 
-from ..base import _TaskAgnosticPoolQueryStrategy
+from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, simple_batch
 
 
-class RandomSampling(_TaskAgnosticPoolQueryStrategy):
+class RandomSampling(SingleAnnotatorPoolQueryStrategy):
     """Random Sampling (RS)
 
     This class implements random sampling as a lower baseline for other query
@@ -22,6 +22,16 @@ class RandomSampling(_TaskAgnosticPoolQueryStrategy):
         unambiguous one-dimensional targets; two-dimensional multi-label
         targets must be declared explicitly.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

@@ -7,7 +7,7 @@ Module implementing discriminative active learning.
 import numpy as np
 from sklearn import clone
 
-from ..base import _TaskAgnosticPoolQueryStrategy, SkactivemlClassifier
+from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     rand_argmax,
@@ -17,7 +17,7 @@ from ..utils import (
 )
 
 
-class DiscriminativeAL(_TaskAgnosticPoolQueryStrategy):
+class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
     """Discriminative Active Learning (DAL)
 
     This class implements the "Discriminative Active Learning" (DAL) [1]_
@@ -53,6 +53,16 @@ class DiscriminativeAL(_TaskAgnosticPoolQueryStrategy):
     .. [1] D. Gissin and S. Shalev-Shwartz. Discriminative Active Learning.
        arXiv:1907.06347, 2019.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

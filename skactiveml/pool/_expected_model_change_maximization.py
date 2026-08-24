@@ -7,7 +7,6 @@ from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
-    _SINGLE_OUTPUT_REGRESSION_CAPABILITIES,
 )
 from skactiveml.utils import (
     check_type,
@@ -63,7 +62,7 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
 
     @property
     def _target_capabilities(self):
-        return _SINGLE_OUTPUT_REGRESSION_CAPABILITIES
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def __init__(
         self,

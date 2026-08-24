@@ -73,19 +73,6 @@ except ImportError:  # pragma: no cover
     pass
 
 
-_MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES = frozenset(
-    {("classification", "single-output", "multi-annotator")}
-)
-_SINGLE_OUTPUT_REGRESSION_CAPABILITIES = frozenset(
-    {("regression", "single-output", "single-annotator")}
-)
-_TASK_AGNOSTIC_TARGET_CAPABILITIES = frozenset(
-    {
-        ("classification", "single-output", "single-annotator"),
-        ("classification", "multi-label", "single-annotator"),
-        ("regression", "single-output", "single-annotator"),
-    }
-)
 _TARGET_SPEC_NOT_PROVIDED = object()
 
 # Canonical names of `query` parameters carrying an estimator whose target
@@ -641,14 +628,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 return candidates, None
 
 
-class _TaskAgnosticPoolQueryStrategy(SingleAnnotatorPoolQueryStrategy):
-    """Shared target contract for estimator-free, task-agnostic strategies."""
-
-    @property
-    def _target_capabilities(self):
-        return _TASK_AGNOSTIC_TARGET_CAPABILITIES
-
-
 class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with
     multiple annotators in scikit-activeml.
@@ -681,7 +660,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     @property
     def _target_capabilities(self):
         """Exact target semantics supported by multi-annotator strategies."""
-        return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
 
     def _resolve_target_spec(self, y, classes=None):
         try:

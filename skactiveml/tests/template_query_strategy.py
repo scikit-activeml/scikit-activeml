@@ -15,7 +15,6 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 
-from skactiveml.base import _TaskAgnosticPoolQueryStrategy
 from skactiveml.exceptions import MappingError
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
@@ -130,6 +129,20 @@ def _with_component_params(params, *, missing_label, classes=None):
         else:
             params[key] = _component_with_params(value, missing_label, classes)
     return params
+
+
+def _declares_nested_classes(*param_dicts):
+    """Check whether a fixture supplies one class vocabulary per output.
+
+    A strategy resolving no class vocabulary receives none through its
+    fixture either, because `_component_with_params` applies vocabularies
+    only where a component declares one itself.
+    """
+    return any(
+        _has_nested_classes(getattr(value, "classes", None))
+        for params in param_dicts
+        for value in params.values()
+    )
 
 
 def _component_with_params(value, missing_label, classes):
@@ -943,21 +956,22 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         # vocabulary has to reject them through the shared resolution, and
         # must not commit query state while doing so.
         #
-        # A task-agnostic strategy is exempt by construction rather than by
-        # fixture: it takes no estimator, so it resolves the target type alone
-        # and never receives a class vocabulary to reject. Deriving the
-        # exemption from the class keeps it from widening silently when a
-        # fixture changes where it declares its vocabularies.
+        # A strategy resolving no class vocabulary is exempt: it takes no
+        # estimator declaring one, so it resolves the target type alone and
+        # never receives a vocabulary to reject. The exemption is read off the
+        # generated fixture, which is where a declared vocabulary has to
+        # appear for this contract to apply at all.
         if self.query_default_params_clf_multilabel is None:
             return
         if self._multilabel_n_outputs() < 2:
-            return
-        if issubclass(self.qs_class, _TaskAgnosticPoolQueryStrategy):
             return
 
         init_params, query_params = self._multilabel_custom_vocabulary_params(
             self._multilabel_heterogeneous_vocabularies()
         )
+        if not _declares_nested_classes(init_params, query_params):
+            return
+
         qs = self.qs_class(**init_params)
 
         with self.assertRaisesRegex(

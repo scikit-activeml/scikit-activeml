@@ -2,7 +2,6 @@ import numpy as np
 from sklearn.metrics import pairwise_distances, pairwise
 
 from skactiveml.base import (
-    _TaskAgnosticPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlRegressor,
 )
@@ -17,7 +16,7 @@ from skactiveml.utils import (
 from ._target import _fit_and_resolve_estimator_target_spec
 
 
-class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
+class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling in the Feature Space (GSx)
 
     This class implements the query strategy Greedy Sampling in the Feature
@@ -52,6 +51,16 @@ class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
     .. [1] D. Wu, C.-T. Lin, and J. Huang. Active Learning for Regression using
        Greedy Sampling. Inf. Sci., 474:90–105, 2019.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,

@@ -4,7 +4,6 @@ from sklearn import clone
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
-    _SINGLE_OUTPUT_REGRESSION_CAPABILITIES,
 )
 
 from skactiveml.pool.utils import (
@@ -57,7 +56,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     @property
     def _target_capabilities(self):
-        return _SINGLE_OUTPUT_REGRESSION_CAPABILITIES
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def __init__(
         self,

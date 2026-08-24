@@ -3,7 +3,6 @@ import unittest
 import numpy as np
 from sklearn.exceptions import DataConversionWarning
 
-from skactiveml.base import _TaskAgnosticPoolQueryStrategy
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import (
     CoreSet,
@@ -13,6 +12,9 @@ from skactiveml.pool import (
     ProbCover,
     RandomSampling,
     TypiClust,
+)
+from skactiveml.pool.tests.test_multilabel_contracts import (
+    MULTILABEL_TASK_AGNOSTIC,
 )
 from skactiveml.tests.utils import assert_no_query_state
 
@@ -62,10 +64,17 @@ def _strategy_cases(target_type="auto"):
 class TestTaskAgnosticTargetSemantics(unittest.TestCase):
     def test_public_target_type_and_exact_capabilities(self):
         strategy_cases = _strategy_cases()
+        # The roster is written out, so `MULTILABEL_TASK_AGNOSTIC` is what
+        # keeps it complete: the enforced multi-label inventory discovers
+        # every multi-label-capable pool strategy from its declared
+        # capabilities and forces each one into exactly one bucket. A new
+        # task-agnostic strategy therefore cannot reach that bucket without
+        # also needing a behavioral case here.
         self.assertEqual(
             {type(strategy) for strategy, _ in strategy_cases},
-            set(_TaskAgnosticPoolQueryStrategy.__subclasses__()),
-            msg="Every task-agnostic strategy must have a behavioral case.",
+            set(MULTILABEL_TASK_AGNOSTIC),
+            msg="Every task-agnostic strategy of the enforced multi-label "
+            "inventory must have a behavioral case here.",
         )
 
         for strategy, _ in strategy_cases:

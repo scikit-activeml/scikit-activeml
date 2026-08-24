@@ -6,7 +6,6 @@ from sklearn.metrics import mean_squared_error
 from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
-    _SINGLE_OUTPUT_REGRESSION_CAPABILITIES,
 )
 from skactiveml.pool.utils import _update_reg, conditional_expect
 from skactiveml.utils import (
@@ -56,7 +55,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     @property
     def _target_capabilities(self):
-        return _SINGLE_OUTPUT_REGRESSION_CAPABILITIES
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def __init__(
         self,

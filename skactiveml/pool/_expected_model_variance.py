@@ -5,7 +5,6 @@ from sklearn.utils.validation import check_array, _check_n_features
 from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
-    _SINGLE_OUTPUT_REGRESSION_CAPABILITIES,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.utils import _update_reg, conditional_expect
@@ -41,7 +40,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
     @property
     def _target_capabilities(self):
-        return _SINGLE_OUTPUT_REGRESSION_CAPABILITIES
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def __init__(
         self,
