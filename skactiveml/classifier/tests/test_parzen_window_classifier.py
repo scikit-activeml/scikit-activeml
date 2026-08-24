@@ -176,6 +176,17 @@ class TestParzenWindowClassifier(
             pwc.predict_proba([[0], [1]]), np.full((2, 2), 0.5)
         )
 
+        empty = ParzenWindowClassifier(
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(X=np.zeros((0, 1)), y=np.zeros((0, 2), dtype=object))
+
+        self.assertIsNone(empty.n_features_in_)
+        np.testing.assert_array_equal(
+            empty.predict_freq([[0], [1]]), np.zeros((2, 2, 2))
+        )
+
     def test_predict_freq(self):
         pwc = ParzenWindowClassifier(
             classes=["tokyo", "paris", "new york"],

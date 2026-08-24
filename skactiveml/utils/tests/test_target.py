@@ -296,6 +296,14 @@ class TestResolveTargetSpec(unittest.TestCase):
         )
         self.assertEqual(inferred_single_output.target_type, "single-output")
 
+        inferred_multi_output = resolve_target_spec(
+            [[0, 1], [1, 2]],
+            task="classification",
+            target_type="multi-output",
+        )
+        self.assertEqual(inferred_multi_output.target_type, "multi-output")
+        self.assertEqual(inferred_multi_output.classes, ((0, 1), (1, 2)))
+
     def test_public_resolution_validates_shapes_and_metadata(self):
         with self.assertRaisesRegex(ValueError, "Nested class vocabularies"):
             resolve_target_spec(

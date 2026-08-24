@@ -249,12 +249,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         else:
             cand_mapping = np.arange(len(X_cand))
         n_cand = len(X_cand)
-        if n_cand == 0:
-            raise ValueError(
-                "There are no candidate samples to select from. For "
-                "'candidates=None', this means that there is no unlabeled "
-                "sample left in `(X, y)`."
-            )
 
         # gradient embedding, aka predict class membership probabilities
         V = X_cand

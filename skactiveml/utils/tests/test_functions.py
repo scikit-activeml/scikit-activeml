@@ -1,7 +1,11 @@
+import pickle
 import unittest
 
 import inspect
 
+import numpy as np
+
+from skactiveml.exceptions import _ExhaustedCandidatePool
 from skactiveml.utils import call_func, match_signature
 from skactiveml.utils._functions import _guard_exhausted_candidate_pool
 
@@ -26,6 +30,15 @@ class TestFunctions(unittest.TestCase):
         self.assertIs(
             _guard_exhausted_candidate_pool(guarded_query), guarded_query
         )
+
+    def test_exhausted_candidate_pool_reduces_to_its_result(self):
+        signal = _ExhaustedCandidatePool((np.zeros(0), np.zeros((0, 0))))
+
+        restored = pickle.loads(pickle.dumps(signal))
+
+        self.assertEqual(len(restored.result), 2)
+        np.testing.assert_array_equal(restored.result[0], signal.result[0])
+        np.testing.assert_array_equal(restored.result[1], signal.result[1])
 
     def test_call_func(self):
         def dummy_function(a, b=2, c=3):

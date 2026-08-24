@@ -520,11 +520,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             )
         elif target_type == "single-output":
             y = column_or_1d(y, warn=True)
-        else:
-            raise ValueError(
-                "`target_type` must be either 'single-output' or "
-                "'multi-label'."
-            )
 
         if candidates is None:
             is_ulbld = is_unlabeled(

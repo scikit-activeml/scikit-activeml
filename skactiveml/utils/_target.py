@@ -227,9 +227,6 @@ def _check_class_vocabulary_structure(target_type, classes):
     structural contract. Homogeneity *within* one vocabulary is `check_classes`
     business and is already established by both callers.
     """
-    if classes is None:
-        return False
-
     has_nested_classes = _has_nested_classes(classes)
     if target_type == "single-output" and has_nested_classes:
         raise ValueError(

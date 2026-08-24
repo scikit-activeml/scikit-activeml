@@ -22,6 +22,7 @@ from skactiveml.pool import (
     TypiClust,
     UncertaintySampling,
     RandomSampling,
+    SubSamplingWrapper,
     ValueOfInformationEER,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
@@ -35,7 +36,10 @@ from skactiveml.visualization import (
     plot_stream_training_data,
     plot_stream_decision_boundary,
 )
-from skactiveml.visualization._feature_space import _general_plot_utilities
+from skactiveml.visualization._feature_space import (
+    _general_plot_utilities,
+    _resolve_utility_target_type,
+)
 
 # PDF rasterization differs slightly across supported Matplotlib versions.
 IMAGE_COMPARE_TOL = 6.0
@@ -155,6 +159,19 @@ class TestFeatureSpace(unittest.TestCase):
             clf=clf,
             feature_bound=self.bound,
         )
+        clf.target_spec_ = TargetSpec(
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=((0, 1), (0, 1)),
+        )
+        with self.assertRaisesRegex(AttributeError, "multi-label"):
+            plot_decision_boundary(
+                clf=clf,
+                feature_bound=self.bound,
+                ax=plt.subplots(1, 2)[1],
+                confidence=None,
+            )
 
     def test_decision_boundary_param_bound(self):
         self.assertRaises(
@@ -597,6 +614,21 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIs(returned_ax, ax)
         self.assertGreater(len(ax.collections), 0)
 
+        wrapper = SubSamplingWrapper(qs, max_candidates=10, random_state=0)
+        _, wrapper_ax = plt.subplots()
+
+        returned_wrapper_ax = plot_utilities(
+            wrapper,
+            X,
+            y,
+            feature_bound=feature_bound,
+            ax=wrapper_ax,
+            res=7,
+        )
+
+        self.assertIs(returned_wrapper_ax, wrapper_ax)
+        self.assertGreater(len(wrapper_ax.collections), 0)
+
     def test_plot_utilities_regression_column_mapping_fallback(self):
         X, _ = make_blobs(
             n_samples=30,
@@ -627,6 +659,14 @@ class TestFeatureSpace(unittest.TestCase):
 
         self.assertIs(returned_ax, ax)
         self.assertGreater(len(ax.collections), 0)
+
+    def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
+        qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
+
+        self.assertEqual(
+            _resolve_utility_target_type(qs, self.y_active_multi, {}),
+            "single-output",
+        )
 
     def test_plot_utilities_rejects_annotator_options_for_multilabel(self):
         y = np.column_stack([self.y_active, self.y_active])
