@@ -170,6 +170,24 @@ private module name from the class name in snake case and use the same stem for
 its test module. A conceptual or acronym-based filename is appropriate when a
 module intentionally groups a strategy family.
 
+Where Helpers Live
+~~~~~~~~~~~~~~~~~~
+
+Keep helper functions close to the code that uses them. A helper used in one
+file should stay in that file. If several files in one subpackage use it, put
+it in a private file in that subpackage. If several subpackages use a general
+helper and it does not import from ``skactiveml.base``, put it in a clearly
+named private file under ``skactiveml/utils``.
+
+Do not import helper functions or constants from ``skactiveml.base``; that
+file is for base classes. If a helper must import a base class, keep it in the
+subpackage that uses it. ``skactiveml/pool/_target.py`` is an example. Put
+exception classes in ``skactiveml/exceptions.py``.
+
+Add a query-strategy base class only when it contains behavior shared by its
+subclasses. Do not add one only to share a constant or to help tests find
+strategies.
+
 Example for Code Contribution Cycle (C3) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
