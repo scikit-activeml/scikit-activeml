@@ -3,7 +3,10 @@ import unittest
 import numpy as np
 from sklearn.exceptions import DataConversionWarning
 
-from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.pool import UncertaintySampling
 from skactiveml.regressor import NICKernelRegressor
 
@@ -58,6 +61,24 @@ class TestColumnVectorTargetContract(unittest.TestCase):
                     )
 
                 self.assertEqual(query_indices.shape, (1,))
+
+    def test_sliding_window_classifier_warns_for_single_output_column(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([[0], [1], [-1], [-1]])
+        classifier = SlidingWindowClassifier(
+            estimator=ParzenWindowClassifier(
+                classes=[0, 1], missing_label=-1, random_state=0
+            ),
+            classes=[0, 1],
+            missing_label=-1,
+            random_state=0,
+            target_type="single-output",
+        )
+
+        with self.assertWarns(DataConversionWarning):
+            classifier.fit(X, y)
+
+        self.assertEqual(classifier.target_spec_.target_type, "single-output")
 
     def test_regressor_accepts_single_output_column_vector(self):
         X = np.arange(8, dtype=float).reshape(4, 2)

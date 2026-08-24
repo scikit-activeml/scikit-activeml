@@ -1988,7 +1988,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
-        y = column_or_1d(y)
+        y = column_or_1d(y, warn=True)
         if len(y) == 0:
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
