@@ -23,14 +23,14 @@ from sklearn.utils.validation import (
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
-from ..base import (
-    SkactivemlClassifier,
-    _resolve_own_fitted_attribute,
-    _restore_wrapper_attributes,
-)
+from ..base import SkactivemlClassifier
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
+)
+from ..utils._wrapper_state import (
+    _resolve_own_fitted_attribute,
+    _restore_wrapper_attributes,
 )
 from ..utils import (
     rand_argmin,

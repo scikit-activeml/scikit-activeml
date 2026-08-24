@@ -7,7 +7,6 @@ from sklearn.utils.validation import check_array, _is_arraylike
 from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
-    _has_no_class_evidence,
 )
 from .._target import (
     _collect_declared_authorities,
@@ -23,7 +22,10 @@ from ...utils import (
     check_equal_missing_label,
     resolve_target_spec,
 )
-from ...utils._target import _check_target_spec_capability
+from ...utils._target import (
+    _check_target_spec_capability,
+    _has_no_class_evidence,
+)
 
 
 class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):

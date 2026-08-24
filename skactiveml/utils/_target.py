@@ -491,6 +491,16 @@ def _resolve_task_agnostic_target_type(
     return target_type
 
 
+def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
+    y_array = np.asarray(y)
+    expected_ndim = 2 if annotation_type == "multi-annotator" else 1
+    return (
+        target_type in {"auto", "single-output"}
+        and y_array.ndim == expected_ndim
+        and is_unlabeled(y_array, missing_label=missing_label).all()
+    )
+
+
 def _check_target_array(y):
     y = check_array(
         y,

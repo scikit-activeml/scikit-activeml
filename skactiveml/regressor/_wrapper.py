@@ -16,8 +16,6 @@ from sklearn.utils.validation import (
 from ..base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
-    _resolve_own_fitted_attribute,
-    _restore_wrapper_attributes,
 )
 from ..utils import (
     is_labeled,
@@ -30,6 +28,10 @@ from ..utils import (
     resolve_target_spec,
 )
 from ..utils._target import _check_target_spec_capability
+from ..utils._wrapper_state import (
+    _resolve_own_fitted_attribute,
+    _restore_wrapper_attributes,
+)
 
 successful_skorch_torch_import = False
 try:

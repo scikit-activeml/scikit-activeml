@@ -14,7 +14,6 @@ from sklearn.utils.validation import check_array, check_consistent_length
 from ..base import (
     SkactivemlClassifier,
     ProbabilisticRegressor,
-    _resolve_own_fitted_attribute,
 )
 from ..classifier import ParzenWindowClassifier
 from ..utils import (
@@ -28,6 +27,7 @@ from ..utils import (
     check_random_state,
     check_scalar,
 )
+from ..utils._wrapper_state import _resolve_own_fitted_attribute
 
 __all__ = ["IndexClassifierWrapper"]
 
