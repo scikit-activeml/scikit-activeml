@@ -512,12 +512,12 @@ def _validate_single_output_shape(y, task, annotation_type):
             )
         return
 
-    if task == "classification" and y.ndim != 1:
-        raise ValueError(
-            "Single-output, single-annotator classification targets must be "
-            "one-dimensional."
-        )
-    if task == "regression" and y.ndim == 2 and y.shape[1] != 1:
+    if y.ndim == 2 and y.shape[1] != 1:
+        if task == "classification":
+            raise ValueError(
+                "Single-output, single-annotator classification targets "
+                "must be one-dimensional or a column vector."
+            )
         raise ValueError(
             "Single-output regression targets must be one-dimensional or a "
             "column vector."

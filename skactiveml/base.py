@@ -1732,7 +1732,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             or target_spec.annotation_type == "multi-annotator"
         )
         if len(y) > 0:
-            y = y if structured_target else column_or_1d(y)
+            y = y if structured_target else column_or_1d(y, warn=True)
             y = self._le.fit_transform(y)
             if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")

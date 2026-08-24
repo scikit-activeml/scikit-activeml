@@ -317,6 +317,23 @@ nested set of binary vocabularies means multi-label classification.  A nested
 vocabulary containing a non-binary output resolves to future multi-output
 classification, which current components reject as unsupported.
 
+Single-output column vectors
+============================
+
+A target of shape ``(n_samples, 1)`` is accepted once its target semantics
+resolve to single-output.  For classification, an explicit
+``target_type="single-output"`` or a flat class vocabulary provides the
+necessary evidence; classifiers and pool query strategies then convert the
+column to the canonical one-dimensional representation and emit a
+``DataConversionWarning``.  A bare classification column under
+``target_type="auto"`` and ``classes=None`` remains an ambiguous
+two-dimensional target.
+
+For regression, both ``target_type="auto"`` and an explicit
+``target_type="single-output"`` accept a column vector, preserving the
+existing regression contract.  A target with more than one column is not a
+single-output target for either task.
+
 Target-aware masks and indices
 ==============================
 
