@@ -13,10 +13,11 @@ class TestColumnVectorTargetContract(unittest.TestCase):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.array([[0], [1], [-1], [-1]])
 
-        for target_type in ["auto", "single-output"]:
-            with self.subTest(target_type=target_type):
+        target_cases = [("auto", [0, 1]), ("single-output", None)]
+        for target_type, classes in target_cases:
+            with self.subTest(target_type=target_type, classes=classes):
                 classifier = ParzenWindowClassifier(
-                    classes=[0, 1],
+                    classes=classes,
                     missing_label=-1,
                     random_state=0,
                     target_type=target_type,
@@ -43,7 +44,7 @@ class TestColumnVectorTargetContract(unittest.TestCase):
                     classes=[0, 1],
                     missing_label=-1,
                     random_state=0,
-                    target_type=target_type,
+                    target_type="auto",
                 )
                 strategy = UncertaintySampling(
                     missing_label=-1,
