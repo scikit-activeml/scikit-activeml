@@ -120,16 +120,33 @@ class TestExamples(unittest.TestCase):
             if any("multi-label" in example["tags"] for example in examples)
         }
         self.assertEqual(expected_strategies, tagged_strategies)
+        # A strategy declares its capabilities per class, but an example
+        # describes one configuration of it. Where a configuration is not
+        # multi-label capable even though its class is (e.g.
+        # `UncertaintySampling(method="expected_average_precision")`), the
+        # example opts out via `"multi_label_capable": false`.
         for strategy in expected_strategies:
-            with self.subTest(strategy=strategy):
-                self.assertTrue(
-                    all(
-                        "multi-label" in example["tags"]
-                        for example in examples_by_strategy[strategy]
-                    ),
-                    msg=f'Not every "{strategy}" example is tagged '
-                    '"multi-label".',
-                )
+            for example in examples_by_strategy[strategy]:
+                method = example["method"]
+                with self.subTest(strategy=strategy, example=method):
+                    if example.get("multi_label_capable", True):
+                        self.assertIn(
+                            "multi-label",
+                            example["tags"],
+                            msg=f'The "{method}" example is not '
+                            'tagged "multi-label". Tag it, or set '
+                            '"multi_label_capable" to false if this '
+                            "configuration cannot handle multi-label "
+                            "targets.",
+                        )
+                    else:
+                        self.assertNotIn(
+                            "multi-label",
+                            example["tags"],
+                            msg=f'The "{method}" example is tagged '
+                            '"multi-label" but declares '
+                            '"multi_label_capable" as false.',
+                        )
 
     def test_strategy_overview_has_multilabel_filter(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

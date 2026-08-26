@@ -51,7 +51,8 @@
     "method" : "Uncertainty Sampling with Expected Average Precision (USAP)",
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "single-annotator", "multi-label", "top-k-batch"],
+    "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "multi_label_capable" : false,
     "title": "Uncertainty Sampling with Expected Average Precision (USAP)",
     "refs": [
       "wang2018uncertainty"
