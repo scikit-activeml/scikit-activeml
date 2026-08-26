@@ -13,7 +13,10 @@ from sklearn.svm import LinearSVC
 from sklearn.utils._testing import assert_allclose
 
 from skactiveml import visualization
-from skactiveml.base import SingleAnnotatorPoolQueryStrategy
+from skactiveml.base import (
+    MultiAnnotatorPoolQueryStrategy,
+    SingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.exceptions import MappingError
 from skactiveml.pool import (
@@ -660,6 +663,68 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIs(returned_ax, ax)
         self.assertGreater(len(ax.collections), 0)
 
+    @staticmethod
+    def multi_annotator_fallback_pool():
+        X, _ = make_blobs(
+            n_samples=30,
+            centers=4,
+            n_features=2,
+            random_state=0,
+        )
+        y = np.full(len(X), np.nan)
+        y[:10] = 0.0
+        y[10:15] = 1.0
+        y_multi = np.column_stack([y, y])
+        # Annotator 1 still owes a label for sample 0, which annotator 0 has
+        # already provided.
+        y_multi[0, 1] = np.nan
+        feature_bound = [X.min(axis=0), X.max(axis=0)]
+        return X, y_multi, feature_bound
+
+    def test_plot_annotator_utilities_mapping_fallback(self):
+        X, y_multi, feature_bound = self.multi_annotator_fallback_pool()
+        qs = SingleAnnotatorWrapper(
+            TypiClust(cluster_algo_dict={"n_init": 1}, random_state=0),
+            random_state=0,
+        )
+        _, axes = plt.subplots(1, 2)
+
+        returned_axes = plot_annotator_utilities(
+            qs=qs,
+            X=X,
+            y=y_multi,
+            feature_bound=feature_bound,
+            axes=axes,
+            res=5,
+        )
+
+        self.assertIs(returned_axes, axes)
+        for ax in returned_axes:
+            self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_annotator_utilities_fallback_candidates_are_samples(self):
+        X, y_multi, feature_bound = self.multi_annotator_fallback_pool()
+        qs = MappingOnlyMultiAnnotatorStrategy(random_state=0)
+        _, axes = plt.subplots(1, 2)
+
+        returned_axes = plot_annotator_utilities(
+            qs=qs,
+            X=X,
+            y=y_multi,
+            feature_bound=feature_bound,
+            axes=axes,
+            res=5,
+        )
+
+        # A sample is a candidate as soon as one annotator still owes a label
+        # for it, which includes sample 0.
+        np.testing.assert_array_equal(
+            qs.candidates_, np.concatenate([[0], np.arange(15, len(X))])
+        )
+        self.assertIs(returned_axes, axes)
+        for ax in returned_axes:
+            self.assertGreater(len(ax.collections), 0)
+
     def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
         qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
 
@@ -1296,6 +1361,32 @@ class AmbiguousListClassifier(ClassifierMixin):
             np.column_stack([1 - positive_probas[:, j], positive_probas[:, j]])
             for j in range(positive_probas.shape[1])
         ]
+
+
+class MappingOnlyMultiAnnotatorStrategy(MultiAnnotatorPoolQueryStrategy):
+    """Rejects candidate matrices and records the candidates it receives."""
+
+    def query(
+        self,
+        X,
+        y,
+        candidates=None,
+        annotators=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
+        candidates = np.asarray(candidates)
+        if candidates.ndim == 2:
+            raise MappingError("This strategy requires candidate indices.")
+        self.candidates_ = candidates
+        utilities = np.full((batch_size, len(X), y.shape[1]), np.nan)
+        utilities[:, candidates] = 1.0
+        query_indices = np.column_stack(
+            [candidates[:batch_size], np.zeros(batch_size, dtype=int)]
+        )
+        if return_utilities:
+            return query_indices, utilities
+        return query_indices
 
 
 class MappingOnlyRegressionStrategy(SingleAnnotatorPoolQueryStrategy):

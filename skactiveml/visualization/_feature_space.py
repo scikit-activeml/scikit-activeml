@@ -140,7 +140,9 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
         - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`.
+          `(X,y)` are considered as `candidates`. For a two-dimensional
+          `y`, a sample is unlabeled as soon as at least one annotator
+          has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -639,7 +641,9 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
         - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`.
+          `(X,y)` are considered as `candidates`. For a multi-annotator
+          strategy with a two-dimensional `y`, a sample is unlabeled as
+          soon as at least one annotator has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -808,6 +812,12 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
             missing_label=qs.missing_label,
             target_type=target_type,
         )
+        if is_multi_annotator and candidates.ndim == 2:
+            # A multi-annotator `y` yields one `(sample, annotator)` pair per
+            # missing annotation, whereas the fallback needs candidate
+            # samples. A sample is a candidate as soon as at least one
+            # annotator still owes a label for it.
+            candidates = np.unique(candidates[:, 0])
 
     candidates = check_array(
         candidates,
