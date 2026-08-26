@@ -7,6 +7,9 @@ uncertainties as sample weights.
 
 import numpy as np
 
+from copy import deepcopy
+from inspect import signature
+
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
@@ -326,6 +329,14 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
 
         # Perform clustering to get centroids.
         cluster_algo_dict[self.n_cluster_param_name] = batch_size
+
+        # Optionally, set random state.
+        cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
+        algo_has_seed = "random_state" in cluster_algo_sig
+        dict_lacks_seed = "random_state" not in cluster_algo_dict
+        if self.random_state is not None and algo_has_seed and dict_lacks_seed:
+            cluster_algo_dict["random_state"] = deepcopy(self.random_state)
+
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
         dist = cluster_obj.fit_transform(
             X_cand, y=None, sample_weight=uncertainties
