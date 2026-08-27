@@ -47,6 +47,7 @@ from ..utils import (
     _has_nested_classes,
     resolve_target_spec,
 )
+from ..utils._validation import _check_probas_are_valid
 
 # used to defer import of capymoa as it may result in an error with pytest
 import importlib
@@ -2256,6 +2257,18 @@ if successful_skorch_torch_import:
         target_type : "auto" or "single-output" or "multi-label", \
                 default="auto"
             Declared target type. Multi-label classification is supported.
+        validate_proba : bool, default=True
+            Flag whether `predict_proba` checks that its first forward output
+            describes class probabilities. Since `forward_outputs` decides how
+            the module's outputs are read, a mapping without a suitable
+            transform lets raw scores pass as probabilities, which consumers
+            then misread. Values of a single-output target must sum to one,
+            values of a multi-label target must lie within `[0, 1]`.
+
+            - If `True`, invalid probabilities raise a `ValueError`.
+            - If `False`, the first forward output is passed on unchecked,
+              e.g., to interpret scores that are not probabilities. The
+              caller is then responsible for the consumers of these values.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
               of the estimator.
@@ -2307,6 +2320,7 @@ if successful_skorch_torch_import:
             random_state=None,
             target_dtype=None,
             target_type="auto",
+            validate_proba=True,
         ):
             super(SkorchClassifier, self).__init__(
                 classes=classes,
@@ -2323,6 +2337,7 @@ if successful_skorch_torch_import:
             self.target_dtype = target_dtype
             self.target_type = target_type
             self.include_unlabeled_samples = include_unlabeled_samples
+            self.validate_proba = validate_proba
 
         @property
         def _target_capabilities(self):
@@ -2514,6 +2529,19 @@ if successful_skorch_torch_import:
 
             # First element is expected to be the class probabilities.
             P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
+            check_scalar(self.validate_proba, "validate_proba", bool)
+            if self.validate_proba:
+                _check_probas_are_valid(
+                    P,
+                    is_multilabel=self._uses_multilabel_target(),
+                    hint=(
+                        "The first output of `forward_outputs` is read as "
+                        "class probabilities, so set a transform producing "
+                        "them, e.g. `torch.nn.Softmax(dim=-1)` for logits. "
+                        "Set `validate_proba=False` to pass the values on "
+                        "unchecked instead."
+                    ),
+                )
             self._initialize_fallbacks(P)
             return fw_out
 

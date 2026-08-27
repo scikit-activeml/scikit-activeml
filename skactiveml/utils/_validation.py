@@ -217,6 +217,44 @@ def _check_1d_class_list(c, name="classes"):
         )
 
 
+def _check_probas_are_valid(probas, is_multilabel, hint=""):
+    """Check that `probas` describe class probabilities.
+
+    A single-output probability describes a distribution over the classes of
+    one sample, so its values sum to one. A multi-label probability describes
+    one positive-class probability per label output, so its values are bounded
+    but do not sum to one.
+
+    Parameters
+    ----------
+    probas : array-like of shape (n_samples, n_classes) or \
+            (n_samples, n_outputs)
+        The class probabilities to be checked.
+    is_multilabel : bool
+        Flag whether `probas` describes a multi-label target.
+    hint : str, default=""
+        Text appended to the error message. Callers producing the values
+        themselves use it to name what has to be changed, because the
+        caller of `predict_proba` cannot act on the values alone.
+
+    Raises
+    ------
+    ValueError
+        If `probas` does not describe class probabilities.
+    """
+    probas = np.asarray(probas)
+    suffix = f" {hint}" if hint else ""
+    if is_multilabel:
+        if not np.all(probas <= 1) or not np.all(0 <= probas):
+            raise ValueError(
+                f"'probas' are invalid. They need to be within [0,1].{suffix}"
+            )
+    elif not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3):
+        raise ValueError(
+            f"'probas' are invalid. The sum over axis 1 must be one.{suffix}"
+        )
+
+
 def _canonicalize_multilabel_probas(
     probas,
     n_samples=None,

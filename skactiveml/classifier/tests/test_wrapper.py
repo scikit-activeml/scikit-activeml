@@ -3097,6 +3097,43 @@ if successful_skorch_torch_import:
             test_cases += [(None, None), (np.int64, None)]
             self._test_param("init", "target_dtype", test_cases)
 
+        def test_init_param_validate_proba(self):
+            # The flag is consumed by `predict_proba`, so it is checked
+            # there rather than while fitting.
+            for validate_proba, err in [
+                (True, None),
+                (False, None),
+                ("Test", TypeError),
+                (None, TypeError),
+            ]:
+                with self.subTest(validate_proba=validate_proba):
+                    init_params = self.init_default_params.copy()
+                    init_params["validate_proba"] = validate_proba
+                    clf = SkorchClassifier(**init_params).fit(self.X, self.y)
+                    if err is None:
+                        clf.predict_proba(self.X)
+                    else:
+                        self.assertRaises(err, clf.predict_proba, self.X)
+
+        def test_predict_proba_rejects_values_that_are_no_probabilities(self):
+            # `forward_outputs` decides how the module's outputs are read, so
+            # a mapping without a suitable transform passes on raw scores.
+            init_params = self.init_default_params.copy()
+            init_params["forward_outputs"] = {"proba": (0, None)}
+            clf = SkorchClassifier(**init_params).fit(self.X, self.y)
+
+            with self.assertRaisesRegex(ValueError, "'probas' are invalid"):
+                clf.predict_proba(self.X)
+
+            init_params["validate_proba"] = False
+            clf = SkorchClassifier(**init_params).fit(self.X, self.y)
+
+            P = clf.predict_proba(self.X)
+
+            self.assertFalse(
+                np.allclose(np.sum(P, axis=1), 1, rtol=0, atol=1.0e-3)
+            )
+
         def test_init_param_target_type(self):
             self._test_param(
                 "init",

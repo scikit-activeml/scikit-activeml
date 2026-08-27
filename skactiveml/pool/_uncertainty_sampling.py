@@ -15,7 +15,10 @@ from ..utils import (
     simple_batch,
     check_classes,
 )
-from ..utils._validation import _canonicalize_multilabel_probas
+from ..utils._validation import (
+    _canonicalize_multilabel_probas,
+    _check_probas_are_valid,
+)
 from ._target import _fit_and_resolve_estimator_target_spec
 
 
@@ -405,15 +408,7 @@ def uncertainty_scores(
     else:
         probas = check_array(probas)
 
-    if is_multilabel and (not np.all(probas <= 1) or not np.all(0 <= probas)):
-        raise ValueError("'probas' are invalid. They need to be within [0,1].")
-
-    if not is_multilabel and not np.allclose(
-        np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3
-    ):
-        raise ValueError(
-            "'probas' are invalid. The sum over axis 1 must be one."
-        )
+    _check_probas_are_valid(probas, is_multilabel=is_multilabel)
 
     n_classes = probas.shape[1]
 
