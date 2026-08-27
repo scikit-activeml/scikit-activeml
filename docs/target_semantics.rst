@@ -259,6 +259,25 @@ declared, e.g. the integer ``0`` of one output would come back as the string
    ...
    ValueError:
 
+Predictions are described by the declared class labels, not by the wider
+dtype that also has to represent ``missing_label``.  ``predict`` therefore
+returns the dtype of ``classes_`` for a single-output target, and the dtype
+its per-output vocabularies have in common for a multi-label target.  Integer
+classes combined with the default ``missing_label=np.nan`` are the common
+case: targets are held as ``float64`` so that missing labels fit beside them,
+while predictions come back as ``int64`` and stay usable where class labels
+are expected, e.g. as indices.
+
+.. doctest::
+
+   >>> from skactiveml.classifier import ParzenWindowClassifier
+   >>> dtype_X = np.zeros((3, 1))
+   >>> dtype_y = np.array([0, np.nan, 1])
+   >>> dtype_clf = ParzenWindowClassifier(classes=[0, 1])
+   >>> _ = dtype_clf.fit(dtype_X, dtype_y)
+   >>> dtype_clf.predict(dtype_X).dtype == dtype_clf.classes_.dtype
+   True
+
 Without explicit ``classes``, resolution never invents a ``(0, 1)``
 vocabulary.  A column with fewer than two observed classes raises an error.
 

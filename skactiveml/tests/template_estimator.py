@@ -3,6 +3,7 @@ import warnings
 from copy import deepcopy
 
 from skactiveml.tests.utils import (
+    assert_predicts_class_dtype,
     check_positional_args,
     check_test_param_test_availability,
 )
@@ -323,26 +324,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
     # to report the estimator's rejection of such a continuous target.
     non_integral_classes_error = None
 
-    def setUp(
-        self,
-        estimator_class,
-        init_default_params,
-        fit_default_params=None,
-        predict_default_params=None,
-        init_default_params_multilabel=None,
-        fit_default_params_multilabel=None,
-        predict_default_params_multilabel=None,
-    ):
-        super().setUp(
-            estimator_class,
-            init_default_params,
-            fit_default_params,
-            predict_default_params,
-            init_default_params_multilabel,
-            fit_default_params_multilabel,
-            predict_default_params_multilabel,
-        )
-
     def _has_multilabel_defaults(self):
         return self.fit_default_params_multilabel is not None
 
@@ -373,6 +354,38 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         self.assertEqual(capability[0], "classification")
         self.assertNotEqual(capability[1], "multi-output")
 
+    def test_predict_dtype_matches_class_dtype(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        """Check that `predict` returns the declared class dtype.
+
+        The label encoder decodes into a dtype that can also represent
+        `missing_label`, so integer classes combined with the default
+        `missing_label=np.nan` decode to `float64`. Predictions never carry
+        `missing_label` and must therefore be narrowed back, so that they
+        remain usable where the declared class labels are expected.
+        """
+        init_params = deepcopy(self.init_default_params)
+        init_params["classes"] = [0, 1]
+        init_params["missing_label"] = np.nan
+        if replace_init_params is not None:
+            init_params.update(deepcopy(replace_init_params))
+
+        fit_params = deepcopy(self.fit_default_params)
+        fit_params["y"] = [0, np.nan, 1]
+        fit_params["X"] = np.zeros((3, 1))
+        if replace_fit_params is not None:
+            fit_params.update(deepcopy(replace_fit_params))
+
+        predict_params = deepcopy(self.predict_default_params)
+        predict_params["X"] = fit_params["X"]
+
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "fit", fit_params)
+        y_pred = np.asarray(estimator.predict(**predict_params))
+
+        assert_predicts_class_dtype(self, y_pred, estimator.classes_)
+
     def _get_multilabel_params(self):
         if not self._has_multilabel_defaults():
             return None, None, None
@@ -392,6 +405,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         y_pred = np.asarray(y_pred)
         self.assertEqual(y_pred.ndim, 2)
         self.assertEqual(y_pred.shape[1], len(classes))
+        assert_predicts_class_dtype(self, y_pred, classes)
         for j, classes_j in enumerate(classes):
             self.assertTrue(np.isin(y_pred[:, j], classes_j).all())
 
@@ -763,6 +777,21 @@ class TemplateMultiAnnotatorClassifier:
                             **deepcopy(self.target_contract_fit_params)
                         )
 
+    def test_predict_dtype_matches_class_dtype(self):
+        """Check that `predict` returns the declared class dtype.
+
+        Multi-annotator classifiers decode their predictions through the
+        same label encoder as single-annotator ones, so their predictions
+        are narrowed back to the declared class dtype as well.
+        """
+        estimator = self.target_contract_estimator_factory()
+        fit_params = deepcopy(self.target_contract_fit_params)
+        estimator.fit(**fit_params)
+
+        y_pred = np.asarray(estimator.predict(fit_params["X"]))
+
+        assert_predicts_class_dtype(self, y_pred, estimator.classes_)
+
     def test_multiannotator_target_contract(self):
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
@@ -797,20 +826,6 @@ class TemplateMultiAnnotatorClassifier:
 
 
 class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
-    def setUp(
-        self,
-        estimator_class,
-        init_default_params,
-        fit_default_params=None,
-        predict_default_params=None,
-    ):
-        super().setUp(
-            estimator_class,
-            init_default_params,
-            fit_default_params,
-            predict_default_params,
-        )
-
     def test_init_param_class_prior(self):
         test_cases = []
         test_cases += [

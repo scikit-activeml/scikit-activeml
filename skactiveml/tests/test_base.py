@@ -20,6 +20,7 @@ from skactiveml.base import (
 from skactiveml.exceptions import MappingError
 from skactiveml.pool import RandomSampling
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, match_signature
+from skactiveml.tests.utils import assert_predicts_class_dtype
 
 successful_skorch_torch_import = False
 try:
@@ -849,6 +850,56 @@ class SkactivemlClassifierTest(unittest.TestCase):
 
         clf.fit(X, y)
         np.testing.assert_array_equal(clf.predict(X), y)
+
+    def test_predict_dtype_matches_class_dtype(self):
+        # `missing_label=np.nan` widens the label encoder to `float64`, so
+        # the decoded labels must be narrowed back to the class dtype.
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([0, np.nan])
+        clf = DummySkactivemlClassifier(
+            classes=[0, 1],
+            missing_label=np.nan,
+            probas=np.array([[0.9, 0.1], [0.2, 0.8]]),
+        )
+
+        clf.fit(X, y)
+        y_pred = clf.predict(X)
+
+        assert_predicts_class_dtype(self, y_pred, clf.classes_)
+        # The decoded labels are usable where class labels are expected.
+        np.testing.assert_array_equal(np.array(["a", "b"])[y_pred], ["a", "b"])
+
+    def test_predict_dtype_matches_class_dtype_multilabel(self):
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([[1, 1], [np.nan, np.nan]])
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1], [0, 1]],
+            missing_label=np.nan,
+            probas=np.array([[0.9, 0.9], [0.8, 0.2]]),
+            target_type="multi-label",
+        )
+
+        clf.fit(X, y)
+        y_pred = clf.predict(X)
+
+        assert_predicts_class_dtype(self, y_pred, clf.classes_)
+
+    def test_predict_dtype_preserves_extra_outputs(self):
+        # Only the class labels are narrowed; extra outputs are untouched.
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([0, np.nan])
+        extra = np.array([[0.5], [0.5]], dtype=np.float32)
+        clf = DummySkactivemlClassifier(
+            classes=[0, 1],
+            missing_label=np.nan,
+            probas=(np.array([[0.9, 0.1], [0.2, 0.8]]), extra),
+        )
+
+        clf.fit(X, y)
+        y_pred, extra_pred = clf.predict(X)
+
+        assert_predicts_class_dtype(self, y_pred, clf.classes_)
+        self.assertEqual(extra_pred.dtype, np.float32)
 
     def test_score_multilabel(self):
         X = np.arange(4).reshape(2, 2)

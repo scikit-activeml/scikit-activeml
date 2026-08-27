@@ -23,11 +23,29 @@ class TestMixtureModelClassifier(
             "y": ["tokyo", "nan", "paris"],
         }
         predict_default_params = {"X": [[1]]}
+        self.X_ml = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        self.y_ml = np.array([[0, 1], [0, 1], [1, 0], [1, 0]], dtype=float)
+        init_default_params_multilabel = {
+            "classes": [[0, 1], [0, 1]],
+            # `np.nan` widens the label encoder past the class dtype, so the
+            # narrowing of multi-label predictions is actually exercised.
+            "missing_label": np.nan,
+            # A multi-label fit cannot derive the number of components from
+            # a single class vocabulary, so the mixture model is given.
+            "mixture_model": GaussianMixture(n_components=2, random_state=0),
+        }
+        fit_default_params_multilabel = {"X": self.X_ml, "y": self.y_ml}
+        predict_default_params_multilabel = {"X": self.X_ml}
         super().setUp(
             estimator_class=estimator_class,
             init_default_params=init_default_params,
             fit_default_params=fit_default_params,
             predict_default_params=predict_default_params,
+            init_default_params_multilabel=init_default_params_multilabel,
+            fit_default_params_multilabel=fit_default_params_multilabel,
+            predict_default_params_multilabel=(
+                predict_default_params_multilabel
+            ),
         )
         self.y_nan = ["nan", "nan", "nan"]
         self.w = [2, np.nan, 1]

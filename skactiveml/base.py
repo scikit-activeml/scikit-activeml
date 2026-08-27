@@ -1438,6 +1438,52 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 self.cost_matrix_, len(self.classes_)
             )
 
+    def _class_label_dtype(self):
+        """Return the dtype the declared class labels are described by.
+
+        For a single-output target, `classes_` is one array and its dtype
+        describes every label. For a multi-label target, `classes_` is one
+        array per output, so the labels of one sample are described by the
+        dtype their vocabularies have in common. Resolution rejects outputs
+        of differing dtype kinds, so this common dtype only ever widens
+        between vocabularies of one kind, e.g. `<U3` and `<U6` to `<U6`.
+
+        Returns
+        -------
+        dtype : numpy.dtype
+            The dtype of the declared class labels.
+        """
+        if self.target_spec_.target_type == "multi-label":
+            return np.result_type(*[c.dtype for c in self.classes_])
+        return self.classes_.dtype
+
+    def _decode_class_labels(self, y_enc):
+        """Decode encoded class labels into the declared class dtype.
+
+        The label encoder decodes into a dtype that can also represent
+        `missing_label`, e.g., `float64` for integer classes and
+        `missing_label=np.nan`. Encoded predictions never carry
+        `missing_label`, so their decoded labels are narrowed back to the
+        dtype of the declared classes. Without this narrowing, predictions
+        are no longer the labels that were declared and cannot be used
+        where those labels are expected, e.g., as indices.
+
+        Parameters
+        ----------
+        y_enc : numpy.ndarray of shape (n_samples,) or \
+                (n_samples, n_outputs)
+            The encoded class labels.
+
+        Returns
+        -------
+        y_dec : numpy.ndarray of shape (n_samples,) or \
+                (n_samples, n_outputs)
+            The decoded class labels in the declared class dtype.
+        """
+        return self._le.inverse_transform(y_enc).astype(
+            self._class_label_dtype(), copy=False
+        )
+
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
         """Fit the model using `X` as training data and `y` as class labels.
@@ -1511,7 +1557,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             y_pred = (P >= 0.5).astype(int, copy=False)
 
         # Transform labels and append extra outputs.
-        y_pred = self._le.inverse_transform(y_pred)
+        y_pred = self._decode_class_labels(y_pred)
         if isinstance(out, tuple):
             return (y_pred,) + out[1:]
         else:

@@ -749,15 +749,16 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
                 if self._is_multilabel_target():
                     y_pred = self._check_multilabel_predictions(y_pred)
-                else:
-                    y_pred = y_pred.astype(self.classes_.dtype)
+                y_pred = np.asarray(y_pred).astype(
+                    self._class_label_dtype(), copy=False
+                )
             else:
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
                     costs, random_state=self.random_state_, axis=1
                 )
-                y_pred = self._le.inverse_transform(y_pred)
+                y_pred = self._decode_class_labels(y_pred)
         else:
             p = self.predict_proba([X[0]])
             if self._is_multilabel_target():
@@ -777,7 +778,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 y_enc_pred = self.random_state_.choice(
                     np.arange(len(p[0])), len(X), replace=True, p=p[0]
                 )
-            y_pred = self._le.inverse_transform(y_enc_pred)
+            y_pred = self._decode_class_labels(y_enc_pred)
         return y_pred
 
     @match_signature("estimator", "predict_proba")
@@ -1098,12 +1099,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 (n_labeled, n_outputs)
             The decoded class labels passed on to the wrapped estimator.
         """
-        y_train_inv = self._le.inverse_transform(y_train)
-        if self._is_multilabel_target():
-            class_dtypes = [classes_j.dtype for classes_j in self.classes_]
-        else:
-            class_dtypes = [self.classes_.dtype]
-        return y_train_inv.astype(np.result_type(*class_dtypes), copy=False)
+        return self._decode_class_labels(y_train)
 
     def _has_degenerate_training_classes(self, y_train):
         """Check whether an encoded training subset lacks two classes.

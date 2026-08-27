@@ -21,6 +21,36 @@ def assert_no_query_state(test_case, strategy):
         )
 
 
+def assert_predicts_class_dtype(test_case, y_pred, classes):
+    """Assert that predictions carry the declared class dtype.
+
+    The label encoder decodes into a dtype that can also represent
+    `missing_label`, so predictions must be narrowed back to the dtype of
+    the declared classes to stay usable where those labels are expected.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case providing the assertion.
+    y_pred : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        The predicted class labels.
+    classes : numpy.ndarray or list of numpy.ndarray
+        The declared classes, i.e., one array per label output for a
+        multi-label target and one array otherwise.
+    """
+    if isinstance(classes, (list, tuple)):
+        expected_dtype = np.result_type(
+            *[np.asarray(classes_j).dtype for classes_j in classes]
+        )
+    else:
+        expected_dtype = np.asarray(classes).dtype
+    test_case.assertEqual(
+        np.asarray(y_pred).dtype,
+        expected_dtype,
+        msg="`predict` must return the declared class dtype.",
+    )
+
+
 def assert_attributes_unchanged(
     test_case, estimator, attributes_before, ignored=()
 ):

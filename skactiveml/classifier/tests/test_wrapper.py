@@ -40,6 +40,7 @@ from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
 from skactiveml.tests.utils import (
     assert_attributes_unchanged,
     assert_fit_failure_is_transactional,
+    assert_predicts_class_dtype,
 )
 from skactiveml.utils import MISSING_LABEL, TargetSpec
 
@@ -591,6 +592,38 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             self.assertEqual(len(w), 1)
         y_exp = ["tokyo"] * len(self.fit_default_params["X"])
         np.testing.assert_array_equal(y_exp, y)
+
+    def test_predict_dtype_with_cost_matrix(self):
+        # The cost-matrix path decodes through the label encoder, which
+        # `missing_label=np.nan` widens to `float64`. The samples are
+        # separable so that the estimator is fitted on real probabilities.
+        X = np.array([[-2.0], [0.0], [2.0]])
+        y = np.array([0, np.nan, 1])
+        clf = SklearnClassifier(
+            estimator=GaussianNB(),
+            classes=[0, 1],
+            missing_label=np.nan,
+            cost_matrix=1 - np.eye(2),
+        ).fit(X, y)
+
+        y_pred = clf.predict(X)
+
+        self.assertTrue(clf.is_fitted_)
+        assert_predicts_class_dtype(self, y_pred, clf.classes_)
+
+    def test_predict_dtype_without_fitted_estimator(self):
+        # Without any labels, `predict` falls back to the label prior, which
+        # is the path taken in the first cycle of an active learning loop.
+        X = np.zeros((3, 1))
+        y = np.full(3, np.nan)
+        clf = SklearnClassifier(
+            estimator=GaussianNB(), classes=[0, 1], missing_label=np.nan
+        ).fit(X, y)
+
+        y_pred = clf.predict(X)
+
+        self.assertFalse(clf.is_fitted_)
+        assert_predicts_class_dtype(self, y_pred, clf.classes_)
 
     def test_multilabel_predict_proba(self):
         X = self.X_ml
@@ -2244,6 +2277,23 @@ class TestSlidingWindowClassifier(
         clf = SlidingWindowClassifier(estimator=Perceptron())
         self.assertRaises(TypeError, clf.partial_fit, [[0], [1]], [[0], [1]])
 
+    def test_predict_dtype_matches_class_dtype(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        # The wrapped classifier must agree on `missing_label`, so the
+        # default estimator pinned to `"nan"` is replaced.
+        init_params = {
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label=np.nan
+            )
+        }
+        if replace_init_params is not None:
+            init_params.update(replace_init_params)
+        super().test_predict_dtype_matches_class_dtype(
+            replace_init_params=init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
     def test_init_param_missing_label(self, test_cases=None):
         replace_init_params = {
             "estimator": SklearnClassifier(
@@ -3564,7 +3614,7 @@ if successful_skorch_torch_import:
             )
 
         def test_predict_param_extra_outputs(self):
-            self._test_extra_outputs("predict_proba")
+            self._test_extra_outputs("predict")
 
         def test_predict_proba_param_extra_outputs(self):
             self._test_extra_outputs("predict_proba")
