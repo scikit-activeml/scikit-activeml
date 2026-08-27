@@ -130,7 +130,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         "annotator_class",
     }
     _annotation_type = "multi-annotator"
-    _resolve_target_spec_on_validate = True
 
     @property
     def _target_capabilities(self):

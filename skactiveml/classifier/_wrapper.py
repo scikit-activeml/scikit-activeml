@@ -2322,7 +2322,6 @@ if successful_skorch_torch_import:
             self.sample_dtype = sample_dtype
             self.target_dtype = target_dtype
             self.target_type = target_type
-            self._resolve_target_spec_on_validate = True
             self.include_unlabeled_samples = include_unlabeled_samples
 
         @property

@@ -124,7 +124,6 @@ try:
                 sample_dtype=sample_dtype,
                 target_type=target_type,
             )
-            self._resolve_target_spec_on_validate = True
             self.clf_module = clf_module
             self.n_annotators = n_annotators
 
