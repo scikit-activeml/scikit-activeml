@@ -1096,7 +1096,9 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``y_pred``                        | The estimated targets per sample. |
+| ``y_pred``                        | The estimated targets per sample, |
+|                                   | as an array of shape              |
+|                                   | ``(n_samples,)``.                 |
 +-----------------------------------+-----------------------------------+
 
 .. _general-advice-12:

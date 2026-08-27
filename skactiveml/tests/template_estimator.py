@@ -4,6 +4,7 @@ from copy import deepcopy
 
 from skactiveml.tests.utils import (
     assert_predicts_class_dtype,
+    assert_predicts_single_output_shape,
     check_positional_args,
     check_test_param_test_availability,
 )
@@ -973,6 +974,31 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             estimator.target_spec_.annotation_type, "single-annotator"
         )
         self.assertIsNone(estimator.target_spec_.classes)
+
+    def test_predict_returns_one_dimensional_targets(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        """Check that `predict` describes one target value per sample.
+
+        A single-output regression target is described by one value per
+        sample. A wrapped estimator may emit a column instead, which every
+        consumer indexing predictions by sample then misreads.
+        """
+        init_params = deepcopy(self.init_default_params)
+        if replace_init_params is not None:
+            init_params.update(deepcopy(replace_init_params))
+
+        fit_params = deepcopy(self.fit_default_params)
+        if replace_fit_params is not None:
+            fit_params.update(deepcopy(replace_fit_params))
+
+        predict_params = deepcopy(self.predict_default_params)
+
+        estimator = self.estimator_class(**init_params)
+        estimator.fit(**fit_params)
+        y_pred = estimator.predict(**predict_params)
+
+        assert_predicts_single_output_shape(self, y_pred, predict_params["X"])
 
     def test_fit_param_X(self, test_cases=None):
         super().test_fit_param_X(test_cases)

@@ -385,6 +385,24 @@ but regressors reject that valid specification because multi-output execution
 is not yet a declared capability.  Regression target specifications always
 have ``classes=None``.
 
+A single-output regression target is described by one value per sample, so
+``predict`` returns an array of shape ``(n_samples,)``.  A wrapped estimator
+may describe one sample by a column instead; its predictions are narrowed to
+the declared target type.  Predictions describing several target columns are
+rejected rather than flattened, because flattening would silently turn them
+into ``n_samples * n_outputs`` values that no longer describe a sample each.
+
+.. doctest::
+
+   >>> from skactiveml.regressor import SklearnRegressor
+   >>> from sklearn.linear_model import LinearRegression
+   >>> shape_X = np.zeros((3, 1))
+   >>> shape_y = np.array([0.0, np.nan, 1.0])
+   >>> shape_reg = SklearnRegressor(LinearRegression())
+   >>> _ = shape_reg.fit(shape_X, shape_y)
+   >>> shape_reg.predict(shape_X).shape
+   (3,)
+
 Multiple annotators
 ===================
 

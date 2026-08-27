@@ -946,6 +946,9 @@ if successful_skorch_torch_import:
             }
             init_default_params = {
                 "module": TestNeuralNet,
+                # The module's output is passed on untransformed for this
+                # criterion, so the default configuration exercises the
+                # narrowing that `predict` performs itself.
                 "criterion": nn.HuberLoss,
                 "missing_label": MISSING_LABEL,
                 "random_state": 1,
@@ -1183,8 +1186,8 @@ if successful_skorch_torch_import:
             y_pred, X_embed, y_pred_exp = reg.predict(
                 self.X, extra_outputs=["emb", "exp-output"]
             )
-            self.assertEqual(len(y_pred), len(self.X))
-            self.assertTrue(X_embed.shape[1], 2)
+            self.assertEqual(y_pred.shape, (len(self.X),))
+            self.assertEqual(X_embed.shape, (len(self.X), 128))
             np.testing.assert_almost_equal(np.exp(y_pred), y_pred_exp.ravel())
             init_default_params = self.init_default_params.copy()
             reg = SkorchRegressor(**init_default_params)
@@ -1194,6 +1197,70 @@ if successful_skorch_torch_import:
             np.testing.assert_almost_equal(y_pred_0, y_pred_1)
             reg.fit(self.X, self.y)
             self.assertGreaterEqual(reg.score(self.X, self.y_true), 0.9)
+
+        def test_predict_shape_is_independent_of_forward_outputs(self):
+            # The module emits a column, so the shape of the predicted
+            # target values must not depend on how the module's outputs
+            # are named and transformed.
+            configurations = [
+                {"criterion": nn.MSELoss},
+                {"criterion": nn.HuberLoss},
+                {
+                    "criterion": nn.HuberLoss,
+                    "forward_outputs": {
+                        "output": (0, None),
+                        "emb": (1, None),
+                    },
+                },
+            ]
+            for replace_init_params in configurations:
+                with self.subTest(**replace_init_params):
+                    init_params = self.init_default_params.copy()
+                    init_params.update(replace_init_params)
+                    reg = SkorchRegressor(**init_params).fit(self.X, self.y)
+
+                    y_pred = reg.predict(self.X)
+
+                    self.assertEqual(y_pred.shape, (len(self.X),))
+
+            # Further model outputs describe the module, not the targets,
+            # so they keep the shape the module gave them.
+            init_params = self.init_default_params.copy()
+            init_params["forward_outputs"] = {
+                "output": (0, None),
+                "emb": (1, None),
+            }
+            reg = SkorchRegressor(**init_params).fit(self.X, self.y)
+
+            y_pred, X_embed = reg.predict(self.X, extra_outputs="emb")
+
+            self.assertEqual(y_pred.shape, (len(self.X),))
+            self.assertEqual(X_embed.shape, (len(self.X), 128))
+
+        def test_predict_rejects_multi_output_module(self):
+            # Narrowing a multi-output prediction would silently turn it
+            # into `n_samples * n_outputs` meaningless values.
+            class MultiOutputNeuralNet(nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.output = nn.Linear(
+                        in_features=10,
+                        out_features=3,
+                        bias=True,
+                        dtype=torch.float32,
+                    )
+
+                def forward(self, X, **kwargs):
+                    return self.output(X)
+
+            init_params = self.init_default_params.copy()
+            init_params["module"] = MultiOutputNeuralNet
+            reg = SkorchRegressor(**init_params).fit(self.X, self.y)
+
+            with self.assertRaisesRegex(
+                ValueError, "does not support target capability"
+            ):
+                reg.predict(self.X)
 
         def test_init_param_sample_dtype(self):
             test_cases = [
@@ -1367,6 +1434,3 @@ if successful_skorch_torch_import:
                 return output_values, hidden
             else:
                 return output_values
-
-    class TestSkorchProbabilisticRegressor(TestSkorchRegressor):
-        pass

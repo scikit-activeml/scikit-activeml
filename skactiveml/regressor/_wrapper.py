@@ -35,7 +35,6 @@ from ..utils._wrapper_state import (
 
 successful_skorch_torch_import = False
 try:
-    import torch
     from torch import nn
     from skactiveml.base import SkorchMixin
     from skactiveml.utils import make_criterion_tuple_aware
@@ -43,6 +42,58 @@ try:
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover
     pass
+
+
+def _narrow_to_single_output_prediction(estimator, prediction):
+    """Return `prediction` with its primary output as shape `(n_samples,)`.
+
+    A single-output regression target is described by one value per sample,
+    so the wrapped estimator's predictions are narrowed to that shape. The
+    target type is resolved from the prediction itself and checked against
+    the capabilities of `estimator`, so that a multi-output prediction is
+    rejected instead of being flattened into meaningless values.
+
+    Parameters
+    ----------
+    estimator : SkactivemlRegressor
+        The regressor whose capabilities the prediction must satisfy.
+    prediction : array-like or tuple
+        The predictions of the wrapped estimator. A tuple carries the
+        predicted target values as its first element, e.g., together with
+        their standard deviations or further model outputs.
+
+    Returns
+    -------
+    prediction : numpy.ndarray of shape (n_samples,) or tuple
+        The predictions with their primary output narrowed. Further tuple
+        elements are returned unchanged, because their shapes describe
+        model outputs instead of target values.
+
+    Raises
+    ------
+    ValueError
+        If the predicted target values do not describe a target type
+        supported by `estimator`.
+    """
+    is_tuple = isinstance(prediction, tuple)
+    y_pred = prediction[0] if is_tuple else prediction
+    prediction_spec = resolve_target_spec(
+        y_pred,
+        task="regression",
+        target_type="auto",
+        annotation_type="single-annotator",
+        classes=None,
+        missing_label=estimator.missing_label,
+    )
+    _check_target_spec_capability(
+        type(estimator).__name__,
+        prediction_spec,
+        estimator._target_capabilities,
+    )
+    y_pred = np.asarray(y_pred).reshape(-1)
+    if is_tuple:
+        return (y_pred, *prediction[1:])
+    return y_pred
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -332,26 +383,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         check_n_features(self, X, reset=False)
         if self.is_fitted_:
             prediction = self.estimator_.predict(X, **predict_kwargs)
-            y_pred = (
-                prediction[0] if isinstance(prediction, tuple) else prediction
-            )
-            prediction_spec = resolve_target_spec(
-                y_pred,
-                task="regression",
-                target_type="auto",
-                annotation_type="single-annotator",
-                classes=None,
-                missing_label=self.missing_label,
-            )
-            _check_target_spec_capability(
-                type(self).__name__,
-                prediction_spec,
-                self._target_capabilities,
-            )
-            y_pred = np.asarray(y_pred).reshape(-1)
-            if isinstance(prediction, tuple):
-                return (y_pred, *prediction[1:])
-            return y_pred
+            return _narrow_to_single_output_prediction(self, prediction)
 
         warnings.warn(
             f"Since the 'estimator' could not be fitted when"
@@ -698,7 +730,10 @@ if successful_skorch_torch_import:
             should be passed, although instantiated modules will also work.
         criterion : torch.nn.Module or torch.nn.Module.__class__, \
                 default=torch.nn.MSELoss
-            The loss (criterion) used to optimize the module.
+            The loss (criterion) used to optimize the module. A concrete
+            default is given because regressors support a single target
+            type, whereas `SkorchClassifier` defers its criterion until
+            the target type is known.
 
             - If a class (subclass of `torch.nn.Module`) is passed
               (e.g. `torch.nn.MSELoss`), it is instantiated
@@ -738,21 +773,16 @@ if successful_skorch_torch_import:
             - In `predict`, the transformed first output is interpreted as
               predicted targets.
 
-            If ``forward_outputs`` is ``None``, a sensible default is chosen
-            for common single-output regressors based on the ``criterion``:
-
-            - If ``criterion`` is ``torch.nn.MSELoss``, ``torch.nn.L1Loss``, or
-              ``torch.nn.SmoothL1Loss``, it is assumed that ``module.forward``
-              returns the regression predictions directly and the effective
-              mapping is::
-
-                  {"output": (0, torch.ravel)}
-
-            - For all other criteria, a single-output module is assumed to
-              already produce values in the target space, and the effective
-              mapping is::
+            If ``forward_outputs`` is ``None``, a single-output module is
+            assumed to already produce values in the target space, and the
+            effective mapping is::
 
                   {"output": (0, None)}
+
+            The mapping does not have to describe the shape of the predicted
+            targets. `predict` narrows them to one value per sample itself,
+            so a module returning a column is handled like one returning a
+            flat array.
 
         criterion_output_keys : str or sequence of str or None, default=None
             Name or names of the forward outputs that are passed to the
@@ -962,9 +992,13 @@ if successful_skorch_torch_import:
 
             # Forward propagation whose return values depends on the request
             # ones.
-            return self._forward_with_named_outputs(
+            prediction = self._forward_with_named_outputs(
                 X, forward_outputs=forward_outputs, extra_outputs=extra_outputs
             )
+
+            # The module decides the shape of its outputs, so the predicted
+            # target values are narrowed to the declared target type.
+            return _narrow_to_single_output_prediction(self, prediction)
 
         def _effective_forward_outputs(self):
             """Return the effective `forward_outputs` mapping.
@@ -986,19 +1020,10 @@ if successful_skorch_torch_import:
             if self.forward_outputs is not None:
                 return self.forward_outputs
 
-            # No explicit mapping: handle common single-output cases.
-            crit_cls = (
-                self.criterion
-                if isinstance(self.criterion, type)
-                else self.criterion.__class__
-            )
-
-            if crit_cls in [nn.MSELoss, nn.L1Loss, nn.SmoothL1Loss]:
-                # Module returns raw predictions.
-                return {"output": (0, torch.ravel)}
-
-            # Fallback: treat the single forward output as already in desired
-            # target space. Caller is responsible for making this true.
+            # The single forward output is treated as already being in the
+            # desired target space. Its shape is not the mapping's concern:
+            # `predict` narrows the predicted target values itself, and the
+            # transforms are ignored while training.
             return {"output": (0, None)}
 
         def _net_parts(self, X=None, y=None):
