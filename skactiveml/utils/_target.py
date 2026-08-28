@@ -455,8 +455,10 @@ def _resolve_task_agnostic_target_type(
         if y.ndim != 1:
             raise ValueError(
                 "Two-dimensional targets with `target_type='auto'` are "
-                "ambiguous for a task-agnostic strategy; declare "
-                "`target_type`."
+                "ambiguous for a task-agnostic strategy, because it has "
+                "neither classes nor an estimator to resolve them by. "
+                "Declare `target_type`, or pass an estimator whose target "
+                "semantics resolve them."
             )
         return "single-output"
 

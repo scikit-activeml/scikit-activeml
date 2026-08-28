@@ -350,7 +350,11 @@ two-dimensional target.
 
 For regression, both ``target_type="auto"`` and an explicit
 ``target_type="single-output"`` accept a column vector, preserving the
-existing regression contract.  A target with more than one column is not a
+existing regression contract.  This holds wherever the task is known, i.e.
+at a regressor and at a strategy that resolves its targets by one.  A
+task-agnostic strategy knows neither the task nor a class vocabulary, so it
+treats every bare two-dimensional target as ambiguous, whether its values
+are continuous or discrete.  A target with more than one column is not a
 single-output target for either task.
 
 Target-aware masks and indices
