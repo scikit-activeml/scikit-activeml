@@ -7,6 +7,7 @@
    Strategy Overview <generated/strategy_overview>
    generated/sphinx_gallery_examples/index
    generated/api/skactiveml
+   Target Semantics <target_semantics>
    contributing
    Changelog <https://github.com/scikit-activeml/scikit-activeml/releases>
 

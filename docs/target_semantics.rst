@@ -1,52 +1,58 @@
-:orphan:
-
 .. _target-semantics:
 
 ===============================
 Target and Annotation Semantics
 ===============================
 
-Target semantics describe the task, target type, and annotation type that give
-target data its meaning.  The target contract resolves those semantics once,
-represents them with :class:`~skactiveml.utils.TargetSpec`, and then checks
-whether a consumer supports the exact resolved target capability.  Resolution
-and capability checking are deliberately separate: a target can be meaningful
-even when a particular estimator or query strategy cannot execute it.
+Target semantics specify three properties of target data: the task, the target
+type, and the annotation type. The target contract first resolves these
+properties into a :class:`~skactiveml.utils.TargetSpec`. Each estimator or query
+strategy can then check whether it supports that exact specification.
+
+Resolution and capability checking are separate. A target specification can be
+valid even if a particular estimator or query strategy does not support it.
 
 Public API
 ==========
 
-:func:`~skactiveml.utils.resolve_target_spec` combines ``y`` with the declared
-``task``, ``target_type``, ``annotation_type``, optional class vocabularies,
-and ``missing_label``.  It returns a frozen target specification with four
-fields:
+:func:`~skactiveml.utils.resolve_target_spec` determines the target semantics
+from ``y`` and the declared ``task``, ``target_type``, ``annotation_type``,
+optional class vocabularies, and ``missing_label``. It returns a frozen target
+specification with four fields:
 
 ``task``
     ``"classification"`` or ``"regression"``.
+
 ``target_type``
-    The concrete value ``"single-output"``, ``"multi-label"``, or
-    ``"multi-output"``.  A resolved specification never stores ``"auto"``.
+    The resolved value ``"single-output"``, ``"multi-label"``, or
+    ``"multi-output"``. A resolved specification never contains ``"auto"``.
+
 ``annotation_type``
     ``"single-annotator"`` or ``"multi-annotator"``.
+
 ``classes``
     The canonical immutable class vocabulary for classification, or ``None``
     for regression.
 
 Public estimators and pool query strategies expose a ``target_type``
-constructor parameter.  Its default, ``"auto"``, preserves unambiguous
-single-output calls.  After a successful fit, classifiers and regressors expose
-the concrete ``target_spec_`` attribute.
-Query strategies resolve semantics for each call and do not retain a
-last-query specification.  When a fitted classifier is passed to a strategy,
-the classifier's ``target_spec_`` is authoritative.
+constructor parameter. The default ``"auto"`` keeps existing unambiguous
+single-output calls working. After a successful fit, classifiers and regressors
+expose the resolved ``target_spec_`` attribute.
+
+Query strategies resolve the target semantics separately for each call and do
+not store the specification from the previous query. If a fitted classifier is
+passed to a strategy, its ``target_spec_`` is authoritative, i.e., it
+determines what ``y`` means for that query.
 
 Explicit multi-label classification
 ===================================
 
-Declare a multi-label target rather than relying on its two-dimensional shape.
-With ``classes=None``, every output column must expose both binary classes.
-The following example fits a classifier and queries one complete label vector;
-it is executed as part of the documentation tests.
+For multi-label classification, declare ``target_type="multi-label"`` instead
+of relying on ``y`` being two-dimensional. If ``classes=None``, each output
+column must contain both binary classes so that its vocabulary can be inferred.
+
+The following example fits a classifier and queries one complete label vector.
+It is executed as part of the documentation tests.
 
 .. doctest::
 
@@ -86,59 +92,67 @@ it is executed as part of the documentation tests.
 Multi-label pool strategy capabilities
 --------------------------------------
 
-The following pool strategies accept complete multi-label targets.  This
-categorized inventory is checked against the exact capability inventory in
-``skactiveml/pool/tests/test_multilabel_contracts.py``.  That test groups
-strategies by probability consumption, while this user-facing inventory groups
-them by how their acquisition method relates to multi-label data.  Adding a
-multi-label-capable strategy therefore requires classifying it in both places.
+The following pool strategies support complete multi-label targets. This list
+is checked against the exact capability inventory in
+``skactiveml/pool/tests/test_multilabel_contracts.py``. The test groups
+strategies by how they consume probabilities, whereas this documentation groups
+them by how their acquisition method uses multi-label data. A new
+multi-label-capable strategy therefore has to be added to the appropriate group
+in both places.
+
 The :doc:`Strategy Overview <generated/strategy_overview>` provides a
 ``Multi-Label`` filter and links to the available examples.
 
 **Native multi-label methods**
+
     :class:`~skactiveml.pool.MaxLossReductionMaxConfidence` and
-    :class:`~skactiveml.pool.LabelCardinalityInconsistency` cite methods
-    designed for multi-label acquisition.  Maximum Loss Reduction with
-    Maximal Confidence is commonly shortened to **MMC** in the literature and
-    tutorials; the importable class is
-    :class:`~skactiveml.pool.MaxLossReductionMaxConfidence`, and no separate
-    ``MMC`` alias is provided.
+    :class:`~skactiveml.pool.LabelCardinalityInconsistency` implement methods
+    designed for multi-label acquisition. Maximum Loss Reduction with Maximal
+    Confidence is commonly abbreviated as **MMC** in the literature and
+    tutorials. The importable class is
+    :class:`~skactiveml.pool.MaxLossReductionMaxConfidence`; there is no separate
+    ``MMC`` alias.
 
 **Extensions of single-output methods**
+
     :class:`~skactiveml.pool.Badge`, :class:`~skactiveml.pool.Clue`,
     :class:`~skactiveml.pool.DropQuery`, :class:`~skactiveml.pool.Falcun`,
     :class:`~skactiveml.pool.ProbCover`,
     :class:`~skactiveml.pool.UHerding`, and
-    :class:`~skactiveml.pool.UncertaintySampling` document how the library
-    extends their cited single-output method.  Most compute per-label scores
-    and reduce them to one sample utility; ``ProbCover`` instead reads the
-    observed label rows when choosing its default radius.  Follow each class
-    link for the precise extension and reduction contract.
+    :class:`~skactiveml.pool.UncertaintySampling` document how the corresponding
+    single-output method is extended to multi-label data. Most of these methods
+    compute a score for each label and reduce the scores to one utility per
+    sample. ``ProbCover`` differs in that it uses the observed label rows when
+    choosing its default radius. See the documentation of each class for the
+    exact extension and reduction rule.
 
 **Representation- and mask-only methods**
+
     :class:`~skactiveml.pool.CoreSet`,
     :class:`~skactiveml.pool.DiscriminativeAL`,
     :class:`~skactiveml.pool.GreedySamplingX`,
     :class:`~skactiveml.pool.MaxHerding`,
     :class:`~skactiveml.pool.RandomSampling`, and
-    :class:`~skactiveml.pool.TypiClust` operate on sample representations and
-    the labeled/unlabeled mask; label values do not enter their acquisition.
+    :class:`~skactiveml.pool.TypiClust` use sample representations and the
+    labeled/unlabeled mask. The label values themselves do not affect the
+    acquisition.
 
 :class:`~skactiveml.pool.ParallelUtilityEstimationWrapper` and
-:class:`~skactiveml.pool.SubSamplingWrapper` inherit multi-label behavior from
-their wrapped strategy.
+:class:`~skactiveml.pool.SubSamplingWrapper` inherit multi-label support from
+the strategy they wrap.
 
 Estimator capability for multi-label wrapping
 ---------------------------------------------
 
-``SklearnClassifier`` admits an estimator for multi-label classification only
-when it is a ``scikit-learn`` classifier, implements ``predict_proba``, and
-positively declares either ``target_tags.multi_output`` or
-``classifier_tags.multi_label``.  Capability is never discovered by fitting on
-generated data.  An estimator such as plain ``LogisticRegression`` exposes
-``predict_proba`` but declares neither tag, so it is rejected before any
-fitted state is committed instead of silently degrading to prior-only
-predictions.
+``SklearnClassifier`` accepts an estimator for multi-label classification only
+if the estimator is a ``scikit-learn`` classifier, implements ``predict_proba``,
+and declares either ``target_tags.multi_output`` or
+``classifier_tags.multi_label`` as supported. This capability is determined
+from the estimator metadata and is never inferred by fitting generated data.
+
+For example, a plain ``LogisticRegression`` implements ``predict_proba`` but
+declares neither tag. It is therefore rejected before any fitted state is stored
+instead of silently falling back to prior-only predictions.
 
 .. doctest::
 
@@ -157,14 +171,15 @@ predictions.
 Pre-fitted estimators
 ---------------------
 
-A pre-fitted ``estimator`` already published the target semantics of its own
-predictions, so ``SklearnClassifier`` reconciles the declared semantics with its
-learned classes by class identity before publishing any fitted attribute.
-Declared ``classes`` may extend the learned vocabulary, and the additional
+A pre-fitted ``estimator`` already has learned target semantics. Before
+``SklearnClassifier`` exposes any fitted attributes, it checks that the declared
+semantics are consistent with the estimator's learned classes by class identity.
+
+Declared ``classes`` may extend the learned class vocabulary. Any additional
 classes then receive zero-filled probability columns in the declared order.
-They can neither reinterpret learned classes nor change the number of predicted
-outputs, so equally wide but disjoint vocabularies are rejected rather than
-silently relabeled.
+However, the declaration may neither reinterpret learned classes nor change the
+number of predicted outputs. Consequently, equally wide but disjoint class
+vocabularies are rejected instead of being silently relabeled.
 
 .. doctest::
 
@@ -185,16 +200,19 @@ silently relabeled.
    True
    >>> assert not hasattr(relabeled, "target_spec_")
 
-A fitted multi-label estimator is accepted when it publishes one binary class
-vocabulary per label output, as ``MultiOutputClassifier`` and a multi-output
-``RandomForestClassifier`` do, or when it publishes explicit multi-label
-metadata whose flat ``classes_`` identifies its label outputs, as
-``OneVsRestClassifier`` does.  In the latter case, the flat classes are output
-identifiers rather than one binary vocabulary, and each output carries a binary
-indicator, so ``[[0, 1], ...]`` has to be declared.  A pre-fitted estimator
-publishing neither representation cannot be declared multi-label at all,
-because a flat learned vocabulary is indistinguishable from single-output
-classification; fit such an estimator through the wrapper instead.
+A fitted multi-label estimator is accepted in either of two cases. First, it may
+provide one binary class vocabulary per label output, as
+``MultiOutputClassifier`` and a multi-output ``RandomForestClassifier`` do.
+Second, it may provide explicit multi-label metadata together with a flat
+``classes_`` that identifies the label outputs, as ``OneVsRestClassifier`` does.
+
+For ``OneVsRestClassifier``, the flat classes identify outputs rather than the
+binary class vocabulary of each output. Because each output is a binary
+indicator, ``[[0, 1], ...]`` must therefore be declared explicitly. A pre-fitted
+estimator that provides neither representation cannot be declared as multi-label:
+a flat learned class vocabulary alone cannot be distinguished from
+single-output classification. Such an estimator must instead be fitted through
+the wrapper.
 
 .. doctest::
 
@@ -212,11 +230,12 @@ classification; fit such an estimator through the wrapper instead.
 Class vocabularies and complete rows
 ------------------------------------
 
-Multi-label classification uses one binary class vocabulary per label output.
-Explicit vocabularies let fitting start before both classes have been observed
-and allow non-numeric labels.  Their input order is not the probability-column
-order: each vocabulary is normalized to the same canonical ordering used by
-fitted ``classes_``.
+Multi-label classification uses one binary class vocabulary for each label
+output. Explicit vocabularies allow fitting to start before both classes have
+been observed and also support non-numeric labels. The order in which a
+vocabulary is provided does not define the probability-column order. Each
+vocabulary is normalized to the same canonical order used by fitted
+``classes_``.
 
 .. doctest::
 
@@ -234,15 +253,16 @@ fitted ``classes_``.
    ... )
    >>> assert spec.classes == (("absent", "present"), ("no", "yes"))
 
-All label outputs must declare classes of one dtype kind, because one array
-holds every output of a sample.  Outputs may declare different vocabularies
-and different widths of the same kind, e.g. ``("no", "yes")`` beside
-``("off", "always")``.  Mixing kinds is rejected during resolution: strings
-with numbers, integers with floats, and booleans with integers alike.  Were a
-mixture accepted, the array would coerce the outputs to a common dtype, and
-the labels describing a sample would no longer be the labels that were
-declared, e.g. the integer ``0`` of one output would come back as the string
-``'0'``.
+All label outputs must use classes of the same dtype kind because one array
+stores all outputs of a sample. Different outputs may still use different
+vocabularies and different vocabulary sizes within the same kind, for example
+``("no", "yes")`` next to ``("off", "always")``.
+
+Mixing dtype kinds is rejected during resolution, including strings with
+numbers, integers with floats, and booleans with integers. Otherwise, the array
+would coerce the outputs to a common dtype and could change the declared class
+labels. For example, the integer ``0`` of one output could be returned as the
+string ``'0'``.
 
 .. doctest::
 
@@ -259,14 +279,15 @@ declared, e.g. the integer ``0`` of one output would come back as the string
    ...
    ValueError:
 
-Predictions are described by the declared class labels, not by the wider
-dtype that also has to represent ``missing_label``.  ``predict`` therefore
-returns the dtype of ``classes_`` for a single-output target, and the dtype
-its per-output vocabularies have in common for a multi-label target.  Integer
-classes combined with the default ``missing_label=np.nan`` are the common
-case: targets are held as ``float64`` so that missing labels fit beside them,
-while predictions come back as ``int64`` and stay usable where class labels
-are expected, e.g. as indices.
+Predictions use the dtype of the declared class labels, not the potentially
+wider dtype required by ``missing_label``. For a single-output target,
+``predict`` therefore returns the dtype of ``classes_``. For a multi-label
+target, it returns the common dtype of the per-output vocabularies.
+
+A common case is integer classes together with the default
+``missing_label=np.nan``. The target array then uses ``float64`` so that it can
+contain ``np.nan``, while predictions use ``int64`` and remain valid wherever
+class labels are expected, for example as indices.
 
 .. doctest::
 
@@ -278,8 +299,9 @@ are expected, e.g. as indices.
    >>> dtype_clf.predict(dtype_X).dtype == dtype_clf.classes_.dtype
    True
 
-Without explicit ``classes``, resolution never invents a ``(0, 1)``
-vocabulary.  A column with fewer than two observed classes raises an error.
+If ``classes`` is not specified, target resolution never assumes a ``(0, 1)``
+vocabulary. A label column with fewer than two observed classes therefore raises
+an error.
 
 .. doctest::
 
@@ -295,9 +317,10 @@ vocabulary.  A column with fewer than two observed classes raises an error.
    ...
    ValueError:
 
-The current contract treats a multi-label sample as one complete vector.  Each
-row must therefore be wholly observed or wholly missing; mixed rows would imply
-partial-label training or acquisition, which is not supported.
+The current contract treats the multi-label target of a sample as one complete
+label vector. A row must therefore be either fully observed or fully missing.
+A partially observed row would require partial-label training or acquisition,
+which is not supported.
 
 .. doctest::
 
@@ -315,12 +338,13 @@ partial-label training or acquisition, which is not supported.
 Ambiguous two-dimensional classification
 ========================================
 
-For single-annotator classification, a bare two-dimensional ``y`` with
-``target_type="auto"`` and ``classes=None`` is ambiguous: columns could be
-binary label outputs or distinct future outputs.  Values that happen to look
-binary do not resolve that ambiguity.  Disambiguate by declaring
-``target_type``, supplying a flat or nested class vocabulary, or passing a
-fitted estimator whose ``target_spec_`` already provides resolved evidence.
+For single-annotator classification, a two-dimensional ``y`` is ambiguous when
+``target_type="auto"`` and ``classes=None``. Its columns could represent binary
+label outputs or distinct outputs of a future multi-output classification task.
+Binary-looking values do not resolve this ambiguity.
+
+Specify ``target_type``, provide a flat or nested class vocabulary, or pass a
+fitted estimator whose ``target_spec_`` already resolves the target semantics.
 
 .. doctest::
 
@@ -331,31 +355,34 @@ fitted estimator whose ``target_spec_`` already provides resolved evidence.
    ...
    ValueError:
 
-A flat vocabulary under ``"auto"`` means single-output classification.  A
-nested set of binary vocabularies means multi-label classification.  A nested
-vocabulary containing a non-binary output resolves to future multi-output
-classification, which current components reject as unsupported.
+With ``target_type="auto"``, a flat class vocabulary resolves to single-output
+classification. A nested set of binary vocabularies resolves to multi-label
+classification. A nested vocabulary containing a non-binary output resolves to
+multi-output classification. This target type is recognized but is not yet
+supported by current components.
 
 Single-output column vectors
 ============================
 
-A target of shape ``(n_samples, 1)`` is accepted once its target semantics
-resolve to single-output.  For classification, an explicit
-``target_type="single-output"`` or a flat class vocabulary provides the
-necessary evidence; classifiers and pool query strategies then convert the
-column to the canonical one-dimensional representation and emit a
-``DataConversionWarning``.  A bare classification column under
-``target_type="auto"`` and ``classes=None`` remains an ambiguous
-two-dimensional target.
+A target with shape ``(n_samples, 1)`` is accepted once its semantics resolve to
+single-output. For classification, either an explicit
+``target_type="single-output"`` or a flat class vocabulary provides enough
+information. Classifiers and pool query strategies then convert the column to
+the canonical one-dimensional representation and emit a
+``DataConversionWarning``.
+
+A classification column with ``target_type="auto"`` and ``classes=None`` remains
+an ambiguous two-dimensional target.
 
 For regression, both ``target_type="auto"`` and an explicit
-``target_type="single-output"`` accept a column vector, preserving the
-existing regression contract.  This holds wherever the task is known, i.e.
-at a regressor and at a strategy that resolves its targets by one.  A
-task-agnostic strategy knows neither the task nor a class vocabulary, so it
-treats every bare two-dimensional target as ambiguous, whether its values
-are continuous or discrete.  A target with more than one column is not a
-single-output target for either task.
+``target_type="single-output"`` accept a column vector, preserving the existing
+regression behavior. This applies whenever the task is known, for example in a
+regressor or in a strategy that resolves its targets through a regressor.
+
+A task-agnostic strategy has neither a known task nor a class vocabulary.
+Therefore, it treats every bare two-dimensional target as ambiguous, regardless
+of whether the values are continuous or discrete. A target with more than one
+column is not single-output for either classification or regression.
 
 Target-aware masks and indices
 ==============================
@@ -363,12 +390,16 @@ Target-aware masks and indices
 :func:`~skactiveml.utils.is_labeled`,
 :func:`~skactiveml.utils.is_unlabeled`,
 :func:`~skactiveml.utils.labeled_indices`, and
-:func:`~skactiveml.utils.unlabeled_indices` accept the keyword-only
-``target_type`` argument.  The default ``"single-output"`` behavior remains
-elementwise, including for multi-annotator matrices.  With
-``target_type="multi-label"``, the helpers validate complete-or-missing rows
-and return sample-level masks or indices.  They do not accept ``"auto"``;
-pass the concrete value from a resolved specification.
+:func:`~skactiveml.utils.unlabeled_indices` accept a keyword-only ``target_type``
+argument.
+
+With the default ``target_type="single-output"``, their behavior remains
+elementwise, including for multi-annotator matrices. With
+``target_type="multi-label"``, they require each row to be fully observed or
+fully missing and return sample-level masks or indices.
+
+These helpers do not accept ``"auto"``. Pass the concrete ``target_type`` from a
+resolved target specification.
 
 .. doctest::
 
@@ -381,20 +412,23 @@ pass the concrete value from a resolved specification.
 Regression
 ==========
 
-Regressors accept ``target_type="auto"`` and ``"single-output"`` for
-currently supported execution.  One-dimensional numerical targets resolve to
-single-output regression, and column vectors remain compatible.  Multiple
-target columns resolve to recognized ``"multi-output"`` regression semantics,
-but regressors reject that valid specification because multi-output execution
-is not yet a declared capability.  Regression target specifications always
-have ``classes=None``.
+For currently supported regression, regressors accept ``target_type="auto"``
+and ``target_type="single-output"``. One-dimensional numeric targets resolve to
+single-output regression, and column vectors remain supported.
 
-A single-output regression target is described by one value per sample, so
-``predict`` returns an array of shape ``(n_samples,)``.  A wrapped estimator
-may describe one sample by a column instead; its predictions are narrowed to
-the declared target type.  Predictions describing several target columns are
-rejected rather than flattened, because flattening would silently turn them
-into ``n_samples * n_outputs`` values that no longer describe a sample each.
+Targets with multiple columns resolve to the recognized
+``target_type="multi-output"`` semantics. The specification itself is valid,
+but regressors reject it because multi-output regression is not yet a supported
+capability. Regression target specifications always have ``classes=None``.
+
+A single-output regression target contains one value per sample, so ``predict``
+returns an array of shape ``(n_samples,)``. A wrapped estimator may instead
+return one prediction per sample as a column; this column is reduced to the
+shape required by the declared single-output target type.
+
+Predictions with several target columns are rejected rather than flattened.
+Flattening them would produce ``n_samples * n_outputs`` values and would no
+longer preserve one target value per sample.
 
 .. doctest::
 
@@ -410,37 +444,42 @@ into ``n_samples * n_outputs`` values that no longer describe a sample each.
 Multiple annotators
 ===================
 
-Target type and annotation type are independent axes.  In a multi-annotator
-matrix, columns identify annotators supplying observations for the same
-single-output label; they are not label-output columns.  Mixed observed and
-missing entries within one sample remain valid.  Existing multi-annotator
-estimators and strategies keep that annotation type internally and preserve
-sample-annotator acquisition: query results still identify ``(sample,
-annotator)`` pairs.
+Target type and annotation type are independent. In a multi-annotator target
+matrix, the columns represent annotators that provide observations for the same
+single-output target. They do not represent separate label outputs.
+
+A sample may therefore contain both observed and missing annotator labels.
+Existing multi-annotator estimators and strategies retain the multi-annotator
+annotation type and continue to query sample-annotator pairs, so query results
+still identify ``(sample, annotator)`` pairs.
 
 Errors and component capabilities
 =================================
 
-Invalid semantics fail during resolution.  Examples include an unknown
-``target_type`` or ``target_type="multi-label"`` with regression.  A valid
-target specification that is absent from a component's exact capabilities
-fails later with a capability error naming both the requested and supported
-combinations.  This distinction tells users whether to correct the meaning of
-their input or choose a component that implements it.
+Invalid target semantics raise an error during resolution. Examples include an
+unknown ``target_type`` or ``target_type="multi-label"`` for regression.
 
-After fitting, inspect ``estimator.target_spec_`` instead of repeating target
-resolution from array shape.  In particular, inspect its ``target_type`` and
-``annotation_type`` before selecting downstream behavior, and use its
-``classes`` as the canonical classification vocabulary.
+A different case is a valid target specification that a particular component
+does not support. This passes resolution and fails during capability checking.
+The resulting error reports both the requested specification and the supported
+combinations. The distinction indicates whether the target declaration itself
+must be corrected or a different component is required.
+
+After fitting, use ``estimator.target_spec_`` rather than inferring the semantics
+again from the shape of the target array. In particular, use its ``target_type``
+and ``annotation_type`` to choose downstream behavior and its ``classes`` as the
+canonical class vocabulary for classification.
 
 Recognized future semantics
 ===========================
 
-The contract deliberately recognizes without executing multi-output
-classification and multi-output regression.  It also defers partial-label
-querying and multi-label multi-annotator querying.  These are capability and
-acquisition-scope limits, not architectural conflations: target type remains
-separate from annotation type, and acquisition granularity is not stored in
-``TargetSpec``.  Future support can therefore add exact component capabilities
-and an explicit acquisition model without changing the meanings published
-here.
+The target contract already recognizes multi-output classification and
+multi-output regression, although current components do not execute them.
+Partial-label querying and multi-label multi-annotator querying are also not yet
+supported.
+
+These are limits of current component capabilities and acquisition scope. They
+do not change the distinction between target type and annotation type, and
+acquisition granularity is not part of ``TargetSpec``. Future support can
+therefore add the required component capabilities and an explicit acquisition
+model without changing the target semantics defined here.
