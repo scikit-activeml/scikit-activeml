@@ -23,11 +23,40 @@ from skactiveml.utils._validation import (
     _check_1d_class_list,
     _check_callable,
     _check_forward_outputs,
+    _check_probas_are_valid,
     _has_nested_classes,
 )
 
 
 class TestValidation(unittest.TestCase):
+    def test_check_probas_are_valid(self):
+        valid_cases = [
+            (np.array([[0.25, 0.75], [1.0, 0.0]]), False),
+            (np.array([[0.25, 0.75], [1.0, 0.0]]), True),
+        ]
+        for probas, is_multilabel in valid_cases:
+            with self.subTest(is_multilabel=is_multilabel):
+                _check_probas_are_valid(probas, is_multilabel=is_multilabel)
+
+        invalid_cases = [
+            (np.array([[2.0, -1.0]]), False),
+            (np.array([[1.5, -0.5]]), False),
+            (np.array([[0.25, 0.25]]), False),
+            (np.array([[np.nan, np.nan]]), False),
+            (np.array([[2.0, -1.0]]), True),
+            (np.array([[np.nan, 0.5]]), True),
+        ]
+        for probas, is_multilabel in invalid_cases:
+            with self.subTest(
+                probas=probas.tolist(), is_multilabel=is_multilabel
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "'probas' are invalid"
+                ):
+                    _check_probas_are_valid(
+                        probas, is_multilabel=is_multilabel
+                    )
+
     def test_canonicalize_multilabel_probas(self):
         probas_array = np.array([[0.2, 0.8], [0.7, 0.3]])
         np.testing.assert_allclose(

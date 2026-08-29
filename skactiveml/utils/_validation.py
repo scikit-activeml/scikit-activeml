@@ -244,12 +244,13 @@ def _check_probas_are_valid(probas, is_multilabel, hint=""):
     """
     probas = np.asarray(probas)
     suffix = f" {hint}" if hint else ""
-    if is_multilabel:
-        if not np.all(probas <= 1) or not np.all(0 <= probas):
-            raise ValueError(
-                f"'probas' are invalid. They need to be within [0,1].{suffix}"
-            )
-    elif not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3):
+    if not np.all((0 <= probas) & (probas <= 1)):
+        raise ValueError(
+            f"'probas' are invalid. They need to be within [0,1].{suffix}"
+        )
+    if not is_multilabel and not np.allclose(
+        np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3
+    ):
         raise ValueError(
             f"'probas' are invalid. The sum over axis 1 must be one.{suffix}"
         )

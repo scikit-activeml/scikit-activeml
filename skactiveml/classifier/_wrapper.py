@@ -2136,7 +2136,7 @@ if successful_skorch_torch_import:
             - If `None`, the torch.nn.Module is set to
               `torch.nn.CrossEntropyLoss` in the case of a single output
               classification problem and `torch.nn.BCEWithLogitsLoss` in the
-              case of a multioutput classification problem. The criterion is
+              case of a multi-label classification problem. The criterion is
               therefore deferred until the target type is resolved, unlike
               `SkorchRegressor`, which supports a single target type and
               names a concrete default.

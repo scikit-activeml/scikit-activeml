@@ -6,9 +6,7 @@ uncertainties as sample weights.
 """
 
 import numpy as np
-
-from copy import deepcopy
-from inspect import signature
+from sklearn.cluster import KMeans
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -22,7 +20,7 @@ from ..utils import (
     check_type,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
-from sklearn.cluster import KMeans
+from ._clustering import _set_random_state_if_supported
 from ._target import _fit_and_resolve_estimator_target_spec
 
 
@@ -330,12 +328,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         # Perform clustering to get centroids.
         cluster_algo_dict[self.n_cluster_param_name] = batch_size
 
-        # Optionally, set random state.
-        cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
-        algo_has_seed = "random_state" in cluster_algo_sig
-        dict_lacks_seed = "random_state" not in cluster_algo_dict
-        if self.random_state is not None and algo_has_seed and dict_lacks_seed:
-            cluster_algo_dict["random_state"] = deepcopy(self.random_state)
+        _set_random_state_if_supported(
+            self.cluster_algo, cluster_algo_dict, self.random_state
+        )
 
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
         dist = cluster_obj.fit_transform(

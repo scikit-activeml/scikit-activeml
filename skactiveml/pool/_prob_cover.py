@@ -1,11 +1,8 @@
-import numpy as np
 import warnings
 
-
-from copy import deepcopy
-from inspect import signature
-from sklearn.metrics import pairwise_distances
+import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances
 from sklearn.utils.validation import column_or_1d
 
 from ..base import SingleAnnotatorPoolQueryStrategy
@@ -15,6 +12,7 @@ from ..utils import (
     check_scalar,
     is_labeled,
 )
+from ._clustering import _set_random_state_if_supported
 
 
 class ProbCover(SingleAnnotatorPoolQueryStrategy):
@@ -251,11 +249,9 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             if self.cluster_algo_dict is None
             else self.cluster_algo_dict.copy()
         )
-        cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
-        algo_has_seed = "random_state" in cluster_algo_sig
-        dict_lacks_seed = "random_state" not in cluster_algo_dict
-        if self.random_state is not None and algo_has_seed and dict_lacks_seed:
-            cluster_algo_dict["random_state"] = deepcopy(self.random_state)
+        _set_random_state_if_supported(
+            self.cluster_algo, cluster_algo_dict, self.random_state
+        )
 
         if update or not hasattr(self, "delta_max_"):
             # Compute distances between each pair of observed samples.

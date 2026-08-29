@@ -1,12 +1,10 @@
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, check_scalar, rand_argmax
-
-from copy import deepcopy
-from inspect import signature
-from sklearn.cluster import KMeans
-from sklearn.neighbors import NearestNeighbors
+from ._clustering import _set_random_state_if_supported
 
 
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
@@ -179,12 +177,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         n_clusters = len(labeled_sample_indices) + batch_size
         cluster_algo_dict[self.n_cluster_param_name] = n_clusters
 
-        # Optionally, set random state.
-        cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
-        algo_has_seed = "random_state" in cluster_algo_sig
-        dict_lacks_seed = "random_state" not in cluster_algo_dict
-        if self.random_state is not None and algo_has_seed and dict_lacks_seed:
-            cluster_algo_dict["random_state"] = deepcopy(self.random_state)
+        _set_random_state_if_supported(
+            self.cluster_algo, cluster_algo_dict, self.random_state
+        )
 
         # Create object for clustering with given parameters.
         cluster_obj = self.cluster_algo(**cluster_algo_dict)

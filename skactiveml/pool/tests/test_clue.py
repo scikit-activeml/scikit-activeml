@@ -301,6 +301,60 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
 
                     prev_utilities = utilities
 
+    def test_query_random_state_controls_clustering(self):
+        X, y_true = make_blobs(n_samples=100, centers=4, random_state=0)
+        y = np.full(len(X), MISSING_LABEL)
+        estimator = ParzenWindowClassifier(classes=np.unique(y_true))
+
+        repeated = [
+            Clue(random_state=7).query(X, y, estimator=estimator, batch_size=5)
+            for _ in range(4)
+        ]
+        for query_indices in repeated[1:]:
+            np.testing.assert_array_equal(query_indices, repeated[0])
+
+        different_seed = Clue(random_state=8).query(
+            X, y, estimator=estimator, batch_size=5
+        )
+        self.assertFalse(np.array_equal(repeated[0], different_seed))
+
+        propagated_seed = Clue(random_state=0).query(
+            X, y, estimator=estimator, batch_size=5
+        )
+        explicit_seed = Clue(
+            random_state=7, cluster_algo_dict={"random_state": 0}
+        ).query(X, y, estimator=estimator, batch_size=5)
+        np.testing.assert_array_equal(explicit_seed, propagated_seed)
+
+        # A one-centroid clustering problem was deterministic before seed
+        # propagation and remains unchanged for integer and absent seeds.
+        np.testing.assert_array_equal(
+            Clue(random_state=7).query(
+                X, y, estimator=estimator, batch_size=1
+            ),
+            [76],
+        )
+        np.testing.assert_array_equal(
+            Clue(random_state=None).query(
+                X, y, estimator=estimator, batch_size=1
+            ),
+            [76],
+        )
+
+        class FirstPointsClustering:
+            def __init__(self, n_clusters):
+                self.n_clusters = n_clusters
+
+            def fit_transform(self, X, y=None, sample_weight=None):
+                return np.linalg.norm(
+                    X[:, np.newaxis] - X[: self.n_clusters], axis=2
+                )
+
+        query_indices = Clue(
+            cluster_algo=FirstPointsClustering, random_state=7
+        ).query(X, y, estimator=estimator, batch_size=5)
+        self.assertEqual(query_indices.shape, (5,))
+
     def test_query_multilabel_with_list_probas(self):
         X = self.query_default_params_clf_multilabel["X"]
         y = self.query_default_params_clf_multilabel["y"]

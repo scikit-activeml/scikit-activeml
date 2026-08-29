@@ -713,6 +713,10 @@ class TestParallelUtilityEstimationWrapper(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
     supports_multilabel_batch_variation = False
+    # This wrapper parallelizes one-sample utility estimates and deliberately
+    # rejects larger batches; its wrapped strategies retain their own batch
+    # reproducibility coverage.
+    reproducibility_batch_size = 1
 
     def setUp(self):
         X, y = load_breast_cancer(return_X_y=True)

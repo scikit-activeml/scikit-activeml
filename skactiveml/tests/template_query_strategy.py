@@ -423,6 +423,8 @@ class TemplateQueryStrategy:
 
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
+    reproducibility_batch_size = 2
+
     def setUp(
         self,
         qs_class,
@@ -722,16 +724,24 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         ]:
             if query_params is not None:
                 query_params = deepcopy(query_params)
+                # Batch-level algorithms may delegate randomness to a
+                # component that is not exercised for `batch_size=1`, e.g.,
+                # a one-centroid clustering problem. Keep the shared
+                # reproducibility contract on a genuine batch.
+                query_params["batch_size"] = self.reproducibility_batch_size
                 query_params["return_utilities"] = True
                 id1, u1 = qs1.query(**query_params)
                 id1_again, u1_again = qs1.query(**query_params)
                 id2, u2 = qs2.query(**query_params)
+                id2_again, u2_again = qs2.query(**query_params)
 
                 self.assertEqual(len(u1[0]), len(query_params["X"]))
                 np.testing.assert_array_equal(id1, id1_again)
                 np.testing.assert_allclose(u1, u1_again)
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
+                np.testing.assert_array_equal(id2, id2_again)
+                np.testing.assert_allclose(u2, u2_again)
 
     def test_query_multilabel_invalid_rows(self):
         # Partially observed multi-label rows are rejected, for the ordinary
