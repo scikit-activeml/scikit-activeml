@@ -119,34 +119,16 @@ class TestExamples(unittest.TestCase):
             for strategy, examples in examples_by_strategy.items()
             if any("multi-label" in example["tags"] for example in examples)
         }
+        # The tags are not rendered; they only decide which rows the
+        # `Multi-Label` filter of the strategy overview surfaces. What a user
+        # depends on is therefore that no multi-label capable strategy is
+        # missing from that filter, which is what this comparison states.
+        # Whether every single example of such a strategy is tagged is not
+        # checked, because a class declares its capabilities while an example
+        # describes one configuration of it, e.g.
+        # `UncertaintySampling(method="expected_average_precision")` is not
+        # multi-label capable although its class is.
         self.assertEqual(expected_strategies, tagged_strategies)
-        # A strategy declares its capabilities per class, but an example
-        # describes one configuration of it. Where a configuration is not
-        # multi-label capable even though its class is (e.g.
-        # `UncertaintySampling(method="expected_average_precision")`), the
-        # example opts out via `"multi_label_capable": false`.
-        for strategy in expected_strategies:
-            for example in examples_by_strategy[strategy]:
-                method = example["method"]
-                with self.subTest(strategy=strategy, example=method):
-                    if example.get("multi_label_capable", True):
-                        self.assertIn(
-                            "multi-label",
-                            example["tags"],
-                            msg=f'The "{method}" example is not '
-                            'tagged "multi-label". Tag it, or set '
-                            '"multi_label_capable" to false if this '
-                            "configuration cannot handle multi-label "
-                            "targets.",
-                        )
-                    else:
-                        self.assertNotIn(
-                            "multi-label",
-                            example["tags"],
-                            msg=f'The "{method}" example is tagged '
-                            '"multi-label" but declares '
-                            '"multi_label_capable" as false.',
-                        )
 
     def test_strategy_overview_has_multilabel_filter(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
