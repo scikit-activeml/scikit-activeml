@@ -192,7 +192,9 @@ html_theme_options = {
     },
     "check_switcher": False,
     "navbar_start": ["navbar-logo", "version-switcher"],
-    "header_links_before_dropdown": 7,
+    # Keep the header on one line at any viewport width. The remaining
+    # links stay reachable through the "More" dropdown.
+    "header_links_before_dropdown": 5,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
