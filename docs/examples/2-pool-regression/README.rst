@@ -1,4 +1,4 @@
-Pool-based AL Strategies for Regression
----------------------------------------
+🏊 Pool-based Active Learning: Regression
+-----------------------------------------
 
 .. image:: /examples/pool_regression_legend.png
