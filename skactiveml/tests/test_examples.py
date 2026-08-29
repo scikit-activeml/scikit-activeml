@@ -6,7 +6,13 @@ import tempfile
 import unittest
 from os import path
 
-from docs.generate import generate_examples, generate_strategy_overview_rst
+from docutils.utils import column_width
+
+from docs.generate import (
+    OVERVIEW_HEADINGS,
+    generate_examples,
+    generate_strategy_overview_rst,
+)
 from skactiveml import pool, stream
 
 from skactiveml.pool import ExpectedErrorReduction
@@ -129,6 +135,95 @@ class TestExamples(unittest.TestCase):
         # `UncertaintySampling(method="expected_average_precision")` is not
         # multi-label capable although its class is.
         self.assertEqual(expected_strategies, tagged_strategies)
+
+    @staticmethod
+    def _overview_example(qs_name, method, category):
+        return {
+            "class": qs_name,
+            "package": "pool",
+            "method": method,
+            "category": category,
+            "tags": ["pool", "classification", "single-annotator"],
+            "refs": [],
+        }
+
+    def _generate_overview(self, json_data, sections=()):
+        """Render an overview and return it, with a stub for each section."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        gen_path = path.join(tmp_dir, "generated")
+        os.makedirs(gen_path)
+        for section in sections:
+            section_path = path.join(tmp_dir, "examples", section)
+            os.makedirs(section_path)
+            with open(path.join(section_path, "README.rst"), "w") as file:
+                file.write(f"{section}\n")
+        generate_strategy_overview_rst(gen_path, json_data)
+        with open(path.join(gen_path, "strategy_overview.rst")) as file:
+            return file.read()
+
+    def test_strategy_overview_groups_tasks_under_their_scenario(self):
+        # Two sections of one scenario share its heading, and each task and
+        # category is one level below the previous one.
+        sections = list(OVERVIEW_HEADINGS)[:2]
+        scenario, first_task = OVERVIEW_HEADINGS[sections[0]]
+        _, second_task = OVERVIEW_HEADINGS[sections[1]]
+        json_data = {
+            sections[0]: {
+                "data": [
+                    self._overview_example(
+                        "RandomSampling", "Random Sampling", "Baseline"
+                    )
+                ]
+            },
+            sections[1]: {
+                "data": [
+                    self._overview_example(
+                        "GreedySamplingX", "Greedy Sampling", "Informativeness"
+                    )
+                ]
+            },
+        }
+
+        overview = self._generate_overview(json_data, sections)
+
+        self.assertEqual(
+            overview.count(f"{scenario}\n"),
+            1,
+            msg="One scenario heading must cover all of its tasks.",
+        )
+        for title, underline in [
+            (scenario, "-"),
+            (first_task, "~"),
+            (second_task, "~"),
+            ("Baseline", "^"),
+            ("Informativeness", "^"),
+        ]:
+            with self.subTest(title=title):
+                # `docutils` measures an underline by its display width, so
+                # a title containing an emoji needs more characters than it
+                # has.
+                expected = "".ljust(column_width(title), underline)
+                self.assertIn(f"{title}\n{expected}\n", overview)
+
+    def test_strategy_overview_keeps_a_section_without_a_heading_path(self):
+        # A gallery section that nobody added to `OVERVIEW_HEADINGS` keeps
+        # its own title instead of silently losing its strategies.
+        json_data = {
+            "9-unmapped": {
+                "data": [
+                    self._overview_example(
+                        "RandomSampling", "Random Sampling", "Baseline"
+                    )
+                ]
+            }
+        }
+
+        with self.assertWarnsRegex(UserWarning, "OVERVIEW_HEADINGS"):
+            overview = self._generate_overview(json_data, ["9-unmapped"])
+
+        self.assertIn("9-unmapped\n", overview)
+        self.assertIn("RandomSampling", overview)
 
     def test_strategy_overview_has_multilabel_filter(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
