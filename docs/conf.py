@@ -126,7 +126,11 @@ exclude_patterns = [
     # including the generated .rst files
     'generated/sphinx_gallery_examples/**/*.ipynb',
     'examples/*',
-    'generated/examples/*'
+    'generated/examples/*',
+    # Executing a tutorial downloads third-party sources next to it. They
+    # are not documents of this project, so they are neither rendered nor
+    # reported as missing from a toctree.
+    'generated/**/.cache/**',
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.
