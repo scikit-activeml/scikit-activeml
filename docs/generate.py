@@ -14,6 +14,7 @@ import warnings
 import copy
 
 import numpy as np
+from docutils.utils import column_width
 from matplotlib.lines import Line2D
 from pybtex.database import parse_file
 import matplotlib.pyplot as plt
@@ -28,6 +29,36 @@ for module in skactiveml.__all__:
     importlib.import_module("skactiveml." + module)
 
 warnings.filterwarnings("ignore")
+
+# Heading path of each gallery section in the strategy overview, as
+# `(scenario, task)`. The wording matches `docs/tutorials.rst` verbatim, so
+# that both pages name the same things the same way. `sphinx-gallery` cannot
+# nest its sections, which is why the overview describes the hierarchy here
+# instead of reading it from the gallery directories.
+OVERVIEW_HEADINGS = OrderedDict(
+    [
+        (
+            "1-pool-classification",
+            ("\U0001F3CA Pool-based Active Learning", "Classification"),
+        ),
+        (
+            "2-pool-regression",
+            ("\U0001F3CA Pool-based Active Learning", "Regression"),
+        ),
+        (
+            "3-pool-multi-annotator",
+            (
+                "\U0001F3CA Pool-based Active Learning",
+                "Multi-annotator Learning",
+            ),
+        ),
+        (
+            "4-stream",
+            ("\U0001F30A Stream-based Active Learning", "Classification"),
+        ),
+    ]
+)
+
 
 def _format_generated_python_script(file_path, line_length=79):
     """Formats a generated Python example script with Black."""
@@ -267,16 +298,35 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "   <label>Single-Annotator</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="multi-annotator">\n '
-            "   <label>Multi-Annotator</label>\n"
+            "   <label>Multi-Annotator</label>\n\n"
+            '   <p id="tag-filter-status"></p>\n'
         )
         file.write("\n")
 
-        # Iterate over the sections.
-        strategy_order = list(strategy_table.keys())
-        strategy_order.sort()
-        for section_name in strategy_order:
+        # Iterate over the sections, ordered by their heading path so that
+        # one scenario heading covers all of its tasks.
+        known = [s for s in OVERVIEW_HEADINGS if s in strategy_table]
+        unknown = sorted(
+            s
+            for s in strategy_table
+            if len(s) > 0 and s not in OVERVIEW_HEADINGS
+        )
+        for section_name in unknown:
+            warnings.warn(
+                f'The gallery section "{section_name}" has no entry in '
+                f"`OVERVIEW_HEADINGS`, so it is described by its own "
+                f"`README.rst` instead of the shared heading vocabulary."
+            )
+
+        current_scenario = None
+        for section_name in known + unknown:
+            # The examples root is not a section of its own.
+            if len(section_name) == 0:
+                continue
             cats = strategy_table[section_name]
-            if len(section_name) > 0:
+            if section_name in OVERVIEW_HEADINGS:
+                scenario, task = OVERVIEW_HEADINGS[section_name]
+            else:
                 with open(
                     os.path.join(
                         os.path.dirname(gen_path),
@@ -284,15 +334,20 @@ def generate_strategy_overview_rst(gen_path, json_data):
                     ),
                     "r",
                 ) as f:
-                    first_line = f.readline().strip()
-            else:
-                first_line = ""
-            file.write(f"{first_line}\n")
-            file.write("".ljust(len(first_line), "-") + "\n")
-            file.write("\n")
+                    scenario, task = f.readline().strip(), None
+
+            if scenario != current_scenario:
+                file.write(f"{scenario}\n")
+                file.write("".ljust(column_width(scenario), "-") + "\n")
+                file.write("\n")
+                current_scenario = scenario
+            if task is not None:
+                file.write(f"{task}\n")
+                file.write("".ljust(column_width(task), "~") + "\n")
+                file.write("\n")
 
             # Iterate over the examples.
-            file.write(format_sections(cats))
+            file.write(format_sections(cats, underline="^"))
             file.write("\n")
 
         file.write("References\n")
@@ -360,14 +415,14 @@ def json_data_to_strategy_table(json_data, gen_path):
     return strategy_table
 
 
-def format_sections(cats, indent=0):
+def format_sections(cats, indent=0, underline="~"):
     string = ""
 
     # Iterate over the categories in the current paper.
     for cat in sorted(cats):
         if cat != "Others":
             string += f"{cat}\n"
-            string += "".ljust(len(cat), "~") + "\n"
+            string += "".ljust(column_width(cat), underline) + "\n"
             string += table_data_to_rst_table(
                 cats[cat], header_lines=1, indent=indent
             )
@@ -375,7 +430,7 @@ def format_sections(cats, indent=0):
         # 'Others' is the fallback, if no category is specified
         # in the json file
         string += "Others\n"
-        string += "~~~~~~\n"
+        string += "".ljust(column_width("Others"), underline) + "\n"
         string += table_data_to_rst_table(
             cats["Others"], header_lines=1, indent=indent
         )
