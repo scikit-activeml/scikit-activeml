@@ -89,10 +89,12 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             `(n_samples, n_outputs)` or a list of binary probability matrices
             with shape `(n_samples, 2)` per output.
         discriminator : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`. It
-            predicts a candidate sample's number of positive labels, i.e., its
-            label cardinality. The parameters `classes` and `missing_label`
-            will be internally redefined.
+            Model implementing the methods `fit` and `predict`. It must support
+            single-output classification with a single annotator and declare
+            `target_type="auto"` or `target_type="single-output"`. It predicts
+            a candidate sample's number of positive labels, i.e., its label
+            cardinality. The parameters `classes` and `missing_label` will be
+            internally redefined.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -174,6 +176,22 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(discriminator, "discriminator", SkactivemlClassifier)
+        discriminator_capability = (
+            "classification",
+            "single-output",
+            "single-annotator",
+        )
+        if (
+            getattr(discriminator, "target_type", "auto")
+            not in ("auto", "single-output")
+            or discriminator_capability
+            not in discriminator._target_capabilities
+        ):
+            raise ValueError(
+                "`discriminator` must support single-output classification "
+                "with a single annotator and declare `target_type='auto'` or "
+                "`target_type='single-output'`."
+            )
 
         discriminator = clone(discriminator)
         discriminator.classes = list(range(y.shape[1] + 1))

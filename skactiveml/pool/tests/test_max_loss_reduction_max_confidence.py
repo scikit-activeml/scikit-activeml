@@ -84,6 +84,25 @@ class TestMaxLossReductionMaxConfidence(
             [("invalid", TypeError), (self.discriminator, None)],
         )
 
+    def test_query_rejects_multilabel_discriminator(self):
+        discriminator = ParzenWindowClassifier(
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            random_state=0,
+            target_type="multi-label",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "`discriminator` must support single-output classification",
+        ):
+            self.qs.query(
+                self.X,
+                self.y,
+                discriminator=discriminator,
+                clf=self.clf,
+            )
+
     def test_query(self):
         query_idx1, utilities1 = self.qs.query(
             self.X,
