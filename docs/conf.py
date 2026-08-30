@@ -82,6 +82,7 @@ extensions = [
 nitpicky = True
 nitpick_ignore = [
     ("py:class", "skactiveml.pool._bald._GeneralBALD"),
+    ("py:class", "skactiveml.pool._wrapper._TargetPreservingWrapper"),
     ("py:class", "skactiveml.classifier.multiannotator._utils._SkorchMultiAnnotatorClassifier"),
 ]
 
