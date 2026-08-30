@@ -713,6 +713,19 @@ class TestUncertaintyScores(unittest.TestCase):
             cost_matrix=np.ones((2, 2)),
         )
 
+    def test_multilabel_cost_matrix_raises(self):
+        for method in ["least_confident", "margin_sampling", "entropy"]:
+            with self.subTest(method=method):
+                with self.assertRaisesRegex(
+                    ValueError, "cost_matrix.*multi-label"
+                ):
+                    uncertainty_scores(
+                        self.multilabel_probas,
+                        cost_matrix=np.ones((3, 3)),
+                        method=method,
+                        is_multilabel=True,
+                    )
+
     def test_uncertainty_scores(self):
         # least_confident
         val_scores = np.array([0.5, 0.3])
@@ -803,3 +816,11 @@ class TestUncertaintyScores(unittest.TestCase):
         np.testing.assert_allclose(
             np.array([0.4477710424, 0.6154752525]), scores
         )
+
+    def test_multilabel_entropy_is_zero_at_probability_endpoints(self):
+        certain_probas = np.array([[0.0, 1.0], [1.0, 0.0]])
+        scores = uncertainty_scores(
+            certain_probas, method="entropy", is_multilabel=True
+        )
+        np.testing.assert_array_equal(scores, np.zeros(2))
+        self.assertFalse(np.signbit(scores).any())

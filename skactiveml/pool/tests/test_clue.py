@@ -8,6 +8,7 @@ from sklearn.multioutput import MultiOutputClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.cluster import SpectralClustering, KMeans, MiniBatchKMeans
 from sklearn.exceptions import NotFittedError
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.pool import Clue
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.regressor import NadarayaWatsonRegressor
@@ -21,6 +22,41 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierEmbeddingUncertainty,
     ParzenWindowClassifierTriplet,
 )
+
+
+class ExactMultilabelClassifier(SkactivemlClassifier):
+    def __init__(
+        self,
+        probas=(0.0, 1.0),
+        classes=((0, 1), (0, 1)),
+        missing_label=MISSING_LABEL,
+    ):
+        super().__init__(
+            classes=classes,
+            missing_label=missing_label,
+            target_type="multi-label",
+        )
+        self.probas = probas
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
+
+    def fit(self, X, y, sample_weight=None):
+        target_spec = self._resolve_fitting_target_spec(y)
+        self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            target_spec=target_spec,
+        )
+        self.target_spec_ = target_spec
+        return self
+
+    def predict_proba(self, X):
+        return np.tile(self.probas, (len(X), 1))
 
 
 class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
@@ -373,6 +409,21 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
         self.assertEqual(query_idx.shape, (2,))
         self.assertEqual(utilities.shape, (2, len(X)))
         self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_multilabel_entropy_falls_back_for_certain_predictions(self):
+        X = np.array([[0, 0], [0, 1], [10, 0], [10, 1]])
+        y = np.full((len(X), 2), MISSING_LABEL)
+        query_indices = Clue(
+            method="entropy",
+            random_state=0,
+            cluster_algo_dict={"random_state": 0, "n_init": 1},
+        ).query(
+            X,
+            y,
+            estimator=ExactMultilabelClassifier(),
+            batch_size=2,
+        )
+        np.testing.assert_array_equal(query_indices, [3, 0])
 
     def test_query_multilabel_with_multiclass_list_probas_raises(self):
         X = np.linspace(0, 1, 12).reshape(6, 2)

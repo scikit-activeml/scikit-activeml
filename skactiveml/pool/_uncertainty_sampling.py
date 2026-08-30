@@ -357,8 +357,8 @@ def uncertainty_scores(
     - `1 - |2 * p_j - 1|` for `'margin_sampling'`, i.e., the margin between
       the two classes of the label output, and
     - `-(p_j * log(p_j) + (1 - p_j) * log(1 - p_j))` for `'entropy'`, i.e.,
-      the binary entropy of the label output, computed with an additive
-      `1e-10` inside both logarithms,
+      the binary entropy of the label output, with the endpoint terms
+      `0 * log(0)` defined as zero,
 
     and `multilabel_aggregation_fn` then reduces these per-label scores along
     the label axis to one score per sample. Correlations between label outputs
@@ -374,7 +374,8 @@ def uncertainty_scores(
     cost_matrix : array-like pf shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for
-        'least_confident' or 'margin_sampling'.
+        'least_confident' or 'margin_sampling' and single-output targets.
+        Cost matrices are not supported if `is_multilabel=True`.
     method : 'least_confident' or 'margin_sampling' or 'entropy', \
             default='least_confident'
         The method to calculate the uncertainty. For multilabel data, only
@@ -412,6 +413,12 @@ def uncertainty_scores(
     _check_probas_are_valid(probas, is_multilabel=is_multilabel)
 
     n_classes = probas.shape[1]
+
+    if is_multilabel and cost_matrix is not None:
+        raise ValueError(
+            "`cost_matrix` is not supported for multi-label uncertainty "
+            "scores."
+        )
 
     if is_multilabel and method not in [
         "least_confident",
@@ -455,9 +462,12 @@ def uncertainty_scores(
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
                 if is_multilabel:
-                    per_label_entropy = -(
-                        probas * np.log(probas + 1e-10)
-                        + (1 - probas) * np.log(1 - probas + 1e-10)
+                    per_label_entropy = np.zeros_like(probas)
+                    is_uncertain = (probas > 0) & (probas < 1)
+                    uncertain_probas = probas[is_uncertain]
+                    per_label_entropy[is_uncertain] = -(
+                        uncertain_probas * np.log(uncertain_probas)
+                        + (1 - uncertain_probas) * np.log1p(-uncertain_probas)
                     )
                     return multilabel_aggregation_fn(per_label_entropy, axis=1)
                 return np.nansum(-probas * np.log(probas), axis=1)
