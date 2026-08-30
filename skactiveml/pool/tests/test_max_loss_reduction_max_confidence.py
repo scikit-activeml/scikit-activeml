@@ -102,43 +102,6 @@ class TestMaxLossReductionMaxConfidence(
                 clf=self.clf,
             )
 
-    def test_query_labeled_candidates(self):
-        # A given `candidates` is authoritative, i.e., labeled samples remain
-        # candidates, e.g., to relabel them or to recompute their utilities.
-        lbld_idx = np.setdiff1d(np.arange(len(self.X)), self.unld_idx)
-        query_idx, utilities = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            candidates=np.arange(len(self.X)),
-            batch_size=4,
-            return_utilities=True,
-        )
-        self.assertFalse(np.isnan(utilities[0]).any())
-        self.assertTrue(np.isin(query_idx, lbld_idx).any())
-
-        # Restricting `candidates` to labeled samples selects among those.
-        query_idx_lbld = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            candidates=lbld_idx,
-            batch_size=2,
-        )
-        self.assertTrue(np.isin(query_idx_lbld, lbld_idx).all())
-
-        # In contrast, `candidates=None` considers unlabeled samples only.
-        query_idx_none = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            batch_size=3,
-        )
-        self.assertTrue(np.isin(query_idx_none, self.unld_idx).all())
-
     def test_query_delegates_to_public_utility(self):
         recorded = {}
         acquisition_scores = 1.0 + np.arange(len(self.unld_idx), dtype=float)

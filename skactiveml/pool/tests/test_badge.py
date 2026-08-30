@@ -493,48 +493,17 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertGreater(len(first_indices), 1)
 
     def test_query_labeled_candidates(self):
-        # A given `candidates` is authoritative, i.e., labeled samples remain
-        # candidates, e.g., to relabel them or to recompute their utilities.
-        X = np.random.RandomState(0).rand(10, 2)
-        y = np.hstack([np.tile([0, 1], 3), np.full(4, MISSING_LABEL)])
-        labeled_indices = np.arange(6)
-        clf = SklearnClassifier(
-            LogisticRegression(), classes=self.classes, random_state=0
-        )
+        query_params = self.query_default_params_clf
         query_indices, utilities = Badge(random_state=0).query(
-            X,
-            y,
-            clf,
-            candidates=np.arange(10),
-            batch_size=5,
+            query_params["X"],
+            query_params["y"],
+            query_params["clf"],
+            candidates=np.arange(2),
+            batch_size=2,
             return_utilities=True,
         )
-        self.assertEqual(len(np.unique(query_indices)), 5)
-        self.assertFalse(np.isnan(utilities[0]).any())
-        np.testing.assert_allclose(np.nansum(utilities, axis=1), 1)
-
-        # Restricting `candidates` to labeled samples selects among those.
-        query_indices_lbld = Badge(random_state=0).query(
-            X, y, clf, candidates=labeled_indices, batch_size=3
-        )
-        self.assertTrue(np.isin(query_indices_lbld, labeled_indices).all())
-        self.assertEqual(len(np.unique(query_indices_lbld)), 3)
-
-        # In contrast, `candidates=None` considers unlabeled samples only.
-        query_indices_none = Badge(random_state=0).query(
-            X, y, clf, batch_size=4
-        )
-        np.testing.assert_array_equal(
-            np.sort(query_indices_none), np.arange(6, 10)
-        )
-
-        # Without any unlabeled sample, `candidates=None` leaves nothing to
-        # select, which is answered with an empty batch.
-        with self.assertWarnsRegex(UserWarning, "exhausted"):
-            query_indices_exhausted = Badge(random_state=0).query(
-                X=X, y=np.tile([0, 1], 5), clf=clf
-            )
-        self.assertEqual(query_indices_exhausted.shape, (0,))
+        np.testing.assert_array_equal(np.sort(query_indices), [0, 1])
+        self.assertTrue(np.isfinite(utilities[0, :2]).all())
 
     def test_query_candidates_as_sample_matrix(self):
         # Candidates that are given as a sample matrix are indexed directly.

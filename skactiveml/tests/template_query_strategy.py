@@ -1405,6 +1405,38 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
     test_query_batch_variation = None
     test_query_multilabel_candidate_variation = None
 
+    def test_query_labeled_candidates(self):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        missing_label = self.init_default_params["missing_label"]
+        unld_idx = unlabeled_indices(
+            query_params["y"],
+            missing_label,
+            target_type="multi-label",
+        )
+        lbld_idx = np.setdiff1d(np.arange(len(query_params["X"])), unld_idx)
+
+        query_params.update(
+            candidates=np.arange(len(query_params["X"])),
+            batch_size=4,
+            return_utilities=True,
+        )
+        query_idx, utilities = strategy.query(**query_params)
+        self.assertFalse(np.isnan(utilities[0]).any())
+        self.assertTrue(np.isin(query_idx, lbld_idx).any())
+
+        query_params.update(
+            candidates=lbld_idx, batch_size=2, return_utilities=False
+        )
+        query_idx = strategy.query(**query_params)
+        self.assertTrue(np.isin(query_idx, lbld_idx).all())
+
+        query_params.update(
+            candidates=None, batch_size=3, return_utilities=False
+        )
+        query_idx = strategy.query(**query_params)
+        self.assertTrue(np.isin(query_idx, unld_idx).all())
+
     def _query_multilabel_only_strategy(self, strategy, y, clf, **kwargs):
         query_params = deepcopy(self.query_default_params_clf_multilabel)
         query_params.update(y=y, clf=clf, **kwargs)
