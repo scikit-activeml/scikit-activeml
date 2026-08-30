@@ -1595,9 +1595,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if not self._is_multilabel_target():
             return "array"
 
-        is_multilabel = all(len(classes_j) == 2 for classes_j in self.classes_)
         if self.proba_format == "auto":
-            return "array" if is_multilabel else "list"
+            return "array"
         return self.proba_format
 
     def _is_multilabel_target(self):
