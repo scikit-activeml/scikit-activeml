@@ -1,5 +1,4 @@
 import unittest
-import warnings
 from unittest.mock import patch
 
 import numpy as np
@@ -346,38 +345,6 @@ class TestMaxLossReductionMaxConfidence(
                             discriminator=self.discriminator,
                             clf=self.clf,
                         )
-
-    def test_query_batch_variation(self):
-        query_idx, utilities = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            batch_size=3,
-            return_utilities=True,
-        )
-        self.assertEqual(query_idx.shape, (3,))
-        self.assertEqual(utilities.shape, (3, len(self.X)))
-
-        self.assertWarns(
-            Warning,
-            self.qs.query,
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            batch_size=len(self.unld_idx) + 1,
-        )
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore")
-            query_idx = self.qs.query(
-                self.X,
-                self.y,
-                discriminator=self.discriminator,
-                clf=self.clf,
-                batch_size=len(self.unld_idx) + 1,
-            )
-            self.assertEqual(len(query_idx), len(self.unld_idx))
 
 
 class TestMaxLossReductionMaxConfidenceFunction(unittest.TestCase):

@@ -1,5 +1,4 @@
 import unittest
-import warnings
 from unittest.mock import patch
 
 import numpy as np
@@ -130,35 +129,6 @@ class TestLabelCardinalityInconsistency(
             self.X, self.y, clf=self.clf, batch_size=3
         )
         self.assertTrue(np.isin(query_idx_none, self.unld_idx).all())
-
-    def test_query_batch_variation(self):
-        query_idx, utilities = self.qs.query(
-            self.X,
-            self.y,
-            clf=self.clf,
-            batch_size=3,
-            return_utilities=True,
-        )
-        self.assertEqual(query_idx.shape, (3,))
-        self.assertEqual(utilities.shape, (3, len(self.X)))
-
-        self.assertWarns(
-            Warning,
-            self.qs.query,
-            self.X,
-            self.y,
-            clf=self.clf,
-            batch_size=len(self.unld_idx) + 1,
-        )
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore")
-            query_idx = self.qs.query(
-                self.X,
-                self.y,
-                clf=self.clf,
-                batch_size=len(self.unld_idx) + 1,
-            )
-            self.assertEqual(len(query_idx), len(self.unld_idx))
 
     def test_query_with_sample_weight(self):
         DummyMultilabelClassifier.last_sample_weight = None

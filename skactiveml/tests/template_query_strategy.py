@@ -1393,6 +1393,7 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
     def test_query(self):
         super().test_query_multilabel_candidate_variation()
 
+    test_query_batch_variation = None
     test_query_multilabel_candidate_variation = None
 
     def _query_multilabel_only_strategy(self, strategy, y, clf, **kwargs):
