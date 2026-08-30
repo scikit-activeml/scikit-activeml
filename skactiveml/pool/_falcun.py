@@ -89,11 +89,12 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.gamma = gamma
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):

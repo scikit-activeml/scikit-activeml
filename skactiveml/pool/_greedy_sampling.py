@@ -259,7 +259,9 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.method = method
         self.x_metric = x_metric
@@ -267,7 +269,6 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         self.x_metric_dict = x_metric_dict
         self.y_metric_dict = y_metric_dict
         self.n_GSx_samples = n_GSx_samples
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):

@@ -203,13 +203,14 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
         target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.query_strategy = query_strategy
         self.max_candidates = max_candidates
         self.exclude_non_subsample = exclude_non_subsample
         self.embed_samples_func = embed_samples_func
-        self.target_type = target_type
 
     @match_signature("query_strategy", "query")
     def query(
@@ -507,12 +508,13 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
         target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.query_strategy = query_strategy
         self.n_jobs = n_jobs
         self.parallel_dict = parallel_dict
-        self.target_type = target_type
 
     @match_signature("query_strategy", "query")
     def query(

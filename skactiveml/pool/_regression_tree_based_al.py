@@ -69,11 +69,12 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.method = method
         self.max_iter_representativity = max_iter_representativity
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):

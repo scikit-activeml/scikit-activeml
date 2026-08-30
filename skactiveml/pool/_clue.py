@@ -130,7 +130,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
@@ -138,7 +140,6 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         self.method = method
         self.predict_dict = predict_dict
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):

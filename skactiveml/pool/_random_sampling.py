@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, simple_batch
+from ..utils import simple_batch
 
 
 class RandomSampling(SingleAnnotatorPoolQueryStrategy):
@@ -31,18 +31,6 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
                 ("classification", "multi-label", "single-annotator"),
                 ("regression", "single-output", "single-annotator"),
             }
-        )
-
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label,
-            random_state=random_state,
-            target_type=target_type,
         )
 
     def query(

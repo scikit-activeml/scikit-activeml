@@ -6,7 +6,6 @@ from sklearn import clone
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     ExtLabelEncoder,
-    MISSING_LABEL,
     is_unlabeled,
     simple_batch,
     check_type,
@@ -44,17 +43,6 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
        the 15th ACM SIGKDD International Conference on Knowledge Discovery and
        Data Mining (pp. 917-926).
     """
-
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
-        )
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):

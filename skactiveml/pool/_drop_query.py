@@ -130,7 +130,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         self.clf_embedding_flag_name = clf_embedding_flag_name
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
         self.disagreement_threshold = disagreement_threshold
-        self.target_type = target_type
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
