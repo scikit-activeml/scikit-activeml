@@ -10,11 +10,13 @@ from skactiveml.pool import Falcun
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelAggregationQueryStrategy,
 )
 
 
-class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestFalcun(
+    TemplateMultilabelAggregationQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         X = np.linspace(0, 1, 20).reshape(10, 2)
         y = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
@@ -84,11 +86,6 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             (-0.5, ValueError),
         ]
         self._test_param("init", "gamma", test_cases)
-
-    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
-        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

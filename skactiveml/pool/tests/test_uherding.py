@@ -14,7 +14,7 @@ from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import MaxHerding, UHerding
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelAggregationQueryStrategy,
     _relabel_multilabel_target,
 )
 from skactiveml.tests.utils import (
@@ -124,7 +124,7 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
 
 
 class TestUHerding(
-    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+    TemplateMultilabelAggregationQueryStrategy, unittest.TestCase
 ):
     def setUp(self):
         self.classes = [0, 1]
@@ -300,11 +300,6 @@ class TestUHerding(
             test_cases,
             replace_init_params={"adaptive_sigma": False},
         )
-
-    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
-        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

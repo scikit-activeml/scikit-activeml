@@ -1385,6 +1385,15 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
             pass
 
 
+class TemplateMultilabelAggregationQueryStrategy(
+    TemplateSingleAnnotatorPoolQueryStrategy
+):
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
+
+
 class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
     TemplateSingleAnnotatorPoolQueryStrategy
 ):

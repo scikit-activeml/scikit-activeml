@@ -11,7 +11,7 @@ from skactiveml.pool import DropQuery
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelAggregationQueryStrategy,
 )
 from skactiveml.tests.utils import (
     ParzenWindowClassifierEmbedding,
@@ -20,7 +20,7 @@ from skactiveml.tests.utils import (
 
 
 class TestDropQuery(
-    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+    TemplateMultilabelAggregationQueryStrategy, unittest.TestCase
 ):
     def setUp(self):
         X = np.linspace(0, 1, 20).reshape(10, 2)
@@ -195,11 +195,6 @@ class TestDropQuery(
             replace_query_params=self.query_default_params_clf_embedding,
             test_cases=test_cases,
         )
-
-    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
-        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
