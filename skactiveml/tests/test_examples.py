@@ -225,24 +225,40 @@ class TestExamples(unittest.TestCase):
         self.assertIn("9-unmapped\n", overview)
         self.assertIn("RandomSampling", overview)
 
-    def test_strategy_overview_has_multilabel_filter(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            gen_path = path.join(tmp_dir, "generated")
-            section_path = path.join(tmp_dir, "examples", "section")
-            os.makedirs(gen_path)
-            os.makedirs(section_path)
-            with open(path.join(section_path, "README.rst"), "w") as file:
-                file.write("Section\n")
+    def test_strategy_overview_offers_a_filter_per_tag(self):
+        # The tags themselves are never rendered; a strategy reaches a user
+        # only through these checkboxes, so every tag a row can carry needs
+        # one. The rows are real, because a filter over nothing filters
+        # nothing.
+        section = next(iter(OVERVIEW_HEADINGS))
+        json_data = {
+            section: {
+                "data": [
+                    self._overview_example(
+                        "RandomSampling", "Random Sampling", "Baseline"
+                    )
+                ]
+            }
+        }
 
-            generate_strategy_overview_rst(
-                gen_path,
-                {"section": {"data": []}},
-            )
+        overview = self._generate_overview(json_data, [section])
 
-            with open(path.join(gen_path, "strategy_overview.rst")) as file:
-                overview = file.read()
-            self.assertIn('value="multi-label"', overview)
-            self.assertIn("<label>Multi-Label</label>", overview)
+        for tag in [
+            "classification",
+            "regression",
+            "multi-label",
+            "single-annotator",
+            "multi-annotator",
+            "top-k-batch",
+            "diverse-batch",
+        ]:
+            with self.subTest(tag=tag):
+                self.assertIn(f'value="{tag}"', overview)
+        self.assertIn("<label>Multi-Label</label>", overview)
+        # The filter reads the tags of a rendered row, so the row has to
+        # carry them where the filter looks.
+        self.assertIn("RandomSampling", overview)
+        self.assertIn("single-annotator", overview)
 
 
 class Dummy:
