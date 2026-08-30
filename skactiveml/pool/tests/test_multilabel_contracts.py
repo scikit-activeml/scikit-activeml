@@ -71,6 +71,7 @@ from skactiveml.pool import (
     UncertaintySampling,
 )
 from skactiveml.tests.template_query_strategy import TemplatePoolQueryStrategy
+from skactiveml.pool.tests._strategy_helpers import _instantiate
 
 MULTILABEL_CAPABILITY = ("classification", "multi-label", "single-annotator")
 
@@ -141,23 +142,6 @@ MULTILABEL_DELEGATING_WRAPPERS = frozenset(
         SubSamplingWrapper,
     }
 )
-
-
-def _instantiate(strategy):
-    """Instantiates a strategy by defaulting its required arguments."""
-    init_params = {}
-    for name, parameter in inspect.signature(
-        strategy.__init__
-    ).parameters.items():
-        if name == "self":
-            continue
-        if name == "query_strategy":
-            # Wrappers delegate their capabilities to the wrapped strategy,
-            # so they must not be inspected with an absent one.
-            init_params[name] = RandomSampling()
-        elif parameter.default is inspect.Parameter.empty:
-            init_params[name] = None
-    return strategy(**init_params)
 
 
 def _multilabel_capable_strategies():

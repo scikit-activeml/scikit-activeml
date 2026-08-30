@@ -3,11 +3,13 @@ The :mod:`skactiveml.base` package implements the base classes for
 :mod:`skactiveml`.
 """
 
+import inspect
 import numpy as np
 import warnings
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from functools import wraps
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils.validation import (
@@ -17,11 +19,6 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError, _ExhaustedCandidatePool
-from .utils._functions import _guard_own_query
-from .utils._selection import (
-    _answer_exhausted_candidate_pool,
-    _maps_to_samples,
-)
 from .utils._target import (
     _check_target_capability,
     _has_no_class_evidence,
@@ -80,6 +77,108 @@ _TARGET_SPEC_NOT_PROVIDED = object()
 # name (e.g. the labeled-vs-unlabeled `discriminator` of `DiscriminativeAL`)
 # solve an auxiliary problem and are therefore no semantic authority for `y`.
 _TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
+
+
+def _maps_to_samples(candidates):
+    """Check whether an acquisition result is indexed w.r.t. `X`.
+
+    Parameters
+    ----------
+    candidates : None or numpy.ndarray
+        The checked `candidates` of a `query` call.
+
+    Returns
+    -------
+    maps_to_samples : bool
+        `True`, if the query indices and utilities refer to the samples in `X`,
+        and `False`, if they refer to the directly given candidate samples.
+    """
+    return candidates is None or candidates.ndim == 1
+
+
+def _answer_exhausted_candidate_pool(
+    query_indices_shape, utilities_shape, return_utilities
+):
+    """Warn about an exhausted candidate pool and answer it as an empty batch.
+
+    The result is shaped like an ordinary acquisition with a batch size of
+    zero, so that a budget loop running one cycle past exhaustion can consume
+    it without a special case. The warning names the exhaustion, so that the
+    empty batch is never mistaken for a defect.
+
+    Parameters
+    ----------
+    query_indices_shape : tuple of int
+        Shape of the empty query indices.
+    utilities_shape : tuple of int
+        Shape of the empty utilities.
+    return_utilities : bool
+        If `True`, the utilities are part of the result.
+
+    Returns
+    -------
+    result : numpy.ndarray or tuple of numpy.ndarray
+        The empty query indices and, if requested, the empty utilities.
+    """
+    warnings.warn(
+        "The candidate pool is exhausted, i.e., there is no candidate left "
+        "to be queried. Instead of a selection, an empty batch is returned."
+    )
+    query_indices = np.empty(query_indices_shape, dtype=int)
+    if return_utilities:
+        return query_indices, np.empty(utilities_shape, dtype=float)
+    return query_indices
+
+
+def _guard_exhausted_candidate_pool(query):
+    """Answer an exhausted candidate pool with an empty acquisition result."""
+    if getattr(query, "_guards_exhausted_candidate_pool", False):
+        return query
+
+    @wraps(query)
+    def guarded_query(self, *args, **kwargs):
+        try:
+            return query(self, *args, **kwargs)
+        except _ExhaustedCandidatePool as exhaustion:
+            return exhaustion.result
+
+    guarded_query._guards_exhausted_candidate_pool = True
+    return guarded_query
+
+
+def _guard_own_query(cls):
+    """Guard the `query` a pool query strategy defines itself.
+
+    A `query` published through a descriptor, i.e. the one `match_signature`
+    creates, is guarded through the function that descriptor binds, so that
+    the descriptor keeps owning how `query` is exposed. Any other publication
+    is rejected at class definition time rather than silently left unguarded.
+
+    Parameters
+    ----------
+    cls : type
+        The pool query strategy whose own `query` is to be guarded.
+
+    Raises
+    ------
+    TypeError
+        If `cls` publishes `query` in a way this guard does not cover.
+    """
+    query = cls.__dict__.get("query")
+    if query is None:
+        return
+    if inspect.isfunction(query):
+        cls.query = _guard_exhausted_candidate_pool(query)
+        return
+    published_query = getattr(query, "fn", None)
+    if inspect.isfunction(published_query):
+        query.fn = _guard_exhausted_candidate_pool(published_query)
+        return
+    raise TypeError(
+        f"'{cls.__name__}' publishes `query` as {type(query).__name__}, which "
+        "the exhausted candidate pool guard does not cover. Extend "
+        "`_guard_own_query` for that publication."
+    )
 
 
 def _reuse_established_target_spec(resolved_spec, established_spec=None):

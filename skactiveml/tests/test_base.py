@@ -228,6 +228,23 @@ class DummyMultiAnnotatorPoolQueryStrategy(MultiAnnotatorPoolQueryStrategy):
 
 
 class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
+    def test_guard_does_not_rewrap_an_inherited_query(self):
+        class ParentStrategy(DummySingleAnnotatorPoolQueryStrategy):
+            pass
+
+        class ChildStrategy(ParentStrategy):
+            pass
+
+        self.assertIs(ChildStrategy.query, ParentStrategy.query)
+
+        with self.assertWarnsRegex(UserWarning, "exhausted"):
+            query_indices = ChildStrategy().query(
+                X=np.arange(4).reshape(2, 2),
+                y=np.array([0, 1]),
+            )
+
+        self.assertEqual(query_indices.shape, (0,))
+
     def test_guard_covers_a_query_published_through_a_descriptor(self):
         # `match_signature` publishes `query` as a descriptor, which stays in
         # place while the function it binds carries the guard.

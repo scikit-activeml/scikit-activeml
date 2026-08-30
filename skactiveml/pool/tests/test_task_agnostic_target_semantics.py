@@ -16,7 +16,7 @@ from skactiveml.pool import (
     RandomSampling,
     TypiClust,
 )
-from skactiveml.pool.tests.test_multilabel_contracts import _instantiate
+from skactiveml.pool.tests._strategy_helpers import _instantiate
 from skactiveml.tests.utils import assert_no_query_state
 
 TASK_AGNOSTIC_CAPABILITIES = frozenset(

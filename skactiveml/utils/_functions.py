@@ -1,9 +1,6 @@
 import inspect
-from functools import wraps
 from types import MethodType
 from makefun import with_signature
-
-from ..exceptions import _ExhaustedCandidatePool
 
 successful_skorch_torch_import = False
 try:
@@ -168,75 +165,6 @@ def match_signature(wrapped_obj_name, func_name):
 
     return lambda fn: _MatchSignatureDescriptor(
         fn, wrapped_obj_name, func_name=func_name
-    )
-
-
-def _guard_exhausted_candidate_pool(query):
-    """Answer an exhausted candidate pool with an empty acquisition result.
-
-    The guard wraps a `query` implementation so that the shared validation can
-    abort the call before any strategy code runs on an empty candidate slice.
-    Guarding at the boundary rather than per strategy keeps a strategy from
-    reintroducing an estimator call on an empty slice, e.g., by predicting on
-    the candidates before inspecting how many there are.
-
-    Parameters
-    ----------
-    query : function
-        The `query` implementation to guard.
-
-    Returns
-    -------
-    guarded_query : function
-        The guarded `query` implementation.
-    """
-    if getattr(query, "_guards_exhausted_candidate_pool", False):
-        return query
-
-    @wraps(query)
-    def guarded_query(self, *args, **kwargs):
-        try:
-            return query(self, *args, **kwargs)
-        except _ExhaustedCandidatePool as exhaustion:
-            return exhaustion.result
-
-    guarded_query._guards_exhausted_candidate_pool = True
-    return guarded_query
-
-
-def _guard_own_query(cls):
-    """Guard the `query` a pool query strategy defines itself.
-
-    A `query` published through a descriptor, i.e. the one `match_signature`
-    above creates, is guarded through the function that descriptor binds, so
-    that the descriptor keeps owning how `query` is exposed. Any other
-    publication is rejected at class definition time rather than silently left
-    unguarded.
-
-    Parameters
-    ----------
-    cls : type
-        The pool query strategy whose own `query` is to be guarded.
-
-    Raises
-    ------
-    TypeError
-        If `cls` publishes `query` in a way this guard does not cover.
-    """
-    query = cls.__dict__.get("query")
-    if query is None:
-        return
-    if inspect.isfunction(query):
-        cls.query = _guard_exhausted_candidate_pool(query)
-        return
-    published_query = getattr(query, "fn", None)
-    if inspect.isfunction(published_query):
-        query.fn = _guard_exhausted_candidate_pool(published_query)
-        return
-    raise TypeError(
-        f"'{cls.__name__}' publishes `query` as {type(query).__name__}, which "
-        "the exhausted candidate pool guard does not cover. Extend "
-        "`_guard_own_query` for that publication."
     )
 
 
