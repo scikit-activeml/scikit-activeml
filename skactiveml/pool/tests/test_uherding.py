@@ -647,6 +647,27 @@ class TestUHerding(
             ParzenWindowClassifierLogitsEmbedding.fit_calls, fit_calls_before
         )
 
+    def test_query_accepts_list_sample_weight_during_calibration(self):
+        X = np.arange(3.0)[:, None]
+        y = np.array([0.0, 1.0, MISSING_LABEL])
+        clf = ParzenWindowClassifier(classes=self.classes, random_state=0).fit(
+            X, y
+        )
+
+        query_indices = UHerding(
+            temperatures=[0.5, 1.0],
+            validation_size=0.5,
+            random_state=0,
+        ).query(
+            X,
+            y,
+            clf=clf,
+            fit_clf=False,
+            sample_weight=[1.0, 1.0, 1.0],
+        )
+
+        np.testing.assert_array_equal(query_indices, [2])
+
     def test_select_temperature_direct_return_for_fixed_temperature(self):
         qs = UHerding(random_state=0)
         qs.missing_label_ = qs.missing_label

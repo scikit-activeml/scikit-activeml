@@ -514,7 +514,11 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         y_train = y[train_idx]
         X_val = X[val_idx]
         y_val = y[val_idx]
-        sw_train = None if sample_weight is None else sample_weight[train_idx]
+        sw_train = (
+            None
+            if sample_weight is None
+            else np.asarray(sample_weight)[train_idx]
+        )
         try:
             if sw_train is None:
                 clf_cal = clone(clf).fit(X_train, y_train)
