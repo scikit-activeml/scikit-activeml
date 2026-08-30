@@ -255,8 +255,8 @@ vocabulary is normalized to the same canonical order used by fitted
 
 All label outputs must use classes of the same dtype kind because one array
 stores all outputs of a sample. Different outputs may still use different
-vocabularies and different vocabulary sizes within the same kind, for example
-``("no", "yes")`` next to ``("off", "always")``.
+binary vocabularies within the same kind, for example ``("no", "yes")`` next
+to ``("off", "always")``.
 
 Mixing dtype kinds is rejected during resolution, including strings with
 numbers, integers with floats, and booleans with integers. Otherwise, the array
