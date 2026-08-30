@@ -571,6 +571,30 @@ class TestUHerding(
         self.assertEqual(utilities.shape, (2, len(X)))
         self.assertTrue((utilities[~np.isnan(utilities)] >= 0).all())
 
+    def test_query_one_output_multilabel_with_one_dimensional_logits(self):
+        class OneOutputMultilabelClassifier(DummyMultilabelLogitClassifier):
+            def __init__(self):
+                super().__init__(classes=((0, 1),))
+
+            def decision_function(self, X):
+                return np.asarray(X, dtype=float)[:, 0]
+
+            def predict_proba(self, X):
+                return expit(self.decision_function(X))[:, None]
+
+        X = np.array([[0.0], [1.0]])
+        y = np.array([[0.0], [MISSING_LABEL]])
+        clf = OneOutputMultilabelClassifier().fit(X, y)
+
+        query_indices = UHerding(
+            temperatures=1.0,
+            predict_proba_dict=None,
+            target_type="multi-label",
+            random_state=0,
+        ).query(X, y, clf=clf, fit_clf=False)
+
+        np.testing.assert_array_equal(query_indices, [1])
+
     def test_query_fit_clf_false_uses_temp_clones_only(self):
         ParzenWindowClassifierLogitsEmbedding.reset_fit_calls()
         clf = ParzenWindowClassifierLogitsEmbedding(

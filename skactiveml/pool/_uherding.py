@@ -643,7 +643,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         probas, logits, emb = self._parse_predict_output(out)
 
         if logits is None:
-            logits = self._decision_function_logits(clf, X)
+            logits = self._decision_function_logits(
+                clf, X, is_multilabel=is_multilabel
+            )
         if is_multilabel:
             # Canonicalize both public multilabel probability formats before
             # the acquisition logic consumes them.
@@ -749,7 +751,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         return ece
 
     @staticmethod
-    def _decision_function_logits(clf, X):
+    def _decision_function_logits(clf, X, is_multilabel=False):
         """
         Helper function to compute logits from the decision function as a
         common method in sklearn.
@@ -762,7 +764,10 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             return None
         logits = np.asarray(logits)
         if logits.ndim == 1:
-            logits = np.column_stack([np.zeros_like(logits), logits])
+            if is_multilabel:
+                logits = logits[:, None]
+            else:
+                logits = np.column_stack([np.zeros_like(logits), logits])
         return logits
 
     @staticmethod
