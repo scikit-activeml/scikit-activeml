@@ -1319,16 +1319,14 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             ]
         return y
 
-    def test_fit_rejects_heterogeneous_output_vocabularies(self):
-        # A multi-label target is one array, so outputs declaring different
-        # dtypes cannot be represented. The rejection precedes any comparison
-        # against `y`, and above all any fitted state.
+    def test_fit_rejects_mixed_output_label_families(self):
+        # A multi-label target is one array, so string and numeric output
+        # vocabularies cannot be mixed. The rejection precedes fitted state.
         y = self._multilabel_object_targets((("no", "yes"), (0, 1)))
 
         for classes in (
             [["no", "yes"], [0, 1]],
             [["no", "yes"], [0.0, 1.0]],
-            [[0, 1], [0.0, 1.0]],
         ):
             with self.subTest(classes=classes):
                 clf = SklearnClassifier(
@@ -1343,8 +1341,20 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                     clf,
                     lambda: clf.fit(self.X_ml, y),
                     ValueError,
-                    "one dtype across all label outputs",
+                    "one label family across all label outputs",
                 )
+
+    def test_fit_accepts_mixed_numeric_output_dtypes(self):
+        y = self._multilabel_object_targets(((0, 1), (0.0, 1.0)))
+
+        clf = SklearnClassifier(
+            MultiOutputClassifier(LogisticRegression()),
+            classes=[[0, 1], [0.0, 1.0]],
+            target_type="multi-label",
+            missing_label=None,
+        ).fit(self.X_ml, y)
+
+        self._assert_prefit_multilabel_consistency(clf, ((0, 1), (0.0, 1.0)))
 
     def test_fit_accepts_homogeneous_non_numeric_vocabularies(self):
         # Homogeneous string vocabularies of differing width stay valid, and

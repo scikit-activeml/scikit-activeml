@@ -14,7 +14,12 @@ from sklearn.utils.validation import (
     _check_n_features as sklearn_check_n_features,
 )
 
-from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
+from ._label import (
+    MISSING_LABEL,
+    _is_nan_missing_label,
+    check_missing_label,
+    is_unlabeled,
+)
 
 
 def check_scalar(
@@ -189,7 +194,12 @@ def _check_1d_class_list(c, name="classes"):
 
     # Ensure scalars are hashable and unique.
     try:
-        if len(set(arr.tolist())) != arr.size:
+        values = arr.tolist()
+        nan_count = sum(
+            isinstance(value, numbers.Number) and bool(value != value)
+            for value in values
+        )
+        if len(set(values)) != arr.size or nan_count > 1:
             raise ValueError(f"Duplicate entries in `{name}`.")
     except TypeError as e:
         raise TypeError(
@@ -698,11 +708,7 @@ def check_X_y(
         if multi_output and target_type == "single-output":
             target_type = "multi-label"
     if allow_nan is None:
-        allow_nan = (
-            True
-            if isinstance(missing_label, float) and np.isnan(missing_label)
-            else False
-        )
+        allow_nan = _is_nan_missing_label(missing_label)
     if X is not None:
         X = check_array(
             X,

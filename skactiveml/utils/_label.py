@@ -5,6 +5,13 @@ import numpy as np
 MISSING_LABEL = np.nan
 
 
+def _is_nan_missing_label(missing_label):
+    """Return whether a numeric missing-label scalar represents NaN."""
+    return np.issubdtype(type(missing_label), np.inexact) and bool(
+        np.isnan(missing_label)
+    )
+
+
 def _deepflatten(to_flatten):
     """Flattens the iterable `to_flatten` recursively, in such a way that only
     elementary items are returned in an one-dimensional list.
@@ -130,10 +137,7 @@ def is_unlabeled(
         )
 
     # Compute elementwise missing mask.
-    missing_is_nan = isinstance(missing_label, float) and np.isnan(
-        missing_label
-    )
-    if missing_is_nan:
+    if _is_nan_missing_label(missing_label):
         is_missing = np.isnan(y)
     else:
         y = y.astype(y_dtype)

@@ -142,6 +142,31 @@ class TestLabel(unittest.TestCase):
             ),
         )
 
+    def test_is_unlabeled_accepts_numpy_floating_nan_sentinels(self):
+        for dtype in (np.float16, np.float32, np.float64, np.longdouble):
+            with self.subTest(dtype=dtype):
+                missing_label = dtype(np.nan)
+                y = np.array([0, missing_label], dtype=dtype)
+
+                np.testing.assert_array_equal(
+                    is_unlabeled(y, missing_label=missing_label),
+                    [False, True],
+                )
+
+    def test_is_unlabeled_accepts_complex_nan_sentinels(self):
+        for missing_label in (
+            complex(float("nan"), 0),
+            np.complex64(np.nan),
+            np.complex128(np.nan),
+        ):
+            with self.subTest(dtype=type(missing_label)):
+                y = np.array([0, missing_label])
+
+                np.testing.assert_array_equal(
+                    is_unlabeled(y, missing_label=missing_label),
+                    [False, True],
+                )
+
     def test_is_labeled(self):
         np.testing.assert_array_equal(
             ~np.array([1, 0, 0, 0, 1], dtype=bool), is_labeled(self.y1)

@@ -410,6 +410,20 @@ class TestValidation(unittest.TestCase):
             target_type="multi-label",
         )
 
+    def test_check_X_y_accepts_numpy_floating_nan_sentinels(self):
+        X = [[1], [2]]
+
+        for dtype in (np.float16, np.float32, np.float64, np.longdouble):
+            with self.subTest(dtype=dtype):
+                missing_label = dtype(np.nan)
+                y = np.array([0, missing_label], dtype=dtype)
+
+                _, checked_y, _ = check_X_y(X, y, missing_label=missing_label)
+
+                np.testing.assert_array_equal(
+                    np.isnan(checked_y), [False, True]
+                )
+
     def test_check_X_y_deprecated_multi_output(self):
         X = [[1, 2], [3, 4]]
         y_2d = [[1, 0], [0, 1]]
