@@ -749,7 +749,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
                 if self._is_multilabel_target():
-                    y_pred = self._check_multilabel_predictions(y_pred)
+                    y_pred = self._check_multilabel_predictions(
+                        y_pred, n_samples=len(X)
+                    )
                 y_pred = np.asarray(y_pred).astype(
                     self._class_label_dtype(), copy=False
                 )
@@ -835,7 +837,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         P, n_samples=n_samples
                     )
                 else:
-                    P_ml = self._check_multilabel_proba_array(P)
+                    P_ml = self._check_multilabel_proba_array(
+                        P, n_samples=n_samples
+                    )
                     P_list = [
                         np.column_stack([1 - P_ml[:, j], P_ml[:, j]])
                         for j in range(n_outputs)
@@ -1001,7 +1005,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         # Include unlabeled samples, if requested, e.g., when wrapping
         # semi-supervised classifiers from sklearn.
         if self.include_unlabeled_samples:
-            is_included = np.full_like(y, fill_value=True, dtype=bool)
+            is_included = np.ones(len(y), dtype=bool)
         else:
             is_included = is_labeled(
                 y=y,
@@ -1353,13 +1357,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         return fit_method(**call_kwargs)
 
-    def _check_multilabel_predictions(self, y_pred):
+    def _check_multilabel_predictions(self, y_pred, n_samples):
         """Validate the class label predictions of a multi-label estimator.
 
         Parameters
         ----------
         y_pred : array-like
             The predictions returned by the wrapped estimator's `predict`.
+        n_samples : int
+            Number of samples the predictions are expected to have.
 
         Returns
         -------
@@ -1373,15 +1379,28 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         """
         n_outputs = len(self.classes_)
         y_pred = np.asarray(y_pred)
-        if y_pred.ndim != 2 or y_pred.shape[1] != n_outputs:
+        expected_shape = (n_samples, n_outputs)
+        if y_pred.shape != expected_shape:
             raise ValueError(
                 f"Expected `predict` of the wrapped estimator to return "
-                f"shape `(n_samples, {n_outputs})` for multi-label "
+                f"shape `(n_samples, {n_outputs})`, exactly "
+                f"`{expected_shape}`, for multi-label "
                 f"classification, got {y_pred.shape}."
             )
+        for output_idx, classes_j in enumerate(self.classes_):
+            missing_classes = _classes_missing_from(
+                y_pred[:, output_idx], classes_j
+            )
+            if missing_classes:
+                class_label = _format_class(missing_classes[0])
+                raise ValueError(
+                    f"Class {class_label!r} predicted for output "
+                    f"{output_idx} is not contained in its declared class "
+                    f"vocabulary {_format_classes(classes_j)}."
+                )
         return y_pred
 
-    def _check_multilabel_proba_array(self, P):
+    def _check_multilabel_proba_array(self, P, n_samples):
         """Validate a positive-class probability array of a multi-label fit.
 
         Parameters
@@ -1389,6 +1408,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         P : array-like
             The probabilities returned by the wrapped estimator's
             `predict_proba`, which are not given as one matrix per output.
+        n_samples : int
+            Number of samples the probabilities are expected to have.
 
         Returns
         -------
@@ -1403,15 +1424,38 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         """
         n_outputs = len(self.classes_)
         P_ml = np.asarray(P, dtype=float)
-        if P_ml.ndim != 2 or P_ml.shape[1] != n_outputs:
+        expected_shape = (n_samples, n_outputs)
+        if P_ml.shape != expected_shape:
             raise ValueError(
                 f"Expected `predict_proba` of the wrapped estimator to "
                 f"return positive-class probabilities of shape "
-                f"`(n_samples, {n_outputs})`, or one `(n_samples, 2)` array "
-                f"per output, for multi-label classification, got "
-                f"{P_ml.shape}."
+                f"`(n_samples, {n_outputs})`, exactly `{expected_shape}`, "
+                f"or one `(n_samples, 2)` array per output, for multi-label "
+                f"classification, got {P_ml.shape}."
             )
+        self._check_estimator_probas_are_valid(P_ml, is_multilabel=True)
         return P_ml
+
+    @staticmethod
+    def _check_estimator_probas_are_valid(P, is_multilabel):
+        """Validate estimator probabilities while preserving NaN fallback.
+
+        NaN values signal that the wrapper should use its label-count prior.
+        Other values still have to be finite and bounded, and complete rows
+        representing class distributions have to sum to one.
+
+        Parameters
+        ----------
+        P : numpy.ndarray
+            Probability values returned by the wrapped estimator.
+        is_multilabel : bool
+            Whether columns are independent positive-class probabilities.
+        """
+        values_without_nan = P[~np.isnan(P)].reshape(-1, 1)
+        _check_probas_are_valid(values_without_nan, is_multilabel=True)
+        if not is_multilabel:
+            complete_rows = P[~np.isnan(P).any(axis=1)]
+            _check_probas_are_valid(complete_rows, is_multilabel=False)
 
     def _normalize_single_output_proba(self, P, n_samples):
         """Align a single-output probability array to `classes_`.
@@ -1528,17 +1572,18 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         f"matching the estimator, or return probabilities for "
                         f"all declared classes."
                     )
-                P_list.append(P_j)
-                continue
-
-            P_list.append(
-                _map_proba_columns(
+                P_j_normalized = P_j
+            else:
+                P_j_normalized = _map_proba_columns(
                     P_j,
                     np.asarray(est_classes_j),
                     classes_j,
                     output_idx=j,
                 )
+            self._check_estimator_probas_are_valid(
+                P_j_normalized, is_multilabel=False
             )
+            P_list.append(P_j_normalized)
 
         return P_list
 
@@ -2714,7 +2759,7 @@ if successful_skorch_torch_import:
             """
             X_train, y_train = None, None
             if self.include_unlabeled_samples:
-                is_included = np.full_like(y, fill_value=True, dtype=bool)
+                is_included = np.ones(len(y), dtype=bool)
             else:
                 is_included = is_labeled(
                     y=y,
