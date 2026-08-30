@@ -61,7 +61,7 @@ exclude = [
 Homepage       = "https://scikit-activeml.github.io"
 Source         = "https://github.com/scikit-activeml/scikit-activeml"
 
-[tool.pytest]
+[tool.pytest.ini_options]
 addopts = [
   "--cov=./skactiveml",
   "--cov-report=xml"
