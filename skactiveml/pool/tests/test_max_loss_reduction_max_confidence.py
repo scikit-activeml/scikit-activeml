@@ -103,39 +103,6 @@ class TestMaxLossReductionMaxConfidence(
                 clf=self.clf,
             )
 
-    def test_query(self):
-        query_idx1, utilities1 = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            return_utilities=True,
-        )
-        query_idx2, utilities2 = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            candidates=self.unld_idx,
-            return_utilities=True,
-        )
-        query_idx3, utilities3 = self.qs.query(
-            self.X,
-            self.y,
-            discriminator=self.discriminator,
-            clf=self.clf,
-            candidates=self.X[self.unld_idx],
-            return_utilities=True,
-        )
-
-        np.testing.assert_array_equal(query_idx1, query_idx2)
-        np.testing.assert_allclose(utilities1, utilities2, equal_nan=True)
-        np.testing.assert_allclose(
-            utilities1[0][self.unld_idx], utilities3[0], equal_nan=True
-        )
-        self.assertEqual(query_idx3.shape, (1,))
-        self.assertEqual(utilities3.shape, (1, len(self.unld_idx)))
-
     def test_query_labeled_candidates(self):
         # A given `candidates` is authoritative, i.e., labeled samples remain
         # candidates, e.g., to relabel them or to recompute their utilities.

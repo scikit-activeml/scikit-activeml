@@ -1369,6 +1369,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         query_params["candidates"] = unld_idx2
         query_idx3, utils3 = qs.query(**query_params)
 
+        np.testing.assert_array_equal(query_idx1, query_idx2)
         np.testing.assert_allclose(utils1, utils2)
         utils3_copy = np.full_like(utils1, fill_value=np.nan)
         utils3_copy[0, unld_idx2] = utils3[0, unld_idx2]
@@ -1377,6 +1378,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         try:
             query_params["candidates"] = query_params["X"][unld_idx]
             query_idx4, utils4 = qs.query(**query_params)
+            np.testing.assert_allclose(utils1[0][unld_idx], utils4[0])
             self.assertEqual(query_idx4.shape, (1,))
             self.assertEqual(utils4.shape, (1, len(unld_idx)))
         except MappingError:
@@ -1387,6 +1389,11 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
     TemplateSingleAnnotatorPoolQueryStrategy
 ):
     """Shared target-contract tests for multi-label-only strategies."""
+
+    def test_query(self):
+        super().test_query_multilabel_candidate_variation()
+
+    test_query_multilabel_candidate_variation = None
 
     def _query_multilabel_only_strategy(self, strategy, y, clf, **kwargs):
         query_params = deepcopy(self.query_default_params_clf_multilabel)
