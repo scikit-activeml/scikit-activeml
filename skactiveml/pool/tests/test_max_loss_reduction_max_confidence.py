@@ -234,6 +234,27 @@ class TestMaxLossReductionMaxConfidence(
         self.assertTrue(np.isfinite(utilities[0, 3:]).all())
         self.assertIn(query_indices[0], range(3, len(self.X)))
 
+    def test_query_handles_zero_positive_class_probabilities(self):
+        y = self.y.copy()
+        y[:3] = 0
+        clf = ParzenWindowClassifier(
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            random_state=0,
+            target_type="multi-label",
+        )
+
+        query_indices, utilities = self.qs.query(
+            self.X,
+            y,
+            discriminator=self.discriminator,
+            clf=clf,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query_indices.shape, (1,))
+        self.assertTrue(np.isfinite(utilities[0, self.unld_idx]).all())
+
     def test_query_multilabel_list_probas(self):
         # Regression test: `MultiOutputClassifier` natively returns a list of
         # binary probability matrices, which used to reach the boolean label

@@ -320,7 +320,13 @@ def _label_cardinality_features(probas):
     -------
     features : numpy.ndarray of shape (n_samples, n_outputs)
         Label-order-independent input representation of the label-cardinality
-        discriminator.
+        discriminator. An all-zero confidence profile remains all zero.
     """
     features = np.flip(np.sort(probas, axis=1), axis=-1)
-    return features / features.sum(axis=1, keepdims=True)
+    feature_sums = features.sum(axis=1, keepdims=True)
+    return np.divide(
+        features,
+        feature_sums,
+        out=np.zeros_like(features),
+        where=feature_sums != 0,
+    )
