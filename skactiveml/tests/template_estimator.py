@@ -4,7 +4,6 @@ from copy import deepcopy
 
 from skactiveml.tests.utils import (
     assert_predicts_class_dtype,
-    assert_predicts_single_output_shape,
     check_positional_args,
     check_test_param_test_availability,
 )
@@ -998,7 +997,11 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
         estimator.fit(**fit_params)
         y_pred = estimator.predict(**predict_params)
 
-        assert_predicts_single_output_shape(self, y_pred, predict_params["X"])
+        self.assertEqual(
+            np.asarray(y_pred).shape,
+            (len(predict_params["X"]),),
+            msg="`predict` must return one target value per sample.",
+        )
 
     def test_fit_param_X(self, test_cases=None):
         super().test_fit_param_X(test_cases)

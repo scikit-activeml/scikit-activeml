@@ -51,30 +51,6 @@ def assert_predicts_class_dtype(test_case, y_pred, classes):
     )
 
 
-def assert_predicts_single_output_shape(test_case, y_pred, X):
-    """Assert that predictions describe one target value per sample.
-
-    A single-output regression target is described by one value per sample,
-    so `predict` returns shape `(n_samples,)`. A wrapped estimator may emit
-    a column instead, which silently changes the meaning of the predictions
-    for every consumer indexing them by sample.
-
-    Parameters
-    ----------
-    test_case : unittest.TestCase
-        The test case providing the assertion.
-    y_pred : array-like
-        The predicted target values.
-    X : array-like of shape (n_samples, n_features)
-        The samples the predictions were made for.
-    """
-    test_case.assertEqual(
-        np.asarray(y_pred).shape,
-        (len(X),),
-        msg="`predict` must return one target value per sample.",
-    )
-
-
 def assert_attributes_unchanged(
     test_case, estimator, attributes_before, ignored=()
 ):
