@@ -102,6 +102,45 @@ class TestMaxLossReductionMaxConfidence(
                 clf=self.clf,
             )
 
+    def test_query_rejects_incompatible_discriminator_cost_matrix(self):
+        discriminator = ParzenWindowClassifier(
+            classes=[0, 1],
+            missing_label=-1,
+            cost_matrix=[[0, 2], [1, 0]],
+            random_state=0,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "`discriminator.cost_matrix` must have shape \\(3, 3\\)",
+        ):
+            self.qs.query(
+                self.X,
+                self.y,
+                discriminator=discriminator,
+                clf=self.clf,
+            )
+
+    def test_query_rejects_incompatible_discriminator_class_prior(self):
+        discriminator = ParzenWindowClassifier(
+            classes=[0, 1],
+            missing_label=-1,
+            class_prior=[1.0, 1.0],
+            random_state=0,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "`discriminator.class_prior` must be scalar or have shape "
+            "\\(3,\\)",
+        ):
+            self.qs.query(
+                self.X,
+                self.y,
+                discriminator=discriminator,
+                clf=self.clf,
+            )
+
     def test_query_delegates_to_public_utility(self):
         recorded = {}
         acquisition_scores = 1.0 + np.arange(len(self.unld_idx), dtype=float)

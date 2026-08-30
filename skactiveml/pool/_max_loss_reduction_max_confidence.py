@@ -82,7 +82,9 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             `target_type="auto"` or `target_type="single-output"`. It predicts
             a candidate sample's number of positive labels, i.e., its label
             cardinality. The parameters `classes` and `missing_label` will be
-            internally redefined.
+            internally redefined. Class-dependent `cost_matrix` and
+            `class_prior` parameters must already match the resulting label
+            cardinality classes.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -181,8 +183,12 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
                 "`target_type='single-output'`."
             )
 
+        n_discriminator_classes = y.shape[1] + 1
+        _check_discriminator_class_configuration(
+            discriminator, n_discriminator_classes
+        )
         discriminator = clone(discriminator)
-        discriminator.classes = list(range(y.shape[1] + 1))
+        discriminator.classes = list(range(n_discriminator_classes))
         discriminator.missing_label = -1
 
         # Determine the labeled samples, which train the discriminator.
@@ -236,6 +242,34 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+
+def _check_discriminator_class_configuration(discriminator, n_classes):
+    """Reject class-dependent parameters that MMC cannot safely redefine."""
+    cost_matrix = getattr(discriminator, "cost_matrix", None)
+    expected_cost_shape = (n_classes, n_classes)
+    if (
+        cost_matrix is not None
+        and np.shape(cost_matrix) != expected_cost_shape
+    ):
+        raise ValueError(
+            "`discriminator.cost_matrix` must have shape "
+            f"{expected_cost_shape} because the discriminator predicts label "
+            f"cardinalities. Got {np.shape(cost_matrix)}."
+        )
+
+    if hasattr(discriminator, "class_prior"):
+        class_prior = discriminator.class_prior
+        expected_prior_shape = (n_classes,)
+        if (
+            np.ndim(class_prior) != 0
+            and np.shape(class_prior) != expected_prior_shape
+        ):
+            raise ValueError(
+                "`discriminator.class_prior` must be scalar or have shape "
+                f"{expected_prior_shape} because the discriminator predicts "
+                f"label cardinalities. Got {np.shape(class_prior)}."
+            )
 
 
 def max_loss_reduction_max_confidence(probas, n_positive_labels):
