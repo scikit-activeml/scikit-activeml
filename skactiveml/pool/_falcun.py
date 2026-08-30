@@ -262,8 +262,14 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
 
             # Compute relevance scores for candidates (cf. Eq. (5) and
             # (6) in [1]).
-            rel_cand = (unc_cand + dist_cand) ** self.gamma
+            rel_cand = unc_cand + dist_cand
             rel_cand[query_indices] = 0
+            rel_cand_max = rel_cand.max()
+            if self.gamma == 0:
+                rel_cand = np.ones_like(rel_cand)
+                rel_cand[query_indices] = 0
+            elif rel_cand_max > 0:
+                rel_cand = (rel_cand / rel_cand_max) ** self.gamma
             rel_cand_sum = np.sum(rel_cand)
             if rel_cand_sum == 0:
                 rel_cand = np.ones_like(rel_cand)

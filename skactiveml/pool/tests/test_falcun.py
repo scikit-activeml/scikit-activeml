@@ -167,6 +167,18 @@ class TestFalcun(
                 else:
                     prev_utilities = utilities_copy
 
+    def test_query_large_gamma_has_finite_utilities(self):
+        qs = Falcun(random_state=42, gamma=10_000)
+
+        query_indices, utilities = qs.query(
+            **self.query_default_params_clf,
+            return_utilities=True,
+        )
+
+        np.testing.assert_array_equal(query_indices, [2])
+        self.assertTrue(np.isfinite(utilities[0, 2:]).all())
+        self.assertAlmostEqual(np.nansum(utilities), 1.0)
+
     def test_query_multilabel_list_probas(self):
         qs = Falcun(random_state=42)
         query_params = dict(self.query_default_params_clf_multilabel)
