@@ -513,7 +513,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         for classes in clf.classes_:
             np.testing.assert_array_equal(classes, [0, 1])
 
-    def test_empty_partial_fit_reuses_inferred_multilabel_vocabularies(self):
+    def test_empty_partial_fit_preserves_fitted_multilabel_state(self):
         clf = SklearnClassifier(
             estimator=MultiOutputClassifier(
                 SGDClassifier(loss="log_loss", random_state=0)
@@ -526,15 +526,25 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
         clf.partial_fit(X, y)
         established_spec = clf.target_spec_
+        established_estimator = clf.estimator_
+        established_counts = deepcopy(clf._label_counts)
+        established_probabilities = clf.predict_proba(X)
 
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+            warnings.simplefilter("error")
             clf.partial_fit(np.empty((0, 1)), np.empty((0, 2), dtype=int))
 
+        self.assertTrue(clf.is_fitted_)
         self.assertIs(clf.target_spec_, established_spec)
+        self.assertIs(clf.estimator_, established_estimator)
         self.assertEqual(clf.target_spec_.classes, ((0, 1), (0, 1)))
+        for actual, expected in zip(clf._label_counts, established_counts):
+            np.testing.assert_array_equal(actual, expected)
         for classes in clf.classes_:
             np.testing.assert_array_equal(classes, [0, 1])
+        np.testing.assert_allclose(
+            clf.predict_proba(X), established_probabilities
+        )
 
     def test_partial_fit_rejects_changed_target_declaration(self):
         clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)

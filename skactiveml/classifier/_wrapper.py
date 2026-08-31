@@ -946,6 +946,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         for the parameters and the transactional guarantee.
         """
         is_incremental = fit_function == "partial_fit"
+        had_established_target_spec = (
+            is_incremental and getattr(self, "target_spec_", None) is not None
+        )
         supplied_classes = (
             fit_kwargs.get("classes") if is_incremental else None
         )
@@ -1003,6 +1006,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 "'cost_matrix' can be only set, if 'estimator'"
                 "implements 'predict_proba'."
             )
+
+        # An empty incremental batch validates the established target and
+        # feature contracts but must not discard an already trained estimator
+        # or its label counts.
+        if had_established_target_spec and len(y) == 0:
+            return self
+
         if hasattr(self, "estimator_"):
             if fit_function != "partial_fit":
                 self.estimator_ = deepcopy(self.estimator)
