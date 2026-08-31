@@ -4141,8 +4141,10 @@ if successful_river_import:
                         # is_fitted_=True
                         fit_func(X, y_true)
                         self.assertTrue(clf.is_fitted_)
-                        # Empty batches still require configured classes.
-                        if provide_classes:
+                        # Incremental empty batches reuse the established
+                        # classes; reinitializing fits still require an
+                        # explicit class declaration.
+                        if provide_classes or fit_function == "partial_fit":
                             fit_func(X[:0], y_true[:0])
                             self.assertFalse(clf.is_fitted_)
                         else:
@@ -4665,8 +4667,10 @@ if successful_capymoa_import:
                         # is_fitted_=True
                         fit_func(X, y_true)
                         self.assertTrue(clf.is_fitted_)
-                        # Empty batches still require configured classes.
-                        if provide_classes:
+                        # Incremental empty batches reuse the established
+                        # classes; reinitializing fits still require an
+                        # explicit class declaration.
+                        if provide_classes or fit_function == "partial_fit":
                             fit_func(X[:0], y_true[:0])
                             self.assertFalse(clf.is_fitted_)
                         else:
