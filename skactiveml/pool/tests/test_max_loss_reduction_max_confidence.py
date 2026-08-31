@@ -372,6 +372,32 @@ class TestMaxLossReductionMaxConfidenceFunction(unittest.TestCase):
 
         np.testing.assert_allclose(utilities, [1.7, 1.3])
 
+    def test_label_cardinalities_require_integer_scalars(self):
+        probas = np.array([[0.9, 0.2, 0.6], [0.1, 0.4, 0.3]])
+
+        for integer_type in [int, np.int8, np.int64, np.uint64]:
+            with self.subTest(integer_type=integer_type):
+                utilities = max_loss_reduction_max_confidence(
+                    probas, [integer_type(2), integer_type(0)]
+                )
+                np.testing.assert_allclose(utilities, [0.7, 0.8])
+
+        non_integer_cases = [
+            ("integer-valued floats", [2.0, 0.0]),
+            ("booleans", [True, False]),
+            ("zero-imaginary complex numbers", [2 + 0j, 0 + 0j]),
+        ]
+        for msg, n_positive_labels in non_integer_cases:
+            with self.subTest(msg=msg):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    r"`n_positive_labels` must contain integers within "
+                    r"`\[0, 3\]`",
+                ):
+                    max_loss_reduction_max_confidence(
+                        probas, n_positive_labels
+                    )
+
     def test_without_candidates(self):
         utilities = max_loss_reduction_max_confidence(
             np.empty((0, 3)), np.empty(0, dtype=int)
@@ -412,12 +438,12 @@ class TestMaxLossReductionMaxConfidenceFunction(unittest.TestCase):
             (
                 "probabilities outside the unit interval",
                 np.array([[0.9, 1.2, 0.6], [0.1, 0.4, 0.3]]),
-                r"`probas` must contain probabilities within `\[0, 1\]`",
+                "'probas' are invalid",
             ),
             (
                 "missing probability",
                 np.array([[0.9, np.nan, 0.6], [0.1, 0.4, 0.3]]),
-                r"`probas` must contain probabilities within `\[0, 1\]`",
+                "'probas' are invalid",
             ),
         ]
 

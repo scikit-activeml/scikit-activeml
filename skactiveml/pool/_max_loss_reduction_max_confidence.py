@@ -1,5 +1,7 @@
 """Implementation of Maximum Loss Reduction with Maximal Confidence."""
 
+import numbers
+
 import numpy as np
 from sklearn import clone
 
@@ -316,7 +318,7 @@ def max_loss_reduction_max_confidence(probas, n_positive_labels):
        the 15th ACM SIGKDD International Conference on Knowledge Discovery and
        Data Mining (pp. 917-926).
     """
-    n_positive_labels = np.asarray(n_positive_labels)
+    n_positive_labels = np.asarray(n_positive_labels, dtype=object)
     if n_positive_labels.ndim != 1:
         raise ValueError(
             "`n_positive_labels` must have shape `(n_candidates,)`, got "
@@ -328,12 +330,16 @@ def max_loss_reduction_max_confidence(probas, n_positive_labels):
     probas = _canonicalize_multilabel_probas(
         probas, n_samples=len(n_positive_labels)
     )
-    if not ((probas >= 0) & (probas <= 1)).all():
-        raise ValueError(
-            "`probas` must contain probabilities within `[0, 1]`."
-        )
     n_outputs = probas.shape[1]
-    if not np.isin(n_positive_labels, np.arange(n_outputs + 1)).all():
+    contains_only_integers = all(
+        isinstance(n_labels, numbers.Integral)
+        and not isinstance(n_labels, (bool, np.bool_))
+        for n_labels in n_positive_labels
+    )
+    if (
+        not contains_only_integers
+        or not np.isin(n_positive_labels, np.arange(n_outputs + 1)).all()
+    ):
         raise ValueError(
             "`n_positive_labels` must contain integers within "
             f"`[0, {n_outputs}]`."
