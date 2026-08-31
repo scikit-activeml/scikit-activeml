@@ -1991,6 +1991,23 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         for counts_j, classes_j in zip(clf._label_counts, clf.classes_):
             np.testing.assert_array_equal(counts_j, np.zeros(len(classes_j)))
 
+    def test_prefit_multilabel_rejects_cost_matrix_without_state_changes(self):
+        estimator = MultiOutputClassifier(GaussianNB()).fit(
+            self.X_ml, self.y_ml
+        )
+        clf = SklearnClassifier(
+            estimator=estimator,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            cost_matrix=np.eye(3),
+        )
+        attributes_before = dict(clf.__dict__)
+
+        with self.assertRaisesRegex(ValueError, "cost_matrix"):
+            clf.predict_proba(self.X_ml)
+
+        assert_attributes_unchanged(self, clf, attributes_before)
+
     def test_prefit_target_resolution_failure_commits_no_fitted_state(self):
         estimator = GaussianNB().fit(self.X_ml, self.y_ml[:, 0])
         clf = SklearnClassifier(
@@ -3500,6 +3517,26 @@ if successful_skorch_torch_import:
 
             self.assertFalse(hasattr(clf, "target_spec_"))
             self.assertFalse(hasattr(clf, "_le"))
+
+        def test_prefit_multilabel_rejects_cost_matrix(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(
+                {
+                    "module": nn.Linear(1, 2),
+                    "classes": [[0, 1], [0, 1]],
+                    "missing_label": -1,
+                    "cost_matrix": np.eye(3),
+                }
+            )
+            clf = SkorchClassifier(**init_params)
+
+            with self.assertRaisesRegex(ValueError, "cost_matrix"):
+                clf.predict_proba(self.X_ml)
+
+            self.assertFalse(hasattr(clf, "target_spec_"))
+            self.assertFalse(hasattr(clf, "_le"))
+            self.assertFalse(hasattr(clf, "classes_"))
+            self.assertFalse(hasattr(clf, "cost_matrix_"))
 
         def test_init_param_target_type(self):
             self._test_param(

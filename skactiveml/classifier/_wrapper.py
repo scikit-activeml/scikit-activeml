@@ -1315,6 +1315,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         target_spec = self._resolve_target_spec(
             y_dummy, classes=effective_classes
         )
+        check_classifier_params(
+            target_spec.classes, self.missing_label, self.cost_matrix
+        )
         le = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label,

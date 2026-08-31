@@ -1514,6 +1514,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         target_spec = self._resolve_target_spec(
             resolution_y, classes=effective_classes
         )
+        check_classifier_params(
+            target_spec.classes, self.missing_label, self.cost_matrix
+        )
         self.target_spec_ = target_spec
         self._le = ExtLabelEncoder(
             classes=target_spec.classes,
