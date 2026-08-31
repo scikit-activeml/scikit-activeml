@@ -7,6 +7,7 @@ import unittest
 from os import path
 
 from docutils.utils import column_width
+from jinja2 import Environment, FileSystemLoader
 
 from docs.generate import (
     OVERVIEW_HEADINGS,
@@ -101,6 +102,9 @@ class TestExamples(unittest.TestCase):
                     )
 
     def test_api_reference_prioritizes_native_methods(self):
+        environment = Environment(loader=FileSystemLoader(self.docs_path))
+        environment.filters["underline"] = lambda value: value
+        template = environment.get_template("_templates/class.rst")
         test_cases = [
             (
                 "skactiveml.classifier.SklearnClassifier",
@@ -131,17 +135,35 @@ class TestExamples(unittest.TestCase):
         ]
         for class_name, methods, expected in test_cases:
             with self.subTest(class_name=class_name):
-                native = [
-                    method
-                    for method in methods
-                    if is_skactiveml_method(class_name, method)
+                module, name = class_name.rsplit(".", 1)
+                rendered = template.render(
+                    objname=name,
+                    module=module,
+                    fullname=class_name,
+                    name=name,
+                    methods=methods,
+                    attributes=["attribute"],
+                    is_skactiveml_method=is_skactiveml_method,
+                    _=lambda value: value,
+                )
+                summarized = [
+                    line.strip().rsplit(".", 1)[-1]
+                    for line in rendered.splitlines()
+                    if line.strip().startswith(f"~{name}.")
+                    and line.strip().rsplit(".", 1)[-1] in methods
                 ]
-                external = [
-                    method
-                    for method in methods
-                    if not is_skactiveml_method(class_name, method)
+                detailed = [
+                    line.strip().rsplit(".", 1)[-1]
+                    for line in rendered.splitlines()
+                    if line.strip().startswith(".. automethod::")
                 ]
-                self.assertEqual(expected, native + external)
+                self.assertIn(":no-members:", rendered)
+                self.assertIn(":no-inherited-members:", rendered)
+                self.assertIn(
+                    f".. autoattribute:: {class_name}.attribute", rendered
+                )
+                self.assertEqual(expected, summarized)
+                self.assertEqual(expected, detailed)
 
     def test_multilabel_tags_match_capability_inventory(self):
         expected_strategies = {
