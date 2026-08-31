@@ -272,6 +272,7 @@ def _canonicalize_multilabel_probas(
     n_samples=None,
     n_outputs=None,
     allow_none=False,
+    validate_probabilities=True,
 ):
     """Convert multilabel probabilities to a 2D positive-class matrix.
 
@@ -291,6 +292,11 @@ def _canonicalize_multilabel_probas(
         have this many columns.
     allow_none : bool, default=False
         If `True`, `None` is returned unchanged.
+    validate_probabilities : bool, default=True
+        If `True`, require each per-output matrix to describe a binary class
+        distribution and require the canonicalized positive-class
+        probabilities to be within `[0, 1]`. Set to `False` when
+        canonicalizing scores such as logits.
 
     Returns
     -------
@@ -332,6 +338,12 @@ def _canonicalize_multilabel_probas(
                     f"`probas[{j}]` has {probas_j.shape[0]} samples, "
                     f"expected {n_samples}."
                 )
+            if validate_probabilities:
+                _check_probas_are_valid(
+                    probas_j,
+                    is_multilabel=False,
+                    hint=f"`probas[{j}]` must be a binary distribution.",
+                )
             probas_cols.append(probas_j[:, 1])
 
         probas = np.column_stack(probas_cols)
@@ -351,6 +363,8 @@ def _canonicalize_multilabel_probas(
         raise ValueError(
             f"`probas` has {probas.shape[1]} outputs, expected {n_outputs}."
         )
+    if validate_probabilities:
+        _check_probas_are_valid(probas, is_multilabel=True)
 
     return probas
 

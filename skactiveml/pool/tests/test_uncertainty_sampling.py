@@ -681,6 +681,24 @@ class TestUncertaintyScores(unittest.TestCase):
             is_multilabel=True,
         )
 
+    def test_multilabel_per_output_distributions_are_valid(self):
+        valid_output = np.array([[0.6, 0.4], [0.4, 0.6]])
+        invalid_outputs = [
+            np.array([[0.9, 0.9], [0.8, 0.2]]),
+            np.array([[-0.2, 0.4], [0.4, 0.6]]),
+            np.array([[np.nan, 0.4], [0.4, 0.6]]),
+        ]
+
+        for invalid_output in invalid_outputs:
+            with self.subTest(invalid_output=invalid_output):
+                with self.assertRaisesRegex(
+                    ValueError, "'probas' are invalid"
+                ):
+                    uncertainty_scores(
+                        [invalid_output, valid_output],
+                        is_multilabel=True,
+                    )
+
     def test_init_param_method(self):
         self.assertRaises(
             ValueError, uncertainty_scores, self.probas, method="String"

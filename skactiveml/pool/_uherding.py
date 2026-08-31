@@ -670,6 +670,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                 n_samples=len(X),
                 n_outputs=n_outputs,
                 allow_none=True,
+                validate_probabilities=False,
             )
             if probas is None and logits is not None:
                 probas = expit(logits)
