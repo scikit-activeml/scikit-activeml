@@ -111,19 +111,24 @@ class TargetSpec:
         )
 
 
-def _class_vocabularies_equal(classes_a, classes_b):
-    if classes_a is None or classes_b is None:
-        return classes_a is classes_b
-    if len(classes_a) != len(classes_b):
-        return False
-    return all(
-        (
-            _class_vocabularies_equal(class_a, class_b)
-            if isinstance(class_a, tuple) and isinstance(class_b, tuple)
-            else class_a == class_b
-            or (_is_nan_class(class_a) and _is_nan_class(class_b))
-        )
-        for class_a, class_b in zip(classes_a, classes_b)
+def _classes_equal(class_a, class_b):
+    """Compare two class labels, treating a NaN class as equal to itself.
+
+    Parameters
+    ----------
+    class_a : scalar
+        The first class label.
+    class_b : scalar
+        The second class label.
+
+    Returns
+    -------
+    equal : bool
+        `True` exactly if both labels denote the same class.
+    """
+    return bool(
+        class_a == class_b
+        or (_is_nan_class(class_a) and _is_nan_class(class_b))
     )
 
 
@@ -163,8 +168,6 @@ def _sorted_classes(classes):
 
 
 def _class_vocabulary_hash_key(classes):
-    if classes is None:
-        return None
     return tuple(
         (
             _class_vocabulary_hash_key(value)

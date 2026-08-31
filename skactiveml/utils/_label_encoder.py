@@ -70,9 +70,15 @@ class ExtLabelEncoder(BaseEstimator):
                 "Nested `classes` require `target_type='multi-label'`, and "
                 "multi-label encoding requires nested `classes`."
             )
-        check_missing_label(
-            missing_label=self.missing_label, target_type=y.dtype
-        )
+        if y.size > 0:
+            # An empty `y` carries no dtype evidence: NumPy defaults it to
+            # `float64`, which would reject a string
+            # `missing_label`.
+            check_missing_label(
+                missing_label=self.missing_label, target_type=y.dtype
+            )
+        else:
+            check_missing_label(missing_label=self.missing_label)
         check_classifier_params(
             classes=self.classes, missing_label=self.missing_label
         )

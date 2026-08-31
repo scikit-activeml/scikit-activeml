@@ -246,6 +246,27 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
 
         self.assertEqual(query_indices.shape, (0,))
 
+    def test_guard_does_not_rewrap_a_republished_query(self):
+        # A strategy may republish the `query` it inherits under its own name.
+        # That function already carries the guard, so guarding it again would
+        # wrap it twice and warn about an exhausted pool for a query that has
+        # already answered it.
+        class ParentStrategy(DummySingleAnnotatorPoolQueryStrategy):
+            pass
+
+        class ChildStrategy(ParentStrategy):
+            query = ParentStrategy.query
+
+        self.assertIs(ChildStrategy.query, ParentStrategy.query)
+
+        with self.assertWarnsRegex(UserWarning, "exhausted"):
+            query_indices = ChildStrategy().query(
+                X=np.arange(4).reshape(2, 2),
+                y=np.array([0, 1]),
+            )
+
+        self.assertEqual(query_indices.shape, (0,))
+
     def test_guard_covers_a_query_published_through_a_descriptor(self):
         # `match_signature` publishes `query` as a descriptor, which stays in
         # place while the function it binds carries the guard.

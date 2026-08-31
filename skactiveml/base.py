@@ -1726,11 +1726,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
-        error_msg = (
-            "No class label is known because `y` contains no actual "
-            "class labels and `classes` is not defined. Change at "
-            "least on of both parameters to overcome this error."
-        )
         structured_target = (
             target_spec.target_type == "multi-label"
             or target_spec.annotation_type == "multi-annotator"
@@ -1741,8 +1736,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")
         else:
-            if target_spec.classes is None:
-                raise ValueError(error_msg)
+            # Resolving the target specification has already rejected a `y`
+            # without observed class labels and without declared `classes`,
+            # so the encoder always has a vocabulary to fit here.
             self._le.fit(y)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)

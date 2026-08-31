@@ -25,7 +25,7 @@ from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
 from ..utils._target import (
-    _class_vocabularies_equal,
+    _classes_equal,
     _check_target_capability,
     _check_target_spec_capability,
 )
@@ -230,7 +230,7 @@ def _class_column(class_label, declared_classes):
         that vocabulary does not contain it.
     """
     for class_index, declared_class in enumerate(declared_classes):
-        if _class_vocabularies_equal((declared_class,), (class_label,)):
+        if _classes_equal(declared_class, class_label):
             return class_index
     return None
 
