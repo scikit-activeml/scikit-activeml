@@ -23,7 +23,8 @@ from docs.generate import (
     generate_api_reference_rst,
     generate_examples,
     generate_tutorials,
-    generate_switcher
+    generate_switcher,
+    is_skactiveml_method,
 )
 
 # -- Project information -----------------------------------------------------
@@ -274,6 +275,7 @@ todo_include_todos = True
 # -- Generate files for strategy overview and api reference ------------------
 
 autosummary_generate = True
+autosummary_context = {"is_skactiveml_method": is_skactiveml_method}
 
 autodoc_default_options = {
     "members": True,

@@ -12,6 +12,7 @@ from docs.generate import (
     OVERVIEW_HEADINGS,
     generate_examples,
     generate_strategy_overview_rst,
+    is_skactiveml_method,
 )
 from skactiveml import pool, stream
 
@@ -98,6 +99,49 @@ class TestExamples(unittest.TestCase):
                         f'AL-strategy, add "{item}" to the '
                         f'"exceptions" list in this test class.',
                     )
+
+    def test_api_reference_prioritizes_native_methods(self):
+        test_cases = [
+            (
+                "skactiveml.classifier.SklearnClassifier",
+                [
+                    "fit",
+                    "get_metadata_routing",
+                    "get_params",
+                    "predict",
+                    "score",
+                    "set_fit_request",
+                    "set_params",
+                ],
+                [
+                    "fit",
+                    "predict",
+                    "score",
+                    "get_metadata_routing",
+                    "get_params",
+                    "set_fit_request",
+                    "set_params",
+                ],
+            ),
+            (
+                "skactiveml.pool.UncertaintySampling",
+                ["get_params", "query", "set_params"],
+                ["query", "get_params", "set_params"],
+            ),
+        ]
+        for class_name, methods, expected in test_cases:
+            with self.subTest(class_name=class_name):
+                native = [
+                    method
+                    for method in methods
+                    if is_skactiveml_method(class_name, method)
+                ]
+                external = [
+                    method
+                    for method in methods
+                    if not is_skactiveml_method(class_name, method)
+                ]
+                self.assertEqual(expected, native + external)
 
     def test_multilabel_tags_match_capability_inventory(self):
         expected_strategies = {

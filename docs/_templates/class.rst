@@ -10,7 +10,12 @@
 
    .. autosummary::
    {% for item in methods %}
-   {%- if not item == '__init__' %}
+   {%- if item != '__init__' and is_skactiveml_method(fullname, item) %}
+      ~{{ name }}.{{ item }}
+   {%- endif %}
+   {%- endfor %}
+   {% for item in methods %}
+   {%- if item != '__init__' and not is_skactiveml_method(fullname, item) %}
       ~{{ name }}.{{ item }}
    {%- endif %}
    {%- endfor %}

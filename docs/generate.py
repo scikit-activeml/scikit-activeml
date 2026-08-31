@@ -30,6 +30,20 @@ for module in skactiveml.__all__:
 
 warnings.filterwarnings("ignore")
 
+
+def is_skactiveml_method(class_name, method_name):
+    """Return whether a class method is implemented by scikit-activeml."""
+    module_name, class_name = class_name.rsplit(".", 1)
+    cls = getattr(importlib.import_module(module_name), class_name)
+    method = inspect.getattr_static(cls, method_name)
+    if isinstance(method, (classmethod, staticmethod)):
+        method = method.__func__
+    method_module = getattr(method, "__module__", "") or ""
+    return method_module == "skactiveml" or method_module.startswith(
+        "skactiveml."
+    )
+
+
 # Heading path of each gallery section in the strategy overview, as
 # `(scenario, task)`. The wording matches `docs/tutorials.rst` verbatim, so
 # that both pages name the same things the same way. `sphinx-gallery` cannot
