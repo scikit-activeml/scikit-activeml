@@ -248,6 +248,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         utilities_cand = np.full((batch_size, len(X_cand)), np.nan)
         cand_indices = np.arange(len(X_cand))
         for b in range(batch_size):
+            relevance_dist_cand = dist_cand
             if b > 0:
                 # Update distances (diversity) values in the class probability
                 # space (cf. Eqs. (2) and (4) in [1]).
@@ -256,13 +257,13 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
                 dist_cand = np.minimum(dist_new, dist_cand)
                 dist_min = dist_cand.min()
                 dist_range = dist_cand.max() - dist_min
-                dist_cand -= dist_min
+                relevance_dist_cand = dist_cand - dist_min
                 if dist_range > 0:
-                    dist_cand /= dist_range
+                    relevance_dist_cand /= dist_range
 
             # Compute relevance scores for candidates (cf. Eq. (5) and
             # (6) in [1]).
-            rel_cand = unc_cand + dist_cand
+            rel_cand = unc_cand + relevance_dist_cand
             rel_cand[query_indices] = 0
             rel_cand_max = rel_cand.max()
             if self.gamma == 0:

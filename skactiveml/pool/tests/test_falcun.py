@@ -6,12 +6,49 @@ from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.naive_bayes import GaussianNB
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.pool import Falcun
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateMultilabelAggregationQueryStrategy,
 )
+
+
+class _FixedMultilabelClassifier(SkactivemlClassifier):
+    def __init__(
+        self,
+        probas,
+        classes=((0, 1), (0, 1), (0, 1), (0, 1)),
+        missing_label=MISSING_LABEL,
+    ):
+        super().__init__(
+            classes=classes,
+            missing_label=missing_label,
+            target_type="multi-label",
+        )
+        self.probas = probas
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
+
+    def fit(self, X, y, sample_weight=None):
+        target_spec = self._resolve_fitting_target_spec(y)
+        self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            target_spec=target_spec,
+        )
+        self.target_spec_ = target_spec
+        return self
+
+    def predict_proba(self, X):
+        indices = np.asarray(X, dtype=int).ravel()
+        return np.asarray(self.probas)[indices]
 
 
 class TestFalcun(
@@ -178,6 +215,29 @@ class TestFalcun(
         np.testing.assert_array_equal(query_indices, [2])
         self.assertTrue(np.isfinite(utilities[0, 2:]).all())
         self.assertAlmostEqual(np.nansum(utilities), 1.0)
+
+    def test_query_preserves_raw_nearest_distances_across_batch(self):
+        probas = np.array(
+            [
+                [0.43611914, 0.36330946, 0.28414327, 0.77202550],
+                [0.71581874, 0.16283091, 0.76070777, 0.78582817],
+                [0.73860660, 0.22880154, 0.33021148, 0.27613222],
+                [0.89759841, 0.92512259, 0.61857557, 0.13930358],
+                [0.13752908, 0.36586799, 0.11546954, 0.51183268],
+                [0.25935616, 0.11047789, 0.18811405, 0.32395917],
+            ]
+        )
+        X = np.arange(len(probas)).reshape(-1, 1)
+        y = np.full(probas.shape, MISSING_LABEL)
+
+        query_indices = Falcun(gamma=0.5, random_state=0).query(
+            X,
+            y,
+            clf=_FixedMultilabelClassifier(probas=probas),
+            batch_size=len(X),
+        )
+
+        np.testing.assert_array_equal(query_indices, [3, 1, 5, 2, 0, 4])
 
     def test_query_multilabel_list_probas(self):
         qs = Falcun(random_state=42)
