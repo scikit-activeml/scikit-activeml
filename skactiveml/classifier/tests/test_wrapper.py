@@ -3482,6 +3482,25 @@ if successful_skorch_torch_import:
                 np.allclose(np.sum(P, axis=1), 1, rtol=0, atol=1.0e-3)
             )
 
+        def test_predict_proba_rejects_multilabel_output_count_mismatch(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(
+                {
+                    "module": nn.Linear(1, 3),
+                    "classes": [[0, 1], [0, 1]],
+                    "missing_label": -1,
+                }
+            )
+            clf = SkorchClassifier(**init_params)
+
+            with self.assertRaisesRegex(
+                ValueError, r"shape `\(n_samples, 2\)`.+got \(4, 3\)"
+            ):
+                clf.predict_proba(self.X_ml)
+
+            self.assertFalse(hasattr(clf, "target_spec_"))
+            self.assertFalse(hasattr(clf, "_le"))
+
         def test_init_param_target_type(self):
             self._test_param(
                 "init",

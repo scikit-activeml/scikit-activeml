@@ -2629,10 +2629,28 @@ if successful_skorch_torch_import:
             # First element is expected to be the class probabilities.
             P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
             check_scalar(self.validate_proba, "validate_proba", bool)
+            is_multilabel = self._uses_multilabel_target()
+            if is_multilabel:
+                target_spec = getattr(self, "target_spec_", None)
+                classes = (
+                    target_spec.classes
+                    if target_spec is not None
+                    else self.classes
+                )
+                n_outputs = len(classes)
+                expected_shape = (len(X), n_outputs)
+                if np.shape(P) != expected_shape:
+                    raise ValueError(
+                        "Expected `predict_proba` of the Skorch module to "
+                        "return positive-class probabilities of shape "
+                        f"`(n_samples, {n_outputs})`, exactly "
+                        f"`{expected_shape}`, for multi-label "
+                        f"classification, got {np.shape(P)}."
+                    )
             if self.validate_proba:
                 _check_probas_are_valid(
                     P,
-                    is_multilabel=self._uses_multilabel_target(),
+                    is_multilabel=is_multilabel,
                     hint=(
                         "The first output of `forward_outputs` is read as "
                         "class probabilities, so set a transform producing "
