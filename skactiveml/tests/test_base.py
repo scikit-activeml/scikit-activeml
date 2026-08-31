@@ -759,8 +759,10 @@ class SkactivemlClassifierTest(unittest.TestCase):
         X = np.arange(4).reshape(2, 2)
         clf.fit(X, np.array([0, 1]))
         clf.partial_fit(X, np.array([0, 1]))
-        with self.assertRaisesRegex(ValueError, "No class label is known"):
-            clf.partial_fit(np.empty((0, 2)), np.empty(0, dtype=int))
+        established_spec = clf.target_spec_
+        clf.partial_fit(np.empty((0, 2)), np.empty(0, dtype=int))
+        self.assertIs(clf.target_spec_, established_spec)
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
         clf.classes = [0, 1, 2]
         with self.assertRaisesRegex(ValueError, "cannot change"):
             clf.partial_fit(X, np.array([0, 1, 2]))

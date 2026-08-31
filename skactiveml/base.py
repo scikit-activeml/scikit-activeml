@@ -1738,9 +1738,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")
         else:
-            if self.classes is None:
+            if target_spec.classes is None:
                 raise ValueError(error_msg)
-            self._le.fit(self.classes)
+            self._le.fit(y)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)

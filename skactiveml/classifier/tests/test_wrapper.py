@@ -501,6 +501,29 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         for classes in clf.classes_:
             np.testing.assert_array_equal(classes, [0, 1])
 
+    def test_empty_partial_fit_reuses_inferred_multilabel_vocabularies(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            missing_label=-1,
+            target_type="multi-label",
+            proba_format="array",
+        )
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
+        clf.partial_fit(X, y)
+        established_spec = clf.target_spec_
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            clf.partial_fit(np.empty((0, 1)), np.empty((0, 2), dtype=int))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertEqual(clf.target_spec_.classes, ((0, 1), (0, 1)))
+        for classes in clf.classes_:
+            np.testing.assert_array_equal(classes, [0, 1])
+
     def test_partial_fit_rejects_changed_target_declaration(self):
         clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
         X = np.array([[0.0], [1.0]])
@@ -3518,6 +3541,42 @@ if successful_skorch_torch_import:
             self.assertTrue(np.all(probabilities >= 0))
             self.assertTrue(np.all(probabilities <= 1))
 
+        def test_empty_partial_fit_reuses_resolved_multilabel_target_spec(
+            self,
+        ):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(
+                {
+                    "classes": None,
+                    "missing_label": -1,
+                    "target_type": "multi-label",
+                }
+            )
+            init_params["neural_net_param_dict"]["max_epochs"] = 1
+            clf = SkorchClassifier(**init_params)
+            clf.partial_fit(self.X_ml, self.y_ml)
+            established_spec = clf.target_spec_
+            established_net = clf.neural_net_
+            established_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            established_history_length = len(clf.neural_net_.history)
+
+            clf.partial_fit(
+                np.empty((0, 1), dtype=np.float32),
+                np.empty((0, 2), dtype=np.float32),
+            )
+
+            self.assertIs(clf.target_spec_, established_spec)
+            self.assertIs(clf.neural_net_, established_net)
+            self.assertEqual(
+                len(clf.neural_net_.history), established_history_length
+            )
+            np.testing.assert_array_equal(
+                to_numpy(clf.neural_net_.module_.input_to_hidden.weight),
+                established_weights,
+            )
+
         def test_partial_fit_rejects_unseen_multilabel_class_before_training(
             self,
         ):
@@ -3591,6 +3650,42 @@ if successful_skorch_torch_import:
             self.assertEqual(clf.target_spec_.classes, ((0.0, 1.0),) * 2)
             for classes in clf.classes_:
                 np.testing.assert_array_equal(classes, [0.0, 1.0])
+
+        def test_empty_multilabel_warm_start_fit_reuses_target_spec(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(
+                {
+                    "classes": None,
+                    "missing_label": -1,
+                    "target_type": "multi-label",
+                }
+            )
+            init_params["neural_net_param_dict"].update(
+                {"max_epochs": 1, "warm_start": True}
+            )
+            clf = SkorchClassifier(**init_params)
+            clf.fit(self.X_ml, self.y_ml)
+            established_spec = clf.target_spec_
+            established_net = clf.neural_net_
+            established_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            established_history_length = len(clf.neural_net_.history)
+
+            clf.fit(
+                np.empty((0, 1), dtype=np.float32),
+                np.empty((0, 2), dtype=np.float32),
+            )
+
+            self.assertIs(clf.target_spec_, established_spec)
+            self.assertIs(clf.neural_net_, established_net)
+            self.assertEqual(
+                len(clf.neural_net_.history), established_history_length
+            )
+            np.testing.assert_array_equal(
+                to_numpy(clf.neural_net_.module_.input_to_hidden.weight),
+                established_weights,
+            )
 
         def test_reinitializing_fit_resolves_new_target_spec(self):
             init_params = deepcopy(self.init_default_params)
