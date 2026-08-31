@@ -96,7 +96,8 @@ class TargetSpec:
             self.task == other.task
             and self.target_type == other.target_type
             and self.annotation_type == other.annotation_type
-            and _class_vocabularies_equal(self.classes, other.classes)
+            and _class_vocabulary_identity_key(self.classes)
+            == _class_vocabulary_identity_key(other.classes)
         )
 
     def __hash__(self):
@@ -105,7 +106,7 @@ class TargetSpec:
                 self.task,
                 self.target_type,
                 self.annotation_type,
-                _class_vocabulary_hash_key(self.classes),
+                _class_vocabulary_identity_key(self.classes),
             )
         )
 
@@ -169,6 +170,28 @@ def _class_vocabulary_hash_key(classes):
             _class_vocabulary_hash_key(value)
             if isinstance(value, tuple)
             else _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value
+        )
+        for value in classes
+    )
+
+
+def _class_vocabulary_identity_key(classes):
+    """Return the value-and-dtype-kind identity of normalized classes.
+
+    Target specifications preserve a declaration's dtype kind even when
+    Python considers its values equal, such as integer ``0`` and floating
+    ``0.0``. Width differences within one kind remain immaterial.
+    """
+    if classes is None:
+        return None
+    return tuple(
+        (
+            _class_vocabulary_identity_key(value)
+            if isinstance(value, tuple)
+            else (
+                np.asarray(value).dtype.kind,
+                _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value,
+            )
         )
         for value in classes
     )

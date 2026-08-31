@@ -153,6 +153,32 @@ class TestTargetSpec(unittest.TestCase):
         self.assertNotEqual(classification, other_classification)
         self.assertFalse(classification == object())
 
+    def test_equality_and_hashing_preserve_class_dtype_kinds(self):
+        def multilabel_spec(classes):
+            return TargetSpec(
+                task="classification",
+                target_type="multi-label",
+                annotation_type="single-annotator",
+                classes=classes,
+            )
+
+        integer = multilabel_spec(((0, 1), (0, 1)))
+        floating = multilabel_spec(((0.0, 1.0), (0.0, 1.0)))
+        boolean = multilabel_spec(((False, True), (False, True)))
+
+        narrow_integer = multilabel_spec(
+            (
+                np.array([0, 1], dtype=np.int8),
+                np.array([0, 1], dtype=np.int8),
+            )
+        )
+
+        self.assertEqual(integer, narrow_integer)
+        self.assertEqual(hash(integer), hash(narrow_integer))
+        self.assertNotEqual(integer, floating)
+        self.assertNotEqual(integer, boolean)
+        self.assertEqual(len({integer, floating, boolean}), 3)
+
     def test_rejects_unresolved_or_unknown_semantic_values(self):
         invalid_specs = [
             (

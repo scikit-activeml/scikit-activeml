@@ -775,6 +775,23 @@ class SkactivemlClassifierTest(unittest.TestCase):
             multi_annotator_clf.target_spec_.annotation_type, "multi-annotator"
         )
 
+    def test_partial_fit_rejects_changed_multilabel_dtype_kind(self):
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([[0, 2], [1, 3]])
+        clf = DummySkactivemlClassifier(
+            classes=((0, 1), (2, 3)),
+            missing_label=-1,
+            target_type="multi-label",
+        )
+        clf.partial_fit(X, y)
+        established_spec = clf.target_spec_
+
+        clf.classes = ((0.0, 1.0), (2.0, 3.0))
+        with self.assertRaisesRegex(ValueError, "cannot change"):
+            clf.partial_fit(X, y.astype(float))
+
+        self.assertIs(clf.target_spec_, established_spec)
+
     def test_public_fit_validates_weights_and_orders_cost_matrix(self):
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, 1])
