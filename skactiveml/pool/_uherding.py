@@ -673,8 +673,12 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             )
             if probas is None and logits is not None:
                 probas = expit(logits)
-        elif probas is None and logits is not None:
-            probas = softmax(logits, axis=1)
+        else:
+            if logits is not None and np.asarray(logits).ndim == 1:
+                logits = np.asarray(logits)
+                logits = np.column_stack([np.zeros_like(logits), logits])
+            if probas is None and logits is not None:
+                probas = softmax(logits, axis=1)
 
         return probas, logits, emb
 

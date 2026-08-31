@@ -619,6 +619,24 @@ class TestUHerding(
 
         np.testing.assert_array_equal(query_indices, [1])
 
+    def test_query_binary_with_tuple_one_dimensional_logits(self):
+        class OneDimensionalLogitClassifier(ParzenWindowClassifier):
+            def predict_proba(self, X):
+                logits = np.asarray(X, dtype=float)[:, 0]
+                return None, logits
+
+        X = np.array([[0.0], [1.0]])
+        y = np.array([0.0, MISSING_LABEL])
+        clf = OneDimensionalLogitClassifier(classes=[0, 1]).fit(X, y)
+
+        query_indices = UHerding(
+            temperatures=1.0,
+            predict_proba_dict=None,
+            random_state=0,
+        ).query(X, y, clf=clf, fit_clf=False)
+
+        np.testing.assert_array_equal(query_indices, [1])
+
     def test_query_fit_clf_false_uses_temp_clones_only(self):
         ParzenWindowClassifierLogitsEmbedding.reset_fit_calls()
         clf = ParzenWindowClassifierLogitsEmbedding(
