@@ -212,6 +212,26 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             tags.target_tags.multi_output = True
             return tags
 
+    class _NaNClassMultiOutputEstimator(_MultiOutputTaggedEstimator):
+        """Classifier learning a NaN class in a non-canonical order."""
+
+        def fit(self, X, y):
+            self.classes_ = [
+                np.array([np.nan, 1.0]),
+                np.array([1.0, 0.0]),
+            ]
+            self.n_features_in_ = np.shape(X)[1]
+            return self
+
+        def predict(self, X):
+            return np.tile([np.nan, 1.0], (len(X), 1))
+
+        def predict_proba(self, X):
+            return [
+                np.tile([0.75, 0.25], (len(X), 1)),
+                np.tile([0.6, 0.4], (len(X), 1)),
+            ]
+
     class _MultiLabelTaggedEstimator(_TwoOutputEstimator):
         """Two-output classifier declaring only `classifier_tags.multi_label`.
 
@@ -265,6 +285,22 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf._commit_label_state(clf._resolve_label_state(dummy_classes))
         clf.is_fitted_ = True
         return clf
+
+    def _fit_nan_class_multilabel_clf(self):
+        y = np.array(
+            [
+                [np.nan, 0.0],
+                [1.0, 1.0],
+                [np.nan, 1.0],
+                [1.0, 0.0],
+            ]
+        )
+        return SklearnClassifier(
+            estimator=self._NaNClassMultiOutputEstimator(),
+            classes=[[np.nan, 1.0], [0.0, 1.0]],
+            missing_label=-1,
+            proba_format="list",
+        ).fit(self.X_ml, y)
 
     def test_prior_matrix_from_counts(self):
         np.testing.assert_allclose(
@@ -664,6 +700,25 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(P.shape, (len(X), 2))
         y_pred = clf.predict(X)
         self.assertEqual(y_pred.shape, y.shape)
+
+    def test_multilabel_predict_accepts_observed_nan_class(self):
+        clf = self._fit_nan_class_multilabel_clf()
+        predictions = clf.predict(self.X_ml)
+
+        self.assertTrue(np.isnan(predictions[:, 0]).all())
+        np.testing.assert_array_equal(predictions[:, 1], 1.0)
+
+    def test_multilabel_predict_proba_maps_observed_nan_class(self):
+        clf = self._fit_nan_class_multilabel_clf()
+        probabilities = clf.predict_proba(self.X_ml)
+
+        np.testing.assert_allclose(
+            probabilities[0],
+            np.tile([0.25, 0.75], (len(self.X_ml), 1)),
+        )
+        np.testing.assert_allclose(
+            probabilities[1], np.tile([0.4, 0.6], (len(self.X_ml), 1))
+        )
 
     def test_init_param_target_type(self):
         self._test_param(

@@ -25,6 +25,7 @@ from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
 from ..utils._target import (
+    _class_vocabularies_equal,
     _check_target_capability,
     _check_target_spec_capability,
 )
@@ -210,8 +211,9 @@ def _discover_fitted_target_evidence(estimator):
 def _class_column(class_label, declared_classes):
     """Locate one class label in a declared class vocabulary.
 
-    A learned class label is never `numpy.nan`, because `scikit-learn` rejects
-    such a target, so the labels are compared by plain equality.
+    Class labels are compared by the same NaN-aware identity used by target
+    specifications, because a custom estimator may learn `numpy.nan` as an
+    ordinary class when the missing-label sentinel differs.
 
     Parameters
     ----------
@@ -228,7 +230,7 @@ def _class_column(class_label, declared_classes):
         that vocabulary does not contain it.
     """
     for class_index, declared_class in enumerate(declared_classes):
-        if bool(declared_class == class_label):
+        if _class_vocabularies_equal((declared_class,), (class_label,)):
             return class_index
     return None
 
