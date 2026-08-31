@@ -3130,6 +3130,10 @@ if successful_capymoa_import:
             import capymoa.base
             import capymoa.instance
 
+            had_established_target_spec = (
+                fit_function == "partial_fit"
+                and getattr(self, "target_spec_", None) is not None
+            )
             target_spec = self._resolve_target_spec_for_fit(
                 y, is_incremental=fit_function == "partial_fit"
             )
@@ -3160,6 +3164,11 @@ if successful_capymoa_import:
                     "classifier.".format(self.estimator_class)
                 )
             is_included = is_labeled(y, missing_label=-1)
+            # A validated incremental call without training rows is a no-op
+            # for an already established streaming model.
+            if had_established_target_spec and not np.any(is_included):
+                return self
+
             self._label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
@@ -3476,6 +3485,10 @@ if successful_river_import:
             rejects the call, because its only caller `_fit` rolls them back.
             See `_fit` for the parameters and the transactional guarantee.
             """
+            had_established_target_spec = (
+                fit_function == "partial_fit"
+                and getattr(self, "target_spec_", None) is not None
+            )
             target_spec = self._resolve_target_spec_for_fit(
                 y, is_incremental=fit_function == "partial_fit"
             )
@@ -3503,13 +3516,18 @@ if successful_river_import:
                     "'{}' must be a river classifier.".format(self.estimator)
                 )
 
+            is_included = is_labeled(y, missing_label=-1)
+            # A validated incremental call without training rows is a no-op
+            # for an already established streaming model.
+            if had_established_target_spec and not np.any(is_included):
+                return self
+
             if hasattr(self, "estimator_"):
                 if fit_function != "partial_fit":
                     self.estimator_ = deepcopy(self.estimator)
             else:
                 self.estimator_ = deepcopy(self.estimator)
             # count labels per class
-            is_included = is_labeled(y, missing_label=-1)
             self._label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))

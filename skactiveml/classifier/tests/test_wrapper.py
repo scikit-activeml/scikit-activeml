@@ -2534,6 +2534,37 @@ class _IncrementalClassifierTargetContract:
         np.testing.assert_array_equal(clf.predict_proba(X), probabilities)
 
 
+class _StreamingClassifierEmptyUpdateContract:
+    def test_incremental_empty_training_subsets_preserve_state(self):
+        clf = self._make_incremental_contract_classifier()
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+        established_estimator = clf.estimator_
+        established_counts = deepcopy(clf._label_counts)
+        established_probabilities = clf.predict_proba(X)
+
+        updates = [
+            (np.empty((0, 1)), np.empty(0, dtype=int)),
+            (X, np.array([-1, -1])),
+        ]
+        for X_update, y_update in updates:
+            with self.subTest(update_size=len(y_update)):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error")
+                    clf.partial_fit(X_update, y_update)
+
+                self.assertTrue(clf.is_fitted_)
+                self.assertIs(clf.target_spec_, established_spec)
+                self.assertIs(clf.estimator_, established_estimator)
+                np.testing.assert_array_equal(
+                    clf._label_counts, established_counts
+                )
+                np.testing.assert_allclose(
+                    clf.predict_proba(X), established_probabilities
+                )
+
+
 class TestSlidingWindowClassifier(
     _IncrementalClassifierTargetContract,
     TemplateSkactivemlClassifier,
@@ -4164,6 +4195,7 @@ if successful_skorch_torch_import:
 if successful_river_import:
 
     class TestRiverClassifier(
+        _StreamingClassifierEmptyUpdateContract,
         _IncrementalClassifierTargetContract,
         TemplateSkactivemlClassifier,
         unittest.TestCase,
@@ -4275,14 +4307,18 @@ if successful_river_import:
                         # explicit class declaration.
                         if provide_classes or fit_function == "partial_fit":
                             fit_func(X[:0], y_true[:0])
-                            self.assertFalse(clf.is_fitted_)
+                            self.assertEqual(
+                                clf.is_fitted_, fit_function == "partial_fit"
+                            )
                         else:
                             self.assertRaises(
                                 ValueError, fit_func, X[:0], y_true[:0]
                             )
                         if provide_classes:
                             fit_func(X, y_all_missing)
-                            self.assertFalse(clf.is_fitted_)
+                            self.assertEqual(
+                                clf.is_fitted_, fit_function == "partial_fit"
+                            )
                         elif fit_function == "fit":
                             self.assertRaises(
                                 ValueError, fit_func, X, y_all_missing
@@ -4672,6 +4708,7 @@ if successful_capymoa_import:
     from skactiveml.classifier import CapyMOAClassifier
 
     class TestCapyMOAClassifier(
+        _StreamingClassifierEmptyUpdateContract,
         _IncrementalClassifierTargetContract,
         TemplateSkactivemlClassifier,
         unittest.TestCase,
@@ -4801,14 +4838,18 @@ if successful_capymoa_import:
                         # explicit class declaration.
                         if provide_classes or fit_function == "partial_fit":
                             fit_func(X[:0], y_true[:0])
-                            self.assertFalse(clf.is_fitted_)
+                            self.assertEqual(
+                                clf.is_fitted_, fit_function == "partial_fit"
+                            )
                         else:
                             self.assertRaises(
                                 ValueError, fit_func, X[:0], y_true[:0]
                             )
                         if provide_classes:
                             fit_func(X, y_all_missing)
-                            self.assertFalse(clf.is_fitted_)
+                            self.assertEqual(
+                                clf.is_fitted_, fit_function == "partial_fit"
+                            )
                         elif fit_function == "fit":
                             self.assertRaises(
                                 ValueError, fit_func, X, y_all_missing
