@@ -2700,14 +2700,7 @@ if successful_skorch_torch_import:
             if target_spec is not None:
                 return target_spec.target_type
             if self.classes is not None:
-                y_dummy = (
-                    np.empty(
-                        (0, len(self.classes)),
-                        dtype=np.asarray(self.missing_label).dtype,
-                    )
-                    if _has_nested_classes(self.classes)
-                    else self.classes
-                )
+                y_dummy = self._declared_classes_target_dummy()
                 return self._resolve_target_spec(y_dummy).target_type
 
             target_type = (
@@ -2721,6 +2714,15 @@ if successful_skorch_torch_import:
                 self._target_capabilities,
             )
             return target_type
+
+        def _declared_classes_target_dummy(self):
+            """Build an empty target with the declared output structure."""
+            if _has_nested_classes(self.classes):
+                return np.empty(
+                    (0, len(self.classes)),
+                    dtype=np.asarray(self.missing_label).dtype,
+                )
+            return self.classes
 
         def _uses_multilabel_target(self, y=None):
             return self._provisional_target_type(y) == "multi-label"
@@ -2845,7 +2847,7 @@ if successful_skorch_torch_import:
             self.random_state_ = check_random_state(self.random_state)
             if not hasattr(self, "_le"):
                 if self.classes is not None:
-                    y_dummy = self.classes
+                    y_dummy = self._declared_classes_target_dummy()
                 else:
                     y_dummy = np.arange(P.shape[-1], dtype=int)
                 self._initialize_label_state(y_dummy)

@@ -3547,6 +3547,26 @@ if successful_skorch_torch_import:
             y_pred = clf.predict(self.X_ml)
             self.assertEqual(y_pred.shape, self.y_ml.shape)
 
+        def test_prefit_multilabel_prediction_supports_output_counts(self):
+            for n_outputs in [1, 3]:
+                with self.subTest(n_outputs=n_outputs):
+                    init_params = deepcopy(self.init_default_params)
+                    init_params.update(
+                        {
+                            "module": nn.Linear(1, n_outputs),
+                            "classes": [[0, 1] for _ in range(n_outputs)],
+                            "missing_label": -1,
+                        }
+                    )
+                    clf = SkorchClassifier(**init_params)
+
+                    probabilities = clf.predict_proba(self.X_ml)
+                    predictions = clf.predict(self.X_ml)
+
+                    expected_shape = (len(self.X_ml), n_outputs)
+                    self.assertEqual(probabilities.shape, expected_shape)
+                    self.assertEqual(predictions.shape, expected_shape)
+
         def test_fit(self):
             # Check standard fitting cases.
             clf = SkorchClassifier(**self.init_default_params)
