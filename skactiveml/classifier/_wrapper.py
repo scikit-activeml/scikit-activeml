@@ -834,7 +834,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 # Multi-label targets correspond to one binary class
                 # vocabulary per output.
                 n_outputs = len(self.classes_)
-                if isinstance(P, list):
+                # A Python list can also be a row-oriented positive-class
+                # matrix. Only nested matrices identify the per-output form.
+                is_per_output_list = isinstance(P, list) and (
+                    len(P) == 0 or any(np.asarray(P_j).ndim >= 2 for P_j in P)
+                )
+                if is_per_output_list:
                     P_list = self._normalize_multilabel_proba_list(
                         P, n_samples=n_samples
                     )

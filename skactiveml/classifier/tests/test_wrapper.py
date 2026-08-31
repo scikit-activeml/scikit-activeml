@@ -244,6 +244,18 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             tags.classifier_tags.multi_label = True
             return tags
 
+    class _NestedListProbaEstimator(_MultiOutputTaggedEstimator):
+        """Classifier returning positive-class probabilities as Python rows."""
+
+        def predict_proba(self, X):
+            probabilities = [
+                [0.1, 0.9],
+                [0.2, 0.8],
+                [0.3, 0.7],
+                [0.4, 0.6],
+            ]
+            return probabilities[: len(X)]
+
     class _CallRecordingEstimator(_MultiOutputTaggedEstimator):
         """Admitted classifier recording every fit and inference call."""
 
@@ -1191,6 +1203,38 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             clf.predict_proba,
             self.X_ml,
         )
+
+    def test_multilabel_predict_proba_accepts_nested_list_matrix(self):
+        expected = np.array(
+            [
+                [0.1, 0.9],
+                [0.2, 0.8],
+                [0.3, 0.7],
+                [0.4, 0.6],
+            ]
+        )
+        for proba_format in ["array", "list"]:
+            with self.subTest(proba_format=proba_format):
+                clf = SklearnClassifier(
+                    estimator=self._NestedListProbaEstimator(),
+                    classes=[[0, 1], [0, 1]],
+                    missing_label=-1,
+                    proba_format=proba_format,
+                ).fit(self.X_ml, self.y_ml)
+
+                probabilities = clf.predict_proba(self.X_ml)
+
+                if proba_format == "array":
+                    np.testing.assert_allclose(probabilities, expected)
+                else:
+                    self.assertEqual(len(probabilities), expected.shape[1])
+                    for j, probabilities_j in enumerate(probabilities):
+                        np.testing.assert_allclose(
+                            probabilities_j,
+                            np.column_stack(
+                                [1 - expected[:, j], expected[:, j]]
+                            ),
+                        )
 
     def test_multilabel_predict_proba_array_rejects_wrong_sample_count(self):
         clf = self._prefit_multilabel_clf(proba_format="array")
