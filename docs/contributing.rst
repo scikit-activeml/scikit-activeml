@@ -370,12 +370,15 @@ Returns:
 General Advice
 ''''''''''''''
 
-Use the ``self._validate_data`` method (implemented in the superclass)
-to check the inputs ``X`` and ``y`` only once. Fit the classifier or
+Use the ``self._validate_data`` method (implemented in the superclass) exactly
+once for structural validation of the query inputs ``X`` and ``y``. Target
+resolution is a separate semantic step and may intentionally precede
+``self._validate_data`` so that invalid or unsupported target semantics fail
+before estimator fitting or query-state initialization. Fit the classifier or
 regressor if it is not yet fitted (using ``fit_if_not_fitted`` from ``utils``).
-Calculate utilities via an extra public function. Use the
-``simple_batch`` function from ``utils`` to determine the query indices and set
-the utilities in naive batch query strategies.
+Calculate utilities via an extra public function. Use the ``simple_batch``
+function from ``utils`` to determine the query indices and set the utilities in
+naive batch query strategies.
 
 .. _testing-1:
 

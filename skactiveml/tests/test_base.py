@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 from sklearn.utils._testing import assert_allclose
+from sklearn.utils.validation import check_array
 
 from skactiveml.base import (
     QueryStrategy,
@@ -400,6 +401,22 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
         np.testing.assert_array_equal(candidates_v, np.array([1, 2]))
         self.assertEqual(batch_size_v, 1)
         self.assertFalse(return_utilities_v)
+
+    def test__validate_data_checks_multilabel_inputs_once(self):
+        X = np.arange(6).reshape(3, 2)
+        y = np.array([[0, 1], [np.nan, np.nan], [np.nan, np.nan]])
+
+        with patch("skactiveml.base.check_array", wraps=check_array) as check:
+            self.qs._validate_data(
+                X=X,
+                y=y,
+                candidates=None,
+                batch_size=1,
+                return_utilities=False,
+                target_type="multi-label",
+            )
+
+        self.assertEqual(check.call_count, 2)
 
     def test_public_query_resolves_target_capabilities(self):
         X = np.arange(8).reshape(4, 2)

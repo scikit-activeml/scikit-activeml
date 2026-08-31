@@ -613,11 +613,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             target_type=target_type,
         )
 
-        if target_type == "multi-label":
-            y = check_array(
-                y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
-            )
-        elif target_type == "single-output":
+        if target_type == "single-output":
             y = column_or_1d(y, warn=True)
 
         if candidates is None:
