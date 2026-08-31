@@ -65,24 +65,25 @@ def check_scalar(
                 name, target_type, type(x)
             )
         )
+    is_nan = x != x
     if min_inclusive:
-        if min_val is not None and (x < min_val or np.isnan(x)):
+        if min_val is not None and (x < min_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be >= " "{}.".format(name, x, min_val)
             )
     else:
-        if min_val is not None and (x <= min_val or np.isnan(x)):
+        if min_val is not None and (x <= min_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be > " "{}.".format(name, x, min_val)
             )
 
     if max_inclusive:
-        if max_val is not None and (x > max_val or np.isnan(x)):
+        if max_val is not None and (x > max_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be <= " "{}.".format(name, x, max_val)
             )
     else:
-        if max_val is not None and (x >= max_val or np.isnan(x)):
+        if max_val is not None and (x >= max_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be < " "{}.".format(name, x, max_val)
             )

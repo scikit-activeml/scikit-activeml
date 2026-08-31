@@ -178,6 +178,14 @@ class TestValidation(unittest.TestCase):
         )
         check_scalar(x=np.nan, name="x", target_type=float)
 
+    def test_check_scalar_accepts_large_integer_without_upper_bound(self):
+        check_scalar(
+            x=10**20,
+            name="x",
+            target_type=(float, int),
+            min_val=0,
+        )
+
     def test_check_classifier_params(self):
         self.assertRaises(
             ValueError,
