@@ -651,6 +651,12 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                 clf, X, is_multilabel=is_multilabel
             )
         if is_multilabel:
+            if (
+                logits is not None
+                and n_outputs == 1
+                and np.asarray(logits).ndim == 1
+            ):
+                logits = np.asarray(logits)[:, None]
             # Canonicalize both public multilabel probability formats before
             # the acquisition logic consumes them.
             probas = _canonicalize_multilabel_probas(
