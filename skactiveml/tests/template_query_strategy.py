@@ -955,14 +955,14 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         return tuple((0, 1) for _ in range(self._multilabel_n_outputs()))
 
     def _multilabel_heterogeneous_vocabularies(self):
-        """Return vocabularies mixing string and numeric label families."""
+        """Return per-output vocabularies whose dtypes deliberately differ."""
         vocabularies = list(self._multilabel_string_vocabularies())
         vocabularies[-1] = (0, 1)
         return tuple(vocabularies)
 
     def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
-        # One array holds every label output, so string and numeric
-        # vocabularies cannot be mixed. A strategy resolving a class
+        # One array holds every label output, so vocabularies of different
+        # dtypes cannot be represented. A strategy resolving a class
         # vocabulary has to reject them through the shared resolution, and
         # must not commit query state while doing so.
         #
@@ -985,7 +985,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         qs = self.qs_class(**init_params)
 
         with self.assertRaisesRegex(
-            ValueError, "one label family across all label outputs"
+            ValueError, "one dtype across all label outputs"
         ):
             qs.query(**query_params)
 

@@ -253,14 +253,16 @@ vocabulary is normalized to the same canonical order used by fitted
    ... )
    >>> assert spec.classes == (("absent", "present"), ("no", "yes"))
 
-All label outputs must use classes from the same label family: either every
-output uses strings or every output uses numbers. Different outputs may still
-use different binary vocabularies within that family, for example
-``("no", "yes")`` next to ``("off", "always")``.
+All label outputs must use classes of the same dtype kind because one array
+stores all outputs of a sample. Different outputs may still use different
+binary vocabularies within the same kind, for example ``("no", "yes")`` next
+to ``("off", "always")``.
 
-Numeric vocabularies may mix integer, floating-point, and Boolean dtypes across
-outputs. Mixing string and numeric vocabularies is rejected during resolution
-so that every output follows one consistent class-label convention.
+Mixing dtype kinds is rejected during resolution, including strings with
+numbers, integers with floats, and booleans with integers. Otherwise, the array
+would coerce the outputs to a common dtype and could change the declared class
+labels. For example, the integer ``0`` of one output could be returned as the
+string ``'0'``.
 
 .. doctest::
 
