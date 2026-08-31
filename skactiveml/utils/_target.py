@@ -517,7 +517,8 @@ def _validate_single_output_shape(y, task, annotation_type):
     if annotation_type == "multi-annotator":
         if y.ndim != 2:
             raise ValueError(
-                "Multi-annotator targets must be two-dimensional."
+                "Targets with multi-annotator annotation type must be "
+                "two-dimensional."
             )
         return
 

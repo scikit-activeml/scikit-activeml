@@ -444,9 +444,10 @@ longer preserve one target value per sample.
 Multiple annotators
 ===================
 
-Target type and annotation type are independent. In a multi-annotator target
-matrix, the columns represent annotators that provide observations for the same
-single-output target. They do not represent separate label outputs.
+Target type and annotation type are independent. In a target observation matrix
+with multi-annotator annotation type, the columns represent annotators that
+provide observations for the same single-output target. They do not represent
+separate label outputs.
 
 A sample may therefore contain both observed and missing annotator labels.
 Existing multi-annotator estimators and strategies retain the multi-annotator
