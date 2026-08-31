@@ -1035,18 +1035,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 "implements 'predict_proba'."
             )
 
-        # An empty incremental batch validates the established target and
-        # feature contracts but must not discard an already trained estimator
-        # or its label counts.
-        if had_established_target_spec and len(y) == 0:
-            return self
-
-        if hasattr(self, "estimator_"):
-            if fit_function != "partial_fit":
-                self.estimator_ = deepcopy(self.estimator)
-        else:
-            self.estimator_ = deepcopy(self.estimator)
-
         # Include unlabeled samples, if requested, e.g., when wrapping
         # semi-supervised classifiers from sklearn.
         if self.include_unlabeled_samples:
@@ -1057,6 +1045,19 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 missing_label=-1,
                 target_type=target_spec.target_type,
             )
+
+        # An incremental batch without an effective training row validates
+        # the established target and feature contracts but must not discard an
+        # already trained estimator or its label counts. All-unlabeled rows
+        # remain effective for estimators that explicitly include them.
+        if had_established_target_spec and not np.any(is_included):
+            return self
+
+        if hasattr(self, "estimator_"):
+            if fit_function != "partial_fit":
+                self.estimator_ = deepcopy(self.estimator)
+        else:
+            self.estimator_ = deepcopy(self.estimator)
 
         # Count labels per class.
         if self._is_multilabel_target():

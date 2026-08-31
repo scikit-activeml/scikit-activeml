@@ -546,6 +546,34 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             clf.predict_proba(X), established_probabilities
         )
 
+    def test_unlabeled_partial_fit_preserves_fitted_state(self):
+        clf = SklearnClassifier(
+            estimator=GaussianNB(), classes=[0, 1], missing_label=-1
+        )
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        y = np.array([0, 0, 1, 1])
+        clf.partial_fit(X, y)
+        established_spec = clf.target_spec_
+        established_estimator = clf.estimator_
+        established_counts = deepcopy(clf._label_counts)
+        established_class_counts = clf.estimator_.class_count_.copy()
+        established_probabilities = clf.predict_proba(X)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            clf.partial_fit(X[:2], np.full(2, -1))
+
+        self.assertTrue(clf.is_fitted_)
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertIs(clf.estimator_, established_estimator)
+        np.testing.assert_array_equal(clf._label_counts, established_counts)
+        np.testing.assert_array_equal(
+            clf.estimator_.class_count_, established_class_counts
+        )
+        np.testing.assert_allclose(
+            clf.predict_proba(X), established_probabilities
+        )
+
     def test_partial_fit_rejects_changed_target_declaration(self):
         clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
         X = np.array([[0.0], [1.0]])
