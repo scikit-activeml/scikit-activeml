@@ -839,13 +839,41 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 is_per_output_list = isinstance(P, list) and (
                     len(P) == 0 or any(np.asarray(P_j).ndim >= 2 for P_j in P)
                 )
+                P_array = None if is_per_output_list else np.asarray(P)
+                estimator_classes = (
+                    self._estimator_classes_for_output(0, n_outputs)
+                    if n_outputs == 1
+                    else None
+                )
+                is_collapsed_binary_output = (
+                    P_array is not None
+                    and estimator_classes is not None
+                    and P_array.ndim == 2
+                    and P_array.shape[0] == n_samples
+                    and (
+                        P_array.shape[1] == len(estimator_classes)
+                        or (
+                            len(estimator_classes) == 1
+                            and P_array.shape[1] == 2
+                        )
+                    )
+                )
                 if is_per_output_list:
                     P_list = self._normalize_multilabel_proba_list(
                         P, n_samples=n_samples
                     )
+                elif is_collapsed_binary_output:
+                    if len(estimator_classes) == 1 and P_array.shape[1] == 2:
+                        self._check_estimator_probas_are_valid(
+                            P_array, is_multilabel=False
+                        )
+                        P_array = P_array[:, :1]
+                    P_list = self._normalize_multilabel_proba_list(
+                        [P_array], n_samples=n_samples
+                    )
                 else:
                     P_ml = self._check_multilabel_proba_array(
-                        P, n_samples=n_samples
+                        P_array, n_samples=n_samples
                     )
                     P_list = [
                         np.column_stack([1 - P_ml[:, j], P_ml[:, j]])
@@ -1396,6 +1424,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         """
         n_outputs = len(self.classes_)
         y_pred = np.asarray(y_pred)
+        if n_outputs == 1 and y_pred.shape == (n_samples,):
+            y_pred = y_pred[:, None]
         expected_shape = (n_samples, n_outputs)
         if y_pred.shape != expected_shape:
             raise ValueError(
@@ -1630,8 +1660,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         # Collect class candidates in priority order.
         candidates = []
         est_classes = getattr(self.estimator_, "classes_", None)
-        if est_classes is not None and len(est_classes) == n_outputs:
-            candidates.append(est_classes[output_idx])
+        if est_classes is not None:
+            if (
+                n_outputs == 1
+                and not _has_nested_classes(est_classes)
+                and not bool(getattr(self.estimator_, "multilabel_", False))
+            ):
+                candidates.append(est_classes)
+            elif len(est_classes) == n_outputs:
+                candidates.append(est_classes[output_idx])
         if (
             hasattr(self.estimator_, "estimators_")
             and len(self.estimator_.estimators_) == n_outputs

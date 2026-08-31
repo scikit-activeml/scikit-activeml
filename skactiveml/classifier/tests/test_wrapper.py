@@ -943,6 +943,53 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 with self.subTest(estimator=name, proba_format=proba_format):
                     self._assert_multilabel_contract(estimator, proba_format)
 
+    def test_one_output_multilabel_accepts_collapsed_binary_outputs(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        targets = {
+            "both-classes": np.array([[0], [0], [1], [1]]),
+            "negative-only": np.zeros((len(X), 1), dtype=int),
+            "positive-only": np.ones((len(X), 1), dtype=int),
+        }
+        estimators = {
+            "OneVsRestClassifier": OneVsRestClassifier(LogisticRegression()),
+            "RandomForestClassifier": RandomForestClassifier(
+                n_estimators=5, random_state=0
+            ),
+        }
+
+        for name, estimator in estimators.items():
+            for target_name, y in targets.items():
+                for proba_format in ["array", "list"]:
+                    with self.subTest(
+                        estimator=name,
+                        target=target_name,
+                        proba_format=proba_format,
+                    ):
+                        clf = SklearnClassifier(
+                            estimator=estimator,
+                            classes=[[0, 1]],
+                            missing_label=-1,
+                            target_type="multi-label",
+                            proba_format=proba_format,
+                        ).fit(X, y)
+
+                        predictions = clf.predict(X)
+                        probabilities = clf.predict_proba(X)
+
+                        np.testing.assert_array_equal(predictions, y)
+                        if proba_format == "array":
+                            positive_probabilities = probabilities
+                            self.assertEqual(probabilities.shape, y.shape)
+                        else:
+                            self.assertEqual(len(probabilities), 1)
+                            self.assertEqual(
+                                probabilities[0].shape, (len(X), 2)
+                            )
+                            positive_probabilities = probabilities[0][:, [1]]
+                        np.testing.assert_array_equal(
+                            positive_probabilities >= 0.5, y
+                        )
+
     def test_no_labeled_data_falls_back_to_prior_without_fitting(self):
         estimator = self._CallRecordingEstimator()
         clf = SklearnClassifier(
