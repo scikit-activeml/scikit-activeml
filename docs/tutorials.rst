@@ -39,13 +39,13 @@ Classification
        - Parzen Window Classifier
    * - :doc:`Deep Active Learning for Fine-tuning Vision Transformers </generated/tutorials/01_deep_pool_al_with_skorch>`
      - Image
-     - - Vision Transformer with Full Fine-tuning
+     - - DINOv2 Vision Transformer with Full Fine-tuning
    * - :doc:`Deep Active Learning with Frozen Vision Transformers </generated/tutorials/05_pool_al_with_self_supervised_learning>`
      - Image
-     - - Vision Transformer with Linear Probing
+     - - DINOv2 Vision Transformer with Linear Probing
    * - :doc:`Semi-supervised Active Learning </generated/tutorials/08_pool_ssl>`
      - Image
-     - - Vision Transformer with Linear Probing
+     - - DINOv2 Vision Transformer with Linear Probing
        - Self-training
    * - :doc:`Bayesian Active Learning </generated/tutorials/09_bayesian_al>`
      - Audio
@@ -70,7 +70,7 @@ Multilabel Classification
      - Models
    * - :doc:`Pool-based Multilabel Active Learning: Getting Started </generated/tutorials/30_pool_multilabel_getting_started>`
      - Audio
-     - - Perch v2 Embeddings with Multi-layer Perceptron Probing
+     - - Perchv2 Embeddings with Multi-layer Perceptron Probing
 
 
 Regression

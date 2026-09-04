@@ -3,8 +3,9 @@
    :hidden:
 
    Home <self>
+   Workflow <core_workflow>
    Tutorials <tutorials>
-   Strategy Overview <generated/strategy_overview>
+   Strategies <generated/strategy_overview>
    generated/sphinx_gallery_examples/index
    generated/api/skactiveml
    Target Semantics <target_semantics>
