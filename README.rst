@@ -438,12 +438,12 @@ modality, and models used in the tutorial.
      - Pool
      - Classification
      - Image
-     - - Vision Transformer with Full Fine-tuning
+     - - DINOv2 Vision Transformer with Full Fine-tuning
    * - `Pool-based Multilabel Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/30_pool_multilabel_getting_started>`_
      - Pool
      - Multilabel Classification
      - Audio
-     - - Perch v2 Embeddings with Multi-layer Perceptron Probing
+     - - Perchv2 Embeddings with Multi-layer Perceptron Probing
    * - `Advanced Active Learning for Regression Tasks <https://scikit-activeml.github.io/latest/generated/tutorials/07_pool_advanced_regression>`_
      - Pool
      - Regression
