@@ -7,16 +7,30 @@ from matplotlib import testing
 from matplotlib.testing.compare import compare_images
 from sklearn.base import ClassifierMixin, clone
 from sklearn.datasets import make_classification, make_blobs
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.svm import LinearSVC
+from sklearn.utils._testing import assert_allclose
 
 from skactiveml import visualization
-from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.base import (
+    MultiAnnotatorPoolQueryStrategy,
+    SingleAnnotatorPoolQueryStrategy,
+)
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.exceptions import MappingError
 from skactiveml.pool import (
+    LabelCardinalityInconsistency,
+    MaxLossReductionMaxConfidence,
+    TypiClust,
     UncertaintySampling,
     RandomSampling,
+    SubSamplingWrapper,
     ValueOfInformationEER,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
+from skactiveml.regressor import SklearnRegressor
+from skactiveml.utils import TargetSpec
 from skactiveml.visualization import (
     plot_decision_boundary,
     plot_utilities,
@@ -25,7 +39,10 @@ from skactiveml.visualization import (
     plot_stream_training_data,
     plot_stream_decision_boundary,
 )
-from skactiveml.visualization._feature_space import _general_plot_utilities
+from skactiveml.visualization._feature_space import (
+    _general_plot_utilities,
+    _resolve_utility_target_type,
+)
 
 # PDF rasterization differs slightly across supported Matplotlib versions.
 IMAGE_COMPARE_TOL = 6.0
@@ -100,6 +117,36 @@ class TestFeatureSpace(unittest.TestCase):
         )
         self.assertIsNone(comparison)
 
+    @staticmethod
+    def multilabel_pool():
+        X, clusters = make_blobs(
+            n_samples=30,
+            centers=4,
+            n_features=2,
+            random_state=0,
+        )
+        y_true = np.column_stack(
+            [
+                np.isin(clusters, [0, 1]),
+                np.isin(clusters, [1, 2]),
+                np.isin(clusters, [2, 3]),
+            ]
+        ).astype(float)
+        y = np.full_like(y_true, np.nan)
+        y[:15] = y_true[:15]
+        feature_bound = [X.min(axis=0), X.max(axis=0)]
+        return X, y, y_true, feature_bound
+
+    @staticmethod
+    def multilabel_classifier(proba_format="array"):
+        return SklearnClassifier(
+            RandomForestClassifier(n_estimators=5, random_state=0),
+            classes=[[0, 1], [0, 1], [0, 1]],
+            target_type="multi-label",
+            proba_format=proba_format,
+            random_state=0,
+        )
+
     # Tests for plot_decision_boundary function
     def test_decision_boundary_param_clf(self):
         self.assertRaises(
@@ -115,6 +162,19 @@ class TestFeatureSpace(unittest.TestCase):
             clf=clf,
             feature_bound=self.bound,
         )
+        clf.target_spec_ = TargetSpec(
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=((0, 1), (0, 1)),
+        )
+        with self.assertRaisesRegex(AttributeError, "multi-label"):
+            plot_decision_boundary(
+                clf=clf,
+                feature_bound=self.bound,
+                ax=plt.subplots(1, 2)[1],
+                confidence=None,
+            )
 
     def test_decision_boundary_param_bound(self):
         self.assertRaises(
@@ -205,6 +265,115 @@ class TestFeatureSpace(unittest.TestCase):
             confidence_dict={"linestyles": ":"},
         )
 
+    def test_decision_boundary_multilabel_axes_and_proba_formats(self):
+        for proba_format in ["array", "list"]:
+            with self.subTest(proba_format=proba_format):
+                clf = MultilabelTestClassifier(proba_format=proba_format)
+                _, axes = plt.subplots(1, 2)
+
+                returned_axes = plot_decision_boundary(
+                    clf,
+                    [[0, 0], [1, 1]],
+                    ax=axes,
+                    res=5,
+                    confidence=None,
+                )
+
+                self.assertIs(returned_axes, axes)
+                vertical = axes[0].collections[0].get_paths()[0].vertices
+                horizontal = axes[1].collections[0].get_paths()[0].vertices
+                np.testing.assert_allclose(vertical[:, 0], 0.5)
+                np.testing.assert_allclose(horizontal[:, 1], 0.5)
+
+    def test_decision_boundary_sklearn_multilabel_proba_formats(self):
+        X, _, y_true, feature_bound = self.multilabel_pool()
+        for proba_format in ["array", "list"]:
+            with self.subTest(proba_format=proba_format):
+                clf = self.multilabel_classifier(proba_format).fit(X, y_true)
+                _, axes = plt.subplots(1, y_true.shape[1])
+
+                returned_axes = plot_decision_boundary(
+                    clf,
+                    feature_bound,
+                    ax=axes,
+                    res=5,
+                    confidence=None,
+                )
+
+                self.assertIs(returned_axes, axes)
+                self.assertTrue(all(ax.collections for ax in axes))
+
+    def test_decision_boundary_rejects_ambiguous_probability_list(self):
+        with self.assertRaisesRegex(ValueError, "target_spec_"):
+            plot_decision_boundary(
+                AmbiguousListClassifier(),
+                [[0, 0], [1, 1]],
+                confidence=None,
+            )
+
+    def test_decision_boundary_multilabel_overlay_and_confidence(self):
+        clf = MultilabelTestClassifier(proba_format="array")
+        _, ax = plt.subplots()
+
+        returned_ax = plot_decision_boundary(
+            clf,
+            [[0, 0], [1, 1]],
+            ax=ax,
+            res=5,
+            confidence=0.75,
+        )
+
+        self.assertIs(returned_ax, ax)
+        self.assertEqual(len(ax.collections), 4)
+        np.testing.assert_allclose(ax.collections[1].levels, [0.25, 0.75])
+        np.testing.assert_allclose(ax.collections[3].levels, [0.25, 0.75])
+        self.assertFalse(
+            np.array_equal(
+                ax.collections[0].get_edgecolor(),
+                ax.collections[2].get_edgecolor(),
+            )
+        )
+
+    def test_decision_boundary_multilabel_axes_confidence_colors(self):
+        clf = MultilabelTestClassifier(proba_format="array")
+        _, axes = plt.subplots(1, 2)
+
+        plot_decision_boundary(
+            clf,
+            [[0, 0], [1, 1]],
+            ax=axes,
+            res=5,
+            boundary_dict={"colors": "black"},
+            confidence=0.75,
+        )
+
+        confidence_colors = np.array(
+            [
+                plt.colormaps["coolwarm"](0.0),
+                plt.colormaps["coolwarm"](1.0),
+            ]
+        )
+        confidence_colors[:, 3] = 0.9
+        for ax in axes:
+            assert_allclose(
+                ax.collections[0].get_edgecolor(), [[0.0, 0.0, 0.0, 1.0]]
+            )
+            assert_allclose(
+                ax.collections[1].get_edgecolor(), confidence_colors
+            )
+
+    def test_decision_boundary_multilabel_axes_count(self):
+        clf = MultilabelTestClassifier(proba_format="array")
+        _, axes = plt.subplots(1, 3)
+
+        with self.assertRaisesRegex(ValueError, "each label output"):
+            plot_decision_boundary(
+                clf,
+                [[0, 0], [1, 1]],
+                ax=axes,
+                confidence=None,
+            )
+
     # Tests for plot_utilities function
     def test__general_plot_utilities_param_qs(self):
         self.assertRaises(
@@ -275,10 +444,11 @@ class TestFeatureSpace(unittest.TestCase):
             plot_annotators=[4],
         )
         _, axes = plt.subplots(1, 2)
+        qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
         self.assertRaises(
             ValueError,
             _general_plot_utilities,
-            qs=self.qs,
+            qs=qs,
             X=self.X,
             y=self.y_active_multi,
             **self.qs_dict,
@@ -338,10 +508,11 @@ class TestFeatureSpace(unittest.TestCase):
             ax=2,
         )
         _, axes = plt.subplots(1, 2)
+        qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
         self.assertRaises(
             ValueError,
             _general_plot_utilities,
-            qs=self.qs,
+            qs=qs,
             X=self.X,
             y=self.y_active_multi,
             **self.qs_dict,
@@ -380,6 +551,197 @@ class TestFeatureSpace(unittest.TestCase):
             feature_bound=self.bound,
             contour_dict={"linestyles": "."},
         )
+
+    def test_plot_utilities_multilabel_prediction_strategy(self):
+        X, y, _, feature_bound = self.multilabel_pool()
+        clf = self.multilabel_classifier()
+        qs = LabelCardinalityInconsistency(
+            target_type="multi-label", random_state=0
+        )
+        _, ax = plt.subplots()
+
+        returned_ax = plot_utilities(
+            qs,
+            X,
+            y,
+            clf=clf,
+            feature_bound=feature_bound,
+            ax=ax,
+            res=7,
+        )
+
+        self.assertIs(returned_ax, ax)
+        self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_utilities_multilabel_probability_strategy(self):
+        X, y, _, feature_bound = self.multilabel_pool()
+        clf = self.multilabel_classifier()
+        qs = MaxLossReductionMaxConfidence(
+            target_type="multi-label", random_state=0
+        )
+        discriminator = ParzenWindowClassifier(random_state=0)
+        _, ax = plt.subplots()
+
+        returned_ax = plot_utilities(
+            qs,
+            X,
+            y,
+            clf=clf,
+            discriminator=discriminator,
+            feature_bound=feature_bound,
+            ax=ax,
+            res=7,
+        )
+
+        self.assertIs(returned_ax, ax)
+        self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_utilities_multilabel_mapping_fallback(self):
+        X, y, _, feature_bound = self.multilabel_pool()
+        qs = TypiClust(
+            target_type="multi-label",
+            cluster_algo_dict={"n_init": 1},
+            random_state=0,
+        )
+        _, ax = plt.subplots()
+
+        returned_ax = plot_utilities(
+            qs,
+            X,
+            y,
+            feature_bound=feature_bound,
+            ax=ax,
+            res=7,
+        )
+
+        self.assertIs(returned_ax, ax)
+        self.assertGreater(len(ax.collections), 0)
+
+        wrapper = SubSamplingWrapper(qs, max_candidates=10, random_state=0)
+        _, wrapper_ax = plt.subplots()
+
+        returned_wrapper_ax = plot_utilities(
+            wrapper,
+            X,
+            y,
+            feature_bound=feature_bound,
+            ax=wrapper_ax,
+            res=7,
+        )
+
+        self.assertIs(returned_wrapper_ax, wrapper_ax)
+        self.assertGreater(len(wrapper_ax.collections), 0)
+
+    def test_plot_utilities_regression_column_mapping_fallback(self):
+        X, _ = make_blobs(
+            n_samples=30,
+            centers=4,
+            n_features=2,
+            random_state=0,
+        )
+        y = np.full((len(X), 1), np.nan)
+        y[:15, 0] = X[:15, 0]
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(random_state=0),
+            target_type="auto",
+            random_state=0,
+        ).fit(X, y)
+        qs = MappingOnlyRegressionStrategy(target_type="auto", random_state=0)
+        feature_bound = [X.min(axis=0), X.max(axis=0)]
+        _, ax = plt.subplots()
+
+        returned_ax = plot_utilities(
+            qs,
+            X,
+            y,
+            reg=reg,
+            feature_bound=feature_bound,
+            ax=ax,
+            res=7,
+        )
+
+        self.assertIs(returned_ax, ax)
+        self.assertGreater(len(ax.collections), 0)
+
+    @staticmethod
+    def multi_annotator_fallback_pool():
+        X, _ = make_blobs(
+            n_samples=30,
+            centers=4,
+            n_features=2,
+            random_state=0,
+        )
+        y = np.full(len(X), np.nan)
+        y[:10] = 0.0
+        y[10:15] = 1.0
+        y_multi = np.column_stack([y, y])
+        # Annotator 1 still owes a label for sample 0, which annotator 0 has
+        # already provided.
+        y_multi[0, 1] = np.nan
+        feature_bound = [X.min(axis=0), X.max(axis=0)]
+        return X, y_multi, feature_bound
+
+    def test_plot_annotator_utilities_mapping_fallback(self):
+        X, y_multi, feature_bound = self.multi_annotator_fallback_pool()
+        qs = SingleAnnotatorWrapper(
+            TypiClust(cluster_algo_dict={"n_init": 1}, random_state=0),
+            random_state=0,
+        )
+        _, axes = plt.subplots(1, 2)
+
+        returned_axes = plot_annotator_utilities(
+            qs=qs,
+            X=X,
+            y=y_multi,
+            feature_bound=feature_bound,
+            axes=axes,
+            res=5,
+        )
+
+        self.assertIs(returned_axes, axes)
+        for ax in returned_axes:
+            self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_annotator_utilities_fallback_candidates_are_samples(self):
+        X, y_multi, feature_bound = self.multi_annotator_fallback_pool()
+        qs = MappingOnlyMultiAnnotatorStrategy(random_state=0)
+        _, axes = plt.subplots(1, 2)
+
+        returned_axes = plot_annotator_utilities(
+            qs=qs,
+            X=X,
+            y=y_multi,
+            feature_bound=feature_bound,
+            axes=axes,
+            res=5,
+        )
+
+        # A sample is a candidate as soon as one annotator still owes a label
+        # for it, which includes sample 0.
+        np.testing.assert_array_equal(
+            qs.candidates_, np.concatenate([[0], np.arange(15, len(X))])
+        )
+        self.assertIs(returned_axes, axes)
+        for ax in returned_axes:
+            self.assertGreater(len(ax.collections), 0)
+
+    def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
+        qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
+
+        self.assertEqual(
+            _resolve_utility_target_type(qs, self.y_active_multi, {}),
+            "single-output",
+        )
+
+    def test_plot_utilities_rejects_annotator_options_for_multilabel(self):
+        y = np.column_stack([self.y_active, self.y_active])
+        qs = RandomSampling(target_type="multi-label", random_state=0)
+        _, axes = plt.subplots(1, 2)
+
+        with self.assertRaisesRegex(TypeError, "`axes`"):
+            plot_utilities(qs, self.X, y, axes=axes)
+        with self.assertRaisesRegex(TypeError, "plot_annotator"):
+            plot_utilities(qs, self.X, y, plot_annotators=[0])
 
     # Tests for plot_stream_decision_boundary function
     def test_plot_stream_decision_boundary_param_ax(self):
@@ -970,3 +1332,85 @@ class TestFeatureSpace(unittest.TestCase):
 
 class TestClassifier(ClassifierMixin):
     pass
+
+
+class MultilabelTestClassifier(ClassifierMixin):
+    def __init__(self, proba_format):
+        self.proba_format = proba_format
+        self.target_spec_ = TargetSpec(
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=((0, 1), (0, 1)),
+        )
+
+    def predict_proba(self, X):
+        positive_probas = np.column_stack([X[:, 0], X[:, 1]])
+        if self.proba_format == "array":
+            return positive_probas
+        return [
+            np.column_stack([1 - positive_probas[:, j], positive_probas[:, j]])
+            for j in range(positive_probas.shape[1])
+        ]
+
+
+class AmbiguousListClassifier(ClassifierMixin):
+    def predict_proba(self, X):
+        positive_probas = np.column_stack([X[:, 0], X[:, 1]])
+        return [
+            np.column_stack([1 - positive_probas[:, j], positive_probas[:, j]])
+            for j in range(positive_probas.shape[1])
+        ]
+
+
+class MappingOnlyMultiAnnotatorStrategy(MultiAnnotatorPoolQueryStrategy):
+    """Rejects candidate matrices and records the candidates it receives."""
+
+    def query(
+        self,
+        X,
+        y,
+        candidates=None,
+        annotators=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
+        candidates = np.asarray(candidates)
+        if candidates.ndim == 2:
+            raise MappingError("This strategy requires candidate indices.")
+        self.candidates_ = candidates
+        utilities = np.full((batch_size, len(X), y.shape[1]), np.nan)
+        utilities[:, candidates] = 1.0
+        query_indices = np.column_stack(
+            [candidates[:batch_size], np.zeros(batch_size, dtype=int)]
+        )
+        if return_utilities:
+            return query_indices, utilities
+        return query_indices
+
+
+class MappingOnlyRegressionStrategy(SingleAnnotatorPoolQueryStrategy):
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
+
+    def query(
+        self,
+        X,
+        y,
+        reg,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
+        if reg.target_spec_.target_type != "single-output":
+            raise ValueError("`reg` must have single-output target semantics.")
+        candidates = np.asarray(candidates)
+        if candidates.ndim == 2:
+            raise MappingError("This strategy requires candidate indices.")
+        utilities = np.full((batch_size, len(X)), np.nan)
+        utilities[:, candidates] = 1.0
+        query_indices = candidates[:batch_size]
+        if return_utilities:
+            return query_indices, utilities
+        return query_indices

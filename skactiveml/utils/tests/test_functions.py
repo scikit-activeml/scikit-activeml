@@ -1,7 +1,11 @@
+import pickle
 import unittest
 
 import inspect
 
+import numpy as np
+
+from skactiveml.exceptions import _ExhaustedCandidatePool
 from skactiveml.utils import call_func, match_signature
 
 successful_skorch_torch_import = False
@@ -16,6 +20,15 @@ except ImportError:
 
 
 class TestFunctions(unittest.TestCase):
+    def test_exhausted_candidate_pool_reduces_to_its_result(self):
+        signal = _ExhaustedCandidatePool((np.zeros(0), np.zeros((0, 0))))
+
+        restored = pickle.loads(pickle.dumps(signal))
+
+        self.assertEqual(len(restored.result), 2)
+        np.testing.assert_array_equal(restored.result[0], signal.result[0])
+        np.testing.assert_array_equal(restored.result[1], signal.result[1])
+
     def test_call_func(self):
         def dummy_function(a, b=2, c=3):
             return a * b * c
@@ -90,6 +103,10 @@ class TestFunctions(unittest.TestCase):
             def test_me_hint(self, a, b=None, **kwargs):
                 return self.dummy_b.test_me_alt(a=a, **kwargs)
 
+            @match_signature("dummy_b", "test_me_upper")
+            def test_me_upper(self, X, y=None, **kwargs):
+                return self.dummy_b.test_me_upper(X=X, **kwargs)
+
         class DummyB:
             def test_me(self, a, c, **kwargs):
                 output = {"a": a, "c": c}
@@ -103,6 +120,9 @@ class TestFunctions(unittest.TestCase):
             def test_me_hint(self, a: int, c: str) -> dict:
                 output = {"a": a, "c": c}
                 return output
+
+            def test_me_upper(self, X, Y):
+                return {"X": X, "Y": Y}
 
         dummy_b = DummyB()
         dummy_a = DummyA(dummy_b)
@@ -147,6 +167,15 @@ class TestFunctions(unittest.TestCase):
             "c": "p3",
         }
         self.assertRaises(TypeError, dummy_a.test_me_alt, **kwargs_3)
+
+        sig_a_test_me_upper = inspect.signature(dummy_a.test_me_upper)
+        self.assertIn("Y", sig_a_test_me_upper.parameters)
+        self.assertNotIn("y", sig_a_test_me_upper.parameters)
+        self.assertRaises(TypeError, dummy_a.test_me_upper, X="p1", y="p2")
+        self.assertEqual(
+            {"X": "p1", "Y": "p2"},
+            dummy_a.test_me_upper(X="p1", Y="p2"),
+        )
 
         # test for hiding methods that the wrapped object does not have
         self.assertFalse(hasattr(dummy_a, "test_me_hidden"))

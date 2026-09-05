@@ -5,7 +5,7 @@
     "method" : "Uncertainty Herding (UHerding)",
     "category" : "Hybrid",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Uncertainty Herding (UHerding)",
     "refs" : ["bae2025uncertainty"],
     "sequence" : ["title", "text_0", "plot", "refs"],

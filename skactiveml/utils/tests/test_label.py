@@ -21,12 +21,38 @@ class TestLabel(unittest.TestCase):
         self.y5 = [8, -1, 1, 5, 2]
         self.y6 = ["paris", "france", "tokyo", "nan"]
         self.y7 = ["paris", "france", "tokyo", -1]
+        self.y8 = [[0, 0, 1], [1, 1, 1], [1, 0, 1], [-1, -1, -1]]
+        self.y9 = [[0, 0, 1], [1, 1, 1], [1, 0, 1], [-1, 0, -1]]
 
     def test_is_unlabeled(self):
+        self.assertRaises(ValueError, is_unlabeled, y=[0], target_type="auto")
+        self.assertRaises(
+            ValueError, is_unlabeled, y=[0], target_type="multi-output"
+        )
+        self.assertRaises(
+            ValueError, is_unlabeled, y=[], target_type="multi-label"
+        )
+        np.testing.assert_array_equal(
+            np.array([], dtype=bool),
+            is_unlabeled(np.empty((0, 2)), target_type="multi-label"),
+        )
         self.assertRaises(
             TypeError, is_unlabeled, y=self.y1, missing_label="2"
         )
         self.assertRaises(ValueError, is_unlabeled, [[]], missing_label="2")
+        self.assertRaises(
+            ValueError,
+            is_unlabeled,
+            y=np.zeros((1, 1, 1)),
+            missing_label=-1,
+        )
+        self.assertRaises(
+            ValueError,
+            is_unlabeled,
+            y=[0, 1],
+            missing_label=-1,
+            target_type="multi-label",
+        )
         self.assertRaises(
             TypeError, is_unlabeled, y=self.y2, missing_label=np.nan
         )
@@ -63,6 +89,14 @@ class TestLabel(unittest.TestCase):
             TypeError, is_unlabeled, y=self.y7, missing_label="2"
         )
         self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=-1)
+        self.assertRaises(
+            ValueError,
+            is_unlabeled,
+            y=self.y9,
+            missing_label=-1,
+            target_type="multi-label",
+        )
+
         np.testing.assert_array_equal(
             np.array([], dtype=bool), is_unlabeled([])
         )
@@ -97,6 +131,41 @@ class TestLabel(unittest.TestCase):
             np.array([0, 0, 0, 1], dtype=bool),
             is_unlabeled(self.y6, missing_label="nan"),
         )
+        np.testing.assert_array_equal(
+            np.array([0, 0, 0, 1], dtype=bool),
+            is_unlabeled(self.y8, missing_label=-1, target_type="multi-label"),
+        )
+        np.testing.assert_array_equal(
+            np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 0, 1]], dtype=bool),
+            is_unlabeled(
+                self.y9, missing_label=-1, target_type="single-output"
+            ),
+        )
+
+    def test_is_unlabeled_accepts_numpy_floating_nan_sentinels(self):
+        for dtype in (np.float16, np.float32, np.float64, np.longdouble):
+            with self.subTest(dtype=dtype):
+                missing_label = dtype(np.nan)
+                y = np.array([0, missing_label], dtype=dtype)
+
+                np.testing.assert_array_equal(
+                    is_unlabeled(y, missing_label=missing_label),
+                    [False, True],
+                )
+
+    def test_is_unlabeled_accepts_complex_nan_sentinels(self):
+        for missing_label in (
+            complex(float("nan"), 0),
+            np.complex64(np.nan),
+            np.complex128(np.nan),
+        ):
+            with self.subTest(dtype=type(missing_label)):
+                y = np.array([0, missing_label])
+
+                np.testing.assert_array_equal(
+                    is_unlabeled(y, missing_label=missing_label),
+                    [False, True],
+                )
 
     def test_is_labeled(self):
         np.testing.assert_array_equal(
@@ -129,6 +198,16 @@ class TestLabel(unittest.TestCase):
         np.testing.assert_array_equal(
             ~np.array([0, 0, 0, 1], dtype=bool),
             is_labeled(self.y6, missing_label="nan"),
+        )
+        np.testing.assert_array_equal(
+            ~np.array([0, 0, 0, 1], dtype=bool),
+            is_labeled(self.y8, missing_label=-1, target_type="multi-label"),
+        )
+        np.testing.assert_array_equal(
+            ~np.array(
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 0, 1]], dtype=bool
+            ),
+            is_labeled(self.y9, missing_label=-1, target_type="single-output"),
         )
 
     def test_unlabeled_indices(self):

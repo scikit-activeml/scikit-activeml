@@ -3,6 +3,8 @@
 .. currentmodule:: {{ module }}
 
 .. autoclass:: {{ fullname }}
+   :no-members:
+   :no-inherited-members:
 
    {% block methods %}
    {% if methods %}
@@ -10,7 +12,12 @@
 
    .. autosummary::
    {% for item in methods %}
-   {%- if not item == '__init__' %}
+   {%- if item != '__init__' and is_skactiveml_method(fullname, item) %}
+      ~{{ name }}.{{ item }}
+   {%- endif %}
+   {%- endfor %}
+   {% for item in methods %}
+   {%- if item != '__init__' and not is_skactiveml_method(fullname, item) %}
       ~{{ name }}.{{ item }}
    {%- endif %}
    {%- endfor %}
@@ -27,6 +34,20 @@
    {%- endfor %}
    {% endif %}
    {% endblock %}
+
+{% for item in methods %}
+{%- if item != '__init__' and is_skactiveml_method(fullname, item) %}
+.. automethod:: {{ fullname }}.{{ item }}
+{%- endif %}
+{%- endfor %}
+{% for item in methods %}
+{%- if item != '__init__' and not is_skactiveml_method(fullname, item) %}
+.. automethod:: {{ fullname }}.{{ item }}
+{%- endif %}
+{%- endfor %}
+{% for item in attributes %}
+.. autoattribute:: {{ fullname }}.{{ item }}
+{%- endfor %}
 
 .. _sphx_glr_backref_{{fullname}}:
 

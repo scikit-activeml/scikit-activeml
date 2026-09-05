@@ -5,7 +5,7 @@
     "method" : "Greedy Sampling on the Feature Space (GSx)",
     "category" :  "Representativeness",
     "template" : "examples/template_pool_regression.py",
-    "tags" : ["pool",  "regression", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool",  "regression", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Greedy Sampling on the Feature Space (GSx)",
     "refs" : ["wu2019active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

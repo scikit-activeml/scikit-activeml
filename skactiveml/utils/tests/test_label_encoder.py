@@ -86,3 +86,80 @@ class TestLabelEncoder(unittest.TestCase):
         self.assertRaises(
             ValueError, ExtLabelEncoder().fit([]).transform, [1, 3]
         )
+
+        classes = [["a", "b"], ["c", "d"]]
+        missing_label = "nan"
+        y = [["a", "c"], ["b", "d"], ["nan", "nan"]]
+        ext_le = ExtLabelEncoder(
+            classes=classes,
+            missing_label=missing_label,
+            target_type="multi-label",
+        )
+        y_enc = ext_le.fit_transform(y)
+        np.testing.assert_array_equal([[0, 0], [1, 1], [-1, -1]], y_enc)
+        y_dec = ext_le.inverse_transform(y_enc)
+        np.testing.assert_array_equal(y, y_dec)
+        self.assertEqual(ext_le.target_type, "multi-label")
+
+    def test_ExtLabelEncoder_multilabel_shape_validation(self):
+        classes = [["a", "b"], ["c", "d"]]
+        ext_le = ExtLabelEncoder(
+            classes=classes,
+            missing_label="nan",
+            target_type="multi-label",
+        )
+
+        self.assertRaises(ValueError, ext_le.fit, ["a", "c"])
+
+        ext_le.fit([["a", "c"], ["b", "d"]])
+        self.assertRaises(ValueError, ext_le.transform, ["a", "c"])
+        self.assertRaises(ValueError, ext_le.inverse_transform, [0, 1])
+
+    def test_ExtLabelEncoder_multilabel_rejects_partial_rows(self):
+        ext_le = ExtLabelEncoder(
+            classes=[["a", "b"], ["c", "d"]],
+            missing_label="nan",
+            target_type="multi-label",
+        )
+        partial_y = [["a", "nan"], ["b", "d"]]
+
+        with self.assertRaisesRegex(ValueError, "either only observed labels"):
+            ext_le.fit(partial_y)
+
+        ext_le.fit([["a", "c"], ["b", "d"]])
+        with self.assertRaisesRegex(ValueError, "either only observed labels"):
+            ext_le.transform(partial_y)
+        with self.assertRaisesRegex(ValueError, "either only observed labels"):
+            ext_le.inverse_transform([[0, -1], [1, 1]])
+
+    def test_ExtLabelEncoder_multilabel_requires_binary_classes(self):
+        ext_le = ExtLabelEncoder(
+            classes=[["a", "b", "c"], ["d", "e"]],
+            missing_label="nan",
+            target_type="multi-label",
+        )
+
+        with self.assertRaisesRegex(ValueError, "exactly two classes"):
+            ext_le.fit([["a", "d"], ["b", "e"]])
+
+    def test_ExtLabelEncoder_inverse_transform_rejects_invalid_codes(self):
+        ext_le = ExtLabelEncoder(classes=[10, 20], missing_label=-1).fit([])
+
+        with self.assertRaisesRegex(ValueError, "previously unseen labels"):
+            ext_le.inverse_transform([0.9])
+        with self.assertRaisesRegex(TypeError, "not compatible"):
+            ext_le.inverse_transform(["1"])
+
+    def test_ExtLabelEncoder_target_type_controls_class_structure(self):
+        classes = [["a", "b"], ["c", "d"]]
+
+        self.assertRaises(
+            ValueError,
+            ExtLabelEncoder(classes=classes, target_type="single-output").fit,
+            [["a", "c"], ["b", "d"]],
+        )
+        self.assertRaises(
+            ValueError,
+            ExtLabelEncoder(classes=classes, target_type="multi-output").fit,
+            [["a", "c"], ["b", "d"]],
+        )

@@ -1,9 +1,10 @@
 import copy
 import warnings
-from collections.abc import Iterable
-from inspect import Parameter, signature
-
+from collections.abc import Iterator
+import numbers
 import numpy as np
+
+from inspect import Parameter, signature
 from sklearn.utils.validation import (
     check_array,
     column_or_1d,
@@ -13,7 +14,12 @@ from sklearn.utils.validation import (
     _check_n_features as sklearn_check_n_features,
 )
 
-from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
+from ._label import (
+    MISSING_LABEL,
+    _is_nan_missing_label,
+    check_missing_label,
+    is_unlabeled,
+)
 
 
 def check_scalar(
@@ -59,61 +65,308 @@ def check_scalar(
                 name, target_type, type(x)
             )
         )
+    is_nan = x != x
     if min_inclusive:
-        if min_val is not None and (x < min_val or np.isnan(x)):
+        if min_val is not None and (x < min_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be >= " "{}.".format(name, x, min_val)
             )
     else:
-        if min_val is not None and (x <= min_val or np.isnan(x)):
+        if min_val is not None and (x <= min_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be > " "{}.".format(name, x, min_val)
             )
 
     if max_inclusive:
-        if max_val is not None and (x > max_val or np.isnan(x)):
+        if max_val is not None and (x > max_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be <= " "{}.".format(name, x, max_val)
             )
     else:
-        if max_val is not None and (x >= max_val or np.isnan(x)):
+        if max_val is not None and (x >= max_val or is_nan):
             raise ValueError(
                 "`{}`= {}, must be < " "{}.".format(name, x, max_val)
             )
 
 
-def check_classifier_params(classes, missing_label, cost_matrix=None):
-    """Check whether the parameters are compatible to each other (only if
-    `classes` is not None).
+def _is_nonstring_iterable(obj):
+    """Check whether `obj` is iterable but not string-like.
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes,)
-        Array of class labels.
-    missing_label : scalar or string or np.nan or None
-        Value to represent a missing label.
-    cost_matrix : array-like of shape (n_classes, n_classes), default=None
-        Cost matrix. If `None`, cost matrix will be not checked.
+    obj : object
+        Object to be checked.
+
+    Returns
+    -------
+    is_iterable : bool
+        `True` if `obj` is iterable and not a string, bytes object, or
+        NumPy string scalar, and `False` otherwise.
     """
-    check_missing_label(missing_label)
-    if classes is not None:
-        check_classes(classes)
-        dtype = np.array(classes).dtype
-        check_missing_label(missing_label, target_type=dtype, name="classes")
-        n_labeled = is_unlabeled(y=classes, missing_label=missing_label).sum()
-        if n_labeled > 0:
-            raise ValueError(
-                f"`classes={classes}` contains "
-                f"`missing_label={missing_label}.`"
+    if isinstance(obj, (str, bytes, np.str_)):
+        return False
+    try:
+        iter(obj)
+        return True
+    except TypeError:
+        return False
+
+
+def _has_nested_classes(classes):
+    """Check whether `classes` contains one vocabulary per target label.
+
+    Parameters
+    ----------
+    classes : object
+        Candidate class specification. Single-output class specifications are
+        expected to be one-dimensional iterables of scalar labels. Nested
+        specifications are expected to contain one iterable per target label.
+
+    Returns
+    -------
+    has_nested_classes : bool
+        `True` if `classes` has a nested structure and `False` otherwise.
+
+    Raises
+    ------
+    TypeError
+        If `classes` or one of its nested class vocabularies is a one-shot
+        iterator.
+    ValueError
+        If `classes` is an empty iterable.
+    """
+    if classes is None:
+        return False
+    if not _is_nonstring_iterable(classes):
+        return False
+    if isinstance(classes, Iterator):
+        raise TypeError(
+            "`classes` must be a reusable iterable, not a one-shot iterator."
+        )
+
+    outer = list(classes)
+    if len(outer) == 0:
+        raise ValueError("`classes` must not be empty.")
+
+    nested = [_is_nonstring_iterable(value) for value in outer]
+    if any(nested) and not all(nested):
+        raise ValueError(
+            "`classes` must be uniformly flat or nested; mixed class "
+            "vocabularies are not supported."
+        )
+    for output_idx, value in enumerate(outer):
+        if isinstance(value, Iterator):
+            raise TypeError(
+                f"`classes[{output_idx}]` must be a reusable iterable, not a "
+                "one-shot iterator."
             )
-        if cost_matrix is not None:
-            check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
+    return all(nested)
+
+
+def _check_1d_class_list(c, name="classes"):
+    """Validate a one-dimensional class list.
+
+    Parameters
+    ----------
+    c : iterable
+        Class labels of a single output.
+    name : str, default="classes"
+        Name used in error messages.
+
+    Raises
+    ------
+    TypeError
+        If `c` is not iterable, contains unhashable or unsupported label
+        types, or mixes numeric and string labels.
+    ValueError
+        If `c` is empty, not one-dimensional, or contains duplicate labels.
+    """
+    if not _is_nonstring_iterable(c):
+        raise TypeError(f"`{name}` must be iterable. Got {type(c)}.")
+
+    arr = np.asarray(list(c), dtype=object)
+
+    if arr.ndim != 1:
+        raise ValueError(
+            f"`{name}` must be one-dimensional. Got shape {arr.shape}."
+        )
+    if arr.size == 0:
+        raise ValueError(f"`{name}` must be non-empty.")
+
+    # Ensure scalars are hashable and unique.
+    try:
+        values = arr.tolist()
+        nan_count = sum(
+            isinstance(value, numbers.Number) and bool(value != value)
+            for value in values
+        )
+        if len(set(values)) != arr.size or nan_count > 1:
+            raise ValueError(f"Duplicate entries in `{name}`.")
+    except TypeError as e:
+        raise TypeError(
+            f"`{name}` must contain hashable scalar labels "
+            f"(strings or numbers)."
+        ) from e
+
+    # Enforce "uniformly strings or numbers"
+    kinds = set()
+    for v in arr.tolist():
+        if isinstance(v, (str, np.str_)):
+            kinds.add("str")
+        elif isinstance(v, (numbers.Number, np.number)):
+            kinds.add("num")
+        else:
+            raise TypeError(
+                f"`{name}` must contain only strings or numbers. "
+                f"Got element {v!r} of type {type(v)}."
+            )
+
+    if len(kinds) != 1:
+        raise TypeError(
+            f"`{name}` must be uniformly strings or numbers. "
+            f"Got mixture: {sorted(kinds)}."
+        )
+
+
+def _check_probas_are_valid(probas, is_multilabel, hint=""):
+    """Check that `probas` describe class probabilities.
+
+    A single-output probability describes a distribution over the classes of
+    one sample, so its values sum to one. A multi-label probability describes
+    one positive-class probability per label output, so its values are bounded
+    but do not sum to one.
+
+    Parameters
+    ----------
+    probas : array-like of shape (n_samples, n_classes) or \
+            (n_samples, n_outputs)
+        The class probabilities to be checked.
+    is_multilabel : bool
+        Flag whether `probas` describes a multi-label target.
+    hint : str, default=""
+        Text appended to the error message. Callers producing the values
+        themselves use it to name what has to be changed, because the
+        caller of `predict_proba` cannot act on the values alone.
+
+    Raises
+    ------
+    ValueError
+        If `probas` does not describe class probabilities.
+    """
+    probas = np.asarray(probas)
+    suffix = f" {hint}" if hint else ""
+    if not np.all((0 <= probas) & (probas <= 1)):
+        raise ValueError(
+            f"'probas' are invalid. They need to be within [0,1].{suffix}"
+        )
+    if not is_multilabel and not np.allclose(
+        np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3
+    ):
+        raise ValueError(
+            f"'probas' are invalid. The sum over axis 1 must be one.{suffix}"
+        )
+
+
+def _canonicalize_multilabel_probas(
+    probas,
+    n_samples=None,
+    n_outputs=None,
+    allow_none=False,
+    validate_probabilities=True,
+):
+    """Convert multilabel probabilities to a 2D positive-class matrix.
+
+    Parameters
+    ----------
+    probas : array-like of shape (n_samples, n_outputs) or list of \
+            array-like of shape (n_samples, 2), or None
+        Multilabel probabilities. A two-dimensional array-like is interpreted
+        as one positive-class probability per label. A list whose entries are
+        two-dimensional is interpreted as one binary probability matrix per
+        label.
+    n_samples : int or None, default=None
+        Expected number of samples. If not `None`, the returned array must
+        have this many rows.
+    n_outputs : int or None, default=None
+        Expected number of outputs. If not `None`, the returned array must
+        have this many columns.
+    allow_none : bool, default=False
+        If `True`, `None` is returned unchanged.
+    validate_probabilities : bool, default=True
+        If `True`, require each per-output matrix to describe a binary class
+        distribution and require the canonicalized positive-class
+        probabilities to be within `[0, 1]`. Set to `False` when
+        canonicalizing scores such as logits.
+
+    Returns
+    -------
+    probas : numpy.ndarray of shape (n_samples, n_outputs) or None
+        Canonicalized multilabel probabilities containing one positive-class
+        probability per output.
+
+    Raises
+    ------
+    ValueError
+        If `probas` is `None` while `allow_none=False`, or if the provided
+        probabilities do not match the expected multilabel format.
+    """
+    if probas is None:
+        if allow_none:
+            return None
+        raise ValueError("`probas` must not be `None`.")
+
+    is_per_output_list = isinstance(probas, list) and any(
+        np.asarray(probas_j).ndim == 2 for probas_j in probas
+    )
+    if is_per_output_list:
+        if n_outputs is not None and len(probas) != n_outputs:
+            raise ValueError(
+                f"`probas` contains {len(probas)} outputs, expected "
+                f"{n_outputs}."
+            )
+
+        probas_cols = []
+        for j, probas_j in enumerate(probas):
+            probas_j = np.asarray(probas_j, dtype=float)
+            if probas_j.ndim != 2 or probas_j.shape[1] != 2:
+                raise ValueError(
+                    f"`probas[{j}]` must have shape `(n_samples, 2)`, got "
+                    f"{probas_j.shape}."
+                )
+            if n_samples is not None and probas_j.shape[0] != n_samples:
+                raise ValueError(
+                    f"`probas[{j}]` has {probas_j.shape[0]} samples, "
+                    f"expected {n_samples}."
+                )
+            if validate_probabilities:
+                _check_probas_are_valid(
+                    probas_j,
+                    is_multilabel=False,
+                    hint=f"`probas[{j}]` must be a binary distribution.",
+                )
+            probas_cols.append(probas_j[:, 1])
+
+        probas = np.column_stack(probas_cols)
     else:
-        if cost_matrix is not None:
+        probas = np.asarray(probas, dtype=float)
+        if probas.ndim != 2:
             raise ValueError(
-                "You cannot specify 'cost_matrix' without "
-                "specifying 'classes'."
+                "`probas` must have shape `(n_samples, n_outputs)` for "
+                f"multilabel data, got {probas.shape}."
             )
+
+    if n_samples is not None and probas.shape[0] != n_samples:
+        raise ValueError(
+            f"`probas` has {probas.shape[0]} samples, expected {n_samples}."
+        )
+    if n_outputs is not None and probas.shape[1] != n_outputs:
+        raise ValueError(
+            f"`probas` has {probas.shape[1]} outputs, expected {n_outputs}."
+        )
+    if validate_probabilities:
+        _check_probas_are_valid(probas, is_multilabel=True)
+
+    return probas
 
 
 def check_classes(classes):
@@ -121,24 +374,96 @@ def check_classes(classes):
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes,)
-        Array of class labels.
+    classes : array-like of shape (n_classes,) or a list of such array-likes, \
+            default=None
+        The classes labels (single output setting), or a list of arrays of
+        class labels (multioutput setting).
     """
-    if not isinstance(classes, Iterable):
-        raise TypeError(
-            "'classes' is not iterable. Got {}".format(type(classes))
-        )
-    try:
-        classes_sorted = np.array(sorted(set(classes)))
-        if len(classes) != len(classes_sorted):
-            raise ValueError("Duplicate entries in 'classes'.")
-    except TypeError:
-        types = sorted(t.__qualname__ for t in set(type(v) for v in classes))
-        raise TypeError(
-            "'classes' must be uniformly strings or numbers. Got {}".format(
-                types
+    if classes is None:
+        return
+
+    if not _is_nonstring_iterable(classes):
+        raise TypeError(f"`classes` is not iterable. Got {type(classes)}.")
+
+    if _has_nested_classes(classes):
+        outer = list(classes)
+        for i, c in enumerate(outer):
+            _check_1d_class_list(c, name=f"classes[{i}]")
+    else:
+        _check_1d_class_list(classes, name="classes")
+
+
+def check_classifier_params(classes, missing_label, cost_matrix=None):
+    """Check whether the general classifier are compatible with each other.
+
+    Parameters
+    ----------
+    classes : array-like of shape (n_classes,) or a list of such array-likes, \
+            default=None
+        The classes labels (single output setting), or a list of arrays of
+        class labels (multioutput setting).
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label. In the case of a multioutput
+        setting, we expect that the missing label is identical across all
+        tasks.
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
+        Cost matrix to quantify costs of misclassifications.
+
+        - Checked only for single output.
+        - Must be `None` for multioutput.
+    """
+    check_missing_label(missing_label)
+
+    if classes is None:
+        if cost_matrix is not None:
+            raise ValueError(
+                "You cannot specify `cost_matrix` without specifying "
+                "`classes`."
             )
+        return
+
+    # Validates structure + duplicates + type-uniformity.
+    check_classes(classes)
+
+    # Check whether `classes` contains one vocabulary per target label.
+    has_nested_classes = _has_nested_classes(classes)
+
+    # Enforce cost_matrix semantics.
+    if has_nested_classes:
+        if cost_matrix is not None:
+            raise ValueError(
+                "`cost_matrix` must be `None` when `classes` contains "
+                "per-output vocabularies."
+            )
+        outer = list(classes)
+        # Missing_label type check and ensure missing_label not in any task's
+        # classes.
+        for i, c in enumerate(outer):
+            c_arr = np.asarray(list(c))
+            check_missing_label(
+                missing_label, target_type=c_arr.dtype, name=f"classes[{i}]"
+            )
+            n_unlabeled = is_unlabeled(
+                y=c_arr, missing_label=missing_label
+            ).sum()
+            if n_unlabeled > 0:
+                raise ValueError(
+                    f"`classes[{i}]={list(c)}` contains "
+                    f"`missing_label={missing_label}`."
+                )
+    else:
+        c_arr = np.asarray(list(classes))
+        check_missing_label(
+            missing_label, target_type=c_arr.dtype, name="classes"
         )
+        n_unlabeled = is_unlabeled(y=c_arr, missing_label=missing_label).sum()
+        if n_unlabeled > 0:
+            raise ValueError(
+                f"`classes={list(classes)}` contains "
+                f"`missing_label={missing_label}`."
+            )
+        if cost_matrix is not None:
+            check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(c_arr))
 
 
 def check_class_prior(class_prior, n_classes):
@@ -263,7 +588,8 @@ def check_X_y(
     ensure_all_finite=True,
     ensure_2d=True,
     allow_nd=False,
-    multi_output=False,
+    target_type="single-output",
+    multi_output="deprecated",
     allow_nan=None,
     ensure_min_samples=1,
     ensure_min_features=1,
@@ -277,7 +603,7 @@ def check_X_y(
     `y` 1D. By default, `X` is checked to be non-empty and containing only
     finite values. Standard input checks are also applied to `y`, such as
     checking that `y` does not have `np.nan` or `np.inf` targets.
-    For multi-label `y`, set multi_output=True to allow 2D and sparse `y`.
+    For multi-label `y`, set `target_type="multi-label"`.
     If the dtype of `X` is object, attempt converting to float, raising on
     failure.
 
@@ -326,10 +652,16 @@ def check_X_y(
         Whether to raise a value error if X is not 2D.
     allow_nd : boolean, default=False
         Whether to allow X.ndim > 2.
-    multi_output : boolean, default=False
-        Whether to allow 2D y (array or sparse matrix). If false, y will be
-        validated as a vector. y cannot have np.nan or np.inf values if
-        multi_output=True.
+    target_type : "single-output" or "multi-label" or "multi-output", \
+            default="single-output"
+        Resolved target type controlling target-array validation.
+    multi_output : boolean, default="deprecated"
+        Deprecated. Use `target_type` instead: `multi_output=True` maps to
+        `target_type="multi-label"` and `multi_output=False` to
+        `target_type="single-output"`. Passing it emits a `FutureWarning`, and
+        the legacy value is ignored unless `target_type` is `"single-output"`.
+        Note that `target_type="multi-label"` requires a two-dimensional `y`,
+        whereas `multi_output=True` also accepted a one-dimensional one.
     allow_nan : boolean, default=None
         Whether to allow np.nan in y.
     ensure_min_samples : int, default=1
@@ -377,12 +709,21 @@ def check_X_y(
        Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
        Res., 12:2825–2830, 2011.
     """
-    if allow_nan is None:
-        allow_nan = (
-            True
-            if isinstance(missing_label, float) and np.isnan(missing_label)
-            else False
+    if multi_output != "deprecated":
+        warnings.warn(
+            "`multi_output` is deprecated and will be removed in a future "
+            "release. Use `target_type='multi-label'` for multi-label "
+            "targets, `target_type='multi-output'` for multi-output targets, "
+            "and `target_type='single-output'` otherwise. `multi_output=True` "
+            "maps to `target_type='multi-label'`, which requires a "
+            "two-dimensional `y`.",
+            FutureWarning,
+            stacklevel=2,
         )
+        if multi_output and target_type == "single-output":
+            target_type = "multi-label"
+    if allow_nan is None:
+        allow_nan = _is_nan_missing_label(missing_label)
     if X is not None:
         X = check_array(
             X,
@@ -399,7 +740,16 @@ def check_X_y(
             estimator=estimator,
         )
     if y is not None:
-        if multi_output:
+        if target_type not in {
+            "single-output",
+            "multi-label",
+            "multi-output",
+        }:
+            raise ValueError(
+                "`target_type` must be one of {'single-output', "
+                "'multi-label', 'multi-output'}."
+            )
+        if target_type in {"multi-label", "multi-output"}:
             y = check_array(
                 y,
                 accept_sparse="csr",
@@ -407,6 +757,16 @@ def check_X_y(
                 ensure_2d=False,
                 dtype=None,
             )
+            if y.ndim != 2:
+                raise ValueError(
+                    f"`target_type='{target_type}'` requires a "
+                    "two-dimensional `y`."
+                )
+            if target_type == "multi-output" and y.shape[1] < 2:
+                raise ValueError(
+                    "`target_type='multi-output'` requires `y` with at least "
+                    "two target columns."
+                )
         else:
             y = column_or_1d(y, warn=True)
             assert_all_finite(y, allow_nan=allow_nan)
@@ -443,8 +803,8 @@ def check_X_y(
         )
         if X is not None and X_cand.shape[1] != X.shape[1]:
             raise ValueError(
-                "The number of features of candidates does not match"
-                "the number of features of X"
+                "The number of features of candidates does not match "
+                "the number of features of `X`."
             )
 
         if sample_weight_cand is None:
@@ -499,7 +859,8 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     ----------
     indices : array-like of shape (n_indices, n_dim) or (n_indices,)
         The considered indices, where for every `i = 0, ..., n_indices - 1`
-        `indices[i]` is interpreted as an index to the array `A`.
+        `indices[i]` is interpreted as an index to the array `A`. An empty
+        selection is accepted, i.e., `n_indices` may be zero.
     A : array-like
         The array that is indexed.
     dim : int or tuple of ints or 'adaptive', default='adaptive'
@@ -516,7 +877,14 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     indices : tuple of np.ndarray or np.ndarray
         The validated indices.
     """
-    indices = check_array(indices, dtype=int, ensure_2d=False)
+    # An empty selection is valid, whereas a scalar stays a rejected input
+    # because it is no collection of indices at all.
+    indices = check_array(
+        indices,
+        dtype=int,
+        ensure_2d=False,
+        ensure_min_samples=0 if np.ndim(indices) > 0 else 1,
+    )
     A = check_array(
         A, allow_nd=True, ensure_all_finite=False, ensure_2d=False, dtype=None
     )
@@ -582,10 +950,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
 def check_type(
     obj, name, *target_types, target_vals=None, indicator_funcs=None
 ):
-    """Check if `obj` is one of the given types. It is also possible to allow
-    specific values. Further it is possible to pass indicator functions
-    that can also accept `obj`. Thereby, `obj` must either have a correct type
-    a correct value or be accepted by an indicator function.
+    """Check whether an object satisfies type, value, or indicator rules.
 
     Parameters
     ----------
@@ -600,6 +965,12 @@ def check_type(
     indicator_funcs : iterable, default=None
         Possible further custom indicator (boolean) functions that accept
         the object by returning `True` if the object is passed as a parameter.
+
+    Raises
+    ------
+    TypeError
+        If `obj` does not match any allowed type or value and is not accepted
+        by any indicator function.
     """
     target_vals = target_vals if target_vals is not None else []
     indicator_funcs = indicator_funcs if indicator_funcs is not None else []
@@ -652,18 +1023,25 @@ def check_type(
 
 
 def _check_callable(func, name, n_positional_parameters=None):
-    """Checks if `func` is a callable and if the number of free parameters is
-    correct.
+    """Check whether `func` is callable with the expected arity.
 
     Parameters
     ----------
     func : callable
-        The functions to be validated.
+        Callable to be validated.
     name : str
-        The name of the function
+        Name used in error messages.
     n_positional_parameters : int, default=None
-        The number of free parameters. If `n_free_parameters` is `None`,
-        `n_free_parameters` is set to `1`.
+        Expected number of positional parameters without defaults. If `None`,
+        one positional parameter is expected.
+
+    Raises
+    ------
+    TypeError
+        If `func` is not callable.
+    ValueError
+        If `func` does not expose the expected number of positional
+        parameters.
     """
     if n_positional_parameters is None:
         n_positional_parameters = 1
@@ -806,31 +1184,22 @@ def check_budget_manager(
 
 
 def check_n_features(obj, X, reset):
-    """
-    Validate and update the number of features for an estimator based on the
-    input data.
-
-    This function either sets or verifies the estimator's expected number of
-    features using the provided data array. When `reset` is True, it updates
-    the estimator's attribute `n_features_in_` with the number of features in
-    `X` (i.e., `X.shape[1]`). If `X` is empty (has zero rows), the attribute is
-    set to `None`. When `reset` is False and `n_features_in_` is already
-    defined, the function delegates the verification process to
-    `sklearn_check_n_features`.
+    """Validate and update the expected number of features of an estimator.
 
     Parameters
     ----------
     obj : object
-        An estimator or any object that is expected to have an attribute
-        `n_features_in_` indicating the number of features it was fitted on.
+        Estimator-like object expected to expose `n_features_in_`.
     X : array-like of shape (n_samples, n_features)
-        The input data to check. The number of columns in X represents the
-        number of features.
+        Input data whose second dimension determines the number of features.
     reset : bool
-        If True, the function will set `obj.n_features_in_` to the number of
-        features in X. If False, and if `obj.n_features_in_` is already set,
-        the function will check that X has the expected number of features
-        using `sklearn_check_n_features`.
+        If `True`, set `obj.n_features_in_` from `X`. If `False`, validate
+        `X` against the existing value of `obj.n_features_in_`.
+
+    Raises
+    ------
+    ValueError
+        If `reset=False` and `X` does not match the stored number of features.
     """
     if reset:
         obj.n_features_in_ = X.shape[1] if len(X) > 0 else None
@@ -840,14 +1209,13 @@ def check_n_features(obj, X, reset):
 
 
 def _check_forward_outputs(forward_outputs):
-    """Check forward outputs required by `SkorchMixin`
-    and `make_criterion_tuple_aware`.
+    """Validate the `forward_outputs` mapping used by `SkorchMixin`.
 
     Parameters
     ----------
     forward_outputs : dict[str, tuple[int, Callable | None]]
-        `dict` that describes how to obtain and post-process the
-        outputs of `module.forward` for prediction.
+        Mapping that describes how to obtain and post-process the outputs of
+        `module.forward` for prediction.
 
         Given `raw_outputs = module.forward(X)`, each entry
         `name -> (idx, transform)` is interpreted as:
@@ -856,6 +1224,14 @@ def _check_forward_outputs(forward_outputs):
         - `transform`: callable `f(tensor) -> tensor` or `None`.
           If `transform` is not `None`, it is applied to the selected
           raw tensor; otherwise the raw tensor is used.
+
+    Raises
+    ------
+    TypeError
+        If `forward_outputs` is not a dictionary or contains invalid entry
+        specifications.
+    ValueError
+        If `forward_outputs` is empty or contains negative indices.
     """
 
     # Check forward_outputs configured.

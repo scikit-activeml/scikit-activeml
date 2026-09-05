@@ -25,6 +25,11 @@ from ..base import (
     MultiAnnotatorPoolQueryStrategy,
 )
 from ..exceptions import MappingError
+from ..pool._target import (
+    _collect_declared_authorities,
+    _reconcile_target_declarations,
+)
+from ..utils._validation import _canonicalize_multilabel_probas
 from ..utils import (
     check_scalar,
     unlabeled_indices,
@@ -32,6 +37,28 @@ from ..utils import (
     check_type,
     check_indices,
 )
+
+
+def _resolve_utility_target_type(qs, y, query_kwargs):
+    """Resolve target semantics for utility-plot candidate fallback."""
+    if isinstance(qs, MultiAnnotatorPoolQueryStrategy):
+        return "single-output"
+
+    wrapped_resolver = getattr(qs, "_resolve_wrapped_target_type", None)
+    if wrapped_resolver is not None:
+        return wrapped_resolver(y, query_kwargs)
+
+    authorities = _collect_declared_authorities(
+        qs._target_authority_params, query_kwargs
+    )
+    target_type, _ = _reconcile_target_declarations(
+        [(qs.target_type, type(qs).__name__)],
+        authorities,
+        y,
+        missing_label=qs.missing_label,
+        owner_name=type(qs).__name__,
+    )
+    return target_type
 
 
 def plot_utilities(qs, X, y, candidates=None, **kwargs):
@@ -44,9 +71,12 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples,) or (n_samples, n_annotators)
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by `qs.missing_label`).
+        indicated by `qs.missing_label`). Target semantics are resolved by the
+        query strategy and any estimator it declares as authoritative. For
+        multi-label targets, all label outputs contribute to one utility
+        surface because the query strategy returns one utility per sample.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
         - If `candidates` is `None`, the unlabeled samples from
@@ -74,8 +104,7 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
     ax : matplotlib.axes.Axes, default=None
-        The axis on which the utility is plotted. Only if y.ndim = 1 (single
-        annotator).
+        The axis on which the utility is plotted.
     res : int, default=21
         The resolution of the plot.
     contour_dict : dict, default=None
@@ -111,7 +140,9 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
         - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`.
+          `(X,y)` are considered as `candidates`. For a two-dimensional
+          `y`, a sample is unlabeled as soon as at least one annotator
+          has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -178,12 +209,17 @@ def plot_decision_boundary(
     ----------
     clf : sklearn.base.ClassifierMixin
         The fitted classifier whose decision boundary is plotted. If confidence
-        is not None, the classifier must implement the predict_proba function.
+        is not None, the classifier must implement the `predict_proba` method.
+        A multi-label classifier must publish its resolved semantics through
+        `target_spec_` and implement `predict_proba`.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
-    ax : matplotlib.axes.Axes or List, default=None
-        The axis on which the decision boundary is plotted. If ax is a List,
-        each entry has to be an `matplotlib.axes.Axes`.
+    ax : matplotlib.axes.Axes or array-like of matplotlib.axes.Axes, \
+            default=None
+        The axis on which the decision boundary is plotted. For multi-label
+        classification, one axis overlays all label-output boundaries, while
+        an array-like must contain one axis per label output and plots output
+        `j` on axis `j`.
     res : int, default=21
         The resolution of the plot.
     boundary_dict : dict, default=None
@@ -191,24 +227,47 @@ def plot_decision_boundary(
     confidence : scalar or None, default=0.75
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
-        stands for the ratio best class / second best class.
-    cmap : str or matplotlib.colors.Colormap, default='coolwarm_r'
-        The colormap for the confidence levels.
+        stands for the ratio best class / second best class. For each binary
+        label output of a multi-label classifier, the dashed contours are drawn
+        at positive-class probabilities `1 - confidence` and `confidence`.
+    cmap : str or matplotlib.colors.Colormap, default='coolwarm'
+        The colormap for the confidence levels and, unless overridden through
+        `boundary_dict`, the multi-label output boundaries. On separate
+        multi-label output axes, the lower and upper confidence contours use
+        the colormap's endpoints. On one overlaid axis, each output's
+        confidence contours use that output's colormap position.
     confidence_dict : dict, default=None
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
 
     Returns
     -------
-    ax : matplotlib.axes.Axes or List
-        The axis on which the boundary was plotted or the list of axis if ax
-        was a list.
+    ax : matplotlib.axes.Axes or array-like of matplotlib.axes.Axes
+        The supplied axis or axes on which the boundaries were plotted. A
+        multi-label boundary is the `0.5` contour of each label output's
+        positive-class probability, whose positive class is
+        `clf.target_spec_.classes[j][1]`.
     """
     check_type(clf, "clf", ClassifierMixin)
     check_scalar(res, "res", int, min_val=1)
+    target_spec = getattr(clf, "target_spec_", None)
+    is_multilabel = (
+        target_spec is not None and target_spec.target_type == "multi-label"
+    )
     if ax is None:
         ax = plt.gca()
-    check_type(ax, "ax", Axes)
+    if is_multilabel and not isinstance(ax, Axes):
+        axes = np.asarray(ax, dtype=object).reshape(-1)
+        for ax_ in axes:
+            check_type(ax_, "ax", Axes)
+        n_outputs = len(target_spec.classes)
+        if len(axes) != n_outputs:
+            raise ValueError(
+                "`ax` must contain one `Axes` object for each label output."
+            )
+    else:
+        check_type(ax, "ax", Axes)
+        axes = np.array([ax], dtype=object)
     feature_bound = check_bound(bound=feature_bound)
 
     # Check and convert the colormap
@@ -232,9 +291,58 @@ def plot_decision_boundary(
     # Create mesh for plotting
     X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
+    if is_multilabel:
+        if not hasattr(clf, "predict_proba"):
+            raise AttributeError(
+                "A multi-label `clf` must implement `predict_proba`."
+            )
+        n_outputs = len(target_spec.classes)
+        predictions = _canonicalize_multilabel_probas(
+            clf.predict_proba(mesh_samples),
+            n_samples=len(mesh_samples),
+            n_outputs=n_outputs,
+        )
+        output_axes = [axes[0]] * n_outputs if len(axes) == 1 else axes
+        has_one_axis_per_output = len(axes) == n_outputs
+        norm = plt.Normalize(vmin=0, vmax=max(n_outputs - 1, 1))
+
+        for output_idx, ax_ in enumerate(output_axes):
+            posteriors = predictions[:, output_idx].reshape(X_mesh.shape)
+            output_boundary_args = boundary_args.copy()
+            if boundary_dict is None or "colors" not in boundary_dict:
+                output_boundary_args["colors"] = [cmap(norm(output_idx))]
+            ax_.contour(
+                X_mesh,
+                Y_mesh,
+                posteriors,
+                [0.5],
+                **output_boundary_args,
+            )
+            if confidence is not None:
+                confidence_colors = (
+                    [cmap(0.0), cmap(1.0)]
+                    if has_one_axis_per_output
+                    else [cmap(norm(output_idx))]
+                )
+                ax_.contour(
+                    X_mesh,
+                    Y_mesh,
+                    posteriors,
+                    [1 - confidence, confidence],
+                    colors=confidence_colors,
+                    **confidence_args,
+                )
+        return ax
+
     # Calculate predictions
     if hasattr(clf, "predict_proba"):
         predictions = clf.predict_proba(mesh_samples)
+        if isinstance(predictions, list):
+            raise ValueError(
+                "`clf.predict_proba` returned per-output probability "
+                "matrices, but `clf` does not publish a resolved multi-label "
+                "`target_spec_`."
+            )
         classes = np.arange(predictions.shape[1])
     elif hasattr(clf, "predict"):
         if confidence is not None:
@@ -523,13 +631,19 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples, ) or (n_samples, n_annotators)
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
+            (n_samples, n_annotators)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by self.MISSING_LABEL).
+        indicated by `qs.missing_label`). A single-annotator strategy produces
+        one utility surface, including for resolved multi-label targets. For
+        multi-annotator strategies, the columns of a two-dimensional `y`
+        represent annotators and produce one surface per selected annotator.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
         - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`.
+          `(X,y)` are considered as `candidates`. For a multi-annotator
+          strategy with a two-dimensional `y`, a sample is unlabeled as
+          soon as at least one annotator has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -553,11 +667,11 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
     ax : matplotlib.axes.Axes, default=None
-        The axis on which the utility is plotted. Only if y.ndim = 1 (single
-        annotator).
+        The axis on which the utility of a single-annotator strategy is
+        plotted.
     axes : array-like of matplotlib.axes.Axes, default=None
         The axes on which the utilities for the annotators are plotted. Only
-        supported for y.ndim = 2 (multi annotator).
+        supported for a multi-annotator strategy with a two-dimensional `y`.
     res : int, default=21
         The resolution of the plot.
     contour_dict : dict, default=None
@@ -596,7 +710,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     y = check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
     check_consistent_length(X, y)
 
-    if y.ndim == 2:
+    is_multi_annotator = isinstance(qs, MultiAnnotatorPoolQueryStrategy)
+    if is_multi_annotator and y.ndim == 2:
         if plot_annotators is None:
             n_annotators = y.shape[1]
             plot_annotators = np.arange(n_annotators)
@@ -677,14 +792,32 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
                 return axes
 
         except MappingError:
-            candidates = unlabeled_indices(y, missing_label=qs.missing_label)
+            pass
         except BaseException as err:
             warnings.warn(
                 f"Unable to create utility plot with mesh because "
                 f"of the following error. Trying plotting over "
                 f"candidates. \n\n Unexpected {err.__repr__()}"
             )
-            candidates = unlabeled_indices(y, missing_label=qs.missing_label)
+        target_type = _resolve_utility_target_type(qs, y, kwargs)
+        fallback_y = (
+            y[:, 0]
+            if not is_multi_annotator
+            and target_type == "single-output"
+            and y.ndim == 2
+            else y
+        )
+        candidates = unlabeled_indices(
+            fallback_y,
+            missing_label=qs.missing_label,
+            target_type=target_type,
+        )
+        if is_multi_annotator and candidates.ndim == 2:
+            # A multi-annotator `y` yields one `(sample, annotator)` pair per
+            # missing annotation, whereas the fallback needs candidate
+            # samples. A sample is a candidate as soon as at least one
+            # annotator still owes a label for it.
+            candidates = np.unique(candidates[:, 0])
 
     candidates = check_array(
         candidates,

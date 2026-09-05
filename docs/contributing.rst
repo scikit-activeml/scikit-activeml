@@ -10,7 +10,7 @@ Overview
 
 Our philosophy is to extend the ``sklearn`` ecosystem with the most relevant
 query strategies for active learning and to implement tools for working with
-partially unlabeled data. An overview of our repository’s structure is provided
+partially unlabeled data. An overview of our repository's structure is provided
 in the image below. Each node represents a class or interface, and the arrows
 illustrate the inheritance hierarchy among them. Dashed nodes indicate
 functionality that is not yet available in our library. `scikit-learn`
@@ -22,7 +22,7 @@ is used in this image for identification only and does not imply endorsement.
 In our package ``skactiveml``, there are three major components:
 ``SkactivemlClassifier``, ``SkactivemlRegressor``, and ``QueryStrategy``.
 The classifier and regressor modules are necessary to handle partially unlabeled
-data and to implement active-learning–specific estimators. This way, an active
+data and to implement active-learning-specific estimators. This way, an active
 learning cycle can be easily implemented starting with zero initial labels.
 Regarding active learning query strategies, we currently differentiate between
 the pool-based paradigm (a large pool of unlabeled samples is available) and the
@@ -135,7 +135,7 @@ via ``conda`` you can do this as follows:
    conda install -c conda-forge pandoc ghostscript ffmpeg
 
 
-We also provide a `pre-commit <https://https://pre-commit.com/>`__
+We also provide a `pre-commit <https://pre-commit.com/>`__
 configuration that offers automatic linting checks using
 `black <https://black.readthedocs.io/en/stable/>`__ and
 `flake8 <https://flake8.pycqa.org/en/latest/>`__. To use these pre-commit
@@ -165,6 +165,29 @@ code using the following commands:
    black skactiveml
    flake8 skactiveml/ --ignore=E203,W503
 
+For a new strategy module centered on one public strategy class, derive the
+private module name from the class name in snake case and use the same stem for
+its test module. A conceptual or acronym-based filename is appropriate when a
+module intentionally groups a strategy family.
+
+Where Helpers Live
+~~~~~~~~~~~~~~~~~~
+
+Keep helper functions close to the code that uses them. A helper used in one
+file should stay in that file. If several files in one subpackage use it, put
+it in a private file in that subpackage. If several subpackages use a general
+helper and it does not import from ``skactiveml.base``, put it in a clearly
+named private file under ``skactiveml/utils``.
+
+Do not import helper functions or constants from ``skactiveml.base``; that
+file is for base classes. If a helper must import a base class, keep it in the
+subpackage that uses it. ``skactiveml/pool/_target.py`` is an example. Put
+exception classes in ``skactiveml/exceptions.py``.
+
+Add a query-strategy base class only when it contains behavior shared by its
+subclasses. Do not add one only to share a constant or to help tests find
+strategies.
+
 Example for Code Contribution Cycle (C3) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -188,13 +211,13 @@ Example for Code Contribution Cycle (C3) and Pull Requests
 
 .. code:: bash
 
-   pytest
+   python -m pytest --no-cov -n 6
 
 Make sure you have covered all lines with tests.
 
 .. code:: bash
 
-   pytest --cov=./skactiveml
+   python -m pytest -n 6
 
 5. Commit and push your changes.
 
@@ -211,9 +234,36 @@ Query Strategies
 
 All query strategies inherit from the abstract superclass
 ``skactiveml.base.QueryStrategy``, which is implemented in ``skactiveml/base.py``.
-This superclass inherits from ``sklearn.base.Estimator``. By default, its
-``__init__`` method requires a ``random_state`` parameter, and the abstract
-``query`` method enforces the implementation of the sample selection logic.
+This superclass inherits from ``sklearn.base.Estimator``. Its optional
+``random_state`` parameter controls reproducibility, and the abstract ``query``
+method enforces the implementation of the sample-selection logic.
+
+Target semantics and compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Target data has an explicit public contract. Read the
+:doc:`target_semantics` reference before changing estimators, query strategies,
+label helpers, or multi-annotator components. In particular:
+
+- resolve target meaning with
+  :func:`~skactiveml.utils.resolve_target_spec`; do not infer semantics from
+  array shape or values alone;
+- declare the exact target combinations a component supports through its
+  ``_target_capabilities``;
+- preserve the fitted ``target_spec_`` on estimators and wrappers that retain a
+  fitted target specification; query strategies resolve each query and do not
+  retain a last-query specification;
+- add tests for every supported target combination and for invalid or
+  unsupported combinations, including ambiguous two-dimensional targets and
+  complete-row requirements for multi-label data;
+- operate on encoded targets for multi-label data, because each label output
+  may declare its own binary class vocabulary, e.g.
+  ``[["no", "yes"], ["off", "on"]]``. A pool strategy test supplying
+  ``query_default_params_clf_multilabel`` runs the shared custom class
+  vocabulary contract automatically. If its acquisition path needs auxiliary
+  inputs, override ``_multilabel_custom_vocabulary_params`` and record the
+  override in ``skactiveml/pool/tests/test_multilabel_contracts.py``
+  instead of skipping the contract.
 
 Single-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -301,7 +351,7 @@ Returns:
 +-----------------------------------+----------------------------------------------+
 | Parameter                         | Description                                  |
 +===================================+==============================================+
-| ``query_indices``                 | Indices indicating which candidate sample’s  |
+| ``query_indices``                 | Indices indicating which candidate sample's  |
 |                                   | label is to be queried. For example,         |
 |                                   | ``query_indices[0]`` indicates the first     |
 |                                   | selected sample. Depending on the shape of   |
@@ -320,28 +370,31 @@ Returns:
 General Advice
 ''''''''''''''
 
-Use the ``self._validate_data`` method (implemented in the superclass)
-to check the inputs ``X`` and ``y`` only once. Fit the classifier or
+Use the ``self._validate_data`` method (implemented in the superclass) exactly
+once for structural validation of the query inputs ``X`` and ``y``. Target
+resolution is a separate semantic step and may intentionally precede
+``self._validate_data`` so that invalid or unsupported target semantics fail
+before estimator fitting or query-state initialization. Fit the classifier or
 regressor if it is not yet fitted (using ``fit_if_not_fitted`` from ``utils``).
-Calculate utilities via an extra public function. Use the
-``simple_batch`` function from ``utils`` to determine the query indices and set
-the utilities in naive batch query strategies.
+Calculate utilities via an extra public function. Use the ``simple_batch``
+function from ``utils`` to determine the query indices and set the utilities in
+naive batch query strategies.
 
 .. _testing-1:
 
 Testing
 ^^^^^^^
 
-The test classes in ``skactiveml.pool.test.TestQueryStrategy`` for
-single-annotator pool-based query strategies must inherit from the test
-template ``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorPoolQueryStrategy``.
-As a result, many required functionalities will be automatically tested.
-You must specify the parameters of ``qs_class`` and ``init_default_params`` in
-the ``__init__`` accordingly. Depending on whether the query strategy can handle
-regression, classification, or both, you also need to define the parameters
-``query_default_params_reg`` or ``query_default_params_clf``. Once the parameters
-are set, adjust the tests until all errors are resolved. Please refer to the test
-template for more detailed information.
+Pool-strategy tests live in ``skactiveml/pool/tests``. Reuse the test template
+``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorPoolQueryStrategy``.
+Specify ``qs_class`` and ``init_default_params`` in the template setup and,
+depending on the supported task, ``query_default_params_reg`` or
+``query_default_params_clf``. Refer to the template for the complete contract.
+
+Keep test helpers in the narrowest module that owns them. A helper used by one
+test module stays in that module. Put broadly reused assertions and fixture
+helpers in ``skactiveml.tests.utils``. Put inherited query-strategy contract
+behavior in ``skactiveml.tests.template_query_strategy``.
 
 Single-annotator Stream-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,7 +404,7 @@ Single-annotator Stream-based Query Strategies
 General
 ^^^^^^^
 
-All query strategies are stored in a file ``skactivml/stream/*.py``.
+All query strategies are stored in ``skactiveml/stream/*.py``.
 Every query strategy inherits from
 ``skactiveml.base.SingleAnnotatorStreamQueryStrategy``. Every query strategy has
 either an internal budget handling or an outsourced ``budget_manager``.
@@ -481,16 +534,12 @@ update). If a ``budget_manager`` is used forward the update call to the
 
 Testing
 ^^^^^^^
-The test classes in ``skactiveml.stream.test.TestQueryStrategy`` for
-single-annotator stream-based query strategies must inherit from the test
-template ``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorStreamQueryStrategy``.
-As a result, many required functionalities will be automatically tested.
-You must specify the parameters of ``qs_class`` and ``init_default_params`` in
-the ``__init__`` accordingly. Depending on whether the query strategy can handle
-regression, classification, or both, you also need to define the parameters
-``query_default_params_reg`` or ``query_default_params_clf``. Once the parameters
-are set, adjust the tests until all errors are resolved. Please refer to the test
-template for more detailed information.
+Stream-strategy tests live in ``skactiveml/stream/tests``. Reuse the test
+template
+``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorStreamQueryStrategy``.
+Specify ``qs_class`` and ``init_default_params`` in the template setup and,
+depending on the supported task, ``query_default_params_reg`` or
+``query_default_params_clf``. Refer to the template for the complete contract.
 
 .. _general-advice-4:
 
@@ -498,7 +547,7 @@ template for more detailed information.
 ^^^^^^^^^^^^^^^^^^
 
 All budget managers are stored in
-``skactivml/stream/budget_manager/*.py``. The class must implement the
+``skactiveml/stream/budgetmanager/*.py``. The class must implement the
 following methods:
 
 +-----------------------------------+-----------------------------------+
@@ -582,22 +631,18 @@ strategy needs to be adapted accordingly:
 
 Testing
 ^^^^^^^
-The test classes ``skactiveml.stream.budgetmanager.test.TestBudgetManager``
-of budget managers need to inherit from the test template
-``skactiveml.tests.template_budget_manager.TemplateBudgetManager``.
-As a result, many required functionalities will be automatically tested.
-As a requirement, one needs to specify the parameters of ``bm_class``,
-``init_default_params`` and ``query_by_utility_params`` of the ``__init__``
-accordingly. Once, the parameters are set, the developer needs to adjust the
-test until all errors are resolved. We refer to the test template for more
-detailed information.
+Budget-manager tests live in ``skactiveml/stream/budgetmanager/tests`` and
+share the template
+``skactiveml.tests.template_budget_manager.TemplateBudgetManager``. Specify
+``bm_class``, ``init_default_params``, and ``query_by_utility_params`` in the
+template setup, then adjust the generated tests as needed.
 
 
 Multi-Annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All query strategies are stored in a file
-``skactiveml/pool/multi/*.py`` and inherit
+All query strategies are stored in
+``skactiveml/pool/multiannotator/*.py`` and inherit
 ``skactiveml.base.MultiAnnotatorPoolQueryStrategy``.
 
 The class must implement the following methods:
@@ -605,7 +650,7 @@ The class must implement the following methods:
 +------------+----------------------------------------------------------------+
 | Method     | Description                                                    |
 +============+================================================================+
-| ``init``   | Method for initialization.                                     |
+| ``__init__`` | Method for initialization.                                   |
 +------------+----------------------------------------------------------------+
 | ``query``  | Select the annotator-sample pairs to decide which sample's     |
 |            | class label is to be queried from which annotator.             |
@@ -725,7 +770,7 @@ Returns:
 General advice
 ''''''''''''''
 
-Use ``self._validate_data method`` (is implemented in superclass).
+Use ``self._validate_data`` (implemented in the superclass).
 Check the input ``X`` and ``y`` only once. Fit classifier if it is not
 yet fitted (may use ``fit_if_not_fitted`` form ``utils``). If the
 strategy combines a single annotator query strategy with a performance
@@ -745,13 +790,10 @@ If the strategy is a ``greedy`` method regarding the utilities:
 Testing
 ^^^^^^^
 
-The test classes ``skactiveml.pool.multiannotator.test.TestQueryStrategy`` of
-multi-annotator pool-based query strategies need inherit form
-``unittest.TestCase``. In this class, each parameter ``a`` of the
-``__init__`` method needs to be tested via a method ``test_init_param_a``.
-This applies also for a parameter ``a`` of the ``query`` method, which is
-tested via a method ``test_query_param_a``. The main logic of the query
-strategy is test via the method ``test_query``.
+Multi-annotator strategy tests live in
+``skactiveml/pool/multiannotator/tests`` and use ``unittest.TestCase``. Test
+constructor and query parameters explicitly and keep the query-result contract
+for sample-annotator pairs covered by the existing neighboring tests.
 
 
 Classifiers
@@ -819,7 +861,7 @@ Required Parameters:
 |                                   | annotator classifiers, which expect a matrix |
 |                                   | with columns for each annotator.             |
 +-----------------------------------+----------------------------------------------+
-| ``sample_weight``, optional       | Contains weights for the training samples’   |
+| ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | class labels. Must have the same shape as    |
 |                                   | ``y``.                                       |
 +-----------------------------------+----------------------------------------------+
@@ -956,15 +998,11 @@ and that the classifier has been fitted.
 Testing
 ~~~~~~~
 
-The test classes ``skactiveml.classifier.TestClassifier``
-of classifiers need to inherit from the test template
-``skactiveml.tests.template_estimators.TemplateSkactivemlClassifier``.
-As a result, many required functionalities will be automatically tested.
-As a requirement, one needs to specify the parameters of ``estimator_class``,
-``init_default_params``, ``fit_default_params``, and ``predict_default_params``
-of the ``__init__`` accordingly. Once, the parameters are set, the developer
-needs to adjust the test until all errors are resolved. We refer to the test
-template for more detailed information.
+Classifier tests live in ``skactiveml/classifier/tests`` and reuse the template
+``skactiveml.tests.template_estimator.TemplateSkactivemlClassifier``. Specify
+``estimator_class``, ``init_default_params``, ``fit_default_params``, and
+``predict_default_params`` in the template setup, then adjust the generated
+tests as needed.
 
 Regressors
 ----------
@@ -1018,7 +1056,7 @@ Required Parameters:
 |                                   | target regressors, which expect a matrix     |
 |                                   | with columns for each target type.           |
 +-----------------------------------+----------------------------------------------+
-| ``sample_weight``, optional       | Contains weights for the training samples’   |
+| ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | targets. Must have the same shape as ``y``.  |
 +-----------------------------------+----------------------------------------------+
 
@@ -1061,7 +1099,9 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``y_pred``                        | The estimated targets per sample. |
+| ``y_pred``                        | The estimated targets per sample, |
+|                                   | as an array of shape              |
+|                                   | ``(n_samples,)``.                 |
 +-----------------------------------+-----------------------------------+
 
 .. _general-advice-12:
@@ -1071,7 +1111,7 @@ General advice
 
 Check parameter ``X`` regarding its shape, i.e., use method
 ``skactiveml.utils.check_n_features`` to ensure a correct number of
-features. Check that the regressor has been fitted. If the classifier is a
+features. Check that the regressor has been fitted. If the regressor is a
 ``skactiveml.base.ProbabilisticRegressor``, this method is already
 implemented in the superclass.
 
@@ -1116,36 +1156,35 @@ and that the regressor has been fitted.
 Testing
 ~~~~~~~
 
-The test classes ``skactiveml.classifier.TestRegressor``
-of regressors need to inherit from the test template
-``skactiveml.tests.template_estimators.TemplateSkactivemlRegressor``.
-As a result, many required functionalities will be automatically tested.
-As a requirement, one needs to specify the parameters of ``estimator_class``,
-``init_default_params``, ``fit_default_params``, and ``predict_default_params``
-of the ``__init__`` accordingly. Once, the parameters are set, the developer
-needs to adjust the test until all errors are resolved. We refer to the test
-template for more detailed information.
+Regressor tests live in ``skactiveml/regressor/tests`` and reuse the template
+``skactiveml.tests.template_estimator.TemplateSkactivemlRegressor``. Specify
+``estimator_class``, ``init_default_params``, ``fit_default_params``, and
+``predict_default_params`` in the template setup, then adjust the generated
+tests as needed.
 
 
 Examples
 --------
 
 Two of our main goals are to make active learning more understandable and
-improve our framework’s usability. Therefore, we require an example for each
-query strategy. To do so, create a file named
-``scikit-activeml/docs/examples/query_strategy.json``. Currently, we support
-examples for single-annotator pool-based and stream-based query strategies.
+improve our framework's usability. Therefore, we require an example for each
+query strategy. Add a JSON file to the appropriate scenario directory under
+``docs/examples/``. Each scenario directory must contain a ``README.rst``;
+the documentation generator recursively scans these directories and creates
+the example pages, notebooks, and strategy overview. Current directories cover
+pool classification, pool regression, multi-annotator pool, and stream
+examples.
 
-The JSON file supports the following entries:
+Each JSON file contains a list of example entries with the following fields:
 
 +------------------+----------------------------------------------------------+
 | Entry            | Description                                              |
 +==================+==========================================================+
-| ``class``        | Query strategy’s class name.                             |
+| ``class``        | Query strategy's class name.                             |
 +------------------+----------------------------------------------------------+
 | ``package``      | Name of the sub-package (e.g., pool).                    |
 +------------------+----------------------------------------------------------+
-| ``method``       | Query strategy’s official name.                          |
+| ``method``       | Query strategy's official name.                          |
 +------------------+----------------------------------------------------------+
 | ``category``     | The methodological category of this query strategy, e.g.,|
 |                  | Expected Error Reduction, Model Change,                  |
@@ -1155,13 +1194,14 @@ The JSON file supports the following entries:
 | ``template``     | Defines the general setup/setting of the example.        |
 |                  | Supported templates include:                             |
 |                  | ``examples/template_pool.py``,                           |
+|                  | ``examples/template_pool_multilabel.py``,                |
 |                  | ``examples/template_pool_regression.py``,                |
 |                  | ``examples/template_stream.py``, and                     |
 |                  | ``examples/template_pool_batch.py``.                     |
 +------------------+----------------------------------------------------------+
 | ``tags``         | Search categories. Supported tags include ``pool``,      |
 |                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
-|                  | ``classification``, and ``regression``.                  |
+|                  | ``classification``, ``multi-label``, and ``regression``. |
 +------------------+----------------------------------------------------------+
 | ``title``        | Title of the example, usually named after the query      |
 |                  | strategy.                                                |
@@ -1215,11 +1255,15 @@ used by scikit-learn.
 Building the Documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To ensure your documentation is well formatted, build it using Sphinx:
+To ensure your documentation examples execute successfully and the pages are
+well formatted, activate the ``scikit-activeml`` environment and build them
+using Sphinx. The configuration queries release tags and external inventories,
+so a network connection is required:
 
 .. code:: bash
 
-   sphinx-build -b html docs docs/_build
+   python -m sphinx -b doctest docs docs/_build/doctest
+   python -m sphinx -b html docs docs/_build
 
 Issue Tracking
 --------------
@@ -1244,7 +1288,7 @@ Use the following labels when reporting an issue:
 +------------------+-------------------------------------------+
 | Label            | Use Case                                  |
 +==================+===========================================+
-| ``bug``          | Something isn’t working                   |
+| ``bug``          | Something isn't working                   |
 +------------------+-------------------------------------------+
 | ``enhancement``  | Request for a new feature                 |
 +------------------+-------------------------------------------+

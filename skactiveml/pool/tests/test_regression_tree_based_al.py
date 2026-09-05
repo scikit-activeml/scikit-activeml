@@ -2,7 +2,6 @@ import unittest
 
 import numpy as np
 from sklearn.metrics import pairwise_distances_argmin
-from sklearn.datasets import make_regression
 
 from skactiveml.pool import RegressionTreeBasedAL
 from skactiveml.pool._regression_tree_based_al import (
@@ -13,6 +12,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 
@@ -47,6 +47,75 @@ class TestRegressionTreeBasedAL(
         ]
         self._test_param("init", "method", test_cases)
 
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-output", ValueError),
+                ("multi-label", ValueError),
+                ("invalid", ValueError),
+            ],
+        )
+
+    def test_query_uses_fitted_regressor_target_spec(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
+        ).fit(X, y)
+
+        query_idx = RegressionTreeBasedAL(random_state=0).query(
+            X, y, reg, fit_reg=False
+        )
+
+        self.assertIn(query_idx[0], [4, 5])
+
+    def test_fitted_target_shape_failure_precedes_acquisition_state(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.arange(12, dtype=float).reshape(6, 2)
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
+        ).fit(X, np.arange(6, dtype=float))
+        strategy = RegressionTreeBasedAL()
+
+        with self.assertRaisesRegex(ValueError, "Single-output regression"):
+            strategy.query(X, y, reg, fit_reg=False)
+
+        assert_no_query_state(self, strategy)
+
+    def test_strategy_target_type_errors_are_semantic(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.arange(6, dtype=float)
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
+        ).fit(X, y)
+
+        with self.assertRaisesRegex(ValueError, "must be one of"):
+            RegressionTreeBasedAL(target_type="invalid").query(
+                X, y, reg, fit_reg=False
+            )
+        with self.assertRaisesRegex(ValueError, "requires classification"):
+            RegressionTreeBasedAL(target_type="multi-label").query(
+                X, y, reg, fit_reg=False
+            )
+
+    def test_unfitted_regressor_declaration_conflict_precedes_state(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0),
+            target_type="multi-output",
+        )
+        strategy = RegressionTreeBasedAL(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
+            strategy.query(X, y, reg, fit_reg=False)
+
+        assert_no_query_state(self, strategy)
+
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []
         test_cases += [
@@ -60,6 +129,45 @@ class TestRegressionTreeBasedAL(
             "max_iter_representativity",
             test_cases,
             replace_init_params={"method": "representativity"},
+        )
+
+    def test_representativity_iterations_improve_acquisition_utility(self):
+        X = np.array(
+            [
+                [2.24, 0.98],
+                [-0.85, 0.31],
+                [0.40, 1.76],
+                [1.45, 0.14],
+                [-0.98, 1.87],
+                [-0.21, 1.49],
+                [0.12, 0.76],
+                [-0.15, 0.95],
+                [0.33, 0.44],
+                [0.41, -0.10],
+            ]
+        )
+        y = np.array([0, 1, 2] + [MISSING_LABEL] * 7)
+        batch_size = 2
+        acquisition_utility_sums = []
+
+        for max_iter in [1, 10]:
+            query_indices, utilities = RegressionTreeBasedAL(
+                method="representativity",
+                max_iter_representativity=max_iter,
+                random_state=0,
+            ).query(
+                X,
+                y,
+                reg=self.reg,
+                batch_size=batch_size,
+                return_utilities=True,
+            )
+            acquisition_utility_sums.append(
+                utilities[np.arange(batch_size), query_indices].sum()
+            )
+
+        self.assertGreater(
+            acquisition_utility_sums[1], acquisition_utility_sums[0]
         )
 
     def test_query_param_reg(self, test_cases=None):
@@ -175,24 +283,6 @@ class TestRegressionTreeBasedAL(
                     candidates=candidates,
                 )
                 self.assertTrue((np.isnan(utilities) + (utilities == 1)).all())
-
-        # reg = SklearnRegressor(DecisionTreeRegressor(), missing_label=np.nan)
-        X, y = make_regression(n_samples=500, n_features=100, random_state=0)
-        y[100:] = np.nan
-        query_indices = []
-        for i in [1, 10]:
-            qs = RegressionTreeBasedAL(
-                method="representativity",
-                max_iter_representativity=i,
-                random_state=0,
-            )
-            query_indices.append(qs.query(X, y, reg=self.reg, batch_size=5))
-        np.testing.assert_raises(
-            AssertionError,
-            np.testing.assert_array_equal,
-            query_indices[0],
-            query_indices[1],
-        )
 
 
 class _DummyRegressor(DecisionTreeRegressor):

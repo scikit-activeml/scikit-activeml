@@ -48,6 +48,9 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This classifier supports only single-output
+        classification with multiple annotators.
 
     Attributes
     ----------
@@ -61,6 +64,14 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
         training data.
     """
 
+    _annotation_type = "multi-annotator"
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
+
     def __init__(
         self,
         estimators,
@@ -69,6 +80,7 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
+        target_type="auto",
     ):
         SkactivemlClassifier.__init__(
             self,
@@ -76,6 +88,7 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.estimators = estimators
         self.voting = voting
@@ -117,7 +130,6 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
-            y_ensure_1d=False,
         )
 
         # Copy estimators

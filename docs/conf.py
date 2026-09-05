@@ -23,7 +23,8 @@ from docs.generate import (
     generate_api_reference_rst,
     generate_examples,
     generate_tutorials,
-    generate_switcher
+    generate_switcher,
+    is_skactiveml_method,
 )
 
 # -- Project information -----------------------------------------------------
@@ -82,6 +83,7 @@ extensions = [
 nitpicky = True
 nitpick_ignore = [
     ("py:class", "skactiveml.pool._bald._GeneralBALD"),
+    ("py:class", "skactiveml.pool._wrapper._TargetPreservingWrapper"),
     ("py:class", "skactiveml.classifier.multiannotator._utils._SkorchMultiAnnotatorClassifier"),
 ]
 
@@ -126,7 +128,11 @@ exclude_patterns = [
     # including the generated .rst files
     'generated/sphinx_gallery_examples/**/*.ipynb',
     'examples/*',
-    'generated/examples/*'
+    'generated/examples/*',
+    # Executing a tutorial downloads third-party sources next to it. They
+    # are not documents of this project, so they are neither rendered nor
+    # reported as missing from a toctree.
+    'generated/**/.cache/**',
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.
@@ -192,7 +198,9 @@ html_theme_options = {
     },
     "check_switcher": False,
     "navbar_start": ["navbar-logo", "version-switcher"],
-    "header_links_before_dropdown": 7,
+    # Keep the header on one line at any viewport width. The remaining
+    # links stay reachable through the "More" dropdown.
+    "header_links_before_dropdown": 5,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -267,6 +275,7 @@ todo_include_todos = True
 # -- Generate files for strategy overview and api reference ------------------
 
 autosummary_generate = True
+autosummary_context = {"is_skactiveml_method": is_skactiveml_method}
 
 autodoc_default_options = {
     "members": True,

@@ -2,13 +2,17 @@ import unittest
 
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.exceptions import NotFittedError
 from sklearn.preprocessing import StandardScaler
 
+from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.classifier.multiannotator import AnnotatorLogisticRegression
 from skactiveml.pool.multiannotator import (
     IntervalEstimationThreshold,
     IntervalEstimationAnnotModel,
 )
+from skactiveml.tests.utils import assert_no_query_state
+from skactiveml.utils import TargetSpec
 
 
 class TestIntervalEstimationAnnotModel(unittest.TestCase):
@@ -33,7 +37,7 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
 
     def test_init_param_classes(self):
         ie_model = IntervalEstimationAnnotModel(classes="test")
-        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
+        self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)
         ie_model = IntervalEstimationAnnotModel(classes=[0])
         self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
@@ -58,6 +62,37 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
     def test_init_param_random_state(self):
         ie_model = IntervalEstimationAnnotModel(random_state="test")
         self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
+
+    def test_init_param_target_type(self):
+        ie_model = IntervalEstimationAnnotModel(target_type="auto")
+
+        self.assertEqual(ie_model.target_type, "auto")
+        self.assertEqual(
+            ie_model._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+
+        ie_model.fit(self.X, self.y)
+        self.assertEqual(ie_model.target_spec_.task, "classification")
+        self.assertEqual(ie_model.target_spec_.target_type, "single-output")
+        self.assertEqual(
+            ie_model.target_spec_.annotation_type, "multi-annotator"
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            IntervalEstimationAnnotModel(target_type="multi-label").fit(
+                self.X, self.y
+            )
 
     def test_fit_param_y(self):
         ie_model = IntervalEstimationAnnotModel()
@@ -118,6 +153,223 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.clf = AnnotatorLogisticRegression()
         self.A_cand = np.ones_like(self.y)
         self.sample_weight = np.ones_like(self.y)
+
+    def test_init_param_target_type(self):
+        ie_thresh = IntervalEstimationThreshold(target_type="auto")
+
+        self.assertEqual(ie_thresh.target_type, "auto")
+        self.assertEqual(
+            ie_thresh._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+
+    def test_query_preserves_sample_annotator_acquisition(self):
+        ie_thresh = IntervalEstimationThreshold(target_type="auto")
+
+        query_indices, utilities = ie_thresh.query(
+            X=self.X,
+            y=self.y,
+            clf=self.clf,
+            candidates=self.X,
+            annotators=self.A_cand,
+            batch_size=3,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query_indices.shape, (3, 2))
+        self.assertEqual(utilities.shape, (3, len(self.X), self.y.shape[1]))
+
+    def test_query_exhausted_candidate_pool(self):
+        # An exhausted candidate pool is a valid acquisition state that is
+        # answered with an empty batch instead of an error about array shapes.
+        ie_thresh = IntervalEstimationThreshold()
+        n_annotators = self.y.shape[1]
+        cases = [
+            (
+                "fully labeled pool",
+                np.zeros_like(self.y),
+                None,
+                None,
+                len(self.X),
+            ),
+            (
+                "empty index array",
+                self.y,
+                np.array([], int),
+                None,
+                len(self.X),
+            ),
+            ("empty candidate array", self.y, np.empty((0, 2)), None, 0),
+            (
+                "no available annotator",
+                self.y,
+                None,
+                np.zeros_like(self.y, dtype=bool),
+                len(self.X),
+            ),
+            (
+                "empty annotator index array",
+                self.y,
+                None,
+                np.array([], int),
+                len(self.X),
+            ),
+        ]
+
+        for name, y, candidates, annotators, n_rows in cases:
+            with self.subTest(case=name):
+                with self.assertWarnsRegex(UserWarning, "exhausted"):
+                    query_indices, utilities = ie_thresh.query(
+                        X=self.X,
+                        y=y,
+                        clf=self.clf,
+                        candidates=candidates,
+                        annotators=annotators,
+                        return_utilities=True,
+                    )
+
+                self.assertEqual(query_indices.shape, (0, 2))
+                self.assertTrue(np.issubdtype(query_indices.dtype, np.integer))
+                self.assertEqual(utilities.shape, (0, n_rows, n_annotators))
+
+    def test_explicit_multilabel_intent_fails_before_acquisition_state(self):
+        ie_thresh = IntervalEstimationThreshold(target_type="multi-label")
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            ie_thresh.query(
+                X=self.X,
+                y=self.y,
+                clf=self.clf,
+                candidates=self.X,
+                annotators=self.A_cand,
+            )
+
+        assert_no_query_state(self, ie_thresh)
+
+    def test_fitted_aggregated_classifier_is_a_semantic_boundary(self):
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            self.X, np.arange(len(self.X)) % 2
+        )
+        y = np.full_like(self.y, np.nan)
+
+        query_indices, utilities = IntervalEstimationThreshold().query(
+            X=self.X,
+            y=y,
+            clf=clf,
+            fit_clf=False,
+            batch_size=2,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query_indices.shape, (2, 2))
+        self.assertEqual(utilities.shape, (2, len(self.X), y.shape[1]))
+
+    def test_unfitted_classifier_without_target_spec_is_rejected(self):
+        with self.assertRaises(NotFittedError):
+            IntervalEstimationThreshold().query(
+                X=self.X,
+                y=self.y,
+                clf=AnnotatorLogisticRegression(),
+                fit_clf=False,
+            )
+
+    def test_query_rejects_unsupported_classifier_before_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        clf = ParzenWindowClassifier(classes=[0, 1, 2])
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            ie_thresh.query(X=self.X, y=self.y, clf=clf)
+
+        assert_no_query_state(self, ie_thresh)
+
+    def test_cycle_zero_rejection_precedes_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        y = np.full_like(self.y, np.nan)
+        clf = AnnotatorLogisticRegression(target_type="multi-label")
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            ie_thresh.query(X=self.X, y=y, clf=clf)
+
+        assert_no_query_state(self, ie_thresh)
+
+    def test_query_param_fit_clf(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+
+        with self.assertRaises(TypeError):
+            ie_thresh.query(
+                X=self.X,
+                y=self.y,
+                clf=self.clf,
+                fit_clf="invalid",
+            )
+
+        self.assertFalse(hasattr(ie_thresh, "n_features_in_"))
+
+    def test_explicit_classifier_conflict_precedes_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        clf = AnnotatorLogisticRegression(
+            classes=[0, 1, 2], target_type="multi-label"
+        )
+
+        with self.assertRaisesRegex(ValueError, "explicit `target_type`"):
+            ie_thresh.query(X=self.X, y=self.y, clf=clf)
+
+        assert_no_query_state(self, ie_thresh)
+
+    def test_fitted_classifier_conflict_precedes_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            self.X, np.arange(len(self.X)) % 2
+        )
+        clf.target_spec_ = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=(0, 2),
+        )
+        y = np.full_like(self.y, np.nan)
+
+        with self.assertRaisesRegex(ValueError, "vocabulary conflicts"):
+            ie_thresh.query(X=self.X, y=y, clf=clf, fit_clf=False)
+
+        assert_no_query_state(self, ie_thresh)
+
+    def test_classifier_rejection_preserves_existing_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        ie_thresh.query(X=self.X, y=self.y, clf=self.clf)
+        expected_n_features = ie_thresh.n_features_in_
+        expected_missing_label = ie_thresh.missing_label_
+        expected_random_state = ie_thresh.random_state_.get_state()
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            ie_thresh.query(
+                X=self.X,
+                y=self.y,
+                clf=ParzenWindowClassifier(classes=[0, 1, 2]),
+            )
+
+        self.assertEqual(ie_thresh.n_features_in_, expected_n_features)
+        np.testing.assert_equal(
+            ie_thresh.missing_label_, expected_missing_label
+        )
+        actual_random_state = ie_thresh.random_state_.get_state()
+        self.assertEqual(actual_random_state[0], expected_random_state[0])
+        np.testing.assert_array_equal(
+            actual_random_state[1], expected_random_state[1]
+        )
+        self.assertEqual(actual_random_state[2:], expected_random_state[2:])
 
     def test_init_param_alpha(self):
         ie_thresh = IntervalEstimationThreshold(alpha=0.0, random_state=0)

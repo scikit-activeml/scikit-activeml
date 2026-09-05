@@ -3,19 +3,15 @@ Module implementing the pool-based query strategy Batch Active Learning by
 Diverse Gradient Embedding (BADGE).
 """
 
-import warnings
-
 import numpy as np
-from sklearn import clone
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     check_type,
-    check_equal_missing_label,
-    unlabeled_indices,
-    check_scalar,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
@@ -25,7 +21,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     running k-means++ on per-sample gradient embeddings, which combine
     uncertainty and diversity. For each unlabeled sample, it forms the gradient
     of the cross-entropy loss with respect to the last linear layer using the
-    model’s pseudo-label. Large gradient norms indicate uncertainty, while
+    model's pseudo-label. Large gradient norms indicate uncertainty, while
     k-means++ spreads selections to avoid redundancy.
 
     The gradient embedding of a sample is the Kronecker product
@@ -37,6 +33,19 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     products, which reduces the space complexity from
     `O(n_samples * n_classes * n_features)` to
     `O(n_samples * (n_classes + n_features))`.
+
+    The original BADGE method was proposed for multiclass classification. The
+    multi-label support in this implementation is an extension and not part of
+    the original proposal in [1]_. For resolved multi-label targets, BADGE
+    assumes independent sigmoid outputs per label and forms a multi-label
+    gradient embedding from the binary-cross-entropy-style last-layer
+    gradients, i.e., the residual of the label output `j` against the model's
+    own pseudo-label is `p_j - 1[p_j >= 0.5]`, and the per-output last-layer
+    gradients obtained by multiplying these residuals with the sample
+    representation are concatenated into one gradient embedding. This
+    per-output decomposition ignores correlations between label outputs. The
+    factorization above applies unchanged, since the multi-label residual is
+    also a per-output vector `q`.
 
     Parameters
     ----------
@@ -62,6 +71,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The strategy supports single-output and
+        multi-label classification. A fitted classifier's target specification
+        is authoritative when available.
 
     References
     ----------
@@ -79,10 +92,22 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         clf_embedding_flag_name=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         self.clf_embedding_flag_name = clf_embedding_flag_name
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
+        )
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+            }
         )
 
     def query(
@@ -103,16 +128,28 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row. In this
+            case, BADGE uses the multi-label extension described in the class
+            docstring, i.e., independent sigmoid outputs per label.
+            `predict_proba` must then return either one positive-class
+            probability per label with shape `(n_samples, n_outputs)` or a
+            list of binary probability matrices with shape `(n_samples, 2)`
+            per output.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight: array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -123,10 +160,14 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
+
+            A given `candidates` is authoritative, i.e., an index array is
+            taken as given, such that labeled samples remain candidates, e.g.,
+            to relabel them or to recompute their utilities.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle. If it
-            exceeds the number of unlabeled candidates, it is reduced to that
-            number and a warning is raised.
+            exceeds the number of candidates, it is reduced to that number and
+            a warning is raised.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
@@ -148,9 +189,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Each row is the k-means++ sampling distribution of the respective
-            round, i.e., its `nansum` is one. Utilities for labeled samples
-            and for samples that have already been selected in an earlier
-            round will be set to np.nan.
+            round, i.e., its `nansum` is one. Utilities for samples that are
+            no candidates and for candidates that have already been selected
+            in an earlier round will be set to np.nan.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in
@@ -158,17 +199,35 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Validate input parameters
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+        # Resolve through the classifier before acquisition state is changed.
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        # Validate input parameters
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
+
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, target_type=target_spec.target_type
+        )
 
         # Validate classifier type
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_scalar(fit_clf, "fit_clf", bool)
         predict_proba_kwargs = {}
         if self.clf_embedding_flag_name is not None:
             check_type(
@@ -182,55 +241,43 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
 
-        # Fit the classifier
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-
-        # find the unlabeled dataset
-        if candidates is None:
-            X_unlbld = X_cand
-            unlbld_mapping = mapping
-        elif mapping is not None:
-            unlbld_mapping = unlabeled_indices(
-                y[mapping], missing_label=self.missing_label
-            )
-            X_unlbld = X_cand[unlbld_mapping]
-            unlbld_mapping = mapping[unlbld_mapping]
+        # `candidates` is authoritative, i.e., an index array is taken as
+        # given, such that labeled samples remain candidates, e.g., to relabel
+        # them or to recompute their utilities. For `candidates=None`,
+        # `mapping` already refers to the unlabeled samples only.
+        if mapping is not None:
+            cand_mapping = mapping
         else:
-            X_unlbld = X_cand
-            unlbld_mapping = np.arange(len(X_cand))
-
-        # If `candidates` is an index array containing labeled samples, the
-        # number of unlabeled candidates may fall below `batch_size`, which
-        # `_validate_data` cannot detect since it only counts candidates.
-        n_unlbld = len(X_unlbld)
-        if n_unlbld == 0:
-            raise ValueError("'candidates' contains no unlabeled samples.")
-        if batch_size > n_unlbld:
-            warnings.warn(
-                f"'batch_size={batch_size}' is larger than number of "
-                f"unlabeled candidates. Instead, "
-                f"'batch_size={n_unlbld}' was set."
-            )
-            batch_size = n_unlbld
+            cand_mapping = np.arange(len(X_cand))
+        n_cand = len(X_cand)
 
         # gradient embedding, aka predict class membership probabilities
-        probas = clf.predict_proba(X_unlbld, **predict_proba_kwargs)
+        V = X_cand
+        probas = clf.predict_proba(X_cand, **predict_proba_kwargs)
         if isinstance(probas, tuple):
-            probas, X_unlbld = probas
+            probas, V = probas
+        if target_spec.target_type == "multi-label":
+            probas = _canonicalize_multilabel_probas(
+                probas,
+                n_samples=n_cand,
+                n_outputs=y.shape[1],
+            )
 
-        # Factorized gradient embedding `g_i = kron(q_i, v_i)`, where
-        # `q_i = probas_i - e_{y_pred_i}` is the probability residual and
+        # Factorized gradient embedding `g_i = kron(q_i, v_i)`, where `q_i` is
+        # the probability residual against the model's own pseudo-label and
         # `v_i` the sample representation. `float64` is required because the
         # accumulation error of `float32` changes the sampling.
         probas = np.asarray(probas, dtype=np.float64)
-        V = np.asarray(X_unlbld, dtype=np.float64)
-        y_pred = probas.argmax(axis=-1)
-        Q = probas.copy()
-        Q[np.arange(n_unlbld), y_pred] -= 1
+        V = np.asarray(V, dtype=np.float64)
+        if target_spec.target_type == "multi-label":
+            # Independent sigmoid outputs, i.e., the pseudo-label of the label
+            # output `j` is `1[p_j >= 0.5]`.
+            Q = probas - (probas >= 0.5)
+        else:
+            # Softmax outputs, i.e., `q_i = probas_i - e_{y_pred_i}`.
+            y_pred = probas.argmax(axis=-1)
+            Q = probas.copy()
+            Q[np.arange(n_cand), y_pred] -= 1
         g_norm_2 = np.einsum("ij,ij->i", Q, Q) * np.einsum("ij,ij->i", V, V)
 
         # init the utilities
@@ -245,7 +292,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
         # sampling with kmeans++
         query_indices = []
-        query_indices_in_unlbld = []
+        query_indices_in_cand = []
         # In the first round, `d_2` holds the squared gradient norms, which
         # only serve to determine the first center. Afterwards, it is replaced
         # by the squared distances to that center, such that the origin does
@@ -254,7 +301,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         for i in range(batch_size):
             # Zeroing the distances of the already selected centers gives them
             # zero probability, so that they cannot be drawn a second time.
-            d_2[query_indices_in_unlbld] = 0
+            d_2[query_indices_in_cand] = 0
             d_2_sum = d_2.sum()
             if d_2_sum > 0:
                 d_probas = d_2 / d_2_sum
@@ -262,22 +309,22 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
                 # Degenerate case of exclusively zero gradient embeddings,
                 # e.g., for the one-hot probabilities of a single-class cold
                 # start. Then, sample uniformly among the remaining samples.
-                d_probas = np.full(n_unlbld, 1 / (n_unlbld - i))
-                d_probas[query_indices_in_unlbld] = 0
+                d_probas = np.full(n_cand, 1 / (n_cand - i))
+                d_probas[query_indices_in_cand] = 0
 
-            utilities[i, unlbld_mapping] = d_probas
+            utilities[i, cand_mapping] = d_probas
             utilities[i, query_indices] = np.nan
 
             if i == 0 and d_2_sum > 0:
-                idx_in_unlbld = int(np.argmax(d_2))
+                idx_in_cand = int(np.argmax(d_2))
             else:
-                idx_in_unlbld = int(
+                idx_in_cand = int(
                     self.random_state_.choice(
-                        n_unlbld, 1, replace=False, p=d_probas
+                        n_cand, 1, replace=False, p=d_probas
                     )[0]
                 )
-            query_indices_in_unlbld.append(idx_in_unlbld)
-            query_indices.append(unlbld_mapping[idx_in_unlbld])
+            query_indices_in_cand.append(idx_in_cand)
+            query_indices.append(cand_mapping[idx_in_cand])
 
             # Squared distance to the newest center via the factorization:
             # `||g_i - g_c||^2 = ||g_i||^2 + ||g_c||^2
@@ -285,15 +332,15 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             # negative values, which are rejected by `choice(p=...)`, such
             # that they are clipped.
             if i + 1 < batch_size:
-                cross = (Q @ Q[idx_in_unlbld]) * (V @ V[idx_in_unlbld])
-                d_2_new = g_norm_2 + g_norm_2[idx_in_unlbld] - 2 * cross
+                cross = (Q @ Q[idx_in_cand]) * (V @ V[idx_in_cand])
+                d_2_new = g_norm_2 + g_norm_2[idx_in_cand] - 2 * cross
                 np.maximum(d_2_new, 0, out=d_2_new)
                 if i == 0:
                     d_2 = d_2_new
                 else:
                     np.minimum(d_2, d_2_new, out=d_2)
 
-        query_indices = np.array(query_indices)
+        query_indices = np.asarray(query_indices, dtype=int)
         if return_utilities:
             return query_indices, utilities
         else:

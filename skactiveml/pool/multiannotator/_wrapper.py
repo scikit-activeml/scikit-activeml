@@ -8,6 +8,10 @@ from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
 )
+from .._target import (
+    _collect_declared_authorities,
+    _resolve_estimator_target_spec,
+)
 from ...utils import (
     rand_argmax,
     check_type,
@@ -15,6 +19,12 @@ from ...utils import (
     majority_vote,
     check_random_state,
     check_scalar,
+    check_equal_missing_label,
+    resolve_target_spec,
+)
+from ...utils._target import (
+    _check_target_spec_capability,
+    _has_no_class_evidence,
 )
 
 
@@ -42,6 +52,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. The outer target matrix is resolved as
+        single-output classification with multiple annotators before its
+        aggregated vector is resolved for `strategy`.
     """
 
     def __init__(
@@ -50,9 +64,12 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         y_aggregate=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.strategy = strategy
         self.y_aggregate = y_aggregate
@@ -183,6 +200,92 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
               indexing refers to samples in `candidates`.
         """
 
+        outer_target_spec = self._resolve_target_spec(y)
+
+        # Preflight the aggregate and wrapped strategy before base validation
+        # commits public query state.
+        check_type(
+            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
+        )
+        check_equal_missing_label(
+            self.strategy.missing_label, self.missing_label
+        )
+
+        uses_default_aggregate = self.y_aggregate is None
+        y_aggregate = (
+            majority_vote if uses_default_aggregate else self.y_aggregate
+        )
+        if not callable(y_aggregate):
+            raise TypeError(
+                f"`self.y_aggregate` must be callable. "
+                f"`self.y_aggregate` is of type {type(y_aggregate)}"
+            )
+
+        n_free_params = len(
+            list(
+                filter(
+                    lambda x: x.default == Parameter.empty,
+                    signature(y_aggregate).parameters.values(),
+                )
+            )
+        )
+        if n_free_params != 1:
+            raise TypeError(
+                f"The number of free parameters of the callable has to "
+                f"equal one. "
+                f"The number of free parameters is {n_free_params}."
+            )
+
+        if uses_default_aggregate:
+            # Majority voting preserves the outer class vocabulary and always
+            # produces one value per sample. A fixed local seed preflights the
+            # aggregate without consuming query randomness.
+            preflight_aggregated_y = majority_vote(y, random_state=0)
+        else:
+            preflight_aggregated_y = y_aggregate(np.asarray(y))
+
+        strategy_target_type = getattr(self.strategy, "target_type", "auto")
+        try:
+            aggregate_target_spec = resolve_target_spec(
+                preflight_aggregated_y,
+                task="classification",
+                target_type=strategy_target_type,
+                annotation_type="single-annotator",
+                classes=(
+                    None
+                    if outer_target_spec is None
+                    else outer_target_spec.classes
+                ),
+                missing_label=self.missing_label,
+            )
+        except ValueError:
+            # Preserve cycle-zero acquisition for class-agnostic wrapped
+            # strategies without inventing a class vocabulary.
+            lacks_class_evidence = (
+                outer_target_spec is None
+                and _has_no_class_evidence(
+                    preflight_aggregated_y,
+                    strategy_target_type,
+                    "single-annotator",
+                    self.missing_label,
+                )
+            )
+            if not lacks_class_evidence:
+                raise
+            aggregate_target_spec = None
+        if aggregate_target_spec is not None and hasattr(
+            self.strategy, "_target_capabilities"
+        ):
+            _check_target_spec_capability(
+                type(self.strategy).__name__,
+                aggregate_target_spec,
+                self.strategy._target_capabilities,
+            )
+        for estimator in self._collect_target_authorities(query_kwargs):
+            _resolve_estimator_target_spec(
+                self.strategy, estimator, preflight_aggregated_y
+            )
+
         (
             X,
             y,
@@ -198,6 +301,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
+            target_spec=outer_target_spec,
         )
 
         X_cand, mapping, A_cand = self._transform_cand_annot(
@@ -205,56 +309,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         )
 
         random_state = self.random_state_
-
-        # check strategy
-        check_type(
-            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
+        y_sq = (
+            majority_vote(y, random_state=random_state)
+            if uses_default_aggregate
+            else preflight_aggregated_y
         )
-        if self.strategy.missing_label != self.missing_label and not (
-            np.isnan(self.strategy.missing_label)
-            & np.isnan(self.missing_label)
-        ):
-            raise ValueError(
-                f"`self.missing_label` must equal "
-                f"`self.strategy.missing_label`, but "
-                f"`self.missing_label` equals {self.missing_label} and"
-                f"`self.strategy.missing_label` equals "
-                f"{self.strategy.missing_label}."
-            )
-
-        # aggregate y
-        if self.y_aggregate is None:
-
-            def y_aggregate(y):
-                return majority_vote(y, random_state=random_state)
-
-        else:
-            y_aggregate = self.y_aggregate
-
-        if not callable(y_aggregate):
-            raise TypeError(
-                f"`self.y_aggregate` must be callable. "
-                f"`self.y_aggregate` is of type {type(y_aggregate)}"
-            )
-
-        # count the number of arguments that have no default value
-        n_free_params = len(
-            list(
-                filter(
-                    lambda x: x.default == Parameter.empty,
-                    signature(y_aggregate).parameters.values(),
-                )
-            )
-        )
-
-        if n_free_params != 1:
-            raise TypeError(
-                f"The number of free parameters of the callable has to "
-                f"equal one. "
-                f"The number of free parameters is {n_free_params}."
-            )
-
-        y_sq = y_aggregate(y)
 
         n_selectable_candidates = len(X_cand)
         n_candidates = len(candidates) if candidates is not None else len(X)
@@ -386,6 +445,18 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             indices[:, 0] = mapping[w_indices[:, 0]]
             indices[:, 1] = w_indices[:, 1]
             return indices
+
+    def _collect_target_authorities(self, query_kwargs):
+        """Discover the target authorities among the query arguments.
+
+        Discovery is restricted to the roles `self.strategy` declares, so that
+        a query argument holding an estimator for an auxiliary problem is never
+        mistaken for a semantic authority for `y`. See
+        `skactiveml.pool._target._collect_declared_authorities`.
+        """
+        return _collect_declared_authorities(
+            self.strategy._target_authority_params, query_kwargs
+        )
 
     def _query_annotators(
         self,

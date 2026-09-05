@@ -2,13 +2,28 @@ import inspect
 import json
 import os
 import shutil
+import tempfile
 import unittest
 from os import path
 
-from docs.generate import generate_examples
+from docutils.utils import column_width
+from jinja2 import Environment, FileSystemLoader
+
+from docs.generate import (
+    OVERVIEW_HEADINGS,
+    generate_examples,
+    generate_strategy_overview_rst,
+    is_skactiveml_method,
+)
 from skactiveml import pool, stream
 
 from skactiveml.pool import ExpectedErrorReduction
+from skactiveml.pool.tests.test_multilabel_contracts import (
+    MULTILABEL_DELEGATING_WRAPPERS,
+    MULTILABEL_PREDICTION_CONSUMERS,
+    MULTILABEL_PROBA_CONSUMERS,
+    MULTILABEL_TASK_AGNOSTIC,
+)
 from skactiveml.stream import UncertaintyZliobaite, CognitiveDualQueryStrategy
 
 QUERY_STRATEGY_EXCEPTIONS_LIST = [
@@ -85,6 +100,231 @@ class TestExamples(unittest.TestCase):
                         f'AL-strategy, add "{item}" to the '
                         f'"exceptions" list in this test class.',
                     )
+
+    def test_api_reference_prioritizes_native_methods(self):
+        environment = Environment(loader=FileSystemLoader(self.docs_path))
+        environment.filters["underline"] = lambda value: value
+        template = environment.get_template("_templates/class.rst")
+        test_cases = [
+            (
+                "skactiveml.classifier.SklearnClassifier",
+                [
+                    "fit",
+                    "get_metadata_routing",
+                    "get_params",
+                    "predict",
+                    "score",
+                    "set_fit_request",
+                    "set_params",
+                ],
+                [
+                    "fit",
+                    "predict",
+                    "score",
+                    "get_metadata_routing",
+                    "get_params",
+                    "set_fit_request",
+                    "set_params",
+                ],
+            ),
+            (
+                "skactiveml.pool.UncertaintySampling",
+                ["get_params", "query", "set_params"],
+                ["query", "get_params", "set_params"],
+            ),
+        ]
+        for class_name, methods, expected in test_cases:
+            with self.subTest(class_name=class_name):
+                module, name = class_name.rsplit(".", 1)
+                rendered = template.render(
+                    objname=name,
+                    module=module,
+                    fullname=class_name,
+                    name=name,
+                    methods=methods,
+                    attributes=["attribute"],
+                    is_skactiveml_method=is_skactiveml_method,
+                    _=lambda value: value,
+                )
+                summarized = [
+                    line.strip().rsplit(".", 1)[-1]
+                    for line in rendered.splitlines()
+                    if line.strip().startswith(f"~{name}.")
+                    and line.strip().rsplit(".", 1)[-1] in methods
+                ]
+                detailed = [
+                    line.strip().rsplit(".", 1)[-1]
+                    for line in rendered.splitlines()
+                    if line.strip().startswith(".. automethod::")
+                ]
+                self.assertIn(":no-members:", rendered)
+                self.assertIn(":no-inherited-members:", rendered)
+                self.assertIn(
+                    f".. autoattribute:: {class_name}.attribute", rendered
+                )
+                self.assertEqual(expected, summarized)
+                self.assertEqual(expected, detailed)
+
+    def test_multilabel_tags_match_capability_inventory(self):
+        expected_strategies = {
+            strategy.__name__
+            for strategy in (
+                MULTILABEL_PROBA_CONSUMERS
+                | MULTILABEL_PREDICTION_CONSUMERS
+                | MULTILABEL_TASK_AGNOSTIC
+                | MULTILABEL_DELEGATING_WRAPPERS
+            )
+        }
+        examples_by_strategy = {}
+        for root, dirs, files in os.walk(self.json_path, topdown=True):
+            for filename in files:
+                if not filename.endswith(".json"):
+                    continue
+                with open(path.join(root, filename)) as file:
+                    for example in json.load(file):
+                        examples_by_strategy.setdefault(
+                            example["class"], []
+                        ).append(example)
+
+        tagged_strategies = {
+            strategy
+            for strategy, examples in examples_by_strategy.items()
+            if any("multi-label" in example["tags"] for example in examples)
+        }
+        # The tags are not rendered; they only decide which rows the
+        # `Multi-Label` filter of the strategy overview surfaces. What a user
+        # depends on is therefore that no multi-label capable strategy is
+        # missing from that filter, which is what this comparison states.
+        # Whether every single example of such a strategy is tagged is not
+        # checked, because a class declares its capabilities while an example
+        # describes one configuration of it, e.g.
+        # `UncertaintySampling(method="expected_average_precision")` is not
+        # multi-label capable although its class is.
+        self.assertEqual(expected_strategies, tagged_strategies)
+
+    @staticmethod
+    def _overview_example(qs_name, method, category):
+        return {
+            "class": qs_name,
+            "package": "pool",
+            "method": method,
+            "category": category,
+            "tags": ["pool", "classification", "single-annotator"],
+            "refs": [],
+        }
+
+    def _generate_overview(self, json_data, sections=()):
+        """Render an overview and return it, with a stub for each section."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        gen_path = path.join(tmp_dir, "generated")
+        os.makedirs(gen_path)
+        for section in sections:
+            section_path = path.join(tmp_dir, "examples", section)
+            os.makedirs(section_path)
+            with open(path.join(section_path, "README.rst"), "w") as file:
+                file.write(f"{section}\n")
+        generate_strategy_overview_rst(gen_path, json_data)
+        with open(path.join(gen_path, "strategy_overview.rst")) as file:
+            return file.read()
+
+    def test_strategy_overview_groups_tasks_under_their_scenario(self):
+        # Two sections of one scenario share its heading, and each task and
+        # category is one level below the previous one.
+        sections = list(OVERVIEW_HEADINGS)[:2]
+        scenario, first_task = OVERVIEW_HEADINGS[sections[0]]
+        _, second_task = OVERVIEW_HEADINGS[sections[1]]
+        json_data = {
+            sections[0]: {
+                "data": [
+                    self._overview_example(
+                        "RandomSampling", "Random Sampling", "Baseline"
+                    )
+                ]
+            },
+            sections[1]: {
+                "data": [
+                    self._overview_example(
+                        "GreedySamplingX", "Greedy Sampling", "Informativeness"
+                    )
+                ]
+            },
+        }
+
+        overview = self._generate_overview(json_data, sections)
+
+        self.assertEqual(
+            overview.count(f"{scenario}\n"),
+            1,
+            msg="One scenario heading must cover all of its tasks.",
+        )
+        for title, underline in [
+            (scenario, "-"),
+            (first_task, "~"),
+            (second_task, "~"),
+            ("Baseline", "^"),
+            ("Informativeness", "^"),
+        ]:
+            with self.subTest(title=title):
+                # `docutils` measures an underline by its display width, so
+                # a title containing an emoji needs more characters than it
+                # has.
+                expected = "".ljust(column_width(title), underline)
+                self.assertIn(f"{title}\n{expected}\n", overview)
+
+    def test_strategy_overview_keeps_a_section_without_a_heading_path(self):
+        # A gallery section that nobody added to `OVERVIEW_HEADINGS` keeps
+        # its own title instead of silently losing its strategies.
+        json_data = {
+            "9-unmapped": {
+                "data": [
+                    self._overview_example(
+                        "RandomSampling", "Random Sampling", "Baseline"
+                    )
+                ]
+            }
+        }
+
+        with self.assertWarnsRegex(UserWarning, "OVERVIEW_HEADINGS"):
+            overview = self._generate_overview(json_data, ["9-unmapped"])
+
+        self.assertIn("9-unmapped\n", overview)
+        self.assertIn("RandomSampling", overview)
+
+    def test_strategy_overview_offers_a_filter_per_tag(self):
+        # The tags themselves are never rendered; a strategy reaches a user
+        # only through these checkboxes, so every tag a row can carry needs
+        # one. The rows are real, because a filter over nothing filters
+        # nothing.
+        section = next(iter(OVERVIEW_HEADINGS))
+        json_data = {
+            section: {
+                "data": [
+                    self._overview_example(
+                        "RandomSampling", "Random Sampling", "Baseline"
+                    )
+                ]
+            }
+        }
+
+        overview = self._generate_overview(json_data, [section])
+
+        for tag in [
+            "classification",
+            "regression",
+            "multi-label",
+            "single-annotator",
+            "multi-annotator",
+            "top-k-batch",
+            "diverse-batch",
+        ]:
+            with self.subTest(tag=tag):
+                self.assertIn(f'value="{tag}"', overview)
+        self.assertIn("<label>Multi-Label</label>", overview)
+        # The filter reads the tags of a rendered row, so the row has to
+        # carry them where the filter looks.
+        self.assertIn("RandomSampling", overview)
+        self.assertIn("single-annotator", overview)
 
 
 class Dummy:

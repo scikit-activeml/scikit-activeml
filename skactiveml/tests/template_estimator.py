@@ -1,12 +1,16 @@
 import inspect
+import warnings
 from copy import deepcopy
 
 from skactiveml.tests.utils import (
+    assert_predicts_class_dtype,
     check_positional_args,
     check_test_param_test_availability,
 )
 import numpy as np
+from sklearn.base import clone
 from sklearn.datasets import make_blobs
+from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
     MISSING_LABEL,
 )
@@ -24,6 +28,9 @@ class TemplateEstimator:
         init_default_params,
         fit_default_params=None,
         predict_default_params=None,
+        init_default_params_multilabel=None,
+        fit_default_params_multilabel=None,
+        predict_default_params_multilabel=None,
     ):
         self.super_setUp_has_been_executed = True
         self.estimator_class = estimator_class
@@ -43,6 +50,15 @@ class TemplateEstimator:
 
         self.fit_default_params = deepcopy(fit_default_params)
         self.predict_default_params = deepcopy(predict_default_params)
+        self.init_default_params_multilabel = deepcopy(
+            init_default_params_multilabel
+        )
+        self.fit_default_params_multilabel = deepcopy(
+            fit_default_params_multilabel
+        )
+        self.predict_default_params_multilabel = deepcopy(
+            predict_default_params_multilabel
+        )
 
         check_positional_args(
             self.estimator_class.fit, "fit", self.fit_default_params
@@ -303,19 +319,119 @@ class TemplateEstimator:
 
 
 class TemplateSkactivemlClassifier(TemplateEstimator):
-    def setUp(
-        self,
-        estimator_class,
-        init_default_params,
-        fit_default_params=None,
-        predict_default_params=None,
-    ):
-        super().setUp(
-            estimator_class,
-            init_default_params,
-            fit_default_params,
-            predict_default_params,
+    # Error expected when fitting on non-integral float class labels. Wrappers
+    # forwarding the declared class labels to a `scikit-learn` estimator have
+    # to report the estimator's rejection of such a continuous target.
+    non_integral_classes_error = None
+
+    def _has_multilabel_defaults(self):
+        return self.fit_default_params_multilabel is not None
+
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-label", ValueError),
+                ("multi-output", ValueError),
+                ("invalid", ValueError),
+            ],
         )
+
+    def test_fitted_target_spec_matches_declared_capability(self):
+        estimator = self.estimator_class(**deepcopy(self.init_default_params))
+        estimator.fit(**deepcopy(self.fit_default_params))
+
+        capability = (
+            estimator.target_spec_.task,
+            estimator.target_spec_.target_type,
+            estimator.target_spec_.annotation_type,
+        )
+        self.assertEqual(estimator.target_type, "auto")
+        self.assertIn(capability, estimator._target_capabilities)
+        self.assertEqual(capability[0], "classification")
+        self.assertNotEqual(capability[1], "multi-output")
+
+    def test_predict_dtype_matches_class_dtype(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        """Check that `predict` returns the declared class dtype.
+
+        The label encoder decodes into a dtype that can also represent
+        `missing_label`, so integer classes combined with the default
+        `missing_label=np.nan` decode to `float64`. Predictions never carry
+        `missing_label` and must therefore be narrowed back, so that they
+        remain usable where the declared class labels are expected.
+        """
+        init_params = deepcopy(self.init_default_params)
+        init_params["classes"] = [0, 1]
+        init_params["missing_label"] = np.nan
+        if replace_init_params is not None:
+            init_params.update(deepcopy(replace_init_params))
+
+        fit_params = deepcopy(self.fit_default_params)
+        fit_params["y"] = [0, np.nan, 1]
+        fit_params["X"] = np.zeros((3, 1))
+        if replace_fit_params is not None:
+            fit_params.update(deepcopy(replace_fit_params))
+
+        predict_params = deepcopy(self.predict_default_params)
+        predict_params["X"] = fit_params["X"]
+
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "fit", fit_params)
+        y_pred = np.asarray(estimator.predict(**predict_params))
+
+        assert_predicts_class_dtype(self, y_pred, estimator.classes_)
+
+    def _get_multilabel_params(self):
+        if not self._has_multilabel_defaults():
+            return None, None, None
+
+        init_params = deepcopy(self.init_default_params)
+        if self.init_default_params_multilabel is not None:
+            init_params.update(self.init_default_params_multilabel)
+
+        fit_params = deepcopy(self.fit_default_params_multilabel)
+        predict_params = deepcopy(self.predict_default_params_multilabel)
+        if predict_params is None:
+            predict_params = {"X": fit_params["X"]}
+
+        return init_params, fit_params, predict_params
+
+    def _assert_multilabel_predictions(self, y_pred, classes):
+        y_pred = np.asarray(y_pred)
+        self.assertEqual(y_pred.ndim, 2)
+        self.assertEqual(y_pred.shape[1], len(classes))
+        assert_predicts_class_dtype(self, y_pred, classes)
+        for j, classes_j in enumerate(classes):
+            self.assertTrue(np.isin(y_pred[:, j], classes_j).all())
+
+    def _build_invalid_multilabel_targets(self, y, missing_label):
+        y_invalid = np.array(y, copy=True)
+        y_invalid = np.atleast_2d(y_invalid)
+        y_invalid[0, 0] = missing_label
+        return y_invalid
+
+    @staticmethod
+    def _target_param_name(method):
+        method_params = inspect.signature(method).parameters
+        return (
+            "Y" if "Y" in method_params and "y" not in method_params else "y"
+        )
+
+    def _call_with_target(
+        self, estimator, method_name, params, **extra_params
+    ):
+        method = getattr(estimator, method_name)
+        call_params = deepcopy(params)
+        target_param = self._target_param_name(method)
+        if target_param != "y" and "y" in call_params:
+            call_params[target_param] = call_params.pop("y")
+        call_params.update(extra_params)
+        return method(**call_params)
 
     def test_init_param_missing_label(
         self, test_cases=None, replace_init_params=None
@@ -359,7 +475,10 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             # id_offset=5,
         )
 
-        test_cases = [("state", TypeError), (0.0, None)]
+        test_cases = [
+            ("state", TypeError),
+            (0.0, self.non_integral_classes_error),
+        ]
         replace_init_params["classes"] = [0.5, 1.4]
         replace_fit_params = {"y": [0.5, 0, 1.4], "X": np.zeros((3, 1))}
         self._test_param(
@@ -565,22 +684,148 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         )
         super().test_param_test_availability()
 
+    def test_fit_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
 
-class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
-    def setUp(
-        self,
-        estimator_class,
-        init_default_params,
-        fit_default_params=None,
-        predict_default_params=None,
-    ):
-        super().setUp(
-            estimator_class,
-            init_default_params,
-            fit_default_params,
-            predict_default_params,
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "fit", fit_params)
+        y_pred = estimator.predict(**predict_params)
+        self._assert_multilabel_predictions(y_pred, estimator.classes_)
+
+    def test_fit_multilabel_invalid_rows(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, _ = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        y_invalid = self._build_invalid_multilabel_targets(
+            fit_params["y"], init_params["missing_label"]
+        )
+        fit_params["y"] = y_invalid
+        with self.assertRaises(ValueError):
+            self._call_with_target(estimator, "fit", fit_params)
+
+    def test_fit_param_sample_weight_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        fit_params = inspect.signature(self.estimator_class.fit).parameters
+        if "sample_weight" not in fit_params:
+            return
+
+        init_params, fit_params, _ = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        y = np.asarray(fit_params["y"])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self._call_with_target(
+                estimator,
+                "fit",
+                fit_params,
+                sample_weight=np.ones(len(y), dtype=float),
+            )
+
+    def test_partial_fit_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        if not hasattr(self.estimator_class, "partial_fit"):
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "partial_fit", fit_params)
+        y_pred = estimator.predict(**predict_params)
+        self._assert_multilabel_predictions(y_pred, estimator.classes_)
+
+    def test_score_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "fit", fit_params)
+        X = predict_params["X"]
+        y_true = fit_params["y"]
+        y_pred = estimator.predict(X)
+        expected_score = accuracy_score(y_true=y_true, y_pred=y_pred)
+        self.assertAlmostEqual(estimator.score(X, y_true), expected_score)
+
+
+class TemplateMultiAnnotatorClassifier:
+    """Shared resolved-target contract for multi-annotator classifiers."""
+
+    def test_init_param_target_type(self):
+        for target_type, error in [
+            ("auto", None),
+            ("single-output", None),
+            ("multi-label", ValueError),
+            ("multi-output", ValueError),
+            ("invalid", ValueError),
+        ]:
+            with self.subTest(target_type=target_type):
+                estimator = clone(
+                    self.target_contract_estimator_factory()
+                ).set_params(target_type=target_type)
+                if error is None:
+                    estimator.fit(**deepcopy(self.target_contract_fit_params))
+                else:
+                    with self.assertRaises(error):
+                        estimator.fit(
+                            **deepcopy(self.target_contract_fit_params)
+                        )
+
+    def test_predict_dtype_matches_class_dtype(self):
+        """Check that `predict` returns the declared class dtype.
+
+        Multi-annotator classifiers decode their predictions through the
+        same label encoder as single-annotator ones, so their predictions
+        are narrowed back to the declared class dtype as well.
+        """
+        estimator = self.target_contract_estimator_factory()
+        fit_params = deepcopy(self.target_contract_fit_params)
+        estimator.fit(**fit_params)
+
+        y_pred = np.asarray(estimator.predict(fit_params["X"]))
+
+        assert_predicts_class_dtype(self, y_pred, estimator.classes_)
+
+    def test_multiannotator_target_contract(self):
+        estimator = self.target_contract_estimator_factory()
+        fit_params = deepcopy(self.target_contract_fit_params)
+
+        self.assertEqual(estimator.target_type, "auto")
+        self.assertEqual(
+            estimator._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+        estimator.fit(**fit_params)
+        self.assertEqual(estimator.target_spec_.task, "classification")
+        self.assertEqual(estimator.target_spec_.target_type, "single-output")
+        self.assertEqual(
+            estimator.target_spec_.annotation_type, "multi-annotator"
         )
 
+        unsupported = clone(estimator).set_params(target_type="multi-label")
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            unsupported.fit(**fit_params)
+        self.assertFalse(hasattr(unsupported, "target_spec_"))
+        self.assertFalse(hasattr(unsupported, "classes_"))
+
+
+class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
     def test_init_param_class_prior(self):
         test_cases = []
         test_cases += [
@@ -699,6 +944,64 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
         # after fixing this issue add test below again.
         # ("nan", TypeError),
         super().test_init_param_missing_label(test_cases)
+
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-output", ValueError),
+                ("multi-label", ValueError),
+                ("invalid", ValueError),
+            ],
+        )
+
+    def test_fitted_target_spec_is_single_output_regression(self):
+        estimator = self.estimator_class(**self.init_default_params)
+
+        estimator.fit(**self.fit_default_params)
+
+        self.assertEqual(
+            estimator._target_capabilities,
+            frozenset({("regression", "single-output", "single-annotator")}),
+        )
+        self.assertEqual(estimator.target_spec_.task, "regression")
+        self.assertEqual(estimator.target_spec_.target_type, "single-output")
+        self.assertEqual(
+            estimator.target_spec_.annotation_type, "single-annotator"
+        )
+        self.assertIsNone(estimator.target_spec_.classes)
+
+    def test_predict_returns_one_dimensional_targets(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        """Check that `predict` describes one target value per sample.
+
+        A single-output regression target is described by one value per
+        sample. A wrapped estimator may emit a column instead, which every
+        consumer indexing predictions by sample then misreads.
+        """
+        init_params = deepcopy(self.init_default_params)
+        if replace_init_params is not None:
+            init_params.update(deepcopy(replace_init_params))
+
+        fit_params = deepcopy(self.fit_default_params)
+        if replace_fit_params is not None:
+            fit_params.update(deepcopy(replace_fit_params))
+
+        predict_params = deepcopy(self.predict_default_params)
+
+        estimator = self.estimator_class(**init_params)
+        estimator.fit(**fit_params)
+        y_pred = estimator.predict(**predict_params)
+
+        self.assertEqual(
+            np.asarray(y_pred).shape,
+            (len(predict_params["X"]),),
+            msg="`predict` must return one target value per sample.",
+        )
 
     def test_fit_param_X(self, test_cases=None):
         super().test_fit_param_X(test_cases)

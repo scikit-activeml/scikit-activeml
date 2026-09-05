@@ -43,6 +43,9 @@ class TestContrastiveAL(
             query_default_params_clf=self.query_default_params_clf,
         )
 
+    def test_fitted_multilabel_classifier_rejected_before_state(self):
+        self._test_fitted_multilabel_classifier_rejection()
+
     def test_init_param_nearest_neighbors_dict(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

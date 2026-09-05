@@ -9,13 +9,27 @@ from sklearn.utils.validation import NotFittedError
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import MISSING_LABEL
+from skactiveml.tests.template_estimator import (
+    TemplateMultiAnnotatorClassifier,
+)
 
 
-class TestAnnotatorEnsembleClassifier(unittest.TestCase):
+class TestAnnotatorEnsembleClassifier(
+    TemplateMultiAnnotatorClassifier, unittest.TestCase
+):
     def setUp(self):
         self.X, self.y_true = make_blobs(n_samples=300, random_state=0)
         self.y = np.array([self.y_true, self.y_true], dtype=float).T
         self.y[:100, 0] = MISSING_LABEL
+        self.target_contract_estimator_factory = lambda: (
+            AnnotatorEnsembleClassifier(
+                estimators=[
+                    ("pwc-0", ParzenWindowClassifier()),
+                    ("pwc-1", ParzenWindowClassifier()),
+                ]
+            )
+        )
+        self.target_contract_fit_params = {"X": self.X, "y": self.y}
 
     def test_init_param_estimators(self):
         clf = AnnotatorEnsembleClassifier(estimators="Test")
@@ -104,6 +118,17 @@ class TestAnnotatorEnsembleClassifier(unittest.TestCase):
             estimators=[("ParzenWindowClassifier", ParzenWindowClassifier())]
         )
         self.assertRaises(ValueError, clf.fit, X=[], y=[])
+
+    def test_fit_rejects_wrong_number_of_annotators(self):
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[
+                ("pwc-0", ParzenWindowClassifier()),
+                ("pwc-1", ParzenWindowClassifier()),
+            ]
+        )
+
+        with self.assertRaisesRegex(ValueError, "n_estimators=2"):
+            clf.fit(self.X, self.y[:, :1])
 
     def test_predict_proba(self):
         pwc = ParzenWindowClassifier()

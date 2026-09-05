@@ -1,20 +1,10 @@
-"""
-Module implementing TypiClust.
-
-TypiClust is a deep active learning strategy suited for low budgets.
-Its aim is to query typical examples with the corresponding high score
-of 'typicality'.
-"""
-
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, check_scalar, rand_argmax
-
-from copy import deepcopy
-from inspect import signature
-from sklearn.cluster import KMeans
-from sklearn.neighbors import NearestNeighbors
+from ._clustering import _set_random_state_if_supported
 
 
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
@@ -26,7 +16,10 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     labeled samples as covered. It then selects the most typical sample
     (highest local density / smallest mean kNN distance) from up to
     `batch_size` uncovered clusters, ensuring diversity while avoiding already
-    represented regions.
+    represented regions. Originally, this query strategy was only proposed for
+    classification tasks. Nevertheless, this implementation is task-agnostic
+    such that it can handle class labels, numerical targets, and multilabel
+    targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -43,6 +36,10 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         The name of the parameter for the number of clusters.
     k : int, default=5
         The number for k-nearest-neighbors for the computation of typicality.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -50,6 +47,16 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
        Opposite Strategies Suit High and Low Budgets. In Int. Conf. Mach.
        Learn., pages 8175–8195, 2022.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,
@@ -59,9 +66,12 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo_dict=None,
         n_cluster_param_name="n_clusters",
         k=5,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
@@ -83,9 +93,11 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -93,6 +105,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
+            - Candidate samples passed directly with shape
+              `(n_candidates, n_features)` are not supported because TypiClust
+              requires a mapping to samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -112,24 +127,26 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
+        target_type = self._resolve_query_target_type(y)
+
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            target_type=target_type,
         )
-
-        _, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
-        )
-
-        # Validate init parameter
         check_scalar(self.k, "k", target_type=int, min_val=1)
-
         if not (
             isinstance(self.cluster_algo_dict, dict)
             or self.cluster_algo_dict is None
         ):
             raise TypeError(
                 "Please pass a dictionary with corresponding parameter name "
-                "and value in the `init` function."
+                "and value to the `init` function."
             )
         cluster_algo_dict = (
             {}
@@ -140,28 +157,36 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         if not isinstance(self.n_cluster_param_name, str):
             raise TypeError("`n_cluster_param_name` supports only string.")
 
+        # Determine candidate samples for selection.
+        _, mapping = self._transform_candidates(
+            candidates=candidates,
+            X=X,
+            y=y,
+            enforce_mapping=True,
+            target_type=target_type,
+        )
+
+        # Determine already labeled samples.
         labeled_sample_indices = labeled_indices(
-            y, missing_label=self.missing_label
+            y=y,
+            missing_label=self.missing_label,
+            target_type=target_type,
         )
 
         # Set number of clusters.
         n_clusters = len(labeled_sample_indices) + batch_size
         cluster_algo_dict[self.n_cluster_param_name] = n_clusters
 
-        # Optionally, set random state.
-        cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
-        algo_has_seed = "random_state" in cluster_algo_sig
-        dict_lacks_seed = "random_state" not in cluster_algo_dict
-        if self.random_state is not None and algo_has_seed and dict_lacks_seed:
-            cluster_algo_dict["random_state"] = deepcopy(self.random_state)
+        _set_random_state_if_supported(
+            self.cluster_algo, cluster_algo_dict, self.random_state
+        )
 
         # Create object for clustering with given parameters.
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
-
         cluster_labels = cluster_obj.fit_predict(X)
 
-        # determine number of samples per cluster and mask clusters with
-        # labeled samples
+        # Determine number of samples per cluster and mask clusters with
+        # labeled samples.
         cluster_sizes = np.zeros(n_clusters)
         cluster_ids, cluster_ids_sizes = np.unique(
             cluster_labels, return_counts=True
@@ -211,7 +236,6 @@ def _typicality(X, uncovered_samples_mapping, k, eps=1e-7):
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
     uncovered_samples_mapping : np.ndarray of shape (n_candidates,),
-    default=None
        Index array that maps `candidates` to `X_for_cluster`.
     k : int
         k for computation of k nearst neighbors.
@@ -220,7 +244,7 @@ def _typicality(X, uncovered_samples_mapping, k, eps=1e-7):
 
     Returns
     -------
-    typicality : numpy.ndarray of shape (n_X)
+    typicality : numpy.ndarray of shape (n_samples,)
         The typicality of all uncovered samples in X
     """
     typicality = np.full(shape=X.shape[0], fill_value=-np.inf)

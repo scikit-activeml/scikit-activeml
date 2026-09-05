@@ -6,7 +6,6 @@ Module implementing various uncertainty based query strategies.
 #          Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
-from sklearn import clone
 from sklearn.utils.validation import check_array
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
@@ -15,9 +14,12 @@ from ..utils import (
     check_cost_matrix,
     simple_batch,
     check_classes,
-    check_type,
-    check_equal_missing_label,
 )
+from ..utils._validation import (
+    _canonicalize_multilabel_probas,
+    _check_probas_are_valid,
+)
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
@@ -44,11 +46,24 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     uncertainty sampling (DWUS) and the dual strategy for active learning
     (DUAL) [4]_.
 
+    The uncertainty measures were proposed for single-output classification.
+    Multi-label support in this implementation is an extension and not part of
+    the original proposal in [1]_. For resolved multi-label targets, the
+    per-label score of the label output `j` is computed from its positive-class
+    probability `p_j` alone, i.e., `min(p_j, 1 - p_j)` for
+    `'least_confident'`, `1 - |2 * p_j - 1|` for `'margin_sampling'`, and the
+    binary entropy for `'entropy'` (cf. `uncertainty_scores`).
+    `multilabel_aggregation_fn` reduces these per-label scores along the label
+    axis to the utility of one sample. This per-output decomposition ignores
+    correlations between label outputs.
+
     Parameters
     ----------
-    method : 'least_confident' or 'margin' or 'entropy' or \
+    method : 'least_confident' or 'margin_sampling' or 'entropy' or \
             'expected_average_precision', default='least_confident'
-        The method to calculate the uncertainty.
+        The method to calculate the uncertainty. For multilabel targets
+        (`y.ndim == 2`), only `'least_confident'`, `'margin_sampling'`,
+        and `'entropy'` are supported.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for
@@ -57,6 +72,24 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState
         The random state to use.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable reducing the per-label uncertainty scores of one sample to
+        one utility. It is only used for resolved multi-label targets and
+        `method in ['least_confident', 'margin_sampling', 'entropy']`. It is
+        called with the per-label scores of shape `(n_samples, n_outputs)` and
+        the label axis passed as the `axis` keyword argument, and must return
+        one score per sample within the range of that sample's per-label
+        scores, e.g. `np.mean`, `np.average`, `np.median`, `np.min`, `np.max`,
+        or a quantile. `np.sum` is not supported, because its result grows with
+        the number of label outputs. Only the callability of the reduction is
+        validated at runtime, so a violating reduction silently changes the
+        acquisition scale.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. Single-output classification is always supported.
+        Multi-label classification is supported only when `cost_matrix=None`
+        and `method` is `"least_confident"`, `"margin_sampling"`, or
+        `"entropy"`. A fitted classifier's target specification is
+        authoritative when available.
 
     References
     ----------
@@ -82,12 +115,32 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        multilabel_aggregation_fn=np.mean,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.method = method
         self.cost_matrix = cost_matrix
+        self.multilabel_aggregation_fn = multilabel_aggregation_fn
+
+    @property
+    def _target_capabilities(self):
+        capabilities = {
+            ("classification", "single-output", "single-annotator")
+        }
+        if self.cost_matrix is None and self.method in {
+            "least_confident",
+            "margin_sampling",
+            "entropy",
+        }:
+            capabilities.add(
+                ("classification", "multi-label", "single-annotator")
+            )
+        return frozenset(capabilities)
 
     def query(
         self,
@@ -108,16 +161,26 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
+            Model implementing the methods `fit` and `predict_proba`. For
+            multi-label classification, `predict_proba` may return either
+            positive-class probabilities of shape `(n_samples, n_outputs)` or
+            a list of binary probability matrices with shape `(n_samples, 2)`
+            per label output.
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         utility_weight : array-like, default=None
             Weight for each candidate (multiplied with utilities). Usually,
             this is to be the density of a candidate. The length of
@@ -164,19 +227,36 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        # Validate input parameters.
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        # Validate input parameters.
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
 
-        # Validate classifier type.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-
-        # Validate classifier type.
-        check_type(fit_clf, "fit_clf", bool)
+        # Determine candidate samples for selection.
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates,
+            X=X,
+            y=y,
+            target_type=target_spec.target_type,
+        )
 
         # Check `utility_weight`.
         if utility_weight is None:
@@ -204,17 +284,14 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 "expected".format(type(self.method), str)
             )
 
-        # sample_weight is checked by clf when fitted
-
-        # Fit the classifier.
-        if fit_clf:
-            if sample_weight is not None:
-                clf = clone(clf).fit(X, y, sample_weight)
-            else:
-                clf = clone(clf).fit(X, y)
-
         # Predict class-membership probabilities.
         probas = clf.predict_proba(X_cand)
+        if target_spec.target_type == "multi-label":
+            # Canonicalize both public multilabel probability formats before
+            # the uncertainties are computed.
+            probas = _canonicalize_multilabel_probas(
+                probas, n_samples=len(X_cand), n_outputs=y.shape[1]
+            )
 
         # Choose the method and calculate corresponding utilities.
         with np.errstate(divide="ignore"):
@@ -227,6 +304,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                     probas=probas,
                     method=self.method,
                     cost_matrix=self.cost_matrix,
+                    is_multilabel=target_spec.target_type == "multi-label",
+                    multilabel_aggregation_fn=self.multilabel_aggregation_fn,
                 )
             elif self.method == "expected_average_precision":
                 classes = clf.classes_
@@ -253,24 +332,69 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
+def uncertainty_scores(
+    probas,
+    cost_matrix=None,
+    method="least_confident",
+    is_multilabel=False,
+    multilabel_aggregation_fn=np.mean,
+):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]_. For the least confident and
     margin sampling methods cost-sensitive variants are implemented in case of
-    a given cost matrix (see [2]_ for more information).
+    a given cost matrix (see [2]_ for more information). For multilabel data,
+    only 'least_confident', 'margin_sampling', and 'entropy' are
+    supported.
+
+    The three uncertainty measures were proposed for single-output
+    classification. Multi-label support in this implementation is an extension
+    and not part of the original proposal in [1]_. It decomposes the target
+    per label output, i.e., the per-label score of the label output `j` is
+    computed from its positive-class probability `p_j` alone,
+
+    - `min(p_j, 1 - p_j)` for `'least_confident'`,
+    - `1 - |2 * p_j - 1|` for `'margin_sampling'`, i.e., the margin between
+      the two classes of the label output, and
+    - `-(p_j * log(p_j) + (1 - p_j) * log(1 - p_j))` for `'entropy'`, i.e.,
+      the binary entropy of the label output, with the endpoint terms
+      `0 * log(0)` defined as zero,
+
+    and `multilabel_aggregation_fn` then reduces these per-label scores along
+    the label axis to one score per sample. Correlations between label outputs
+    are ignored by construction.
 
     Parameters
     ----------
     probas : array-like of shape (n_samples, n_classes)
-        Class membership probabilities for each sample.
+        Class membership probabilities for each sample. If
+        `is_multilabel=True`, positive-class probabilities of shape
+        `(n_samples, n_outputs)` or a list of binary probability matrices with
+        shape `(n_samples, 2)` per label output are expected instead.
     cost_matrix : array-like pf shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for
-        'least_confident' or 'margin_sampling'.
+        'least_confident' or 'margin_sampling' and single-output targets.
+        Cost matrices are not supported if `is_multilabel=True`.
     method : 'least_confident' or 'margin_sampling' or 'entropy', \
             default='least_confident'
-        The method to calculate the uncertainty.
+        The method to calculate the uncertainty. For multilabel data, only
+        `'least_confident'`, `'margin_sampling'`, and `'entropy'` are
+        supported.
+    is_multilabel : bool, default=False
+        Flag whether `probas` are multi-label positive-class probabilities.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable reducing the per-label uncertainty scores of one sample to
+        one uncertainty score. It is only used if `is_multilabel=True`. It is
+        called with the per-label scores of shape `(n_samples, n_outputs)` and
+        the label axis passed as the `axis` keyword argument, and must return
+        one score per sample within the range of that sample's per-label
+        scores, e.g. `np.mean`, `np.average`, `np.median`, `np.min`, `np.max`,
+        or a quantile. `np.sum` is not supported, because its result grows with
+        the number of label outputs. Only the callability of the reduction is
+        validated at runtime, so a violating reduction silently changes the
+        acquisition scale.
+
 
     References
     ----------
@@ -281,22 +405,43 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
        Technol. Appl. Artif. Intell., pages 13–18, 2013.
     """
     # Check probabilities.
-    probas = check_array(probas)
+    if is_multilabel:
+        probas = _canonicalize_multilabel_probas(probas)
+    else:
+        probas = check_array(probas)
 
-    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3):
-        raise ValueError(
-            "'probas' are invalid. The sum over axis 1 must be one."
-        )
+    _check_probas_are_valid(probas, is_multilabel=is_multilabel)
 
     n_classes = probas.shape[1]
+
+    if is_multilabel and cost_matrix is not None:
+        raise ValueError(
+            "`cost_matrix` is not supported for multi-label uncertainty "
+            "scores."
+        )
+
+    if is_multilabel and method not in [
+        "least_confident",
+        "margin_sampling",
+        "entropy",
+    ]:
+        raise ValueError(
+            "For multilabel data, supported methods are "
+            "['least_confident', 'margin_sampling', 'entropy'], the given "
+            "one is: {}.".format(method)
+        )
 
     # Check cost matrix.
     if cost_matrix is not None:
         cost_matrix = check_cost_matrix(cost_matrix, n_classes=n_classes)
 
     # Compute uncertainties.
+    # here changes, multilabel cases
     if method == "least_confident":
         if cost_matrix is None:
+            if is_multilabel:
+                per_label_uncertainty = np.minimum(probas, 1 - probas)
+                return multilabel_aggregation_fn(per_label_uncertainty, axis=1)
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
@@ -304,6 +449,9 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
             return costs[:, 0]
     elif method == "margin_sampling":
         if cost_matrix is None:
+            if is_multilabel:
+                per_label_margin = 1 - np.abs(2 * probas - 1)
+                return multilabel_aggregation_fn(per_label_margin, axis=1)
             probas = -(np.partition(-probas, 1, axis=1)[:, :2])
             return 1 - np.abs(probas[:, 0] - probas[:, 1])
         else:
@@ -313,6 +461,15 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
     elif method == "entropy":
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
+                if is_multilabel:
+                    per_label_entropy = np.zeros_like(probas)
+                    is_uncertain = (probas > 0) & (probas < 1)
+                    uncertain_probas = probas[is_uncertain]
+                    per_label_entropy[is_uncertain] = -(
+                        uncertain_probas * np.log(uncertain_probas)
+                        + (1 - uncertain_probas) * np.log1p(-uncertain_probas)
+                    )
+                    return multilabel_aggregation_fn(per_label_entropy, axis=1)
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(

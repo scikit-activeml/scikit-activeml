@@ -15,10 +15,24 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             "X": np.linspace(0, 1, 20).reshape(10, 2),
             "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
         }
+        params_clf_multilabel = {
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+        }
         super().setUp(
             qs_class=CoreSet,
             init_default_params={},
             query_default_params_clf=query_default_params,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_metric(self):
@@ -145,6 +159,16 @@ class TestKGreedyCenter(unittest.TestCase):
 
     def test_param_y(self):
         self.assertRaises(TypeError, k_greedy_center, X=[[1, 1]], y=1)
+
+    def test_param_target_type(self):
+        self.assertRaisesRegex(
+            ValueError,
+            "target_type",
+            k_greedy_center,
+            X=self.X,
+            y=self.y,
+            target_type="multi-output",
+        )
 
     def test_param_batch_size(self):
         self.assertRaises(

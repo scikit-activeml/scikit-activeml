@@ -5,7 +5,7 @@
     "method" : "MaxHerding",
     "category" : "Representativeness",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool", "regression", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "MaxHerding",
     "refs" : ["bae2024generalized"],
     "sequence" : ["title", "text_0", "plot", "refs"],

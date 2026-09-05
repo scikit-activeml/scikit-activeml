@@ -58,6 +58,21 @@ Classification
      - - Text Transformer with Linear Probing
 
 
+Multilabel Classification
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :class: no-tag-filter
+
+   * - Tutorial
+     - Data
+     - Models
+   * - :doc:`Pool-based Multilabel Active Learning: Getting Started </generated/tutorials/30_pool_multilabel_getting_started>`
+     - Audio
+     - - Perch v2 Embeddings with Multi-layer Perceptron Probing
+
+
 Regression
 ^^^^^^^^^^
 
