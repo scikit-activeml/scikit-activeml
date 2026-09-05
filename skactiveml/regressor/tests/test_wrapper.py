@@ -8,6 +8,7 @@ from sklearn import clone
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVC
@@ -178,6 +179,34 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             check_is_fitted(reg)
 
         self.assertFalse(hasattr(reg, "target_spec_"))
+
+    def test_prefitted_dual_coefficients_determine_output_structure(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        targets = [
+            np.arange(4, dtype=float),
+            np.arange(4, dtype=float).reshape(-1, 1),
+            np.arange(8, dtype=float).reshape(4, 2),
+        ]
+        for y in targets:
+            for target_type in ["auto", "single-output"]:
+                with self.subTest(shape=y.shape, target_type=target_type):
+                    estimator = Pipeline([("regressor", KernelRidge())]).fit(
+                        X, y
+                    )
+                    reg = SklearnRegressor(estimator, target_type=target_type)
+                    if y.ndim == 2 and y.shape[1] > 1:
+                        with self.assertRaisesRegex(
+                            ValueError, "does not support"
+                        ):
+                            reg.predict(X)
+                        self.assertNotIn("target_spec_", reg.__dict__)
+                    else:
+                        np.testing.assert_allclose(
+                            reg.predict(X), estimator.predict(X).ravel()
+                        )
+                        self.assertEqual(
+                            reg.target_spec_.target_type, "single-output"
+                        )
 
     def test_prefitted_multi_output_estimator_tags_are_rejected(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)

@@ -573,7 +573,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         if n_outputs is not None:
             return "single-output" if n_outputs == 1 else "multi-output"
 
-        for attr in ("y_train_", "_y"):
+        # Dual coefficients have one column per prediction output, just like
+        # stored training targets (e.g., for kernel ridge regression).
+        for attr in ("y_train_", "_y", "dual_coef_"):
             target_values = getattr(estimator, attr, None)
             if target_values is not None:
                 target_values = np.asarray(target_values)
