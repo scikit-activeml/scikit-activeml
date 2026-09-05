@@ -137,14 +137,18 @@ def _fit_and_resolve_estimator_target_spec(
     check_type(estimator, estimator_name, *estimator_types)
     check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     check_type(fit_estimator, fit_name, bool)
+    if fit_estimator:
+        # A fresh fit resolves from constructor settings, including explicit
+        # classes, rather than freezing the previous fit's inferred vocabulary.
+        estimator = clone(estimator)
     target_spec = _resolve_estimator_target_spec(
         strategy, estimator, y, missing_label_checked=True
     )
     if fit_estimator:
         if sample_weight is None:
-            estimator = clone(estimator).fit(X, y)
+            estimator = estimator.fit(X, y)
         else:
-            estimator = clone(estimator).fit(X, y, sample_weight)
+            estimator = estimator.fit(X, y, sample_weight)
         target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
     return estimator, target_spec
 
@@ -168,13 +172,22 @@ def _collect_declared_authorities(authority_params, query_kwargs):
     -------
     authorities : list of skactiveml estimators
         The discovered estimators, ordered by declaration and, for sequence
-        valued arguments, by position.
+        valued arguments, by position. Authorities that will be refitted are
+        represented by unfitted clones, so preflight uses their constructor
+        declarations. The canonical `fit_clf`, `fit_reg`, `fit_ensemble`, and
+        `fit_estimator` arguments default to `True`, as in the query methods.
+        Other authority roles retain their supplied estimators.
     """
     authorities = []
     seen_authorities = set()
     for name in authority_params:
         if name not in query_kwargs:
             continue
+        refit = False
+        if name in ("clf", "reg", "ensemble", "estimator"):
+            fit_name = f"fit_{name}"
+            refit = query_kwargs.get(fit_name, True)
+            check_type(refit, fit_name, bool)
         value = query_kwargs[name]
         values = value if isinstance(value, (list, tuple)) else (value,)
         for item in values:
@@ -183,7 +196,7 @@ def _collect_declared_authorities(authority_params, query_kwargs):
             )
             if is_authority and id(item) not in seen_authorities:
                 seen_authorities.add(id(item))
-                authorities.append(item)
+                authorities.append(clone(item) if refit else item)
     return authorities
 
 

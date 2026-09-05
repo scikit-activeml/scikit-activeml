@@ -23,7 +23,10 @@ from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
+from skactiveml.tests.utils import (
+    assert_no_query_state,
+    assert_attributes_unchanged,
+)
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
@@ -114,6 +117,62 @@ class TestSubSamplingWrapper(
             query_default_params_reg=query_default_params_reg,
             query_default_params_clf_multilabel=params_clf_multilabel,
         )
+
+    def test_refitting_respects_declared_and_inferred_vocabularies(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0, 1, 2, MISSING_LABEL])
+        strategies = [
+            UncertaintySampling(),
+            SubSamplingWrapper(UncertaintySampling(), max_candidates=4),
+            ParallelUtilityEstimationWrapper(UncertaintySampling(), n_jobs=1),
+            SingleAnnotatorWrapper(UncertaintySampling()),
+            SingleAnnotatorWrapper(
+                SubSamplingWrapper(UncertaintySampling(), max_candidates=4)
+            ),
+        ]
+        for strategy in strategies:
+            for classes in [None, [0, 1]]:
+                for fit_clf in [None, True, False]:
+                    with self.subTest(
+                        strategy=type(strategy).__name__,
+                        classes=classes,
+                        fit_clf=fit_clf,
+                    ):
+                        qs = deepcopy(strategy)
+                        clf = ParzenWindowClassifier(classes=classes).fit(
+                            X[:2], [0, 1]
+                        )
+                        attributes_before = dict(clf.__dict__)
+                        probabilities_before = clf.predict_proba(X)
+                        kwargs = (
+                            {} if fit_clf is None else {"fit_clf": fit_clf}
+                        )
+                        is_multiannotator = isinstance(
+                            qs, SingleAnnotatorWrapper
+                        )
+                        query_y = (
+                            np.column_stack([y, y]) if is_multiannotator else y
+                        )
+
+                        if classes is not None or fit_clf is False:
+                            with self.assertRaisesRegex(
+                                ValueError, "outside `classes`"
+                            ):
+                                qs.query(X, query_y, clf=clf, **kwargs)
+                            assert_no_query_state(self, qs)
+                        else:
+                            indices = qs.query(X, query_y, clf=clf, **kwargs)
+                            samples = (
+                                indices[:, 0] if is_multiannotator else indices
+                            )
+                            np.testing.assert_array_equal(samples, [3])
+
+                        assert_attributes_unchanged(
+                            self, clf, attributes_before
+                        )
+                        np.testing.assert_array_equal(
+                            clf.predict_proba(X), probabilities_before
+                        )
 
     def test_target_contract_preserves_wrapped_strategy(self):
         wrapped = UncertaintySampling(method="entropy")
@@ -463,7 +522,8 @@ class TestSubSamplingWrapper(
                 "discriminator": SklearnClassifier(
                     GaussianNB(), classes=[0, 1]
                 ),
-                "fit_ensemble": True,
+                "fit_clf": False,
+                "fit_ensemble": False,
                 "sample_weight": None,
             }
         )

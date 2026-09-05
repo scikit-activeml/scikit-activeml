@@ -356,7 +356,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                 "discriminator": SklearnClassifier(
                     GaussianNB(), classes=[0, 1]
                 ),
-                "fit_clf": True,
+                "fit_clf": False,
+                "fit_ensemble": False,
             }
         )
 
