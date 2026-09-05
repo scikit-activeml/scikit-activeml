@@ -23,6 +23,7 @@ from sklearn.linear_model import (
 from sklearn.pipeline import Pipeline
 from sklearn.utils import get_tags
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.semi_supervised import SelfTrainingClassifier
@@ -512,6 +513,46 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(clf.target_spec_.classes, ((0, 1), (0, 1)))
         for classes in clf.classes_:
             np.testing.assert_array_equal(classes, [0, 1])
+
+    def test_partial_fit_preserves_native_flat_classes(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [[0, 0, 0], [1, 1, 1], [0, 1, 0], [1, 0, 1], [1, 1, 0], [0, 0, 1]]
+        )
+        estimators = [
+            OneVsRestClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            MLPClassifier(max_iter=1, random_state=0),
+        ]
+        for estimator in estimators:
+            for n_outputs in [1, 3]:
+                with self.subTest(
+                    estimator=type(estimator).__name__, n_outputs=n_outputs
+                ):
+                    classes = [[0, 1]] * n_outputs
+                    y_fit = y[:, :n_outputs]
+                    clf = SklearnClassifier(estimator, classes=classes).fit(
+                        X, y_fit
+                    )
+                    established_spec = clf.target_spec_
+                    native = deepcopy(clf.estimator_)
+
+                    for kwargs in [{}, {"classes": classes}]:
+                        native.partial_fit(X, y_fit)
+                        clf.partial_fit(X, y_fit, **kwargs)
+
+                        self.assertIs(clf.target_spec_, established_spec)
+                        np.testing.assert_array_equal(
+                            clf.estimator_.classes_, native.classes_
+                        )
+                        np.testing.assert_array_equal(clf.classes_, classes)
+                        expected = native.predict_proba(X)
+                        if n_outputs == 1:
+                            expected = expected[:, [1]]
+                        np.testing.assert_allclose(
+                            clf.predict_proba(X), expected
+                        )
 
     def test_empty_partial_fit_preserves_fitted_multilabel_state(self):
         clf = SklearnClassifier(
@@ -1016,6 +1057,31 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                             positive_probabilities = probabilities[0][:, [1]]
                         np.testing.assert_array_equal(
                             positive_probabilities >= 0.5, y
+                        )
+
+    def test_collapsed_single_class_probabilities_preserve_total_mass(self):
+        X = np.arange(4, dtype=float).reshape(-1, 1)
+        for observed_class in [0, 1]:
+            for proba_format in ["array", "list"]:
+                with self.subTest(
+                    observed_class=observed_class, proba_format=proba_format
+                ):
+                    y = np.full((len(X), 1), observed_class)
+                    clf = SklearnClassifier(
+                        MLPClassifier(max_iter=1, random_state=0),
+                        classes=[[0, 1]],
+                        proba_format=proba_format,
+                    ).fit(X, y)
+
+                    P = clf.predict_proba(X)
+
+                    np.testing.assert_array_equal(clf.predict(X), y)
+                    if proba_format == "array":
+                        np.testing.assert_allclose(P, y)
+                    else:
+                        self.assertEqual(len(P), 1)
+                        np.testing.assert_allclose(
+                            P[0], np.column_stack([1 - y[:, 0], y[:, 0]])
                         )
 
     def test_no_labeled_data_falls_back_to_prior_without_fitting(self):
@@ -2068,7 +2134,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertFalse(np.any(np.isnan(P)))
         np.testing.assert_allclose(P, np.full_like(P, 0.5))
 
-    def test_prefit_multilabel_nan_array_falls_back_to_uniform_prior(self):
+    def test_prefit_multilabel_nan_falls_back_to_uniform_prior(self):
         estimator = MultiOutputClassifier(GaussianNB()).fit(
             self.X_ml, self.y_ml
         )
@@ -2080,49 +2146,26 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             ]
 
         estimator.predict_proba = predict_proba_nan
-        clf = SklearnClassifier(
-            estimator=estimator,
-            classes=None,
-            missing_label=-1,
-            proba_format="array",
-        )
+        for proba_format in ["array", "list"]:
+            with self.subTest(proba_format=proba_format):
+                clf = SklearnClassifier(
+                    estimator=estimator,
+                    classes=None,
+                    missing_label=-1,
+                    proba_format=proba_format,
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    P = clf.predict_proba(self.X_ml)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            P = clf.predict_proba(self.X_ml)
-
-        self.assertEqual(P.shape, self.y_ml.shape)
-        self.assertFalse(np.any(np.isnan(P)))
-        np.testing.assert_allclose(P, np.full_like(P, 0.5))
-
-    def test_prefit_multilabel_nan_list_falls_back_to_uniform_prior(self):
-        estimator = MultiOutputClassifier(GaussianNB()).fit(
-            self.X_ml, self.y_ml
-        )
-
-        def predict_proba_nan(X, **kwargs):
-            return [
-                np.full((len(X), len(classes_j)), np.nan)
-                for classes_j in estimator.classes_
-            ]
-
-        estimator.predict_proba = predict_proba_nan
-        clf = SklearnClassifier(
-            estimator=estimator,
-            classes=None,
-            missing_label=-1,
-            proba_format="list",
-        )
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            P_list = clf.predict_proba(self.X_ml)
-
-        self.assertEqual(len(P_list), self.y_ml.shape[1])
-        for P_j in P_list:
-            self.assertEqual(P_j.shape, (len(self.X_ml), 2))
-            self.assertFalse(np.any(np.isnan(P_j)))
-            np.testing.assert_allclose(P_j, np.full_like(P_j, 0.5))
+                if proba_format == "array":
+                    self.assertEqual(P.shape, self.y_ml.shape)
+                else:
+                    self.assertEqual(len(P), self.y_ml.shape[1])
+                    for P_j in P:
+                        self.assertEqual(P_j.shape, (len(self.X_ml), 2))
+                self.assertFalse(np.any(np.isnan(P)))
+                np.testing.assert_allclose(P, np.full_like(P, 0.5))
 
     def test_multilabel_predict_proba_ensemble_estimators_collision(self):
         # A native multilabel ensemble stores base learners in `estimators_`,

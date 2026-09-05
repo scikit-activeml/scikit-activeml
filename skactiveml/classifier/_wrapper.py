@@ -25,7 +25,6 @@ from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
 from ..utils._target import (
-    _classes_equal,
     _check_target_capability,
     _check_target_spec_capability,
 )
@@ -230,7 +229,9 @@ def _class_column(class_label, declared_classes):
         that vocabulary does not contain it.
     """
     for class_index, declared_class in enumerate(declared_classes):
-        if _classes_equal(declared_class, class_label):
+        if declared_class == class_label or (
+            declared_class != declared_class and class_label != class_label
+        ):
             return class_index
     return None
 
@@ -867,7 +868,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         self._check_estimator_probas_are_valid(
                             P_array, is_multilabel=False
                         )
-                        P_array = P_array[:, :1]
+                        # Both native columns belong to the sole learned
+                        # class; dropping either loses probability mass.
+                        P_array = P_array.sum(axis=1, keepdims=True)
                     P_list = self._normalize_multilabel_proba_list(
                         [P_array], n_samples=n_samples
                     )
@@ -1393,7 +1396,16 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         call_kwargs[target_param] = y
 
         if fit_function == "partial_fit" and "classes" in fit_params:
-            call_kwargs["classes"] = self.classes_
+            evidence = _discover_fitted_target_evidence(self.estimator_)
+            # A native multilabel learner's flat `classes_` can describe
+            # output identifiers or a collapsed binary vocabulary. Preserve
+            # its incremental contract rather than supplying nested classes.
+            call_kwargs["classes"] = (
+                self.estimator_.classes_
+                if self._is_multilabel_target()
+                and evidence.kind in {"label-outputs", "single-output"}
+                else self.classes_
+            )
 
         if sample_weight is not None and (
             "sample_weight" in fit_params

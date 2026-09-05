@@ -111,27 +111,6 @@ class TargetSpec:
         )
 
 
-def _classes_equal(class_a, class_b):
-    """Compare two class labels, treating a NaN class as equal to itself.
-
-    Parameters
-    ----------
-    class_a : scalar
-        The first class label.
-    class_b : scalar
-        The second class label.
-
-    Returns
-    -------
-    equal : bool
-        `True` exactly if both labels denote the same class.
-    """
-    return bool(
-        class_a == class_b
-        or (_is_nan_class(class_a) and _is_nan_class(class_b))
-    )
-
-
 def _class_vocabulary_key(classes):
     """Return a comparable key for a declared class vocabulary.
 
