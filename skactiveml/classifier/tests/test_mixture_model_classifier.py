@@ -365,3 +365,49 @@ class TestMixtureModelClassifier(
         )
         y = cmm.predict(self.fit_default_params["X"])
         np.testing.assert_array_equal(["paris", "paris", "paris"], y)
+
+    def test_similarities_support_all_covariance_types(self):
+        X = np.array([[-2.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [2.0, 1.0]])
+        X_query = np.vstack([X, [0.3, 0.8]])
+        for mixture_type in (GaussianMixture, BayesianGaussianMixture):
+            for covariance_type in ("full", "tied", "diag", "spherical"):
+                for multilabel in (False, True):
+                    with self.subTest(
+                        mixture=mixture_type,
+                        covariance=covariance_type,
+                        multilabel=multilabel,
+                    ):
+                        y = np.array([0, 0, 1, 1])
+                        clf = MixtureModelClassifier(
+                            mixture_type(
+                                n_components=2,
+                                covariance_type=covariance_type,
+                                random_state=0,
+                            ),
+                            weight_mode="similarities",
+                            classes=[[0, 1], [0, 1]] if multilabel else [0, 1],
+                        ).fit(
+                            X, np.column_stack([y, 1 - y]) if multilabel else y
+                        )
+                        model = clf.mixture_model_
+                        similarities = []
+                        for j in range(model.n_components):
+                            covariance = model.covariances_
+                            if covariance_type != "tied":
+                                covariance = covariance[j]
+                            if covariance_type == "diag":
+                                covariance = np.diag(covariance)
+                            elif covariance_type == "spherical":
+                                covariance = np.eye(X.shape[1]) * covariance
+                            delta = X_query - model.means_[j]
+                            squared_distance = np.sum(
+                                delta * np.linalg.solve(covariance, delta.T).T,
+                                axis=1,
+                            )
+                            similarities.append(
+                                np.exp(-np.sqrt(squared_distance))
+                            )
+                        expected = np.tensordot(
+                            np.array(similarities).T, clf.F_components_, axes=1
+                        )
+                        assert_allclose(clf.predict_freq(X_query), expected)

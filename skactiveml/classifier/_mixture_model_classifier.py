@@ -222,6 +222,19 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
         check_n_features(self, X, reset=False)
         if np.sum(self.F_components_) > 0:
             if self.weight_mode == "similarities":
+                mixture = self.mixture_model_
+                precisions = mixture.precisions_
+                if mixture.covariance_type == "tied":
+                    precisions = [precisions] * mixture.n_components
+                elif mixture.covariance_type == "diag":
+                    precisions = [
+                        np.diag(precision) for precision in precisions
+                    ]
+                elif mixture.covariance_type == "spherical":
+                    precisions = [
+                        np.eye(X.shape[1]) * precision
+                        for precision in precisions
+                    ]
                 S = np.exp(
                     -np.array(
                         [
@@ -229,7 +242,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
                                 X,
                                 [self.mixture_model_.means_[j]],
                                 metric="mahalanobis",
-                                VI=self.mixture_model_.precisions_[j],
+                                VI=precisions[j],
                             ).ravel()
                             for j in range(self.mixture_model_.n_components)
                         ]
