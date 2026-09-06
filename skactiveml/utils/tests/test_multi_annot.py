@@ -54,3 +54,13 @@ class TestMultiAnnot(unittest.TestCase):
         np.testing.assert_array_equal(
             np.ones((3, 3)) * 1 / 3, conf_matrices[1]
         )
+
+        actual = ext_confusion_matrix(
+            ["a", "a", "b"],
+            [["a", "b", None], ["b", None, None], ["b", "a", None]],
+            classes=["a", "b"],
+            missing_label=None,
+        )
+        np.testing.assert_array_equal(
+            actual, [[[1, 1], [0, 1]], [[0, 1], [1, 0]], [[0, 0], [0, 0]]]
+        )

@@ -103,5 +103,7 @@ def ext_confusion_matrix(
             elif normalize == "all":
                 cm = cm / cm.sum()
                 conf_matrices[a] = np.nan_to_num(cm, nan=1 / cm.size)
+            else:
+                conf_matrices[a] = cm
 
     return conf_matrices
