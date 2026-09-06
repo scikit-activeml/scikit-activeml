@@ -332,6 +332,14 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             is_included = is_lbld
         X_train = X[is_included]
         y_train = y[is_included]
+        if (
+            fit_function == "partial_fit"
+            and len(X_train) == 0
+            and hasattr(self, "estimator_")
+        ):
+            # Validation still runs, but an empty update preserves both the
+            # learned model and any established fallback statistics.
+            return self
         estimator_params = dict(fit_kwargs) if fit_kwargs is not None else {}
 
         if sample_weight is not None:

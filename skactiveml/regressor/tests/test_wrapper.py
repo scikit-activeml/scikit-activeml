@@ -666,6 +666,40 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         y_pred = reg.predict(X)
         np.testing.assert_array_equal(np.zeros_like(y_pred), y_pred)
 
+    def test_unlabeled_partial_fit_preserves_predictions_and_fallback(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        for loss in ("squared_error", "invalid"):
+            with self.subTest(loss=loss):
+                reg = SklearnRegressor(
+                    SGDRegressor(random_state=0, loss=loss)
+                ).fit(X, [10.0, 10.0, 20.0, 20.0])
+                before = reg.predict(X)
+                statistics = (reg._label_mean, reg._label_std)
+                fitted = reg.is_fitted_
+                estimator = reg.estimator_
+                spec = reg.target_spec_
+                self.assertIs(reg.partial_fit([[3.0]], [np.nan]), reg)
+                np.testing.assert_allclose(reg.predict(X), before)
+                self.assertEqual((reg._label_mean, reg._label_std), statistics)
+                self.assertEqual(reg.is_fitted_, fitted)
+                self.assertIs(reg.estimator_, estimator)
+                self.assertEqual(reg.target_spec_, spec)
+                with self.assertRaises(ValueError):
+                    reg.partial_fit([[3.0, 4.0]], [np.nan])
+                reg.set_params(target_type="multi-output")
+                with self.assertRaises(ValueError):
+                    reg.partial_fit([[3.0]], [np.nan])
+
+    def test_initial_unlabeled_partial_fit_can_learn_later(self):
+        reg = SklearnRegressor(SGDRegressor(random_state=0))
+        self.assertIs(reg.partial_fit([[0.0]], [np.nan]), reg)
+        np.testing.assert_allclose(reg.predict([[0.0]]), [0.0])
+        self.assertFalse(reg.is_fitted_)
+        reg.partial_fit([[0.0]], [np.nan])
+        reg.partial_fit([[0.0], [1.0]], [10.0, 20.0])
+        self.assertTrue(reg.is_fitted_)
+        self.assertGreater(reg.predict([[0.0]])[0], 0.0)
+
 
 class TestSklearnNormalRegressor(
     TemplateProbabilisticRegressor, unittest.TestCase
