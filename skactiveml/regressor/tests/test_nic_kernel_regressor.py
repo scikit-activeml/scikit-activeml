@@ -198,6 +198,26 @@ class TestNICKernelEstimator(
 
         np.testing.assert_almost_equal(prediction_1, prediction_2)
 
+    def test_zero_kernel_evidence_preserves_prior(self):
+        params = dict(mu_0=2.0, kappa_0=3.0, nu_0=5.0, sigma_sq_0=4.0)
+        reg = NICKernelRegressor(**params).fit(
+            [[0.0], [1.0]], [0.0, 1.0], sample_weight=[2.0, 1.0]
+        )
+        prior = NICKernelRegressor(**params).fit(
+            [[0.0], [1.0]], [np.nan, np.nan]
+        )
+        nearby = reg.predict([[0.5]], return_std=True)
+        with np.errstate(divide="raise", invalid="raise"):
+            actual = reg.predict([[100.0], [0.5]], return_std=True)
+        expected_prior = prior.predict([[100.0]], return_std=True)
+        for actual_part, prior_part, nearby_part in zip(
+            actual, expected_prior, nearby
+        ):
+            np.testing.assert_allclose(actual_part[:1], prior_part)
+            np.testing.assert_allclose(actual_part[1:], nearby_part)
+            self.assertTrue(np.isfinite(actual_part).all())
+        self.assertNotAlmostEqual(actual[0][1], params["mu_0"])
+
 
 class TestNadarayaWatsonRegressor(
     TemplateTestNICKernelEstimator, unittest.TestCase

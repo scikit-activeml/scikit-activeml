@@ -140,11 +140,12 @@ class NICKernelRegressor(ProbabilisticRegressor):
             K = self.weights_.reshape(1, -1) * K
 
         N = np.sum(K, axis=1)
-        mu_ml = K @ self.y_ / N
+        # Zero kernel mass contributes a neutral update to the prior.
+        mu_ml = np.divide(K @ self.y_, N, out=np.zeros_like(N), where=N != 0)
         scatter = np.sum(
             K * (self.y_[np.newaxis, :] - mu_ml[:, np.newaxis]) ** 2, axis=1
         )
-        var_ml = 1 / N * scatter
+        var_ml = np.divide(scatter, N, out=np.zeros_like(N), where=N != 0)
 
         return N, mu_ml, var_ml
 
