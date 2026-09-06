@@ -1335,6 +1335,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 if self.cost_matrix is None
                 else self.cost_matrix
             )
+            if self.classes is not None:
+                class_indices = np.argsort(self.classes)
+                cost_matrix = np.asarray(cost_matrix)[
+                    np.ix_(class_indices, class_indices)
+                ]
         check_classifier_params(le.classes_, self.missing_label, cost_matrix)
         return {
             "random_state": random_state,
@@ -1770,6 +1775,10 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     was, the sliding window included. The window therefore never advances past
     what the wrapped `estimator` was trained on, and a rejected update leaves a
     previously fitted wrapper able to predict as before.
+
+    When a window mixes weighted and unweighted batches, samples from an
+    unweighted batch have unit weight. Their weights are retained until the
+    corresponding samples leave the window or a new `fit` replaces it.
     """
 
     #: Fitted attributes this wrapper holds itself, which `__getattr__`
@@ -1970,6 +1979,19 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator_ = deepcopy(self.estimator)
         if self.estimator_.classes is None:
             self.estimator_.set_params(classes=self.target_spec_.classes)
+        if (
+            self.cost_matrix is not None
+            and self.estimator_.cost_matrix is None
+        ):
+            # The member may declare the same vocabulary in a different order.
+            class_indices = [
+                list(self.classes).index(c) for c in self.estimator_.classes
+            ]
+            self.estimator_.set_params(
+                cost_matrix=np.asarray(self.cost_matrix)[
+                    np.ix_(class_indices, class_indices)
+                ]
+            )
         if has_fit_parameter(self.estimator, "sample_weight"):
             fit_kwargs["sample_weight"] = sample_weight_train
         self.estimator_.fit(X=X_train, y=y_train, **fit_kwargs)
@@ -2027,7 +2049,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if not hasattr(self, "y_train_"):
             self.y_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "sample_weight_train_"):
-            self.sample_weight_train_ = deque(maxlen=self.window_size)
+            self.sample_weight_train_ = None
         if self.only_labeled:
             is_lbld = is_labeled(y, self.missing_label)
             X = X[is_lbld]
@@ -2041,13 +2063,19 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if fit_func == "fit":
             self.X_train_ = deque(maxlen=self.window_size)
             self.y_train_ = deque(maxlen=self.window_size)
-            self.sample_weight_train_ = deque(maxlen=self.window_size)
+            self.sample_weight_train_ = None
+        if sample_weight is not None and self.sample_weight_train_ is None:
+            # Previously unweighted rows retain unit weight when weights are
+            # introduced. Fill before extending so eviction stays aligned.
+            self.sample_weight_train_ = deque(
+                np.ones(len(self.X_train_)), maxlen=self.window_size
+            )
         self.X_train_.extend(X)
         self.y_train_.extend(y)
-        if sample_weight is not None:
+        if self.sample_weight_train_ is not None:
+            if sample_weight is None:
+                sample_weight = np.ones(len(X))
             self.sample_weight_train_.extend(sample_weight)
-        else:
-            self.sample_weight_train_ = None
 
     def _validate_data(
         self,
@@ -3443,16 +3471,13 @@ if successful_river_import:
             check_n_features(self, X, reset=False)
             if self.is_fitted_:
                 P_list = []
-                est_classes = None
                 for x in X:
                     x_dict = self.transform_data_to_dict(x)
                     P_i_dict = self.estimator_.predict_proba_one(
                         x_dict, **predict_proba_kwargs
                     )
                     P_i = []
-                    if est_classes is None:
-                        est_classes = np.sort(list(P_i_dict.keys()))
-                    for c in self.classes_:
+                    for c in range(len(self.classes_)):
                         P_i.append(P_i_dict.get(c, 0.0))
                     P_list.append(P_i)
                 P = np.array(P_list)

@@ -2512,6 +2512,35 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         self.assertRaises(ValueError, clf.partial_fit, X_train, y_train_true)
 
+    def test_prefitted_costs_follow_declared_class_order(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        for classes in ([2, 1], ["z", "a"]):
+            with self.subTest(classes=classes):
+                y = [classes[1], classes[1], classes[0], classes[0]]
+                costs = [[0, 10], [1, 0]]
+                params = dict(
+                    classes=classes, cost_matrix=costs, missing_label=None
+                )
+                prefit = SklearnClassifier(
+                    LogisticRegression().fit(X, y), **params
+                )
+                fitted = SklearnClassifier(LogisticRegression(), **params).fit(
+                    X, y
+                )
+                np.testing.assert_array_equal(
+                    prefit.cost_matrix_, [[0, 1], [10, 0]]
+                )
+                np.testing.assert_array_equal(
+                    prefit.cost_matrix_, fitted.cost_matrix_
+                )
+                np.testing.assert_allclose(
+                    prefit.predict_proba(X), fitted.predict_proba(X)
+                )
+                np.testing.assert_array_equal(
+                    prefit.predict(X), fitted.predict(X)
+                )
+                self.assertEqual(prefit.cost_matrix, costs)
+
 
 class _IncrementalClassifierTargetContract:
     def _make_incremental_contract_classifier(self):
@@ -3407,6 +3436,90 @@ class TestSlidingWindowClassifier(
         freq_est = est.predict_freq(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(freq, freq_est)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
+
+    def test_mixed_weight_batches_preserve_window_weights(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0], [0.0], [3.0]])
+        y = np.array([0.0, 0.0, np.nan, 1.0, 0.0, 1.0])
+        for only_labeled in (False, True):
+            for first_weighted in (False, True):
+                with self.subTest(
+                    only_labeled=only_labeled, first_weighted=first_weighted
+                ):
+                    clf = SlidingWindowClassifier(
+                        ParzenWindowClassifier(classes=[0, 1]),
+                        window_size=4,
+                        only_labeled=only_labeled,
+                    )
+                    weights = np.array([10, 2, 3, 4, 5, 6], dtype=float)
+                    supplied = weights.copy()
+                    if first_weighted:
+                        supplied[4:] = 1
+                    else:
+                        supplied[:4] = 1
+                    clf.fit(
+                        X[:4],
+                        y[:4],
+                        sample_weight=weights[:4] if first_weighted else None,
+                    )
+                    clf.partial_fit(
+                        X[4:],
+                        y[4:],
+                        sample_weight=None if first_weighted else weights[4:],
+                    )
+                    retained = (
+                        np.flatnonzero(~np.isnan(y))
+                        if only_labeled
+                        else np.arange(len(y))
+                    )
+                    retained = retained[-4:]
+                    expected = ParzenWindowClassifier(classes=[0, 1]).fit(
+                        X[retained],
+                        y[retained],
+                        sample_weight=supplied[retained],
+                    )
+                    np.testing.assert_allclose(
+                        clf.predict_proba(X), expected.predict_proba(X)
+                    )
+                    np.testing.assert_array_equal(
+                        clf.sample_weight_train_, supplied[retained]
+                    )
+                    np.testing.assert_array_equal(clf.X_train_, X[retained])
+                    clf.fit(X[:2], y[:2])
+                    self.assertIsNone(clf.sample_weight_train_)
+
+    def test_outer_costs_follow_class_order(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        y = [1, 1, 2, 2]
+        costs = np.array([[0, 10], [1, 0]])
+        for outer_classes, inner_classes in (
+            ([1, 2], None),
+            ([2, 1], None),
+            ([2, 1], [1, 2]),
+            ([1, 2], [2, 1]),
+        ):
+            for method in ("fit", "partial_fit"):
+                with self.subTest(
+                    outer=outer_classes, inner=inner_classes, method=method
+                ):
+                    member = ParzenWindowClassifier(classes=inner_classes)
+                    clf = SlidingWindowClassifier(
+                        member, classes=outer_classes, cost_matrix=costs
+                    )
+                    getattr(clf, method)(X, y)
+                    declared = outer_classes or inner_classes or [1, 2]
+                    order = np.argsort(declared)
+                    canonical_costs = costs[np.ix_(order, order)]
+                    query = [[0.1]]
+                    expected = clf.classes_[
+                        np.argmin(
+                            clf.predict_proba(query) @ canonical_costs, axis=1
+                        )
+                    ]
+                    np.testing.assert_array_equal(clf.predict(query), expected)
+                    np.testing.assert_array_equal(
+                        clf.estimator_.cost_matrix_, canonical_costs
+                    )
+                    self.assertIsNone(member.cost_matrix)
 
 
 if successful_skorch_torch_import:
@@ -4319,6 +4432,42 @@ if successful_river_import:
         TemplateSkactivemlClassifier,
         unittest.TestCase,
     ):
+        def test_probabilities_follow_training_encoding(self):
+            X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+            for classes in ([20, 10], [2, 1], ["z", "a"]):
+                for incremental in (False, True):
+                    with self.subTest(
+                        classes=classes, incremental=incremental
+                    ):
+                        canonical = np.sort(classes)
+                        encoded_y = np.array([0, 0, 1, 1])
+                        clf = RiverClassifier(
+                            river.naive_bayes.GaussianNB(),
+                            classes=classes,
+                            missing_label=None,
+                        )
+                        reference = RiverClassifier(
+                            river.naive_bayes.GaussianNB(), classes=[0, 1]
+                        )
+                        for model, labels in (
+                            (clf, canonical[encoded_y]),
+                            (reference, encoded_y),
+                        ):
+                            if incremental:
+                                model.partial_fit(X[:2], labels[:2])
+                                model.partial_fit(X[2:], labels[2:])
+                            else:
+                                model.fit(X, labels)
+                        np.testing.assert_allclose(
+                            clf.predict_proba(X), reference.predict_proba(X)
+                        )
+                        np.testing.assert_allclose(
+                            clf.predict_proba(X).sum(axis=1), 1
+                        )
+                        np.testing.assert_array_equal(
+                            clf.predict(X), canonical[reference.predict(X)]
+                        )
+
         def setUp(self):
             # Set global seeds.
             random.seed(0)
