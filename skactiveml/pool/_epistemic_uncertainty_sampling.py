@@ -238,8 +238,8 @@ def _epistemic_uncertainty_pwc(
         Used to interpolate and speed up the calculation. Will be enlarged if
         necessary. All entries that are 'np.nan' will be filled.
     interpolation_cache : dict or None, default=None
-        Query-local interpolation state retained by the strategy. Reused while
-        the table shape is unchanged; existing table values must not change.
+        Interpolation state retained across queries by the strategy. Reused
+        while the table shape is unchanged; existing values must not change.
 
     Returns
     -------
