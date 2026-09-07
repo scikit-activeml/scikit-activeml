@@ -218,11 +218,14 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
     or greater than an adaptive threshold.
     The features to be labeled are chosen by using uncertainty sampling with
     a least confidence score.
-    The strategy assumes all annotators to be available and is not defined
-    otherwise. To deal with this case nonetheless value-annotator pairs are
-    first ranked according to the amount of annotators available for the given
-    value in `candidates` and are than ranked according to
-    `IntervalEstimationThreshold`.
+    The strategy assumes all annotators are available for each candidate
+    sample. Samples with any unavailable annotator are excluded from selection.
+    By default, only fully unlabeled samples are candidates. Samples with
+    partial annotations can be used for training, but are not selected again
+    by default.
+    Explicit candidates and availability masks define the query pool directly.
+    Callers must ensure that it represents previously unqueried samples to
+    follow the workflow in [1]_.
 
     Parameters
     ----------
@@ -282,9 +285,10 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
-            including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            including missing annotations indicated by `self.missing_label`),
+            meaning that `y[i, j]` contains the label from annotator `j` for
+            sample `i`.
+            Partially annotated samples are supported as training data.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -292,42 +296,42 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             `sample_weight`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
-            See parameter `annotators`.
+            Candidate samples to query. Explicit candidates define the query
+            pool independently of missing labels in `y`. See `annotators` for
+            the supported representations and availability restrictions.
         annotators : None or array-like of shape (n_avl_annotators), dtype=int\
                 or array-like of shape (n_candidates, n_annotators),\
                 default=None
-            - If candidate samples and annotators are not specified, i.e.,
-              `candidates=None`, `annotators=None` the unlabeled target values,
-              `y`, are the candidates annotator-sample-pairs.
-            - If candidate samples and available annotators are specified:
-              The annotator-sample-pairs, for which the sample is a candidate
-              sample and the annotator is an available annotator are considered
-              as candidate annotator-sample-pairs.
-            - If `candidates` is None, all samples of `X` are considered as
-              candidate samples. In this case `n_candidates` equals `len(X)`.
+            A candidate is eligible only if all annotators are available for
+            it. Availability determines eligibility before the performance
+            threshold selects which annotators to query.
+
+            - If `candidates=None` and `annotators=None`, only fully unlabeled
+              rows of `y` are eligible.
+            - If `candidates=None` and `annotators` is specified, all samples
+              of `X` are candidates and `n_candidates` equals `len(X)`.
+              The supplied availability replaces the missing-label mask.
             - If `candidates` is of shape `(n_candidates,)` and of type int,
               `candidates` is considered as the indices of the sample
               candidates in `(X, y)`.
             - If `candidates` is of shape (n_candidates, n_features), the
               sample candidates are directly given in `candidates` (not
-              necessarily contained in `X`). This is not supported by all query
-              strategies.
-            - If `annotators` is `None`, all annotators are considered as
-              available annotators.
+              necessarily contained in `X`).
+            - If `annotators=None` and candidates are explicitly specified,
+              all annotators are considered available.
             - If `annotators` is of shape (n_avl_annotators), and of type int,
               `annotators` is considered as the indices of the available
-              annotators.
+              annotators. A strict subset leaves no eligible samples.
             - If `annotators` is a boolean array of shape `(n_candidates,
-              n_annotators)` the annotator-sample-pairs, for which the sample
-              is a candidate sample and the boolean matrix has entry `True` are
-              considered as candidate annotator-sample pairs.
+              n_annotators)`, a sample is eligible only if all entries in its
+              row are `True`.
         sample_weight : array-like, (n_samples, n_annotators), default=None
             It contains the weights of the training samples' class labels.
             It must have the same shape as `y`.
-        batch_size : 'adaptive' or int, default=1
-            The number of samples to be selected in one AL cycle. If 'adaptive'
-            is set, the `batch_size` is determined based on the annotation
-            performances and the parameter `epsilon`.
+        batch_size : 'adaptive' or int, default='adaptive'
+            The number of sample-annotator pairs selected in one AL cycle.
+            If 'adaptive' is set, the `batch_size` is determined based on the
+            annotation performances and the parameter `epsilon`.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
@@ -434,7 +438,9 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         )
 
         n_annotators = y.shape[1]
-        # Check whether unlabeled data exists
+
+        # IEThresh requires all annotators to be available for a candidate.
+        # With default candidates, this retains only fully unlabeled samples.
         A_cand = np.repeat(
             np.all(A_cand, axis=1).reshape(-1, 1), n_annotators, axis=1
         )
