@@ -1,4 +1,5 @@
 import unittest
+import pickle
 from copy import deepcopy
 
 import numpy as np
@@ -50,6 +51,47 @@ class TestGeneralBALD(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_sequence_ensembles_preserve_members(self):
+        X = np.arange(4, dtype=float).reshape(-1, 1)
+        y = np.array([0, 1, np.nan, np.nan])
+        for strategy_class in [GreedyBALD, BatchBALD]:
+            for fit_ensemble in [True, False]:
+                for prefitted in [False, True]:
+                    if not fit_ensemble and not prefitted:
+                        continue
+                    members = [
+                        ParzenWindowClassifier(classes=[0, 1]),
+                        ParzenWindowClassifier(classes=[0, 1]),
+                    ]
+                    if prefitted:
+                        for member in members:
+                            member.fit(X, [1, 0, np.nan, np.nan])
+                    before = [pickle.dumps(member) for member in members]
+                    results = []
+                    for sequence in [tuple, list]:
+                        with self.subTest(
+                            strategy=strategy_class.__name__,
+                            fit_ensemble=fit_ensemble,
+                            prefitted=prefitted,
+                            sequence=sequence,
+                        ):
+                            results.append(
+                                strategy_class(random_state=0).query(
+                                    X,
+                                    y,
+                                    ensemble=sequence(members),
+                                    fit_ensemble=fit_ensemble,
+                                    batch_size=2,
+                                    return_utilities=True,
+                                )
+                            )
+                            self.assertEqual(
+                                before,
+                                [pickle.dumps(member) for member in members],
+                            )
+                    np.testing.assert_array_equal(results[0][0], results[1][0])
+                    np.testing.assert_allclose(results[0][1], results[1][1])
 
     def test_init_param_n_MC_samples(self):
         test_cases = [
