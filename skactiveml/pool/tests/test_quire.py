@@ -213,6 +213,38 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                     )
                 )
 
+    def test_query_single_precision_kernel_compatibility(self):
+        rng = np.random.RandomState(1)
+        X = rng.normal(size=(25, 6)).astype(np.float32)
+        y = np.arange(len(X), dtype=float) % 3
+        y[-1] = np.nan
+        for metric in ["rbf", "linear", "cosine"]:
+            K = pairwise_kernels(X, X, metric=metric)
+            for lmbda in [1e-4, 0.1, 1.0, 10.0]:
+                expected = _full_quadratic_utilities(
+                    K, y, [0, 1, 2], [len(X) - 1], lmbda
+                )
+                for precomputed in [False, True]:
+                    with self.subTest(
+                        metric=metric, lmbda=lmbda, precomputed=precomputed
+                    ):
+                        _, utilities = Quire(
+                            [0, 1, 2],
+                            lmbda=lmbda,
+                            metric="precomputed" if precomputed else metric,
+                        ).query(
+                            K if precomputed else X, y, return_utilities=True
+                        )
+                        np.testing.assert_allclose(
+                            utilities[0], expected, rtol=1e-8, atol=1e-8
+                        )
+
+    def test_query_rejects_labeled_candidates(self):
+        for candidates in [[0], [0, 3], [2, 1, 3]]:
+            with self.subTest(candidates=candidates):
+                with self.assertRaisesRegex(ValueError, "labeled samples"):
+                    Quire([0, 1]).query(self.X, self.y, candidates=candidates)
+
     def test_query_ties_and_candidate_order(self):
         X = np.zeros((9, 2))
         y = np.full(9, np.nan)

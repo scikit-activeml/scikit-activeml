@@ -136,7 +136,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
         # Obtain candidates plus mapping.
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates, X, y, enforce_mapping=True, allow_only_unlabeled=True
         )
         mask_l = is_labeled(y=y, missing_label=self.missing_label)
         le = ExtLabelEncoder(self.classes, self.missing_label)
@@ -168,7 +168,8 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         )
 
         # --- Computation ----------------------------------------------------
-        # Preserve sklearn's full-pool symmetrization of callable kernels.
+        # Preserve sklearn's full-pool symmetrization of callable kernels and
+        # float32 rounding, which can depend on the shape of the kernel call.
         K = None
         if self.metric == "precomputed":
             K = X
@@ -177,7 +178,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                     "The kernel matrix 'K' must have the shape "
                     "(n_samples, n_samples)."
                 )
-        elif callable(self.metric):
+        elif callable(self.metric) or X.dtype == np.float32:
             K = pairwise_kernels(X, X, metric=self.metric, **self.metric_dict_)
         y_labeled_ovr = _one_versus_rest_transform(
             y[mask_l], classes_, l_rest=-1
@@ -217,7 +218,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                 labeled = np.flatnonzero(mask_l)
                 K_ll = K[np.ix_(labeled, labeled)]
                 K_lc = K[np.ix_(labeled, mapping)]
-                diagonal = K[mapping, mapping]
+                diagonal = np.asarray(K[mapping, mapping], dtype=float)
 
             # Eliminating all other unlabeled variables from Eq. (9) gives
             # z.T A^-1 z + (1 - k.T A^-1 z)^2 / (k_ss + lambda - k.T A^-1 k),
