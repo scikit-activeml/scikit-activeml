@@ -3,7 +3,12 @@ from collections import deque
 from copy import copy, deepcopy
 import warnings
 import numpy as np
-from sklearn.utils import check_array, check_consistent_length, check_scalar
+from sklearn.utils import (
+    check_array,
+    check_consistent_length,
+    check_scalar,
+    check_random_state,
+)
 from sklearn.base import clone
 from sklearn.metrics.pairwise import pairwise_distances
 
@@ -24,6 +29,55 @@ from skactiveml.stream.budgetmanager import (
     RandomBudgetManager,
     RandomVariableUncertaintyBudgetManager,
 )
+
+
+def _copy_budget_manager(budget_manager):
+    """Copy acquisition state and isolate lazily initialized random state."""
+    manager = deepcopy(budget_manager)
+    if hasattr(manager, "random_state_"):
+        manager.random_state_ = deepcopy(
+            check_random_state(manager.random_state_)
+        )
+    elif hasattr(manager, "random_state"):
+        # None would otherwise attach the copy to NumPy's global generator
+        # when its first query initializes random_state_.
+        manager.random_state = deepcopy(
+            check_random_state(manager.random_state)
+        )
+    return manager
+
+
+def _update_budget_manager(
+    budget_manager, candidate, queried, budget_manager_param_dict, index
+):
+    """Advance one observation with local indices and aligned utilities."""
+    params = budget_manager_param_dict.copy()
+    if "utilities" in params:
+        params["utilities"] = np.asarray(params["utilities"])[
+            index : index + 1
+        ]
+    call_func(
+        budget_manager.update,
+        candidates=[candidate],
+        queried_indices=[0] if queried else [],
+        **params,
+    )
+
+
+def _validate_budget_update(candidates, queried_indices):
+    """Validate original-batch indices before any observation is committed."""
+    indices = np.asarray(queried_indices)
+    if indices.ndim != 1:
+        raise IndexError("`queried_indices` must be one-dimensional.")
+    if indices.size and not np.issubdtype(indices.dtype, np.integer):
+        raise IndexError("`queried_indices` must contain integer indices.")
+    if np.any(indices < 0) or np.any(indices >= len(candidates)):
+        raise IndexError(
+            "`queried_indices` must index the original candidates."
+        )
+    queried = np.zeros(len(candidates), dtype=bool)
+    queried[indices.astype(int)] = True
+    return queried
 
 
 class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
@@ -137,7 +191,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -168,23 +222,32 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
         ).reshape([-1])
         utilities = 1 - confidence
-        tmp_min_dist = copy(self.min_dist_)
-        tmp_window = copy(self.window_)
+        budget_manager = _copy_budget_manager(self.budget_manager_)
+        tmp_min_dist = self.min_dist_
+        tmp_window = self.window_
+        self.min_dist_ = copy(tmp_min_dist)
+        self.window_ = copy(tmp_window)
         queried_indices = []
-        for t, (u, x_cand) in enumerate(zip(utilities, candidates)):
-            local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor > 0:
-                queried_indice = self.budget_manager_.query_by_utility(
-                    np.array([u])
+        try:
+            for t, (u, x_cand) in enumerate(zip(utilities, candidates)):
+                eligible = self._calculate_ldf([x_cand]) > 0
+                selected = budget_manager.query_by_utility(
+                    np.array([u if eligible else np.nan])
                 )
-                if len(queried_indice) > 0:
+                queried = eligible and len(selected) > 0
+                if queried:
                     queried_indices.append(t)
-            else:
-                self.budget_manager_.query_by_utility(np.array([np.nan]))
-            self.window_.append(x_cand)
-
-        self.min_dist_ = tmp_min_dist
-        self.window_ = tmp_window
+                _update_budget_manager(
+                    budget_manager,
+                    x_cand if eligible else np.nan,
+                    queried,
+                    {"utilities": utilities},
+                    t,
+                )
+                self.window_.append(x_cand)
+        finally:
+            self.min_dist_ = tmp_min_dist
+            self.window_ = tmp_window
 
         if return_utilities:
             return queried_indices, utilities
@@ -206,15 +269,20 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`.
+            Optional kwargs for each single-observation budget-manager
+            update. If provided, `utilities` must align with the original
+            candidates; it is sliced into one-element arrays for the observed
+            samples. Other kwargs are forwarded unchanged. Supply `utilities`
+            when the budget manager requires them for updating.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
@@ -254,20 +322,16 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             if budget_manager_param_dict is None
             else budget_manager_param_dict
         )
-        new_candidates = []
-        for x_cand in candidates:
+        for i, x_cand in enumerate(candidates):
             local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor > 0:
-                new_candidates.append(x_cand)
-            else:
-                new_candidates.append(np.nan)
+            _update_budget_manager(
+                self.budget_manager_,
+                x_cand if local_density_factor > 0 else np.nan,
+                queried[i],
+                budget_manager_param_dict,
+                i,
+            )
             self.window_.append(x_cand)
-        call_func(
-            self.budget_manager_.update,
-            candidates=new_candidates,
-            queried_indices=queried_indices,
-            **budget_manager_param_dict,
-        )
         return self
 
     def _calculate_ldf(self, candidates):
@@ -620,7 +684,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -648,35 +712,44 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         confidence = np.max(predict_proba, axis=1)
         utilities = 1 - confidence
 
-        # copy variables
-        tmp_cognition_window = copy(self.cognition_window_)
-        tmp_theta = copy(self.theta_)
-        tmp_s = copy(self.s_)
-        tmp_t_x = copy(self.t_x_)
-        f = copy(self.f_)
-        min_dist = copy(self.min_dist_)
-        t = copy(self.t_)
+        budget_manager = _copy_budget_manager(self.budget_manager_)
+        density_state = {
+            name: getattr(self, name)
+            for name in (
+                "cognition_window_",
+                "theta_",
+                "s_",
+                "t_x_",
+                "f_",
+                "min_dist_",
+                "t_",
+            )
+        }
+        for name, value in density_state.items():
+            setattr(self, name, copy(value))
         queried_indices = []
-        for i, (u, x_cand) in enumerate(zip(utilities, candidates)):
-            local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor >= self.density_threshold:
-                queried_indice = self.budget_manager_.query_by_utility(
-                    np.array([u])
+        try:
+            for i, (u, x_cand) in enumerate(zip(utilities, candidates)):
+                eligible = (
+                    self._calculate_ldf([x_cand]) >= self.density_threshold
                 )
-                if len(queried_indice) > 0:
-                    queried_indices.append(i)
-            elif self.force_full_budget:
-                self.budget_manager_.query_by_utility(np.array([np.nan]))
-            self.t_ += 1
-
-        # overwrite changes
-        self.cognition_window_ = tmp_cognition_window
-        self.theta_ = tmp_theta
-        self.s_ = tmp_s
-        self.t_x_ = tmp_t_x
-        self.f_ = f
-        self.min_dist_ = min_dist
-        self.t_ = t
+                if eligible or self.force_full_budget:
+                    selected = budget_manager.query_by_utility(
+                        np.array([u if eligible else np.nan])
+                    )
+                    queried = eligible and len(selected) > 0
+                    if queried:
+                        queried_indices.append(i)
+                    _update_budget_manager(
+                        budget_manager,
+                        x_cand if eligible else np.nan,
+                        queried,
+                        {"utilities": utilities},
+                        i,
+                    )
+                self.t_ += 1
+        finally:
+            self.__dict__.update(density_state)
 
         if return_utilities:
             return queried_indices, utilities
@@ -698,15 +771,20 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`.
+            Optional kwargs for each single-observation budget-manager
+            update. If provided, `utilities` must align with the original
+            candidates; it is sliced into one-element arrays for the observed
+            samples. Other kwargs are forwarded unchanged. Supply `utilities`
+            when the budget manager requires them for updating.
 
         Returns
         -------
         self : CognitiveDualQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -761,20 +839,18 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             if budget_manager_param_dict is None
             else budget_manager_param_dict
         )
-        new_candidates = []
-        for x_cand in candidates:
+        for i, x_cand in enumerate(candidates):
             local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor >= self.density_threshold:
-                new_candidates.append(x_cand)
-            elif self.force_full_budget:
-                new_candidates.append(np.nan)
+            eligible = local_density_factor >= self.density_threshold
+            if eligible or self.force_full_budget:
+                _update_budget_manager(
+                    self.budget_manager_,
+                    x_cand if eligible else np.nan,
+                    queried[i],
+                    budget_manager_param_dict,
+                    i,
+                )
             self.t_ += 1
-        call_func(
-            self.budget_manager_.update,
-            candidates=new_candidates,
-            queried_indices=queried_indices,
-            **budget_manager_param_dict,
-        )
         return self
 
     def _calculate_ldf(self, candidates):
