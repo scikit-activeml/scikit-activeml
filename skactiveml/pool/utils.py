@@ -67,7 +67,12 @@ class IndexClassifierWrapper:
         appear multiple times if their indices are repeated.
     use_speed_up : bool, default=True
         Specifies if potentially available speed ups should be used. Currently
-        implemented for `skactiveml.classifier.ParzenWindowClassifier`.
+        implemented for `skactiveml.classifier.ParzenWindowClassifier`, whose
+        kernel matrix is then precomputed once. Its kernel parameters are
+        resolved once on the training data passed to this wrapper, so a
+        bandwidth requested via `metric_dict={'gamma': 'mean'}` is held fixed
+        for all subsequent fits, which differ from that training data by
+        single labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
 
@@ -195,6 +200,22 @@ class IndexClassifierWrapper:
             self.pwc_metric_dict_ = (
                 {} if self.clf.metric_dict is None else self.clf.metric_dict
             )
+            if (
+                isinstance(self.pwc_metric_dict_, dict)
+                and self.pwc_metric_dict_.get("gamma") == "mean"
+                and self.pwc_metric_ == "rbf"
+            ):
+                # The kernel matrix is precomputed once, so the mean criterion
+                # is resolved once on the actual training data. Its bandwidth
+                # is thereby held fixed for the hypothetical refits, which
+                # differ from the actual training data by a single label.
+                self.pwc_metric_dict_ = (
+                    self.clf.metric_dict_
+                    if hasattr(self.clf, "metric_dict_")
+                    else clone(self.clf)
+                    .fit(self.X, self.y, self.sample_weight)
+                    .metric_dict_
+                )
             self.pwc_K_ = np.full([len(self.X), len(self.X)], np.nan)
 
             self.clf_ = clone(self.clf)
@@ -483,7 +504,7 @@ class IndexClassifierWrapper:
                 self.sample_weight_ = self._copy_sw(self.base_sample_weight_)
 
             if self.enforce_unique_samples:
-                cur_idx = np.array([i not in add_idx for i in self.idx_])
+                cur_idx = np.isin(self.idx_, add_idx, invert=True)
             else:
                 cur_idx = np.arange(len(self.idx_))
             self.idx_ = np.concatenate([self.idx_[cur_idx], add_idx], axis=0)

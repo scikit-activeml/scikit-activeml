@@ -4,6 +4,7 @@ from itertools import product
 
 import numpy as np
 from scipy.stats import norm
+from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
@@ -56,6 +57,34 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         clf = self.clf.fit(self.X, self.y)
         iclf = IndexClassifierWrapper(clf=clf, X=self.X, y=self.y)
         np.testing.assert_array_equal(clf.X_, iclf.clf_.X_)
+
+    def test_init_param_clf_mean_gamma_is_resolved(self):
+        clf = ParzenWindowClassifier(
+            classes=[0, 1], metric_dict={"gamma": "mean"}
+        )
+        expected = clone(clf).fit(self.X, self.y).metric_dict_
+
+        # The kernel is precomputed once, so the criterion is resolved once.
+        iclf = IndexClassifierWrapper(clf, self.X, self.y, use_speed_up=True)
+        self.assertEqual(expected, iclf.pwc_metric_dict_)
+
+        # An already fitted classifier contributes its own bandwidth.
+        iclf = IndexClassifierWrapper(
+            clone(clf).fit(self.X, self.y),
+            self.X,
+            self.y,
+            use_speed_up=True,
+        )
+        self.assertEqual(expected, iclf.pwc_metric_dict_)
+
+        # Numeric kernel parameters are passed through unchanged.
+        iclf = IndexClassifierWrapper(
+            ParzenWindowClassifier(classes=[0, 1], metric_dict={"gamma": 0.5}),
+            self.X,
+            self.y,
+            use_speed_up=True,
+        )
+        self.assertEqual({"gamma": 0.5}, iclf.pwc_metric_dict_)
 
     def test_dtype_error(self):
         X, y = make_blobs(

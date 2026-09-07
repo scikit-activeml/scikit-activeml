@@ -141,6 +141,38 @@ class TemplateTestExpectedErrorReduction(
 
 
 class TestExpectedErrorReduction(unittest.TestCase):
+    def test_query_mean_gamma_parzen_window_classifier(self):
+        X = np.linspace(0, 1, 8).reshape(-1, 1)
+        y = np.full(8, MISSING_LABEL)
+        y[:4] = [0, 1, 0, 1]
+
+        def query(metric_dict):
+            return MonteCarloEER(random_state=0).query(
+                X=X,
+                y=y,
+                clf=ParzenWindowClassifier(
+                    classes=[0, 1], metric_dict=metric_dict
+                ),
+                return_utilities=True,
+            )[1]
+
+        utilities = query({"gamma": "mean"})
+        self.assertTrue(np.all(np.isfinite(utilities[0, 4:])))
+
+        # The mean criterion is re-estimated for every hypothetical label.
+        # Precomputing the kernel would instead freeze the bandwidth fitted
+        # on `X` and `y` and thereby change the utilities.
+        frozen = (
+            ParzenWindowClassifier(
+                classes=[0, 1], metric_dict={"gamma": "mean"}
+            )
+            .fit(X, y)
+            .metric_dict_["gamma"]
+        )
+        self.assertFalse(
+            np.allclose(utilities, query({"gamma": frozen}), equal_nan=True)
+        )
+
     def test__estimate_error_for_candidate(self):
         qs = ExpectedErrorReduction(enforce_mapping=False)
         self.assertRaises(

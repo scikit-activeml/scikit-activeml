@@ -226,7 +226,12 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             set_base_clf=not fit_clf,
             ignore_partial_fit=ignore_partial_fit,
             enforce_unique_samples=True,
-            use_speed_up=True,
+            # Precomputing the kernel requires memory quadratic in the number
+            # of samples and fixes the kernel parameters for all hypothetical
+            # refits, which is incorrect for a data-dependent bandwidth such
+            # as `metric_dict={'gamma': 'mean'}`. It only pays off for
+            # high-dimensional samples and is slower otherwise.
+            use_speed_up=False,
             missing_label=self.missing_label_,
         )
 
