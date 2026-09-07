@@ -717,7 +717,13 @@ def _cross_entropy(
         reg=true_reg,
         random_state=random_state,
         **integration_dict,
-        vector_func="both",
+        # The frozen logpdf contains one distribution per evaluation row.
+        # Dynamic quadrature must select that row from its vector output.
+        vector_func=(
+            True
+            if integration_dict.get("method") == "dynamic_quad"
+            else "both"
+        ),
     )
 
     return cross_ent

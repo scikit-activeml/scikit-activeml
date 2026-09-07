@@ -3,6 +3,7 @@ import unittest
 from itertools import product
 
 import numpy as np
+from scipy.integrate import quad
 from scipy.stats import norm
 from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
@@ -981,6 +982,27 @@ class TestFunctions(unittest.TestCase):
 
         result = _cross_entropy(X_eval=X_1, true_reg=reg_1, other_reg=reg_2)
         self.assertEqual(y_1.shape, result.shape)
+
+        # Dynamic quadrature must evaluate each row's own distribution.
+        expected = []
+        for x in X_1:
+            true_dist = reg_1.predict_target_distribution([x])
+            other_dist = reg_2.predict_target_distribution([x])
+            integral = quad(
+                lambda target: (
+                    -true_dist.pdf(target) * other_dist.logpdf(target)
+                ).item(),
+                -np.inf,
+                np.inf,
+            )[0]
+            expected.append(integral)
+        result = _cross_entropy(
+            X_eval=X_1,
+            true_reg=reg_1,
+            other_reg=reg_2,
+            integration_dict={"method": "dynamic_quad"},
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-9, atol=1e-11)
 
         for name, val in [
             ("X_eval", "illegal"),
