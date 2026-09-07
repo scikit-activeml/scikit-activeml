@@ -48,6 +48,55 @@ class TestProbCover(
             query_default_params_clf_multilabel=qs_params_clf_multilabel,
         )
 
+    def test_candidate_subset_preserves_unlabeled_coverage(self):
+        X = np.array([[0.0], [0.1], [0.2], [5.0]])
+        for target_type, missing_label, observed in [
+            ("single-output", np.nan, 1.5),
+            ("single-output", None, "a"),
+            ("multi-label", np.nan, [0, 1]),
+        ]:
+            for n_classes in [None, 2]:
+                for labeled in [False, True]:
+                    with self.subTest(
+                        target_type=target_type,
+                        missing_label=missing_label,
+                        n_classes=n_classes,
+                        labeled=labeled,
+                    ):
+                        shape = (4, 2) if target_type == "multi-label" else 4
+                        y = np.full(shape, missing_label)
+                        if labeled:
+                            y[1] = observed
+                        qs = ProbCover(
+                            deltas=[0.3],
+                            n_classes=n_classes,
+                            target_type=target_type,
+                            missing_label=missing_label,
+                            random_state=0,
+                        )
+                        indices, utilities = qs.query(
+                            X,
+                            y,
+                            candidates=[0, 3],
+                            batch_size=2,
+                            return_utilities=True,
+                        )
+                        np.testing.assert_array_equal(
+                            indices, [3, 0] if labeled else [0, 3]
+                        )
+                        expected = (
+                            [
+                                [0, np.nan, np.nan, 1],
+                                [0, np.nan, np.nan, np.nan],
+                            ]
+                            if labeled
+                            else [
+                                [3, np.nan, np.nan, 1],
+                                [np.nan, np.nan, np.nan, 1],
+                            ]
+                        )
+                        np.testing.assert_array_equal(utilities, expected)
+
     def test_init_param_n_classes(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

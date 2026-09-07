@@ -193,14 +193,14 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         # Infer number of classes, which must have a minimum of 2.
         is_candidate = np.full(len(X), fill_value=False)
         is_candidate[mapping] = True
+        is_center = is_labeled(
+            y=y,
+            missing_label=self.missing_label_,
+            target_type=target_type,
+        )
         n_classes = self.n_classes
         if n_classes is None:
-            is_lbld = is_labeled(
-                y=y,
-                missing_label=self.missing_label_,
-                target_type=target_type,
-            )
-            y_labeled = y[is_lbld]
+            y_labeled = y[is_center]
             if target_type == "multi-label":
                 n_classes = len(
                     {tuple(np.asarray(row).tolist()) for row in y_labeled}
@@ -290,12 +290,13 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
         for b in range(batch_size):
             # Step (ii) in [1]: Remove incoming edges for covered samples.
-            is_covered = edges[~is_candidate].any(axis=0)
+            is_covered = edges[is_center].any(axis=0)
             edges[:, is_covered] = False
             # Step (i) in [1]: Query the sample with the highest out-degree.
             utilities[b][is_candidate] = edges[is_candidate].sum(axis=1)
             idx = rand_argmax(utilities[b], random_state=self.random_state_)[0]
             is_candidate[idx] = False
+            is_center[idx] = True
             query_indices[b] = idx
 
         if return_utilities:
