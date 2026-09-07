@@ -160,9 +160,13 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
 
         # Fit each estimator
         for i, est in enumerate(self.estimators_):
-            est[1].set_params(missing_label=-1)
-            if self.classes is None or est[1].classes is None:
-                est[1].set_params(classes=np.arange(len(self.classes_)))
+            # Preserve declared class order so member costs keep their meaning.
+            classes = (
+                np.arange(len(self.classes_))
+                if est[1].classes is None
+                else self._le.transform(est[1].classes).astype(int)
+            )
+            est[1].set_params(missing_label=-1, classes=classes)
             if sample_weight is None:
                 est[1].fit(X=X, y=y[:, i])
             else:
@@ -193,7 +197,11 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             y_pred = np.array(
                 [est.predict(X) for _, est in self.estimators_]
             ).T
-            V = compute_vote_vectors(y=y_pred, classes=self.classes_)
+            V = compute_vote_vectors(
+                y=y_pred,
+                classes=np.arange(len(self.classes_)),
+                missing_label=-1,
+            )
             P = V / np.sum(V, axis=1, keepdims=True)
         elif self.voting == "soft":
             P = np.array([est.predict_proba(X) for _, est in self.estimators_])
@@ -256,6 +264,8 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             if (
                 not classes_none
                 and not est_classes_none
-                and not np.array_equal(self.classes, est.classes)
+                and not np.array_equal(
+                    np.sort(self.classes), np.sort(est.classes)
+                )
             ):
                 raise ValueError(error_msg)

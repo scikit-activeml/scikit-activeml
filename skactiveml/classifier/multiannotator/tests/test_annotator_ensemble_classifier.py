@@ -130,6 +130,90 @@ class TestAnnotatorEnsembleClassifier(
         with self.assertRaisesRegex(ValueError, "n_estimators=2"):
             clf.fit(self.X, self.y[:, :1])
 
+    def test_member_costs_preserve_declared_class_order(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        y = np.array([[1], [1], [2], [2]])
+        query = np.array([[-0.1], [0.1]])
+        for inner_classes, costs in [
+            ([2, 1], [[0, 1], [10, 0]]),
+            ([1, 2], [[0, 10], [1, 0]]),
+        ]:
+            with self.subTest(inner_classes=inner_classes):
+                member = ParzenWindowClassifier(
+                    classes=inner_classes, cost_matrix=costs
+                )
+                reference = ParzenWindowClassifier(
+                    classes=inner_classes, cost_matrix=costs
+                ).fit(X, y[:, 0])
+                clf = AnnotatorEnsembleClassifier(
+                    [("pwc", member)], classes=[2, 1], voting="hard"
+                ).fit(X, y)
+                np.testing.assert_array_equal(
+                    clf.predict(query), reference.predict(query)
+                )
+                np.testing.assert_array_equal(member.cost_matrix, costs)
+
+    def test_voting_preserves_original_class_vocabulary(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        encoded_y = np.array([[0, 0], [0, -1], [1, 1], [1, -1]])
+        for classes, missing_label in [([2, 1], np.nan), (["b", "a"], None)]:
+            canonical = np.sort(classes)
+            y = canonical[np.maximum(encoded_y, 0)].astype(
+                object if missing_label is None else float
+            )
+            y[encoded_y == -1] = missing_label
+            for voting in ["hard", "soft"]:
+                reference = AnnotatorEnsembleClassifier(
+                    [
+                        (str(i), ParzenWindowClassifier(missing_label=-1))
+                        for i in range(2)
+                    ],
+                    voting=voting,
+                    classes=[0, 1],
+                    missing_label=-1,
+                    random_state=0,
+                ).fit(X, encoded_y)
+                for outer, inner in [
+                    (None, None),
+                    (classes, None),
+                    (classes, classes),
+                    (classes, canonical),
+                ]:
+                    with self.subTest(
+                        classes=classes,
+                        voting=voting,
+                        outer=outer,
+                        inner=inner,
+                    ):
+                        members = [
+                            (
+                                str(i),
+                                ParzenWindowClassifier(
+                                    classes=inner, missing_label=missing_label
+                                ),
+                            )
+                            for i in range(2)
+                        ]
+                        clf = AnnotatorEnsembleClassifier(
+                            members,
+                            voting=voting,
+                            classes=outer,
+                            missing_label=missing_label,
+                            random_state=0,
+                        ).fit(X, y)
+                        np.testing.assert_array_equal(clf.classes_, canonical)
+                        np.testing.assert_allclose(
+                            clf.predict_proba(X), reference.predict_proba(X)
+                        )
+                        np.testing.assert_array_equal(
+                            clf.predict(X), canonical[reference.predict(X)]
+                        )
+                        for _, member in members:
+                            np.testing.assert_array_equal(
+                                member.classes, inner
+                            )
+                            self.assertFalse(hasattr(member, "classes_"))
+
     def test_predict_proba(self):
         pwc = ParzenWindowClassifier()
         gnb = SklearnClassifier(GaussianNB())
