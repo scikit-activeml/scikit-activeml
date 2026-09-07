@@ -51,6 +51,61 @@ class TestTypiClust(
             query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
+    def test_degenerate_clusters_produce_unique_eligible_batches(self):
+        X = np.zeros((5, 1))
+        for target_type in ["single-output", "multi-label"]:
+            for labeled in [False, True]:
+                for candidates in [None, [1, 3, 4]]:
+                    with self.subTest(
+                        target_type=target_type,
+                        labeled=labeled,
+                        candidates=candidates,
+                    ):
+                        shape = (5, 2) if target_type == "multi-label" else 5
+                        y = np.full(shape, np.nan)
+                        if labeled:
+                            y[0] = 0
+                        eligible = (
+                            np.arange(int(labeled), 5)
+                            if candidates is None
+                            else np.array(candidates)
+                        )
+                        qs = TypiClust(random_state=0, target_type=target_type)
+                        batch_size = min(4, len(eligible))
+                        indices, utilities = qs.query(
+                            X,
+                            y,
+                            candidates=candidates,
+                            batch_size=batch_size,
+                            return_utilities=True,
+                        )
+                        self.assertEqual(len(np.unique(indices)), batch_size)
+                        self.assertTrue(np.isin(indices, eligible).all())
+                        for i, idx in enumerate(indices):
+                            self.assertTrue(np.isfinite(utilities[i, idx]))
+                            self.assertTrue(
+                                np.isnan(utilities[i, indices[:i]]).all()
+                            )
+                            self.assertTrue(
+                                np.isnan(
+                                    utilities[
+                                        i, ~np.isin(np.arange(5), eligible)
+                                    ]
+                                ).all()
+                            )
+
+    def test_uncovered_clusters_without_candidates_are_skipped(self):
+        X = np.array([[0.0], [0.1], [0.2], [0.3], [10.0], [10.1]])
+        indices, utilities = TypiClust(random_state=0).query(
+            X,
+            np.full(6, np.nan),
+            candidates=[4, 5],
+            batch_size=2,
+            return_utilities=True,
+        )
+        np.testing.assert_array_equal(np.sort(indices), [4, 5])
+        self.assertTrue(np.isfinite(utilities[np.arange(2), indices]).all())
+
     def test_init_param_cluster_algo(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

@@ -19,7 +19,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     represented regions. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation is task-agnostic
     such that it can handle class labels, numerical targets, and multilabel
-    targets represented by a two-dimensional `y`.
+    targets represented by a two-dimensional `y`. Clusters without eligible
+    candidates are skipped. If no uncovered cluster remains, the batch is
+    filled uniformly from the remaining candidates.
 
     Parameters
     ----------
@@ -197,6 +199,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         )
         if len(covered_cluster) > 0:
             cluster_sizes[covered_cluster] = 0
+        cluster_sizes[
+            ~np.isin(np.arange(n_clusters), cluster_labels[mapping])
+        ] = 0
 
         utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
         query_indices = []
@@ -210,15 +215,15 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
                 is_cluster = cluster_labels == cluster_id
                 uncovered_samples_mapping = np.where(is_cluster)[0]
                 typicality = _typicality(X, uncovered_samples_mapping, self.k)
+                cluster_sizes[cluster_id] = 0
             utilities[i, mapping] = typicality[mapping]
             utilities[i, query_indices] = np.nan
             idx = rand_argmax(
-                typicality[mapping], random_state=self.random_state_
+                utilities[i, mapping], random_state=self.random_state_
             )
             idx = mapping[idx[0]]
 
             query_indices = np.append(query_indices, [idx]).astype(int)
-            cluster_sizes[cluster_id] = 0
 
         if return_utilities:
             return query_indices, utilities
