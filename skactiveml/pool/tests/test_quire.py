@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.metrics import pairwise_kernels
@@ -13,7 +14,12 @@ from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.tests.utils import assert_no_query_state
-from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled
+from skactiveml.utils import (
+    MISSING_LABEL,
+    is_labeled,
+    is_unlabeled,
+    simple_batch,
+)
 
 
 class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -119,6 +125,154 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         qs = Quire(self.classes)
         _, utils = qs.query(**self.kwargs, return_utilities=True)
 
+    def test_query_matches_full_quadratic_objective(self):
+        rng = np.random.RandomState(42)
+        X = rng.uniform(size=(19, 4))
+        # Include kernels that are not positive semidefinite, and nonconstant
+        # kernel diagonals, without relying on the optimized scoring identity.
+        metrics = [
+            ("rbf", {"gamma": 0.3}),
+            ("linear", {}),
+            ("poly", {"degree": 2, "coef0": 0.2}),
+            ("sigmoid", {"gamma": 0.2}),
+            ("cosine", {}),
+            ("laplacian", {}),
+            ("chi2", {}),
+            ("additive_chi2", {}),
+            (lambda x, y: np.dot(x, y) - 2, {}),
+        ]
+        for n_labeled in [0, 1, 7, 18]:
+            y = np.full(len(X), np.nan)
+            labeled = rng.choice(len(X), n_labeled, replace=False)
+            y[labeled] = np.arange(n_labeled) % 3
+            candidates = np.flatnonzero(np.isnan(y))
+            for metric, params in metrics:
+                K = pairwise_kernels(X, X, metric=metric, **params)
+                for mapping in [candidates, candidates[::-2]]:
+                    for precomputed in [False, True]:
+                        with self.subTest(
+                            n_labeled=n_labeled,
+                            metric=metric,
+                            mapping=mapping,
+                            precomputed=precomputed,
+                        ):
+                            lmbda = 2.0
+                            expected = _full_quadratic_utilities(
+                                K, y, [0, 1, 2], mapping, lmbda
+                            )
+                            qs = Quire(
+                                classes=[0, 1, 2],
+                                metric=(
+                                    "precomputed" if precomputed else metric
+                                ),
+                                metric_dict=None if precomputed else params,
+                                lmbda=lmbda,
+                                random_state=42,
+                            )
+                            indices, utilities = qs.query(
+                                K if precomputed else X,
+                                y,
+                                candidates=mapping,
+                                batch_size=min(3, len(mapping)),
+                                return_utilities=True,
+                            )
+                            for i, index in enumerate(indices):
+                                np.testing.assert_allclose(
+                                    utilities[i],
+                                    expected,
+                                    rtol=1e-9,
+                                    atol=1e-9,
+                                )
+                                self.assertAlmostEqual(
+                                    expected[index], np.nanmax(expected)
+                                )
+                                expected[index] = np.nan
+
+    def test_query_kernel_diagonal_batches(self):
+        rng = np.random.RandomState(42)
+        X = rng.uniform(size=(600, 3))
+        X[0] = 0
+        y = np.full(len(X), np.nan)
+        for metric in ["rbf", "linear", "cosine", "poly"]:
+            with self.subTest(metric=metric):
+                K = pairwise_kernels(X, metric=metric)
+                expected = -1 / (np.diag(K) + 1)
+                with patch(
+                    "skactiveml.pool._quire.pairwise_kernels",
+                    wraps=pairwise_kernels,
+                ) as kernel:
+                    _, utilities = Quire([0, 1], metric=metric).query(
+                        X, y, return_utilities=True
+                    )
+                np.testing.assert_allclose(utilities[0], expected)
+                # With no labels, only bounded diagonal blocks are needed.
+                self.assertTrue(
+                    all(
+                        len(call.args[0]) <= 256
+                        for call in kernel.call_args_list
+                    )
+                )
+
+    def test_query_ties_and_candidate_order(self):
+        X = np.zeros((9, 2))
+        y = np.full(9, np.nan)
+        y[2] = 0
+        candidates = np.array([8, 5, 1, 3])
+        qs = Quire([0, 1], metric="linear", random_state=42)
+        actual = qs.query(
+            X, y, candidates=candidates, batch_size=4, return_utilities=True
+        )
+        expected = np.full(len(X), np.nan)
+        expected[candidates] = -2
+        qs._validate_data(X, y, candidates, 4, True, reset=True)
+        reference = simple_batch(
+            expected, qs.random_state_, batch_size=4, return_utilities=True
+        )
+        np.testing.assert_array_equal(actual[0], reference[0])
+        np.testing.assert_array_equal(actual[1], reference[1])
+
+    def test_query_asymmetric_callable_preserves_symmetrization(self):
+        X = np.arange(18).reshape(6, 3) / 10
+        y = np.array([np.nan, 0, np.nan, 1, np.nan, np.nan])
+
+        def kernel(x, z):
+            return np.dot(x, z) + x[0] - z[0]
+
+        K = pairwise_kernels(X, X, metric=kernel)
+        candidates = np.array([5, 0, 4])
+        expected = _full_quadratic_utilities(K, y, [0, 1], candidates, 1.0)
+        _, utilities = Quire([0, 1], metric=kernel).query(
+            X, y, candidates=candidates, return_utilities=True
+        )
+        np.testing.assert_allclose(utilities[0], expected)
+
+    def test_query_nonsymmetric_precomputed_compatibility(self):
+        K = np.array(
+            [
+                [0.8, 0.2, 0.1, 0.0, 0.6, 0.1],
+                [0.1, 0.9, 0.3, 0.0, 0.1, 0.1],
+                [0.5, 0.1, 0.9, 0.1, 0.1, 0.3],
+                [0.1, 0.0, 0.3, 0.8, 0.2, 0.2],
+                [0.2, 0.5, 0.1, 0.1, 0.5, 0.3],
+                [0.1, 0.1, 0.2, 0.3, 0.2, 0.8],
+            ]
+        )
+        y = np.array([np.nan, 0, np.nan, 1, np.nan, np.nan])
+        # Scores produced by the original inverse/downdate implementation.
+        expected = [
+            -1.62206740,
+            np.nan,
+            -1.58640760,
+            np.nan,
+            -1.99950640,
+            -1.70899301,
+        ]
+        with self.assertWarnsRegex(UserWarning, "not symmetric"):
+            _, utilities = Quire([0, 1], metric="precomputed").query(
+                K, y, return_utilities=True
+            )
+        np.testing.assert_allclose(utilities[0], expected, atol=1e-8)
+
     def test__del_i_inv(self):
         self.assertWarns(Warning, _del_i_inv, np.tri(5), 2)
 
@@ -154,3 +308,22 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         np.testing.assert_array_equal(
             y_ovr, _one_versus_rest_transform(y, classes, l_rest=0)
         )
+
+
+def _full_quadratic_utilities(K, y, classes, candidates, lmbda):
+    """Evaluate the relaxed objective directly using the full precision."""
+    precision = np.linalg.inv(K + lmbda * np.eye(len(K)))
+    labeled = np.flatnonzero(~np.isnan(y))
+    targets = np.where(y[labeled, None] == classes, 1.0, -1.0)
+    utilities = np.full(len(K), np.nan)
+    for candidate in candidates:
+        fixed = np.append(labeled, candidate)
+        free = np.setdiff1d(np.arange(len(K)), fixed)
+        values = np.vstack((targets, np.ones(len(classes))))
+        coupling = precision[np.ix_(free, fixed)] @ values
+        objective = values.T @ precision[np.ix_(fixed, fixed)] @ values
+        objective -= coupling.T @ np.linalg.solve(
+            precision[np.ix_(free, free)], coupling
+        )
+        utilities[candidate] = -np.diag(objective).max()
+    return utilities

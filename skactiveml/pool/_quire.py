@@ -9,7 +9,6 @@ from skactiveml.utils import (
     simple_batch,
     MISSING_LABEL,
     is_labeled,
-    is_unlabeled,
     ExtLabelEncoder,
 )
 
@@ -140,20 +139,9 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             candidates, X, y, enforce_mapping=True
         )
         mask_l = is_labeled(y=y, missing_label=self.missing_label)
-        mask_a = is_unlabeled(y=y, missing_label=self.missing_label)
         le = ExtLabelEncoder(self.classes, self.missing_label)
         y = le.fit_transform(y)
         classes_ = le.transform(self.classes)
-
-        # If we want to use enforce_mapping = False later
-        # map_candidates = mapping is not None
-        # if mapping is None:
-        #     mapping = np.arange(stop=len(X_cand), dtype=int) + np.sum(mask_l)
-        #     y = np.concatenate(
-        #         (y[mask_l], np.full(len(X_cand), fill_value=np.nan)),
-        #         axis=0
-        #     )
-        #     X = np.concatenate((X[mask_l], X_cand), axis=0)
 
         # Check whether metric is available.
         if self.metric not in Quire.METRICS and not callable(self.metric):
@@ -180,47 +168,73 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         )
 
         # --- Computation ----------------------------------------------------
-        # Compute kernel (metric) matrix.
+        # Preserve sklearn's full-pool symmetrization of callable kernels.
+        K = None
         if self.metric == "precomputed":
-            K = np.array(X)
+            K = X
             if K.shape != (len(y), len(y)):
                 raise ValueError(
                     "The kernel matrix 'K' must have the shape "
                     "(n_samples, n_samples)."
                 )
-        else:
+        elif callable(self.metric):
             K = pairwise_kernels(X, X, metric=self.metric, **self.metric_dict_)
-        # compute L and L_aa
-        L = np.linalg.inv(K + lmbda * np.eye(len(X)))
-        # Compute the inverse of L_aa
-        L_aa_inv = _L_aa_inv(K, lmbda, mask_a, mask_l)
-
-        utilities_cand = np.full((len(X)), fill_value=np.nan)
         y_labeled_ovr = _one_versus_rest_transform(
             y[mask_l], classes_, l_rest=-1
         )
-        for i, s in enumerate(mapping):
-            mask_u = mask_a.copy()
-            mask_u[s] = False
-            L_uu_inv = _del_i_inv(L_aa_inv, i, "L_aa_inv")
 
-            utilities_cand[s] = L[s, s] + np.max(
-                [
-                    yl.T.dot(L[mask_l][:, mask_l]).dot(yl)
-                    + 2 * L[s][mask_l].dot(yl)
-                    - (L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
-                    .T.dot(L_uu_inv)
-                    .dot(L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
-                    for yl in y_labeled_ovr.T[:, :, np.newaxis]
-                ]
+        if K is not None and not np.array_equal(K, K.T):
+            # The reduced quadratic form assumes symmetry. Keep the previous
+            # calculation and its warning for nonsymmetric precomputed inputs.
+            utilities = _full_kernel_utilities(
+                K, lmbda, mask_l, mapping, y_labeled_ovr
             )
+        else:
+            if K is None:
+                X_l = X[mask_l]
+                if len(X_l):
+                    K_ll = pairwise_kernels(
+                        X_l, metric=self.metric, **self.metric_dict_
+                    )
+                    K_lc = pairwise_kernels(
+                        X_l, X_cand, metric=self.metric, **self.metric_dict_
+                    )
+                else:
+                    K_ll = np.empty((0, 0))
+                    K_lc = np.empty((0, len(X_cand)))
+                # Bounded blocks support every built-in kernel diagonal and
+                # retain its parameter validation without an M-by-M matrix.
+                diagonal = np.empty(len(X_cand))
+                for start in range(0, len(X_cand), 256):
+                    stop = start + 256
+                    block = X_cand[start:stop]
+                    diagonal[start:stop] = np.diag(
+                        pairwise_kernels(
+                            block, metric=self.metric, **self.metric_dict_
+                        )
+                    )
+            else:
+                labeled = np.flatnonzero(mask_l)
+                K_ll = K[np.ix_(labeled, labeled)]
+                K_lc = K[np.ix_(labeled, mapping)]
+                diagonal = K[mapping, mapping]
 
-        # If we want to use enforce_mapping = False later
-        # if not map_candidates:
-        #     utilities = -utilities_cand[mapping]
-        # else:
-        #     utilities = -utilities_cand
-        utilities = -utilities_cand
+            # Eliminating all other unlabeled variables from Eq. (9) gives
+            # z.T A^-1 z + (1 - k.T A^-1 z)^2 / (k_ss + lambda - k.T A^-1 k),
+            # where A = K_ll + lambda I. Solve once for all classes/candidates.
+            # A general solve also permits symmetric indefinite kernels.
+            n_classes = len(classes_)
+            solved = np.linalg.solve(
+                K_ll + lmbda * np.eye(len(K_ll)),
+                np.column_stack((y_labeled_ovr, K_lc)),
+            )
+            solved_y, solved_k = solved[:, :n_classes], solved[:, n_classes:]
+            residual = 1 - K_lc.T @ solved_y
+            denominator = diagonal + lmbda - np.sum(K_lc * solved_k, axis=0)
+            scores = np.sum(y_labeled_ovr * solved_y, axis=0)
+            scores = scores + residual**2 / denominator[:, None]
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = -np.max(scores, axis=1)
 
         return simple_batch(
             utilities,
@@ -228,6 +242,31 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+
+def _full_kernel_utilities(K, lmbda, mask_l, mapping, y_labeled_ovr):
+    """Retain the original calculation for nonsymmetric kernel matrices."""
+    mask_a = ~mask_l
+    L = np.linalg.inv(K + lmbda * np.eye(len(K)))
+    L_aa_inv = _L_aa_inv(K, lmbda, mask_a, mask_l)
+    unlabeled = np.flatnonzero(mask_a)
+    utilities = np.full(len(K), np.nan)
+    for s in mapping:
+        mask_u = mask_a.copy()
+        mask_u[s] = False
+        position = np.searchsorted(unlabeled, s)
+        L_uu_inv = _del_i_inv(L_aa_inv, position, "L_aa_inv")
+        utilities[s] = -L[s, s] - np.max(
+            [
+                yl.T.dot(L[mask_l][:, mask_l]).dot(yl)
+                + 2 * L[s][mask_l].dot(yl)
+                - (L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
+                .T.dot(L_uu_inv)
+                .dot(L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
+                for yl in y_labeled_ovr.T[:, :, np.newaxis]
+            ]
+        )
+    return utilities
 
 
 def _one_versus_rest_transform(y, classes, l_one=1, l_rest=-1):
