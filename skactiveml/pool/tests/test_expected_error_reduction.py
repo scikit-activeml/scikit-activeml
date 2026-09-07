@@ -449,6 +449,59 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
     def setUp(self):
         super().setUp(qs_class=MonteCarloEER)
 
+    def test_explicit_evaluation_with_training_weights(self):
+        X = np.array([[0.0], [1.0], [0.2], [0.8]])
+        y = np.array([0, 1, np.nan, np.nan])
+        X_eval = np.array([[0.3], [0.9]])
+        for method in ["misclassification_loss", "log_loss"]:
+            for subtract_current in [False, True]:
+                for candidates in [None, [2, 3], X[2:]]:
+                    weights_cases = [None, np.ones(2), np.array([1.0, 3.0])]
+                    for weights in weights_cases:
+                        with self.subTest(
+                            method=method,
+                            subtract_current=subtract_current,
+                            candidates=candidates,
+                            weights=weights,
+                        ):
+                            qs = MonteCarloEER(
+                                method=method,
+                                subtract_current=subtract_current,
+                                random_state=0,
+                            )
+                            kwargs = dict(
+                                X=X,
+                                y=y,
+                                clf=ParzenWindowClassifier(classes=[0, 1]),
+                                sample_weight=np.array([2.0, 1.0, 1.0, 1.0]),
+                                candidates=candidates,
+                                return_utilities=True,
+                            )
+                            indices, utilities = qs.query(
+                                **kwargs,
+                                X_eval=X_eval,
+                                sample_weight_eval=weights,
+                            )
+                            # Unit weights equal the default; integer risk
+                            # weights equal repeated evaluation observations.
+                            repeats = (
+                                np.ones(2, dtype=int)
+                                if weights is None
+                                else weights.astype(int)
+                            )
+                            repeated_eval = np.repeat(X_eval, repeats, axis=0)
+                            expected_indices, expected_utilities = qs.query(
+                                **kwargs,
+                                X_eval=repeated_eval,
+                                sample_weight_eval=np.ones(len(repeated_eval)),
+                            )
+                            np.testing.assert_array_equal(
+                                indices, expected_indices
+                            )
+                            np.testing.assert_allclose(
+                                utilities, expected_utilities
+                            )
+
     def test_init_param_method(self):
         test_cases = [(2, TypeError), ("string", ValueError)]
         self._test_param("init", "method", test_cases)
