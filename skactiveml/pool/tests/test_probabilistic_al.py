@@ -1,12 +1,15 @@
 from copy import deepcopy
+import itertools
+from math import exp, factorial, lgamma
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
-from skactiveml.pool import ProbabilisticAL
+from skactiveml.pool import ProbabilisticAL, cost_reduction
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
@@ -91,6 +94,32 @@ class TestProbabilisticAL(
 
     def test_fitted_multilabel_classifier_rejected_before_state(self):
         self._test_fitted_multilabel_classifier_rejection()
+
+    def test_query_candidate_mapping_matches_closed_form(self):
+        X = np.random.RandomState(0).uniform(size=(8, 2))
+        y = np.array([0, 1, 0, np.nan, np.nan, np.nan, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
+        for candidates in [None, np.array([7, 3, 5]), X[[7, 3, 5]]]:
+            with self.subTest(candidates=candidates):
+                params = dict(
+                    X=X,
+                    y=y,
+                    clf=clf,
+                    fit_clf=False,
+                    candidates=candidates,
+                    batch_size=2,
+                    return_utilities=True,
+                )
+                actual = ProbabilisticAL(random_state=0).query(**params)
+                with patch(
+                    "skactiveml.pool._probabilistic_al.cost_reduction",
+                    side_effect=TestCostReduction._reference,
+                ):
+                    expected = ProbabilisticAL(random_state=0).query(**params)
+                np.testing.assert_array_equal(actual[0], expected[0])
+                np.testing.assert_allclose(
+                    actual[1], expected[1], rtol=1e-9, atol=1e-11
+                )
 
     # Test init parameters
     def test_init_param_prior(self):
@@ -221,3 +250,94 @@ class TestProbabilisticAL(
             X=[[0], [2]], y=[0, 1], clf=clf, candidates=[[0], [1], [2]]
         )
         np.testing.assert_array_equal(best_indices, [1])
+
+
+class TestCostReduction(unittest.TestCase):
+    @staticmethod
+    def _reference(k_vec_list, C=None, m_max=2, prior=1e-3):
+        """Evaluate the original closed-form integral without batching."""
+        n_classes = len(k_vec_list[0])
+        C = 1 - np.eye(n_classes) if C is None else C
+
+        def log_beta(alpha):
+            return sum(lgamma(a) for a in alpha) - lgamma(sum(alpha))
+
+        gains = []
+        for k in k_vec_list:
+            alpha = np.asarray(k) + prior
+            risks = []
+            for m in range(m_max + 1):
+                risk = 0.0
+                for counts in itertools.product(
+                    range(m + 1), repeat=n_classes
+                ):
+                    if sum(counts) != m:
+                        continue
+                    counts = np.asarray(counts)
+                    decision = np.argmin((k + counts) @ C)
+                    coefficient = factorial(m)
+                    for count in counts:
+                        coefficient /= factorial(count)
+                    for c in range(n_classes):
+                        indicator = np.eye(n_classes)[c]
+                        risk += (
+                            coefficient
+                            * C[c, decision]
+                            * exp(
+                                log_beta(alpha + counts + indicator)
+                                - log_beta(alpha)
+                            )
+                        )
+                risks.append(risk)
+            gains.append(
+                max((risks[0] - risks[m]) / m for m in range(1, m_max + 1))
+            )
+        return np.asarray(gains)
+
+    def test_closed_form_equivalence(self):
+        rng = np.random.RandomState(42)
+        for n_classes in [2, 3, 5]:
+            k = rng.uniform(0, 5, size=(4, n_classes))
+            k[0] = 0
+            k[1] = 2
+            costs = rng.uniform(size=(n_classes, n_classes))
+            for m_max in [1, 2, 3]:
+                for prior in [1e-3, 1, 10]:
+                    for C in [None, costs]:
+                        with self.subTest(
+                            n_classes=n_classes,
+                            m_max=m_max,
+                            prior=prior,
+                            default_cost=C is None,
+                        ):
+                            expected = self._reference(k, C, m_max, prior)
+                            actual = cost_reduction(k, C, m_max, prior)
+                            np.testing.assert_allclose(
+                                actual, expected, rtol=1e-9, atol=1e-11
+                            )
+
+    def test_default_cost_and_integer_counts(self):
+        counts = [[0, 0, 0], [1, 1, 0], [2, 0, 1]]
+        for prior in [1e-30, 1, 10]:
+            default = cost_reduction(counts, prior=prior)
+            explicit = cost_reduction(counts, C=1 - np.eye(3), prior=prior)
+            np.testing.assert_allclose(default, explicit, atol=1e-14)
+
+    def test_underflowing_beta_functions(self):
+        for count, prior in [(1000, 1), (0, 1000), (1e6, 1e-3)]:
+            # With tied binary counts, one acquired label reduces the risk
+            # from 1/2 to alpha / (2 * alpha + 1).
+            expected = 1 / (4 * (count + prior) + 2)
+            actual = cost_reduction([[count, count]], m_max=1, prior=prior)
+            np.testing.assert_allclose(actual, expected, rtol=1e-8)
+        np.testing.assert_allclose(
+            cost_reduction([[0, 0]], m_max=1, prior=1e-30), [0.5]
+        )
+
+    def test_candidate_chunks_and_input_preservation(self):
+        counts = np.tile(np.arange(5, dtype=float), (10001, 1))
+        before = counts.copy()
+        expected = self._reference(counts[:1])
+        actual = cost_reduction(counts)
+        np.testing.assert_allclose(actual, np.repeat(expected, len(counts)))
+        np.testing.assert_array_equal(counts, before)

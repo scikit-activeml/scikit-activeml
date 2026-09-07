@@ -1,7 +1,5 @@
-import itertools
-
 import numpy as np
-from scipy.special import factorial, gammaln
+from scipy.special import factorial
 from sklearn.utils.validation import check_array
 
 from ..base import SkactivemlClassifier
@@ -272,7 +270,8 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
     n_samples = len(k_vec_list)
 
     # check cost matrix
-    C = 1 - np.eye(n_classes) if C is None else np.asarray(C)
+    if C is not None:
+        C = np.asarray(C)
 
     # generate labelling vectors for all possible m values
     l_vec_list = np.vstack(
@@ -281,44 +280,58 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
     m_list = np.sum(l_vec_list, axis=1)
     n_l_vecs = len(l_vec_list)
 
-    # compute optimal cost-sensitive decision for all combination of k-vectors
-    # and l-vectors
-    tile = np.tile(k_vec_list, (n_l_vecs, 1, 1))
-    k_l_vec_list = np.swapaxes(tile, 0, 1) + l_vec_list
-    y_hats = np.argmin(k_l_vec_list @ C, axis=2)
+    # Each count vector follows one vector with one fewer observation. This
+    # lets us evaluate B(alpha + l) / B(alpha) using the beta recurrence,
+    # without evaluating either (potentially underflowing) beta function.
+    l_indices = {tuple(l_vec): i for i, l_vec in enumerate(l_vec_list)}
+    added_classes = np.argmax(l_vec_list > 0, axis=1)
+    predecessors = np.zeros(n_l_vecs, dtype=int)
+    for i in range(1, n_l_vecs):
+        predecessor = l_vec_list[i].copy()
+        predecessor[added_classes[i]] -= 1
+        predecessors[i] = l_indices[tuple(predecessor)]
 
-    # add prior to k-vectors
-    prior = prior * np.ones(n_classes)
-    k_vec_list = np.asarray(k_vec_list) + prior
-
-    # all combination of k-, l-, and prediction indicator vectors
-    combs = [k_vec_list, l_vec_list, np.eye(n_classes)]
-    combs = np.asarray(
-        [list(elem) for elem in list(itertools.product(*combs))]
-    )
-
-    # three factors of the closed form solution
-    factor_1 = 1 / _euler_beta(k_vec_list)
-    factor_2 = _multinomial(l_vec_list)
-    factor_3 = _euler_beta(np.sum(combs, axis=1)).reshape(
-        n_samples, n_l_vecs, n_classes
-    )
-
-    # expected classification cost for each m
-    m_sums = np.asarray(
-        [
-            factor_1[k_idx]
-            * np.bincount(
-                m_list,
-                factor_2
-                * [
-                    C[:, y_hats[k_idx, l_idx]] @ factor_3[k_idx, l_idx]
-                    for l_idx in range(n_l_vecs)
-                ],
+    k_vec_list = np.asarray(k_vec_list, dtype=float)
+    multinomial = _multinomial(l_vec_list)
+    m_sums = np.empty((n_samples, m_max + 1))
+    # Bound the candidate/count/class tensors to about one million entries.
+    # Enumerating the count vectors remains combinatorial in m_max.
+    chunk_size = max(1, 2**20 // (n_l_vecs * n_classes))
+    for start in range(0, n_samples, chunk_size):
+        stop = min(start + chunk_size, n_samples)
+        k = k_vec_list[start:stop]
+        k_l = k[:, None, :] + l_vec_list
+        # Preserve the decision rule: the prior affects the expectation,
+        # but is not added when choosing the predicted class.
+        y_hats = (
+            np.argmax(k_l, axis=2) if C is None else np.argmin(k_l @ C, axis=2)
+        )
+        alpha = k + prior
+        alpha_sum = np.sum(alpha, axis=1)
+        beta_ratio = np.ones((len(k), n_l_vecs))
+        for i in range(1, n_l_vecs):
+            c = added_classes[i]
+            beta_ratio[:, i] = beta_ratio[:, predecessors[i]] * (
+                (alpha[:, c] + (l_vec_list[i, c] - 1))
+                / (alpha_sum + (m_list[i] - 1))
             )
-            for k_idx in range(n_samples)
-        ]
-    )
+
+        posterior = k_l + prior
+        if C is None:
+            # Sum the non-predicted classes directly to retain small costs
+            # even when the predicted class probability rounds to one.
+            np.put_along_axis(posterior, y_hats[:, :, None], 0, axis=2)
+            expected_cost = np.sum(posterior, axis=2)
+        else:
+            expected_cost = np.sum(
+                posterior * np.moveaxis(C[:, y_hats], 0, -1), axis=2
+            )
+        expected_cost /= alpha_sum[:, None] + m_list
+        weighted_cost = beta_ratio * multinomial * expected_cost
+        for m in range(m_max + 1):
+            m_sums[start:stop, m] = np.sum(
+                weighted_cost[:, m_list == m], axis=1
+            )
 
     # compute classification cost reduction as difference
     gains = np.zeros((n_samples, m_max)) + m_sums[:, 0].reshape(-1, 1)
@@ -364,24 +377,6 @@ def _gen_l_vec_list(m_approx, n_classes):
     label_vec_list = np.array(new_label_vec_list, int)
 
     return label_vec_list
-
-
-def _euler_beta(a):
-    """Represents Euler beta function:
-
-    B(a(i)) = (Gamma(a(i,1))*...*Gamma(a_n))/Gamma(a(i,1)+...+a(i,n)).
-
-    Parameters
-    ----------
-    a : array-like of shape (m, n)
-        Vectors to evaluated.
-
-    Returns
-    -------
-    result : array-like of shape (m,)
-        Euler beta function results [B(a(0)), ..., B(a(m))
-    """
-    return np.exp(np.sum(gammaln(a), axis=1) - gammaln(np.sum(a, axis=1)))
 
 
 def _multinomial(a):
