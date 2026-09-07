@@ -240,7 +240,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             # Majority voting preserves the outer class vocabulary and always
             # produces one value per sample. A fixed local seed preflights the
             # aggregate without consuming query randomness.
-            preflight_aggregated_y = majority_vote(y, random_state=0)
+            preflight_aggregated_y = majority_vote(
+                y, missing_label=self.missing_label, random_state=0
+            )
         else:
             preflight_aggregated_y = y_aggregate(np.asarray(y))
 
@@ -310,7 +312,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         random_state = self.random_state_
         y_sq = (
-            majority_vote(y, random_state=random_state)
+            majority_vote(
+                y, missing_label=self.missing_label_, random_state=random_state
+            )
             if uses_default_aggregate
             else preflight_aggregated_y
         )

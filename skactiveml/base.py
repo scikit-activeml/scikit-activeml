@@ -982,7 +982,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        check_array(y, ensure_2d=True, ensure_all_finite="allow-nan")
+        check_array(
+            y, dtype=None, ensure_2d=True, ensure_all_finite="allow-nan"
+        )
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:

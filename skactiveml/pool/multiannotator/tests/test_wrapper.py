@@ -1,4 +1,6 @@
+from functools import wraps
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.datasets import make_blobs
@@ -57,6 +59,42 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ],
             dtype=float,
         )
+
+    def test_default_aggregation_honors_missing_label(self):
+        X = np.arange(3)[:, None]
+        for missing_label, y, expected in [
+            (
+                None,
+                [["a", None, None], ["b", None, None], [None, None, None]],
+                ["a", "b", None],
+            ),
+            (-1, [[0, -1, -1], [1, -1, -1], [-1, -1, -1]], [0, 1, -1]),
+        ]:
+            with self.subTest(missing_label=missing_label):
+                strategy = RandomSampling(
+                    missing_label=missing_label, random_state=0
+                )
+                wrapper = SingleAnnotatorWrapper(
+                    strategy, missing_label=missing_label, random_state=0
+                )
+                aggregates = []
+
+                @wraps(majority_vote)
+                def vote(*args, **kwargs):
+                    result = majority_vote(*args, **kwargs)
+                    aggregates.append(result.copy())
+                    return result
+
+                with patch(
+                    "skactiveml.pool.multiannotator._wrapper.majority_vote",
+                    new=vote,
+                ):
+                    query = wrapper.query(X, np.asarray(y), batch_size=1)
+                self.assertEqual(query.shape, (1, 2))
+                self.assertEqual(len(aggregates), 2)
+                for aggregate in aggregates:
+                    np.testing.assert_array_equal(aggregate, expected)
+                self.assertIsNone(wrapper.y_aggregate)
 
     def test_init_param_target_type(self):
         wrapper = SingleAnnotatorWrapper(

@@ -497,6 +497,12 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
         self.qs = MultiAnnotatorPoolQueryStrategy()
         self.qs.missing_label_ = MISSING_LABEL
 
+    def test_validation_preserves_string_annotations(self):
+        y = np.array([["a", None], ["b", None], [None, None]], dtype=object)
+        strategy = DummyMultiAnnotatorPoolQueryStrategy(missing_label=None)
+        validated = strategy.query(X=np.arange(3)[:, None], y=y)
+        np.testing.assert_array_equal(validated[1], y)
+
     def test_query(self):
         self.assertRaises(
             NotImplementedError,
