@@ -1,3 +1,7 @@
+import pickle
+import subprocess
+import sys
+
 import random
 import unittest
 import numpy as np
@@ -724,7 +728,8 @@ class TestSklearnNormalRegressor(
 
         class GaussianProcessRegressorDummy(GaussianProcessRegressor):
             def partial_fit(self, X, y, sample_weight=None):
-                return self.fit(X, y, sample_weight=sample_weight)
+                # Accept weights for wrapper validation; GPR fits unweighted.
+                return self.fit(X, y)
 
         self.prob_reg_partial_fit = GaussianProcessRegressorDummy()
 
@@ -747,6 +752,11 @@ class TestSklearnNormalRegressor(
         super().test_fit_param_sample_weight(
             test_cases,
             replace_init_params=replace_init_params,
+        )
+
+    def test_partial_fit_returns_self(self):
+        super().test_partial_fit_returns_self(
+            replace_init_params={"estimator": self.prob_reg_partial_fit}
         )
 
     def test_partial_fit_param_X(self, test_cases=None):
@@ -1028,6 +1038,45 @@ if successful_skorch_torch_import:
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
             )
+
+        def test_fitted_tuple_estimator_loads_in_fresh_interpreter(self):
+            X = np.arange(40, dtype=np.float32).reshape(4, 10) / 10
+            y = np.array([0, 0, 1, 1])
+            for criterion in [nn.MSELoss, nn.MSELoss()]:
+                with self.subTest(criterion=criterion):
+                    estimator = SkorchRegressor(
+                        module=TestNeuralNet,
+                        criterion=criterion,
+                        forward_outputs={"prediction": (0, None)},
+                        neural_net_param_dict={
+                            "max_epochs": 1,
+                            "train_split": None,
+                            "verbose": 0,
+                        },
+                        random_state=0,
+                    ).fit(X, y)
+                    expected = estimator.predict(X)
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-c",
+                            """
+import pickle
+import sys
+import numpy as np
+estimator, X, y, expected = pickle.loads(sys.stdin.buffer.read())
+np.testing.assert_allclose(estimator.predict(X), expected)
+assert estimator.partial_fit(X, y) is estimator
+assert np.isfinite(estimator.predict(X)).all()
+""",
+                        ],
+                        input=pickle.dumps((estimator, X, y, expected)),
+                        capture_output=True,
+                        timeout=60,
+                    )
+                    self.assertEqual(
+                        result.returncode, 0, result.stderr.decode()
+                    )
 
         def test_init_param_module(self, test_cases=None):
             reg = SkorchRegressor(module="Test")

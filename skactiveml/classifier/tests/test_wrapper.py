@@ -1,3 +1,7 @@
+import pickle
+import subprocess
+import sys
+
 import random
 import unittest
 import warnings
@@ -3589,6 +3593,47 @@ if successful_skorch_torch_import:
                 predict_default_params_multilabel=pred_def_params_multilabel,
             )
 
+        def test_fitted_tuple_estimator_loads_in_fresh_interpreter(self):
+            X = np.arange(4, dtype=np.float32).reshape(4, 1) / 10
+            y = np.array([0, 0, 1, 1])
+            for criterion in [nn.CrossEntropyLoss, nn.CrossEntropyLoss()]:
+                with self.subTest(criterion=criterion):
+                    estimator = SkorchClassifier(
+                        module=TestNeuralNet,
+                        criterion=criterion,
+                        forward_outputs={
+                            "prediction": (0, nn.Softmax(dim=-1))
+                        },
+                        neural_net_param_dict={
+                            "max_epochs": 1,
+                            "train_split": None,
+                            "verbose": 0,
+                        },
+                        random_state=0,
+                    ).fit(X, y)
+                    expected = estimator.predict_proba(X)
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-c",
+                            """
+import pickle
+import sys
+import numpy as np
+estimator, X, y, expected = pickle.loads(sys.stdin.buffer.read())
+np.testing.assert_allclose(estimator.predict_proba(X), expected)
+assert estimator.partial_fit(X, y) is estimator
+assert np.isfinite(estimator.predict_proba(X)).all()
+""",
+                        ],
+                        input=pickle.dumps((estimator, X, y, expected)),
+                        capture_output=True,
+                        timeout=60,
+                    )
+                    self.assertEqual(
+                        result.returncode, 0, result.stderr.decode()
+                    )
+
         def test_init_param_module(self, test_cases=None):
             clf = SkorchClassifier(module="Test")
             self.assertEqual(clf.module, "Test")
@@ -4432,6 +4477,40 @@ if successful_river_import:
         TemplateSkactivemlClassifier,
         unittest.TestCase,
     ):
+        def setUp(self):
+            # Set global seeds.
+            random.seed(0)
+            self.X, self.y_true = make_blobs(
+                n_samples=200, n_features=1, centers=2, random_state=0
+            )
+            self.X = self.X.astype(np.float32)
+            self.y = np.copy(self.y_true).astype(np.float32)
+            self.y[:100] = MISSING_LABEL
+            self.y_ulbld = np.full_like(self.y, fill_value=MISSING_LABEL)
+            self.classes = np.unique(self.y_true)
+
+            estimator_class = RiverClassifier
+            init_default_params = {
+                "estimator": river.tree.HoeffdingAdaptiveTreeClassifier(
+                    seed=0
+                ),
+                "classes": None,
+                "missing_label": MISSING_LABEL,
+                "cost_matrix": None,
+                "random_state": 0,
+            }
+            fit_default_params = {
+                "X": self.X,
+                "y": self.y,
+            }
+            predict_default_params = {"X": self.X}
+            super().setUp(
+                estimator_class=estimator_class,
+                init_default_params=init_default_params,
+                fit_default_params=fit_default_params,
+                predict_default_params=predict_default_params,
+            )
+
         def test_probabilities_follow_training_encoding(self):
             X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
             for classes in ([20, 10], [2, 1], ["z", "a"]):
@@ -4467,40 +4546,6 @@ if successful_river_import:
                         np.testing.assert_array_equal(
                             clf.predict(X), canonical[reference.predict(X)]
                         )
-
-        def setUp(self):
-            # Set global seeds.
-            random.seed(0)
-            self.X, self.y_true = make_blobs(
-                n_samples=200, n_features=1, centers=2, random_state=0
-            )
-            self.X = self.X.astype(np.float32)
-            self.y = np.copy(self.y_true).astype(np.float32)
-            self.y[:100] = MISSING_LABEL
-            self.y_ulbld = np.full_like(self.y, fill_value=MISSING_LABEL)
-            self.classes = np.unique(self.y_true)
-
-            estimator_class = RiverClassifier
-            init_default_params = {
-                "estimator": river.tree.HoeffdingAdaptiveTreeClassifier(
-                    seed=0
-                ),
-                "classes": None,
-                "missing_label": MISSING_LABEL,
-                "cost_matrix": None,
-                "random_state": 0,
-            }
-            fit_default_params = {
-                "X": self.X,
-                "y": self.y,
-            }
-            predict_default_params = {"X": self.X}
-            super().setUp(
-                estimator_class=estimator_class,
-                init_default_params=init_default_params,
-                fit_default_params=fit_default_params,
-                predict_default_params=predict_default_params,
-            )
 
         def _make_incremental_contract_classifier(self):
             return RiverClassifier(

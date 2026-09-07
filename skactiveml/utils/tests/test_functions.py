@@ -1,4 +1,9 @@
+from abc import ABCMeta
+
 import pickle
+import subprocess
+import sys
+from copy import deepcopy
 import unittest
 
 import inspect
@@ -199,6 +204,180 @@ class TestFunctions(unittest.TestCase):
             self.assertEqual(param_a.default, param_a.default)
 
     if successful_skorch_torch_import:
+
+        def test_tuple_aware_criterion_loads_in_fresh_interpreter(self):
+            logits = torch.tensor([[2.0, -1.0], [-1.0, 2.0]])
+            target = torch.tensor([0, 1])
+            outputs = (logits + 3, logits, logits - 2)
+            entries = []
+            for selector in [None, "scores", ["scores"]]:
+                for base in [
+                    nn.CrossEntropyLoss,
+                    nn.CrossEntropyLoss(
+                        weight=torch.tensor([1.0, 3.0]), reduction="sum"
+                    ),
+                ]:
+                    wrapped = make_criterion_tuple_aware(
+                        base,
+                        criterion_output_keys=selector,
+                        forward_outputs={"scores": (1, None)},
+                    )
+                    instance = (
+                        wrapped() if isinstance(wrapped, type) else wrapped
+                    )
+                    original = base() if isinstance(base, type) else base
+                    expected = original(logits, target)
+                    entries.append((wrapped, outputs, target, expected))
+                    copied = deepcopy(instance)
+                    self.assertTrue(
+                        torch.allclose(copied(outputs, target), expected)
+                    )
+                    self.assertIsInstance(copied, nn.CrossEntropyLoss)
+            tuple_loss = make_criterion_tuple_aware(
+                _TupleLoss(scale=2),
+                criterion_output_keys=["last", "first"],
+                forward_outputs={"first": (0, None), "last": (2, None)},
+            )
+            expected = _TupleLoss(scale=2)((outputs[2], outputs[0]), target)
+            entries.append((tuple_loss, outputs, target, expected))
+            for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+                with self.subTest(protocol=protocol):
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-c",
+                            """
+import pickle
+import sys
+import torch
+entries = pickle.loads(sys.stdin.buffer.read())
+for criterion, outputs, target, expected in entries:
+    if isinstance(criterion, type):
+        criterion = criterion()
+    torch.testing.assert_close(criterion(outputs, target), expected)
+        """,
+                        ],
+                        input=pickle.dumps(entries, protocol=protocol),
+                        capture_output=True,
+                        timeout=60,
+                    )
+                    self.assertEqual(
+                        result.returncode, 0, result.stderr.decode()
+                    )
+
+        def test_tuple_aware_criterion_subclasses_keep_overrides(self):
+            criterion = _ScaledTupleAwareLoss(reduction="sum")
+            for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+                with self.subTest(protocol=protocol):
+                    restored_class, restored = pickle.loads(
+                        pickle.dumps(
+                            (_ScaledTupleAwareLoss, criterion),
+                            protocol=protocol,
+                        )
+                    )
+                    self.assertIs(restored_class, _ScaledTupleAwareLoss)
+                    self.assertIs(type(restored), _ScaledTupleAwareLoss)
+                    inputs = (torch.zeros(2), torch.zeros(2), torch.ones(2))
+                    torch.testing.assert_close(
+                        restored(inputs, torch.zeros(2)), torch.tensor(6.0)
+                    )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    """
+import pickle
+import sys
+import torch
+cls, criterion = pickle.loads(sys.stdin.buffer.read())
+assert cls.__name__ == "_ScaledTupleAwareLoss"
+assert type(criterion) is cls
+inputs = (torch.zeros(2), torch.zeros(2), torch.ones(2))
+torch.testing.assert_close(criterion(inputs, torch.zeros(2)), torch.tensor(6.))
+""",
+                ],
+                input=pickle.dumps((_ScaledTupleAwareLoss, criterion)),
+                capture_output=True,
+                timeout=60,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+            class LocalSubclass(_ScaledTupleAwareLoss):
+                pass
+
+            with self.assertRaises((AttributeError, pickle.PicklingError)):
+                pickle.dumps(LocalSubclass)
+
+        def test_tuple_aware_criterion_cache_distinguishes_base_classes(self):
+            class First:
+                class Loss(nn.MSELoss):
+                    def forward(self, input, target):
+                        return super().forward(input, target)
+
+            class Second:
+                class Loss(nn.MSELoss):
+                    def forward(self, input, target):
+                        return 2 * super().forward(input, target)
+
+            wrapped = []
+            for base in [First.Loss, Second.Loss]:
+                cls = make_criterion_tuple_aware(
+                    base, forward_outputs={"value": (0, None)}
+                )
+                self.assertTrue(issubclass(cls, base))
+                self.assertIs(
+                    cls,
+                    make_criterion_tuple_aware(
+                        base, forward_outputs={"renamed": (0, None)}
+                    ),
+                )
+                wrapped.append(cls)
+            self.assertIsNot(wrapped[0], wrapped[1])
+            for cls, expected in zip(wrapped, [1.0, 2.0]):
+                torch.testing.assert_close(
+                    cls()((torch.ones(2),), torch.zeros(2)),
+                    torch.tensor(expected),
+                )
+
+        def test_tuple_aware_criterion_preserves_state_and_gradients(self):
+            base = _LearnedScaleLoss(scale=3.0)
+            criterion = make_criterion_tuple_aware(
+                base, forward_outputs={"value": (1, None)}
+            )
+            self.assertIsInstance(criterion, _LearnedScaleLoss)
+            self.assertIsNot(criterion.scale, base.scale)
+            self.assertIsNot(criterion.offset, base.offset)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    """
+import pickle
+import sys
+import torch
+criterion = pickle.loads(sys.stdin.buffer.read())
+assert criterion.training is False
+assert criterion.description == "custom state"
+torch.testing.assert_close(criterion.scale, torch.tensor(3.))
+torch.testing.assert_close(criterion.offset, torch.tensor(2.))
+x = torch.ones(2, requires_grad=True)
+y = torch.zeros(2)
+loss = criterion((torch.zeros(2), x), y)
+torch.testing.assert_close(loss, torch.tensor(5.))
+loss.backward()
+torch.testing.assert_close(x.grad, torch.full((2,), 3.))
+torch.testing.assert_close(criterion.scale.grad, torch.tensor(1.))
+# Tensor input bypasses selection and uses the same initialized criterion.
+torch.testing.assert_close(criterion(x, y), torch.tensor(5.))
+""",
+                ],
+                input=pickle.dumps(criterion.eval()),
+                capture_output=True,
+                timeout=60,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            self.assertTrue(base.training)
+            self.assertIsNone(base.scale.grad)
 
         def test_make_criterion_tuple_aware(self):
             x = torch.randn(8, 5)
@@ -441,3 +620,32 @@ class TestFunctions(unittest.TestCase):
             self.assertEqual(
                 TupleAwareDummy.__name__, "TupleAwareDummyTupleLossIdx0_2"
             )
+
+
+if successful_skorch_torch_import:
+
+    class _TupleLoss(nn.Module):
+        def __init__(self, scale):
+            super().__init__()
+            self.register_buffer("scale", torch.tensor(float(scale)))
+
+        def forward(self, input, target):
+            return self.scale * (input[0] - 2 * input[1]).sum()
+
+    class _ScaledTupleAwareLoss(
+        make_criterion_tuple_aware(
+            nn.MSELoss, forward_outputs={"value": (2, None)}
+        )
+    ):
+        def forward(self, input, target):
+            return 3 * super().forward(input, target)
+
+    class _LearnedScaleLoss(nn.Module, metaclass=ABCMeta):
+        def __init__(self, scale):
+            super().__init__()
+            self.scale = nn.Parameter(torch.tensor(float(scale)))
+            self.register_buffer("offset", torch.tensor(2.0))
+            self.description = "custom state"
+
+        def forward(self, input, target):
+            return self.scale * ((input - target) ** 2).mean() + self.offset
