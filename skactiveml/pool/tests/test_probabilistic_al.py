@@ -1,3 +1,4 @@
+from copy import deepcopy
 import unittest
 
 import numpy as np
@@ -39,6 +40,54 @@ class TestProbabilisticAL(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_query_preserves_constructor_parameters(self):
+        super().test_query_preserves_constructor_parameters()
+        for metric_dict in [None, {}, {"gamma": 0.5}]:
+            super().test_query_preserves_constructor_parameters(
+                init_param_overrides={
+                    "metric": "rbf",
+                    "metric_dict": metric_dict,
+                }
+            )
+
+    def test_query_metric_defaults_and_kernel_change(self):
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        y = np.array([0, 1, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
+        query_kwargs = dict(
+            X=X,
+            y=y,
+            clf=clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+        for metric_dict in [None, {}, {"gamma": 0.5}]:
+            with self.subTest(metric_dict=metric_dict):
+                qs = ProbabilisticAL(
+                    metric="rbf", metric_dict=metric_dict, random_state=0
+                )
+                reference = ProbabilisticAL(
+                    metric="rbf",
+                    random_state=0,
+                    metric_dict=(
+                        {"gamma": "mean"}
+                        if metric_dict is None
+                        else deepcopy(metric_dict)
+                    ),
+                ).query(**query_kwargs)
+                for _ in range(2):
+                    indices, utilities = qs.query(**query_kwargs)
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
+                if metric_dict is None:
+                    qs.set_params(metric="linear")
+                    indices, utilities = qs.query(**query_kwargs)
+                    reference = ProbabilisticAL(
+                        metric="linear", random_state=0
+                    ).query(**query_kwargs)
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
 
     def test_fitted_multilabel_classifier_rejected_before_state(self):
         self._test_fitted_multilabel_classifier_rejection()

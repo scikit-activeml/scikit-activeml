@@ -227,10 +227,11 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
     n_GSx_samples : int, default=1
         Indicates the number of selected samples required till the query
         strategy switches from GSx to the strategy specified by `method`.
-    method : "GSy" or "GSi", optional (default="GSi")
+    method : "GSy" or "GSi" or None, default=None
         Specifies whether only the diversity in the target space ("GSy") or the
         diversity in the feature and the target space ("GSi") should be
         maximized, when the number of selected samples exceeds `n_GSx_samples`.
+        `None` uses "GSi" without changing the configured parameter.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
@@ -355,9 +356,8 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             target_type=target_spec.target_type,
         )
 
-        if self.method is None:
-            self.method = "GSi"
-        check_type(self.method, "self.method", target_vals=["GSy", "GSi"])
+        method = "GSi" if self.method is None else self.method
+        check_type(method, "self.method", target_vals=["GSy", "GSi"])
         check_scalar(self.n_GSx_samples, "self.k_0", int, min_val=0)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
@@ -435,7 +435,7 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
                 metric_dict_x=self.x_metric_dict,
                 metric_y=self.y_metric,
                 metric_dict_y=self.y_metric_dict,
-                method="xy" if self.method == "GSi" else "y",
+                method="xy" if method == "GSi" else "y",
             )
 
             query_indices[batch_size_x:] = unselected_cands[query_indices_y]

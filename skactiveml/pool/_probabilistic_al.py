@@ -44,9 +44,8 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         If metric is set to None, the `predict_freq` function of the `clf` will
         be used instead. If this is not defined, a TypeError is raised.
     metric_dict : dict, default=None
-        Any further parameters that should be passed directly to the kernel
-        function. If metric_dict is None and metric is 'rbf' metric_dict is set
-        to {'gamma': 'mean'}.
+        Further parameters passed directly to the kernel function. With
+        `metric_dict=None` and `metric="rbf"`, queries use `{"gamma": "mean"}`.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     target_type : "auto" or "single-output", default="auto"
@@ -203,11 +202,14 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
 
         # Predict frequencies.
         if self.metric is not None:
-            if self.metric_dict is None and self.metric == "rbf":
-                self.metric_dict = {"gamma": "mean"}
+            metric_dict = (
+                {"gamma": "mean"}
+                if self.metric_dict is None and self.metric == "rbf"
+                else self.metric_dict
+            )
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
-                metric_dict=self.metric_dict,
+                metric_dict=metric_dict,
                 missing_label=clf.missing_label,
                 classes=clf.classes,
             )

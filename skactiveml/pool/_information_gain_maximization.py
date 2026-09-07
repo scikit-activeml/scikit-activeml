@@ -157,19 +157,20 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 "The training data contains no unlabeled " "data."
             )
 
-        if self.integration_dict_target_val is None:
-            self.integration_dict_target_val = {"method": "assume_linear"}
-
-        if self.integration_dict_cross_entropy is None:
-            self.integration_dict_cross_entropy = {
-                "method": "gauss_hermite",
-                "n_integration_samples": 10,
-            }
-        check_type(
-            self.integration_dict_target_val, "self.integration_dict", dict
+        integration_dict_target_val = (
+            {"method": "assume_linear"}
+            if self.integration_dict_target_val is None
+            else self.integration_dict_target_val
         )
+
+        integration_dict_cross_entropy = (
+            {"method": "gauss_hermite", "n_integration_samples": 10}
+            if self.integration_dict_cross_entropy is None
+            else self.integration_dict_cross_entropy
+        )
+        check_type(integration_dict_target_val, "self.integration_dict", dict)
         check_type(
-            self.integration_dict_cross_entropy, "self.integration_dict", dict
+            integration_dict_cross_entropy, "self.integration_dict", dict
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
@@ -181,7 +182,15 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 reg = clone(reg).fit(X, y, sample_weight)
 
         utilities_cand = self._kullback_leibler_divergence(
-            X_eval, X_cand, mapping, reg, X, y, sample_weight=sample_weight
+            X_eval,
+            X_cand,
+            mapping,
+            reg,
+            X,
+            y,
+            integration_dict_target_val=integration_dict_target_val,
+            integration_dict_cross_entropy=integration_dict_cross_entropy,
+            sample_weight=sample_weight,
         )
 
         if mapping is None:
@@ -198,7 +207,16 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _kullback_leibler_divergence(
-        self, X_eval, X_cand, mapping, reg, X, y, sample_weight=None
+        self,
+        X_eval,
+        X_cand,
+        mapping,
+        reg,
+        X,
+        y,
+        integration_dict_target_val,
+        integration_dict_cross_entropy,
+        sample_weight=None,
     ):
         """Calculates the expected Kullback-Leibler divergence over the
         evaluation set if each candidate sample where to be labeled.
@@ -219,6 +237,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
+        integration_dict_target_val : dict
+            Effective integration parameters for potential target values.
+        integration_dict_cross_entropy : dict
+            Effective integration parameters for cross entropy.
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
 
@@ -247,7 +269,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                     X_eval,
                     reg_new,
                     reg,
-                    integration_dict=self.integration_dict_cross_entropy,
+                    integration_dict=integration_dict_cross_entropy,
                     random_state=self.random_state_,
                 )
             )
@@ -258,7 +280,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             new_kl_divergence,
             reg,
             random_state=self.random_state_,
-            **self.integration_dict_target_val,
+            **integration_dict_target_val,
         )
 
         return kl_div

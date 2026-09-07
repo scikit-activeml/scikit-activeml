@@ -152,9 +152,12 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", ProbabilisticRegressor)
-        if self.integration_dict is None:
-            self.integration_dict = {"method": "assume_linear"}
-        check_type(self.integration_dict, "self.integration_dict", dict)
+        integration_dict = (
+            {"method": "assume_linear"}
+            if self.integration_dict is None
+            else self.integration_dict
+        )
+        check_type(integration_dict, "self.integration_dict", dict)
         if X_eval is None:
             X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
             if len(X_eval) == 0:
@@ -168,9 +171,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             X_eval = check_array(X_eval)
             _check_n_features(self, X_eval, reset=False)
         check_type(fit_reg, "fit_reg", bool)
-        if self.loss is None:
-            self.loss = mean_squared_error
-        _check_callable(self.loss, "self.loss", n_positional_parameters=2)
+        loss = mean_squared_error if self.loss is None else self.loss
+        _check_callable(loss, "self.loss", n_positional_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -195,14 +197,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             )
             y_pred_new = reg_new.predict(X_eval)
 
-            return self.loss(y_pred, y_pred_new)
+            return loss(y_pred, y_pred_new)
 
         change = conditional_expect(
             X_cand,
             _model_output_change,
             reg,
             random_state=self.random_state_,
-            **self.integration_dict,
+            **integration_dict,
         )
 
         if mapping is None:

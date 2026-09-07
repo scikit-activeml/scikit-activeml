@@ -1,3 +1,4 @@
+from sklearn.metrics import mean_squared_error
 import numpy as np
 import unittest
 
@@ -41,6 +42,30 @@ class TestExpectedModelOutputChange(
             ("illegal", TypeError),
         ]
         self._test_param("init", "loss", test_cases)
+
+    def test_query_effective_defaults_match_explicit_parameters(self):
+        query_kwargs = deepcopy(self.query_default_params_reg)
+        effective_defaults = {
+            "integration_dict": {"method": "assume_linear"},
+            "loss": mean_squared_error,
+        }
+        reference = ExpectedModelOutputChange(
+            random_state=0, **effective_defaults
+        ).query(
+            **query_kwargs,
+            return_utilities=True,
+        )
+        for explicit in [False, True]:
+            with self.subTest(explicit=explicit):
+                parameters = deepcopy(effective_defaults) if explicit else {}
+                qs = ExpectedModelOutputChange(random_state=0, **parameters)
+                for _ in range(2):
+                    indices, utilities = qs.query(
+                        **query_kwargs,
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
 
     def test_init_param_integration_dict(self):
         test_cases = [

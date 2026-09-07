@@ -39,9 +39,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         `predict_freq` function of the `clf` will be used instead. If this is
         not defined, an Exception is raised.
     metric_dict : dict, default=None
-        Any further parameters are passed directly to the kernel function. If
-        metric_dict is None and metric is 'rbf' metric_dict is set to {'gamma':
-        'mean'}.
+        Further parameters passed directly to the kernel function. With
+        `metric_dict=None` and `metric="rbf"`, queries use `{"gamma": "mean"}`.
     prior : float, default=1.0e-3
         The prior value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
@@ -168,11 +167,14 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
-            if self.metric_dict is None and self.metric == "rbf":
-                self.metric_dict = {"gamma": "mean"}
+            metric_dict = (
+                {"gamma": "mean"}
+                if self.metric_dict is None and self.metric == "rbf"
+                else self.metric_dict
+            )
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
-                metric_dict=self.metric_dict,
+                metric_dict=metric_dict,
                 missing_label=clf.missing_label,
                 classes=clf.classes,
             )

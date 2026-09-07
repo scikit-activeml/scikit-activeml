@@ -1,3 +1,4 @@
+from copy import deepcopy
 import unittest
 
 import numpy as np
@@ -118,6 +119,27 @@ class TestGreedySamplingTarget(
             strategy.query(X, y, reg, fit_reg=False)
 
         assert_no_query_state(self, strategy)
+
+    def test_query_effective_defaults_match_explicit_parameters(self):
+        query_kwargs = deepcopy(self.query_default_params_reg)
+        effective_defaults = {"method": "GSi"}
+        reference = GreedySamplingTarget(
+            random_state=0, **effective_defaults
+        ).query(
+            **query_kwargs,
+            return_utilities=True,
+        )
+        for explicit in [False, True]:
+            with self.subTest(explicit=explicit):
+                parameters = deepcopy(effective_defaults) if explicit else {}
+                qs = GreedySamplingTarget(random_state=0, **parameters)
+                for _ in range(2):
+                    indices, utilities = qs.query(
+                        **query_kwargs,
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
 
     def test_init_param_x_metric(self):
         test_cases = [

@@ -167,6 +167,24 @@ def _component_with_params(value, missing_label, classes):
     return clone(value).set_params(**replacements)
 
 
+def _constructor_parameter_snapshot(value):
+    """Copy parameter values, comparing nested estimators by configuration."""
+    if isinstance(value, BaseEstimator):
+        return type(value), _constructor_parameter_snapshot(
+            value.get_params(deep=False)
+        )
+    if isinstance(value, dict):
+        return {
+            key: _constructor_parameter_snapshot(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return type(value)(_constructor_parameter_snapshot(v) for v in value)
+    if isinstance(value, RandomState):
+        return value.get_state()
+    return deepcopy(value)
+
+
 class TemplateQueryStrategy:
     def setUp(
         self,
@@ -235,6 +253,36 @@ class TemplateQueryStrategy:
                 self.query_default_params_clf_multilabel,
                 kwargs_name="query_default_kwargs_clf_multilabel",
             )
+
+    def test_query_preserves_constructor_parameters(
+        self, init_param_overrides=None
+    ):
+        fixtures = [
+            ("classification", self.query_default_params_clf),
+            ("regression", self.query_default_params_reg),
+            ("multi-label", self.query_default_params_clf_multilabel),
+        ]
+        for target, query_params in fixtures:
+            if query_params is None:
+                continue
+            with self.subTest(target=target, overrides=init_param_overrides):
+                init_params = (
+                    self._multilabel_init_params()
+                    if target == "multi-label"
+                    else deepcopy(self.init_default_params)
+                )
+                if init_param_overrides is not None:
+                    init_params.update(deepcopy(init_param_overrides))
+                qs = self.qs_class(**init_params)
+                before = _constructor_parameter_snapshot(qs)
+                for query_number in range(2):
+                    with self.subTest(query_number=query_number):
+                        qs.query(**deepcopy(query_params))
+                        np.testing.assert_equal(
+                            _constructor_parameter_snapshot(qs),
+                            before,
+                            err_msg="Constructor parameters changed in query.",
+                        )
 
     def test_init_param_random_state(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

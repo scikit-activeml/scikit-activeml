@@ -160,9 +160,8 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
 
         check_type(reg, "reg", SkactivemlRegressor)
         check_type(fit_reg, "fit_reg", bool)
-        if self.feature_map is None:
-            self.feature_map = lambda x: x
-        _check_callable(self.feature_map, "self.feature_map")
+        if self.feature_map is not None:
+            _check_callable(self.feature_map, "self.feature_map")
 
         if fit_reg:
             if sample_weight is None:
@@ -187,7 +186,9 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         )
         pred = reg.predict(X_cand).reshape(1, -1)
         scalars = np.average(np.abs(results_learner - pred), axis=0)
-        X_cand_mapped_features = self.feature_map(X_cand)
+        X_cand_mapped_features = (
+            X_cand if self.feature_map is None else self.feature_map(X_cand)
+        )
         norms = np.linalg.norm(X_cand_mapped_features, ord=self.ord, axis=1)
         utilities_cand = scalars * norms
 
