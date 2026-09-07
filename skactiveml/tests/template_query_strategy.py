@@ -6,22 +6,41 @@ import numpy as np
 from numpy.random import RandomState
 from sklearn import clone
 import sklearn.datasets
+from sklearn.linear_model import SGDClassifier
+from sklearn.multioutput import MultiOutputClassifier
 
 from skactiveml.tests.utils import (
+    assert_no_query_state,
     check_positional_args,
     check_test_param_test_availability,
 )
 
 from skactiveml.exceptions import MappingError
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import (
     MISSING_LABEL,
     is_unlabeled,
     is_labeled,
+    labeled_indices,
+    resolve_target_spec,
     unlabeled_indices,
     call_func,
 )
+from skactiveml.utils._target import _class_vocabulary_key
+from skactiveml.utils._validation import _has_nested_classes
 
+from sklearn.base import BaseEstimator
 from sklearn.naive_bayes import GaussianNB
+
+# Distinct binary class vocabularies covering the shared custom-vocabulary
+# contract of multi-label pool query strategies. Each vocabulary is given in
+# canonical, i.e. sorted, order, so that its second entry is the positive
+# class of the corresponding label output.
+_MULTILABEL_STRING_VOCABULARIES = (
+    ("no", "yes"),
+    ("off", "on"),
+)
 
 
 class Dummy:
@@ -29,16 +48,140 @@ class Dummy:
         pass
 
 
+def _relabel_multilabel_target(
+    y, source_classes, vocabularies, *, missing_label
+):
+    """Relabel a multi-label target into other binary class vocabularies.
+
+    Each observation is mapped by its position in the source vocabulary of its
+    label output onto the canonically, i.e. sorted, ordered target vocabulary.
+    Canonically ordered source classes therefore preserve the meaning of every
+    observation, i.e. negative stays negative and positive stays positive.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples, n_outputs)
+        The multi-label target to relabel.
+    source_classes : tuple of tuple
+        The binary class vocabulary of `y` per label output.
+    vocabularies : tuple of tuple
+        The binary class vocabulary to relabel onto per label output.
+    missing_label : scalar or str or None
+        Value representing a missing observation in `y`.
+
+    Returns
+    -------
+    y_relabeled : numpy.ndarray of shape (n_samples, n_outputs)
+        The object-valued relabeled target, using `None` as its missing label.
+    """
+    y = np.asarray(y)
+    is_lbld = is_labeled(y, missing_label, target_type="multi-label")
+    y_relabeled = np.full(y.shape, None, dtype=object)
+    for output_idx, source_classes_i in enumerate(source_classes):
+        target_classes_i = sorted(vocabularies[output_idx])
+        for class_idx, class_label in enumerate(source_classes_i):
+            is_class = is_lbld & (y[:, output_idx] == class_label)
+            y_relabeled[is_class, output_idx] = target_classes_i[class_idx]
+    return y_relabeled
+
+
+def _fully_observed_target(y, missing_label, target_type):
+    """Return a copy of `y` in which every observation is observed.
+
+    The missing observations are filled with an already observed value, so
+    that the class vocabulary and, for a multi-label target, the all-or-nothing
+    row contract are preserved.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        The partially observed target to complete.
+    missing_label : scalar or str or None
+        Value representing a missing observation in `y`.
+    target_type : str
+        The resolved target type of `y`.
+
+    Returns
+    -------
+    y_observed : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
+        The completed target, i.e., an exhausted candidate pool.
+    """
+    y_observed = np.array(y, copy=True)
+    is_lbld = is_labeled(y_observed, missing_label, target_type=target_type)
+    is_ulbld = is_unlabeled(y_observed, missing_label, target_type=target_type)
+    y_observed[is_ulbld] = y_observed[is_lbld][0]
+    return y_observed
+
+
+def _with_component_params(params, *, missing_label, classes=None):
+    """Apply a missing label and class vocabularies to all components.
+
+    Every component carried by the parameters, e.g. a wrapped query strategy
+    or a classifier query argument, must agree with the strategy about the
+    missing label. Class vocabularies are replaced only where a component
+    declares one vocabulary per label output, so that a vocabulary of an
+    auxiliary single-output problem is never overwritten.
+    """
+    params = deepcopy(params)
+    for key, value in params.items():
+        if key == "missing_label":
+            params[key] = missing_label
+        else:
+            params[key] = _component_with_params(value, missing_label, classes)
+    return params
+
+
+def _declares_nested_classes(*param_dicts):
+    """Check whether a fixture supplies one class vocabulary per output.
+
+    A strategy resolving no class vocabulary receives none through its
+    fixture either, because `_component_with_params` applies vocabularies
+    only where a component declares one itself.
+    """
+    return any(
+        _has_nested_classes(getattr(value, "classes", None))
+        for params in param_dicts
+        for value in params.values()
+    )
+
+
+def _component_with_params(value, missing_label, classes):
+    """Return one component with the given declarations applied.
+
+    Only the parameters a component declares itself are replaced. A component
+    nested more deeply, e.g. the strategy wrapped by a wrapped strategy, or a
+    collection of components is not covered by any current fixture and fails
+    loudly through the missing-label checks, so such a fixture requires an
+    explicit override.
+    """
+    if not isinstance(value, BaseEstimator):
+        return value
+    component_params = value.get_params(deep=False)
+    replacements = {}
+    if "missing_label" in component_params:
+        replacements["missing_label"] = missing_label
+    if classes is not None and _has_nested_classes(
+        component_params.get("classes")
+    ):
+        replacements["classes"] = [list(classes_i) for classes_i in classes]
+    return clone(value).set_params(**replacements)
+
+
 class TemplateQueryStrategy:
     def setUp(
         self,
         qs_class,
         init_default_params,
+        init_default_params_multilabel=None,
         query_default_params_clf=None,
         query_default_params_reg=None,
+        query_default_params_clf_multilabel=None,
     ):
         self.super_setUp_has_been_executed = True
         self.qs_class = qs_class
+        self.supports_multilabel_batch_variation = getattr(
+            self, "supports_multilabel_batch_variation", True
+        )
 
         self.init_default_params = {"random_state": 42}
         self.init_default_params.update(deepcopy(init_default_params))
@@ -51,16 +194,24 @@ class TemplateQueryStrategy:
 
         self.query_default_params_clf = query_default_params_clf
         self.query_default_params_reg = query_default_params_reg
+        self.init_default_params_multilabel = deepcopy(
+            init_default_params_multilabel
+        )
+        self.query_default_params_clf_multilabel = (
+            query_default_params_clf_multilabel
+        )
 
         if (
             self.query_default_params_clf is None
             and self.query_default_params_reg is None
+            and self.query_default_params_clf_multilabel is None
         ):
             raise ValueError(
                 "The query strategies must support either "
                 "classification or regression. Hence, at least "
                 "one parameter of `query_default_params_clf` "
-                "and `query_default_params_reg` must be not None. "
+                "and `query_default_params_reg` or "
+                "`query_default_params_clf_multilabel` must be not None. "
                 "Use emtpy dictionary to use default values."
             )
         if self.query_default_params_clf is not None:
@@ -76,6 +227,13 @@ class TemplateQueryStrategy:
                 "query",
                 self.query_default_params_reg,
                 kwargs_name="query_default_kwargs_reg",
+            )
+        if self.query_default_params_clf_multilabel is not None:
+            check_positional_args(
+                self.qs_class.query,
+                "query",
+                self.query_default_params_clf_multilabel,
+                kwargs_name="query_default_kwargs_clf_multilabel",
             )
 
     def test_init_param_random_state(self, test_cases=None):
@@ -93,6 +251,17 @@ class TemplateQueryStrategy:
             test_cases=test_cases, fit_values=fit_values, model_type="reg"
         )
 
+    def _default_query_params(self, model_type):
+        if model_type == "clf":
+            return (
+                self.query_default_params_clf
+                if self.query_default_params_clf is not None
+                else self.query_default_params_clf_multilabel
+            )
+        if model_type == "reg":
+            return self.query_default_params_reg
+        raise ValueError("Only 'reg' or 'clf' is allowed as `model_type`.")
+
     def _fit_test(self, test_cases, model_type, fit_values=None):
         fit_values = [False, True] if fit_values is None else fit_values
         query_params = inspect.signature(self.qs_class.query).parameters
@@ -105,14 +274,7 @@ class TemplateQueryStrategy:
             # check if model remains the same for both options
             for fit_type in fit_values:
                 with self.subTest(msg="Model consistency"):
-                    if model_type == "clf":
-                        query_params = self.query_default_params_clf
-                    elif model_type == "reg":
-                        query_params = self.query_default_params_reg
-                    else:
-                        raise ValueError(
-                            "Only 'reg' or 'clf' is allowed as `model_type`."
-                        )
+                    query_params = self._default_query_params(model_type)
                     mdl = deepcopy(query_params[f"{model_type}"])
                     if not fit_type:
                         mdl.fit(query_params["X"], query_params["y"])
@@ -160,14 +322,7 @@ class TemplateQueryStrategy:
 
             # check if model remains the same
             with self.subTest(msg=f"{model_type} consistency"):
-                if model_type == "clf":
-                    query_params = self.query_default_params_clf
-                elif model_type == "reg":
-                    query_params = self.query_default_params_reg
-                else:
-                    raise ValueError(
-                        "Only 'reg' or 'clf' is allowed as `model_type`."
-                    )
+                query_params = self._default_query_params(model_type)
                 mdl = deepcopy(query_params[f"{model_type}"])
                 query_params = deepcopy(query_params)
                 query_params[f"{model_type}"] = deepcopy(mdl)
@@ -232,10 +387,21 @@ class TemplateQueryStrategy:
                 for key, val in replace_init_params.items():
                     init_params[key] = val
 
-                for query_params, exclude_case in [
+                query_param_cases = [
                     (self.query_default_params_clf, exclude_clf),
                     (self.query_default_params_reg, exclude_reg),
-                ]:
+                ]
+                if (
+                    self.query_default_params_clf is None
+                    and self.query_default_params_reg is None
+                ):
+                    query_param_cases.append(
+                        (
+                            self.query_default_params_clf_multilabel,
+                            exclude_clf,
+                        )
+                    )
+                for query_params, exclude_case in query_param_cases:
                     if not (query_params is None or exclude_case):
                         query_params = deepcopy(query_params)
                         for key, val in replace_query_params.items():
@@ -257,32 +423,61 @@ class TemplateQueryStrategy:
 
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
+    reproducibility_batch_size = 2
+
     def setUp(
         self,
         qs_class,
         init_default_params,
+        init_default_params_multilabel=None,
         query_default_params_clf=None,
         query_default_params_reg=None,
+        query_default_params_clf_multilabel=None,
     ):
         if "missing_label" not in init_default_params:
             init_default_params["missing_label"] = MISSING_LABEL
         super().setUp(
             qs_class,
             init_default_params,
+            init_default_params_multilabel,
             query_default_params_clf,
             query_default_params_reg,
+            query_default_params_clf_multilabel,
         )
-        self.y_shape = list(
-            self.query_default_params_clf["y"].shape
-            if self.query_default_params_clf is not None
-            else self.query_default_params_reg["y"].shape
-        )
+        if self.query_default_params_clf is not None:
+            default_query_params = self.query_default_params_clf
+        elif self.query_default_params_reg is not None:
+            default_query_params = self.query_default_params_reg
+        else:
+            default_query_params = self.query_default_params_clf_multilabel
+        self.y_shape = list(default_query_params["y"].shape)
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         ml = self.init_default_params["missing_label"]
         test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param("init", "missing_label", test_cases)
+
+    def test_init_param_target_type(self):
+        self.assertIn(
+            "target_type",
+            inspect.signature(self.qs_class.__init__).parameters,
+        )
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertIsInstance(strategy._target_capabilities, frozenset)
+        self.assertTrue(strategy._target_capabilities)
+        self.assertFalse(
+            any(
+                target_type == "multi-output"
+                for _, target_type, _ in strategy._target_capabilities
+            )
+        )
+        self._test_param(
+            "init",
+            "target_type",
+            [("invalid", ValueError)],
+        )
 
     def test_query_param_X(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -529,19 +724,409 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         ]:
             if query_params is not None:
                 query_params = deepcopy(query_params)
+                # Batch-level algorithms may delegate randomness to a
+                # component that is not exercised for `batch_size=1`, e.g.,
+                # a one-centroid clustering problem. Keep the shared
+                # reproducibility contract on a genuine batch.
+                query_params["batch_size"] = self.reproducibility_batch_size
                 query_params["return_utilities"] = True
                 id1, u1 = qs1.query(**query_params)
                 id1_again, u1_again = qs1.query(**query_params)
                 id2, u2 = qs2.query(**query_params)
+                id2_again, u2_again = qs2.query(**query_params)
 
                 self.assertEqual(len(u1[0]), len(query_params["X"]))
                 np.testing.assert_array_equal(id1, id1_again)
                 np.testing.assert_allclose(u1, u1_again)
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
+                np.testing.assert_array_equal(id2, id2_again)
+                np.testing.assert_allclose(u2, u2_again)
+
+    def test_query_multilabel_invalid_rows(self):
+        # Partially observed multi-label rows are rejected, for the ordinary
+        # as well as for a custom class vocabulary.
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        fixtures = [
+            (
+                "default",
+                self._multilabel_init_params(),
+                deepcopy(self.query_default_params_clf_multilabel),
+            ),
+            (
+                "custom-vocabulary",
+                *self._multilabel_custom_vocabulary_params(
+                    self._multilabel_string_vocabularies()
+                ),
+            ),
+        ]
+        for name, init_params, query_params in fixtures:
+            with self.subTest(vocabularies=name):
+                missing_label = init_params["missing_label"]
+                y = np.array(query_params["y"], copy=True)
+                observed_idx = labeled_indices(
+                    y, missing_label, target_type="multi-label"
+                )
+                y[observed_idx[0], 0] = missing_label
+                query_params["y"] = y
+
+                qs = self.qs_class(**init_params)
+                self.assertRaises(ValueError, qs.query, **query_params)
+
+    def test_query_param_sample_weight_multilabel(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        query_signature = inspect.signature(self.qs_class.query).parameters
+        if "sample_weight" not in query_signature:
+            return
+
+        base_query_params = deepcopy(self.query_default_params_clf_multilabel)
+        y = np.asarray(base_query_params["y"])
+        qs = self.qs_class(**self._multilabel_init_params())
+
+        query_params = deepcopy(base_query_params)
+        query_params["sample_weight"] = np.ones(len(y))
+        qs.query(**query_params)
+
+        query_params = deepcopy(base_query_params)
+        query_params["sample_weight"] = np.ones(len(y) + 1)
+        self.assertRaises(ValueError, qs.query, **query_params)
+
+    def test_query_multilabel_proba_format_contract(self):
+        # The public multilabel probability formats of `SklearnClassifier`
+        # ("array" and "list") must be interchangeable at the acquisition
+        # boundary of a query strategy, i.e., a strategy must never assume the
+        # native representation of the wrapped estimator.
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        base_params = deepcopy(self.query_default_params_clf_multilabel)
+        estimator_key = self._multilabel_proba_format_estimator_key(
+            base_params
+        )
+        if estimator_key is None:
+            return
+
+        proba_formats = ["auto", "array", "list"]
+        results = {}
+        for proba_format in proba_formats:
+            with self.subTest(proba_format=proba_format):
+                query_params = deepcopy(base_params)
+                query_params[estimator_key].set_params(
+                    proba_format=proba_format
+                )
+                query_params["return_utilities"] = True
+                if self.supports_multilabel_batch_variation:
+                    # Cover acquisition logic that indexes probabilities only
+                    # from the second selected sample of a batch onwards.
+                    query_params["batch_size"] = 2
+                qs = self.qs_class(**self._multilabel_init_params())
+                results[proba_format] = qs.query(**query_params)
+        if len(results) < len(proba_formats):
+            # A failing query is already reported by its own subtest.
+            return
+
+        for proba_format in ["array", "list"]:
+            with self.subTest(proba_format=proba_format):
+                np.testing.assert_array_equal(
+                    results["auto"][0],
+                    results[proba_format][0],
+                    err_msg=f"`proba_format='{proba_format}'` selects other "
+                    f"samples than `proba_format='auto'`.",
+                )
+                np.testing.assert_allclose(
+                    results["auto"][1],
+                    results[proba_format][1],
+                    equal_nan=True,
+                    err_msg=f"`proba_format='{proba_format}'` yields other "
+                    f"utilities than `proba_format='auto'`.",
+                )
+
+    @staticmethod
+    def _multilabel_proba_format_estimator_key(query_params):
+        # Locates the wrapper whose public multilabel probability format can
+        # be varied. Strategies without such an estimator, e.g. purely
+        # representation-based ones, are not covered by this contract.
+        for key in ["clf", "estimator"]:
+            candidate = query_params.get(key)
+            if isinstance(candidate, SklearnClassifier) and "proba_format" in (
+                candidate.get_params()
+            ):
+                return key
+        return None
+
+    def _multilabel_init_params(self):
+        init_params = deepcopy(self.init_default_params)
+        if self.init_default_params_multilabel is not None:
+            init_params.update(deepcopy(self.init_default_params_multilabel))
+        if (
+            "target_type"
+            in inspect.signature(self.qs_class.__init__).parameters
+        ):
+            init_params["target_type"] = "multi-label"
+        return init_params
+
+    def test_query_multilabel_custom_class_vocabularies(self):
+        # A multi-label target may use its own binary class vocabulary per
+        # label output, including string labels. Every strategy must therefore
+        # operate on encoded targets instead of assuming that raw labels are
+        # numeric or that they are `{0, 1}`.
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        vocabulary_cases = [
+            ("numeric", self._multilabel_numeric_vocabularies()),
+            ("string", self._multilabel_string_vocabularies()),
+        ]
+        results = {}
+        for name, vocabularies in vocabulary_cases:
+            with self.subTest(vocabularies=name):
+                init_params, query_params = (
+                    self._multilabel_custom_vocabulary_params(vocabularies)
+                )
+                y = query_params["y"]
+                missing_label = init_params["missing_label"]
+                unld_idx = unlabeled_indices(
+                    y, missing_label, target_type="multi-label"
+                )
+                lbld_idx = labeled_indices(
+                    y, missing_label, target_type="multi-label"
+                )
+                query_params["return_utilities"] = True
+
+                qs = self.qs_class(**init_params)
+                query_indices, utilities = qs.query(**query_params)
+
+                self.assertIn(query_indices[0], unld_idx)
+                self.assertTrue(
+                    np.isfinite(utilities[0, query_indices[0]]),
+                    msg=f"Non-finite utility of the selected candidate for "
+                    f"the {name}-valued class vocabularies {vocabularies}.",
+                )
+                # Only labeled samples are excluded via `np.nan`, i.e. a
+                # candidate that a strategy deliberately excludes must remain
+                # comparable through `-np.inf` instead of becoming invalid.
+                self.assertFalse(np.isnan(utilities[0, unld_idx]).any())
+                self.assertFalse(np.isposinf(utilities).any())
+                self.assertTrue(np.isnan(utilities[0, lbld_idx]).all())
+                results[name] = (query_indices, utilities)
+
+        if len(results) < len(vocabulary_cases):
+            # A failing query is already reported by its own subtest.
+            return
+
+        # Semantically equivalent vocabularies must not change acquisition.
+        np.testing.assert_array_equal(
+            results["numeric"][0],
+            results["string"][0],
+            err_msg="String-valued class vocabularies select other samples "
+            "than their equivalent numeric encoding.",
+        )
+        np.testing.assert_allclose(
+            results["numeric"][1],
+            results["string"][1],
+            equal_nan=True,
+            err_msg="String-valued class vocabularies yield other utilities "
+            "than their equivalent numeric encoding.",
+        )
+
+    def _multilabel_n_outputs(self):
+        """Return the number of label outputs of the multi-label fixture."""
+        return np.asarray(self.query_default_params_clf_multilabel["y"]).shape[
+            1
+        ]
+
+    def _multilabel_string_vocabularies(self):
+        """Return one distinct string class vocabulary per label output."""
+        return tuple(
+            (
+                _MULTILABEL_STRING_VOCABULARIES[output_idx]
+                if output_idx < len(_MULTILABEL_STRING_VOCABULARIES)
+                else (f"neg-{output_idx}", f"pos-{output_idx}")
+            )
+            for output_idx in range(self._multilabel_n_outputs())
+        )
+
+    def _multilabel_numeric_vocabularies(self):
+        """Return the ordinary numeric class vocabulary per label output."""
+        return tuple((0, 1) for _ in range(self._multilabel_n_outputs()))
+
+    def _multilabel_heterogeneous_vocabularies(self):
+        """Return per-output vocabularies whose dtypes deliberately differ."""
+        vocabularies = list(self._multilabel_string_vocabularies())
+        vocabularies[-1] = (0, 1)
+        return tuple(vocabularies)
+
+    def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
+        # One array holds every label output, so vocabularies of different
+        # dtypes cannot be represented. A strategy resolving a class
+        # vocabulary has to reject them through the shared resolution, and
+        # must not commit query state while doing so.
+        #
+        # A strategy resolving no class vocabulary is exempt: it takes no
+        # estimator declaring one, so it resolves the target type alone and
+        # never receives a vocabulary to reject. The exemption is read off the
+        # generated fixture, which is where a declared vocabulary has to
+        # appear for this contract to apply at all.
+        if self.query_default_params_clf_multilabel is None:
+            return
+        if self._multilabel_n_outputs() < 2:
+            return
+
+        init_params, query_params = self._multilabel_custom_vocabulary_params(
+            self._multilabel_heterogeneous_vocabularies()
+        )
+        if not _declares_nested_classes(init_params, query_params):
+            return
+
+        qs = self.qs_class(**init_params)
+
+        with self.assertRaisesRegex(
+            ValueError, "one dtype across all label outputs"
+        ):
+            qs.query(**query_params)
+
+        assert_no_query_state(self, qs)
+
+    def _multilabel_custom_vocabulary_params(self, vocabularies):
+        """Build the multi-label fixture of one custom class vocabulary.
+
+        The default implementation relabels the target of
+        `query_default_params_clf_multilabel` into the given per-output binary
+        class vocabularies and adapts the declared vocabularies and the missing
+        label of every component. An object-valued target is used, which
+        requires `missing_label=None` for the strategy as well as for each of
+        its components.
+
+        Override this hook if a strategy needs auxiliary inputs, e.g.
+        embeddings, logits, or a discriminator, that cannot be derived from the
+        default multi-label query parameters. Overriding replaces the fixture;
+        it must never skip the custom-vocabulary contract.
+
+        Parameters
+        ----------
+        vocabularies : tuple of tuple
+            One binary class vocabulary per label output in canonical, i.e.
+            sorted, order.
+
+        Returns
+        -------
+        init_params : dict
+            Initialization parameters of the query strategy.
+        query_params : dict
+            Query parameters using the given class vocabularies.
+        """
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params["y"] = _relabel_multilabel_target(
+            query_params["y"],
+            source_classes=self._multilabel_source_classes(query_params),
+            vocabularies=vocabularies,
+            missing_label=self.init_default_params["missing_label"],
+        )
+        # An object-valued target admits `None` as its only missing label.
+        init_params = _with_component_params(
+            self._multilabel_init_params(), missing_label=None
+        )
+        query_params = _with_component_params(
+            query_params, missing_label=None, classes=vocabularies
+        )
+        return init_params, query_params
+
+    def _multilabel_source_classes(self, query_params):
+        """Resolve the class vocabularies of the default fixture."""
+        declared_classes = None
+        for value in query_params.values():
+            classes = getattr(value, "classes", None)
+            if not _has_nested_classes(classes):
+                continue
+            if declared_classes is not None and _class_vocabulary_key(
+                classes
+            ) != _class_vocabulary_key(declared_classes):
+                raise AssertionError(
+                    "The default multi-label query parameters declare "
+                    "conflicting class vocabularies, so they cannot be "
+                    "relabeled. Override "
+                    "`_multilabel_custom_vocabulary_params`."
+                )
+            declared_classes = classes
+        target_spec = resolve_target_spec(
+            query_params["y"],
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=declared_classes,
+            missing_label=self.init_default_params["missing_label"],
+        )
+        return target_spec.classes
 
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
+    def _test_fitted_multilabel_classifier_rejection(
+        self,
+        *,
+        estimator_param="clf",
+        fit_param="fit_clf",
+        ensemble=False,
+    ):
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        y = np.array([[0, 1], [1, 0], [-1, -1], [-1, -1]])
+        classifier = SklearnClassifier(
+            MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        ).fit(X, y)
+        estimator = (
+            [classifier, deepcopy(classifier)] if ensemble else classifier
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params["missing_label"] = -1
+        strategy = self.qs_class(**init_params)
+        query_params = {
+            "X": X,
+            "y": y,
+            estimator_param: estimator,
+            fit_param: False,
+        }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            rf"{type(strategy).__name__} does not support target capability",
+        ):
+            strategy.query(**query_params)
+
+        assert_no_query_state(self, strategy)
+
+    def _test_classification_target_contract(
+        self,
+        expected_capabilities,
+        *,
+        estimator_param="clf",
+        fit_param="fit_clf",
+    ):
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(strategy._target_capabilities, expected_capabilities)
+
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        estimator = clone(query_params[estimator_param])
+        estimator.set_params(target_type="multi-label")
+        estimator.fit(query_params["X"], query_params["y"])
+        query_params[estimator_param] = estimator
+        query_params[fit_param] = False
+        conflicting = clone(strategy).set_params(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            conflicting.query(**query_params)
+
+        assert_no_query_state(self, conflicting)
+
     def test_query_al_cycles(self):
         budget = 1
         init_params = deepcopy(self.init_default_params)
@@ -606,6 +1191,52 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                     ids, utilities = qs.query(**query_params)
                     self.assertEqual(len(ids), max_batch_size)
 
+    def test_query_multilabel_batch_variation(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+        if not self.supports_multilabel_batch_variation:
+            return
+
+        init_params = self._multilabel_init_params()
+        qs = self.qs_class(**init_params)
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        missing_label = self.init_default_params["missing_label"]
+        max_batch_size = int(
+            sum(
+                is_unlabeled(
+                    query_params["y"],
+                    missing_label,
+                    target_type="multi-label",
+                )
+            )
+        )
+        batch_size = min(5, max_batch_size)
+        self.assertTrue(batch_size > 1, msg="Too few unlabeled")
+
+        query_params["batch_size"] = batch_size
+        query_params["return_utilities"] = True
+        query_ids, utils = qs.query(**query_params)
+
+        self.assertEqual(len(query_ids), batch_size)
+        self.assertEqual(len(utils), batch_size)
+        self.assertEqual(len(utils[0]), len(query_params["X"]))
+        n_labeled = sum(
+            is_labeled(
+                query_params["y"],
+                missing_label,
+                target_type="multi-label",
+            )
+        )
+        self.assertEqual(sum(np.isnan(utils[0])), n_labeled)
+
+        query_params["batch_size"] = max_batch_size + 1
+        self.assertWarns(Warning, qs.query, **query_params)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            ids, utilities = qs.query(**query_params)
+            self.assertEqual(len(ids), max_batch_size)
+
     def test_query_candidate_variation(self):
         init_params = deepcopy(self.init_default_params)
         qs = self.qs_class(**init_params)
@@ -643,6 +1274,361 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 except MappingError:
                     pass
 
+    def _test_exhausted_candidate_pool(
+        self, init_params, query_params, target_type
+    ):
+        """Check the exhausted-pool contract for one acquisition fixture."""
+        missing_label = self.init_default_params["missing_label"]
+        n_features = np.asarray(query_params["X"]).shape[1]
+        n_samples = len(query_params["X"])
+        y_observed = _fully_observed_target(
+            query_params["y"], missing_label, target_type
+        )
+        cases = [
+            ("fully labeled pool", y_observed, None, n_samples),
+            (
+                "empty index array",
+                query_params["y"],
+                np.array([], int),
+                n_samples,
+            ),
+            (
+                "empty candidate array",
+                query_params["y"],
+                np.empty((0, n_features)),
+                0,
+            ),
+        ]
+
+        for name, y, candidates, n_utilities in cases:
+            with self.subTest(case=name, target_type=target_type):
+                qs = self.qs_class(**deepcopy(init_params))
+                params = deepcopy(query_params)
+                params["y"] = y
+                params["candidates"] = candidates
+                params["return_utilities"] = True
+
+                with self.assertWarnsRegex(UserWarning, "exhausted"):
+                    query_indices, utilities = qs.query(**params)
+
+                self.assertEqual(query_indices.shape, (0,))
+                self.assertTrue(np.issubdtype(query_indices.dtype, np.integer))
+                self.assertEqual(utilities.shape, (0, n_utilities))
+
+                params["return_utilities"] = False
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    query_indices = qs.query(**params)
+                self.assertEqual(query_indices.shape, (0,))
+
+    def test_query_exhausted_candidate_pool(self):
+        # An exhausted candidate pool is a valid acquisition state that is
+        # answered with an empty batch instead of an error about array shapes.
+        init_params = deepcopy(self.init_default_params)
+        for query_params in [
+            self.query_default_params_clf,
+            self.query_default_params_reg,
+        ]:
+            if query_params is not None:
+                self._test_exhausted_candidate_pool(
+                    init_params, query_params, "single-output"
+                )
+
+    def test_query_multilabel_exhausted_candidate_pool(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        self._test_exhausted_candidate_pool(
+            self._multilabel_init_params(),
+            self.query_default_params_clf_multilabel,
+            "multi-label",
+        )
+
+    def test_query_multilabel_candidate_variation(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        init_params = self._multilabel_init_params()
+        qs = self.qs_class(**init_params)
+        missing_label = self.init_default_params["missing_label"]
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params["candidates"] = None
+        query_params["return_utilities"] = True
+
+        query_idx1, utils1 = qs.query(**query_params)
+
+        unld_idx = unlabeled_indices(
+            query_params["y"],
+            missing_label,
+            target_type="multi-label",
+        )
+        query_params["candidates"] = unld_idx
+        query_idx2, utils2 = qs.query(**query_params)
+
+        unld_idx2 = unld_idx[0:1]
+        query_params["candidates"] = unld_idx2
+        query_idx3, utils3 = qs.query(**query_params)
+
+        np.testing.assert_array_equal(query_idx1, query_idx2)
+        np.testing.assert_allclose(utils1, utils2)
+        utils3_copy = np.full_like(utils1, fill_value=np.nan)
+        utils3_copy[0, unld_idx2] = utils3[0, unld_idx2]
+        np.testing.assert_allclose(utils3, utils3_copy)
+
+        try:
+            query_params["candidates"] = query_params["X"][unld_idx]
+            query_idx4, utils4 = qs.query(**query_params)
+            np.testing.assert_allclose(utils1[0][unld_idx], utils4[0])
+            self.assertEqual(query_idx4.shape, (1,))
+            self.assertEqual(utils4.shape, (1, len(unld_idx)))
+        except MappingError:
+            pass
+
+
+class TemplateMultilabelAggregationQueryStrategy(
+    TemplateSingleAnnotatorPoolQueryStrategy
+):
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
+
+
+class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
+    TemplateSingleAnnotatorPoolQueryStrategy
+):
+    """Shared target-contract tests for multi-label-only strategies."""
+
+    def test_query(self):
+        super().test_query_multilabel_candidate_variation()
+
+    test_query_batch_variation = None
+    test_query_multilabel_candidate_variation = None
+
+    def test_query_labeled_candidates(self):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        missing_label = self.init_default_params["missing_label"]
+        unld_idx = unlabeled_indices(
+            query_params["y"],
+            missing_label,
+            target_type="multi-label",
+        )
+        lbld_idx = np.setdiff1d(np.arange(len(query_params["X"])), unld_idx)
+
+        query_params.update(
+            candidates=np.arange(len(query_params["X"])),
+            batch_size=4,
+            return_utilities=True,
+        )
+        query_idx, utilities = strategy.query(**query_params)
+        self.assertFalse(np.isnan(utilities[0]).any())
+        self.assertTrue(np.isin(query_idx, lbld_idx).any())
+
+        query_params.update(
+            candidates=lbld_idx, batch_size=2, return_utilities=False
+        )
+        query_idx = strategy.query(**query_params)
+        self.assertTrue(np.isin(query_idx, lbld_idx).all())
+
+        query_params.update(
+            candidates=None, batch_size=3, return_utilities=False
+        )
+        query_idx = strategy.query(**query_params)
+        self.assertTrue(np.isin(query_idx, unld_idx).all())
+
+    def _query_multilabel_only_strategy(self, strategy, y, clf, **kwargs):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params.update(y=y, clf=clf, **kwargs)
+        return strategy.query(**query_params)
+
+    def test_query_requires_multilabel_y(self):
+        y = np.array([0.0, 1.0, 0.0, np.nan, np.nan, np.nan, np.nan, np.nan])
+        clf = SklearnClassifier(estimator=GaussianNB())
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        with self.assertRaisesRegex(
+            ValueError,
+            rf"{type(strategy).__name__} does not support target capability",
+        ):
+            self._query_multilabel_only_strategy(strategy, y, clf)
+
+        assert_no_query_state(self, strategy)
+
+    def test_target_contract(self):
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset({("classification", "multi-label", "single-annotator")}),
+        )
+        self.assertNotIn(
+            ("classification", "multi-label", "multi-annotator"),
+            strategy._target_capabilities,
+        )
+
+    def test_query_rejects_fitted_target_spec_conflict_before_state(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = clone(query_params["clf"]).fit(
+            query_params["X"], query_params["y"]
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params["target_type"] = "single-output"
+        strategy = self.qs_class(**init_params)
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            self._query_multilabel_only_strategy(
+                strategy, query_params["y"], clf, fit_clf=False
+            )
+
+        assert_no_query_state(self, strategy)
+
+    def test_query_reuses_fitted_target_spec_without_class_evidence(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        ).fit(query_params["X"], query_params["y"])
+        established_spec = clf.target_spec_
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                *[[np.nan, np.nan] for _ in range(6)],
+            ]
+        )
+
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        query_idx, utilities = self._query_multilabel_only_strategy(
+            strategy,
+            y_query,
+            clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        self.assertEqual(established_spec.classes, ((0.0, 1.0),) * 2)
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertIn(query_idx[0], range(2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+        self.assertFalse(hasattr(strategy, "target_spec_"))
+
+    def test_query_resolves_explicit_multilabel_without_classes(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        )
+
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        query_idx = self._query_multilabel_only_strategy(
+            strategy, query_params["y"], clf
+        )
+
+        unlabeled_idx = unlabeled_indices(
+            query_params["y"],
+            missing_label=self.init_default_params["missing_label"],
+            target_type="multi-label",
+        )
+        self.assertIn(query_idx[0], unlabeled_idx)
+        self.assertEqual(clf.target_type, "multi-label")
+        self.assertFalse(hasattr(clf, "target_spec_"))
+
+    def test_query_supports_custom_binary_vocabularies(self):
+        missing_label = -1
+        y = np.array(
+            [
+                [0, 0],
+                [0, 5],
+                [2, 5],
+                *[[missing_label, missing_label] for _ in range(5)],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 2], [0, 5]],
+            missing_label=missing_label,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params.update(missing_label=missing_label, random_state=0)
+        strategy = self.qs_class(**init_params)
+
+        query_idx, utilities = self._query_multilabel_only_strategy(
+            strategy, y, clf, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], range(3, len(y)))
+        self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+
+    def test_query_rejects_partially_observed_rows_before_state(self):
+        query_params = self.query_default_params_clf_multilabel
+        clf = clone(query_params["clf"]).fit(
+            query_params["X"], query_params["y"]
+        )
+        y = query_params["y"].copy()
+        y[1, 0] = np.nan
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        with self.assertRaisesRegex(ValueError, "no mixing"):
+            self._query_multilabel_only_strategy(
+                strategy, y, clf, fit_clf=False
+            )
+
+        assert_no_query_state(self, strategy)
+
+    def test_query_rejects_other_target_capabilities_before_state(self):
+        query_params = self.query_default_params_clf_multilabel
+        multi_output_y = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [2.0, 0.0],
+                *[[np.nan, np.nan] for _ in range(5)],
+            ]
+        )
+        multi_output_clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1, 2], [0, 1]],
+            target_type="multi-output",
+        )
+        multiannotator_clf = AnnotatorEnsembleClassifier(
+            estimators=[
+                ("pwc-0", ParzenWindowClassifier(classes=[0, 1])),
+                ("pwc-1", ParzenWindowClassifier(classes=[0, 1])),
+            ],
+            classes=[0, 1],
+        ).fit(query_params["X"], query_params["y"])
+
+        cases = [
+            (multi_output_y, multi_output_clf, "SklearnClassifier"),
+            (
+                query_params["y"],
+                multiannotator_clf,
+                self.qs_class.__name__,
+            ),
+        ]
+        for y, clf, component in cases:
+            with self.subTest(component=component):
+                strategy = self.qs_class(**deepcopy(self.init_default_params))
+                with self.assertRaisesRegex(
+                    ValueError,
+                    rf"{component} does not support target capability",
+                ):
+                    self._query_multilabel_only_strategy(
+                        strategy, y, clf, fit_clf=False
+                    )
+                assert_no_query_state(self, strategy)
+
 
 class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
     def setUp(
@@ -653,10 +1639,10 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         query_default_params_reg=None,
     ):
         super().setUp(
-            qs_class,
-            init_default_params,
-            query_default_params_clf,
-            query_default_params_reg,
+            qs_class=qs_class,
+            init_default_params=init_default_params,
+            query_default_params_clf=query_default_params_clf,
+            query_default_params_reg=query_default_params_reg,
         )
         self.update_params = {
             "candidates": [[]],

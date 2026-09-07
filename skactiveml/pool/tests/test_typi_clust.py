@@ -19,6 +19,21 @@ class TestTypiClust(
             ),
             "y": np.hstack([[0, 1], np.full(998, MISSING_LABEL)]),
         }
+        params_clf_multilabel = {
+            "X": np.random.RandomState(0).uniform(
+                size=(1000, 10), low=-0.5, high=0.5
+            ),
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(998)
+                    ],
+                ]
+            ),
+        }
         query_default_params_reg = {
             "X": np.random.RandomState(0).uniform(
                 size=(1000, 10), low=-0.5, high=0.5
@@ -33,6 +48,7 @@ class TestTypiClust(
             },
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):

@@ -2,7 +2,6 @@ import itertools
 
 import numpy as np
 from scipy.special import factorial, gammaln
-from sklearn import clone
 from sklearn.utils.validation import check_array
 
 from ..base import SkactivemlClassifier
@@ -12,9 +11,8 @@ from ..utils import (
     MISSING_LABEL,
     check_scalar,
     simple_batch,
-    check_type,
-    check_equal_missing_label,
 )
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
@@ -51,6 +49,9 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         to {'gamma': 'mean'}.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This strategy supports only single-output
+        classification.
 
     References
     ----------
@@ -67,9 +68,12 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         metric=None,
         metric_dict=None,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict
@@ -148,17 +152,30 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
+
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        # Check the classifier's type.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_type(fit_clf, "fit_clf", bool)
 
         # Check `utility_weight`.
         if utility_weight is None:
@@ -184,12 +201,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
                 "clf has no predict_freq and metric was set to None"
             )
 
-        # Fit the classifier and predict frequencies.
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
+        # Predict frequencies.
         if self.metric is not None:
             if self.metric_dict is None and self.metric == "rbf":
                 self.metric_dict = {"gamma": "mean"}

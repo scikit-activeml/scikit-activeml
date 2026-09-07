@@ -25,6 +25,8 @@ from skactiveml.utils import (
     labeled_indices,
 )
 
+from ._target import _resolve_estimator_target_spec
+
 
 class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
     """Regression Tree-based Active Learning (RT-AL)
@@ -47,6 +49,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
     max_iter_representativity : int, default=5
         Maximum number of optimisation iterations.
         Only used if `method='representativity'`.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This strategy supports only single-output
+        regression.
 
     References
     ----------
@@ -61,12 +66,19 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         max_iter_representativity=5,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.method = method
         self.max_iter_representativity = max_iter_representativity
+
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def query(
         self,
@@ -141,9 +153,23 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        # Validate the estimator and target semantics before acquisition state
+        # is created by the general query-strategy validation.
+        check_type(reg, "reg", SklearnRegressor)
+        check_type(reg.estimator, "reg.estimator", DecisionTreeRegressor)
+        check_equal_missing_label(reg.missing_label, self.missing_label)
+        check_type(fit_reg, "fit_reg", bool)
+        target_spec = _resolve_estimator_target_spec(self, reg, y)
+
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
         if batch_size == 1:
             warnings.warn(
@@ -152,14 +178,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             )
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         labeled_idxs = labeled_indices(y, self.missing_label_)
-
-        # Validate regressor type.
-        check_type(reg, "reg", SklearnRegressor)
-        check_type(reg.estimator, "reg.estimator", DecisionTreeRegressor)
-        check_equal_missing_label(reg.missing_label, self.missing_label_)
-
-        # Validate boolean flag
-        check_type(fit_reg, "fit_reg", bool)
 
         # Validate method type.
         check_type(self.method, "method", str)

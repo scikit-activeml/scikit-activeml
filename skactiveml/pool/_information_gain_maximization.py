@@ -43,6 +43,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Random state for candidate selection.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This strategy supports only single-output
+        regression.
 
     References
     ----------
@@ -51,15 +54,22 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
        Trade-Off. Entropy, 21(7):651, 2019.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
+
     def __init__(
         self,
         integration_dict_target_val=None,
         integration_dict_cross_entropy=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.integration_dict_target_val = integration_dict_target_val
         self.integration_dict_cross_entropy = integration_dict_cross_entropy

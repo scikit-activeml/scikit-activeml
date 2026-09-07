@@ -1,8 +1,11 @@
 import unittest
 from copy import deepcopy
+from itertools import product
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -12,6 +15,7 @@ from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 
 
 class TestUncertaintySampling(
@@ -26,10 +30,22 @@ class TestUncertaintySampling(
             ),
             "y": np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
         }
+        params_clf_multilabel = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                proba_format="array",
+            ),
+            "y": np.array(
+                [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+            ),
+        }
         super().setUp(
             qs_class=UncertaintySampling,
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_method(self, test_cases=None):
@@ -52,6 +68,64 @@ class TestUncertaintySampling(
             replace_init_params={"method": "entropy"},
         )
 
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.max, None), (np.average, None)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
+
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("invalid", ValueError),
+                (1, ValueError),
+                ("multi-label", ValueError),
+                ("multi-output", ValueError),
+            ],
+        )
+
+    def test_capabilities_are_exact_and_configuration_dependent(self):
+        standard = UncertaintySampling(method="entropy")
+        average_precision = UncertaintySampling(
+            method="expected_average_precision"
+        )
+        cost_sensitive = UncertaintySampling(
+            method="least_confident", cost_matrix=[[0, 1], [1, 0]]
+        )
+
+        self.assertEqual(
+            standard._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            ),
+        )
+        self.assertEqual(
+            average_precision._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+        self.assertEqual(
+            cost_sensitive._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+        self.assertNotIn(
+            ("classification", "multi-label", "multi-annotator"),
+            standard._target_capabilities,
+        )
+
     def test_query_param_clf(self):
         add_test_cases = [
             (SVC(), TypeError),
@@ -59,6 +133,19 @@ class TestUncertaintySampling(
             (SklearnClassifier(SVC(probability=True)), None),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
+
+    def test_missing_label_mismatch_precedes_fit_flag_validation(self):
+        query_params = deepcopy(self.query_default_params_clf)
+        query_params["clf"] = ParzenWindowClassifier(
+            classes=self.classes,
+            missing_label=-1,
+        )
+
+        with self.assertRaisesRegex(ValueError, "must be equal"):
+            UncertaintySampling().query(
+                **query_params,
+                fit_clf="invalid",
+            )
 
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -154,6 +241,333 @@ class TestUncertaintySampling(
         self.assertEqual(utilities.shape, (1, len(candidates)))
         self.assertEqual(best_indices.shape, (1,))
 
+    def test_query_multilabel_list_probas(self):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params["clf"] = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            proba_format="list",
+        )
+
+        query_idx, utilities = UncertaintySampling().query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(query_idx.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_passes_sample_weight_to_classifier_fit(self):
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        clf = ParzenWindowClassifier(classes=[0, 1])
+
+        query_indices = UncertaintySampling().query(
+            X=X,
+            y=y,
+            clf=clf,
+            fit_clf=True,
+            sample_weight=np.ones(len(y)),
+            candidates=X[2:],
+        )
+
+        self.assertEqual(query_indices.shape, (1,))
+
+    def test_query_reuses_fitted_multilabel_target_spec(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+        ).fit(X, y_fit)
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        strategy = UncertaintySampling(target_type="auto", random_state=0)
+
+        query_idx, utilities = strategy.query(
+            X,
+            y_query,
+            clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+        self.assertFalse(hasattr(strategy, "target_spec_"))
+
+    def test_query_rejects_values_outside_fitted_class_vocabularies(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y_fit)
+        y_query = y_fit.copy()
+        y_query[0, 0] = 2
+        strategy = UncertaintySampling()
+
+        with self.assertRaisesRegex(ValueError, r"outside `classes\[0\]`"):
+            strategy.query(X, y_query, clf, fit_clf=False)
+
+        assert_no_query_state(self, strategy)
+
+    def test_query_fits_explicit_multilabel_without_declared_classes(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+        )
+
+        query_idx, utilities = UncertaintySampling(random_state=0).query(
+            X, y, clf, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], [4, 5])
+        self.assertTrue(np.isnan(utilities[0, :4]).all())
+
+    def test_multilabel_capability_failure_precedes_acquisition_state(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y)
+        strategy = UncertaintySampling(method="expected_average_precision")
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            strategy.query(X, y, clf, fit_clf=False)
+
+        assert_no_query_state(self, strategy)
+
+    def test_cost_sensitive_multilabel_methods_fail_before_acquisition_state(
+        self,
+    ):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y)
+
+        for method in ["least_confident", "margin_sampling", "entropy"]:
+            with self.subTest(method=method):
+                strategy = UncertaintySampling(
+                    method=method, cost_matrix=[[0, 1], [1, 0]]
+                )
+
+                with self.assertRaisesRegex(ValueError, "does not support"):
+                    strategy.query(X, y, clf, fit_clf=False)
+
+                assert_no_query_state(self, strategy)
+
+    def test_ambiguous_resolution_failure_precedes_acquisition_state(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(estimator=MultiOutputClassifier(GaussianNB()))
+        strategy = UncertaintySampling()
+
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            strategy.query(X, y, clf, fit_clf=False)
+
+        assert_no_query_state(self, strategy)
+
+    def test_unfitted_classifier_declaration_conflict_precedes_state(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            target_type="single-output",
+        )
+        for fit_clf in [False, True]:
+            with self.subTest(fit_clf=fit_clf):
+                strategy = UncertaintySampling(target_type="multi-label")
+
+                with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
+                    strategy.query(X, y, clf, fit_clf=fit_clf)
+
+                assert_no_query_state(self, strategy)
+
+    def test_estimator_preflight_configuration_cross_product(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        cost_matrix = [[0, 1], [1, 0]]
+        target_cases = {
+            "single-output": {
+                "fit_y": np.array([0.0, 1.0, 0.0, 1.0, np.nan, np.nan]),
+                "subset_y": np.array(
+                    [0.0, 0.0, np.nan, np.nan, np.nan, np.nan]
+                ),
+                "outside_y": np.array(
+                    [2.0, 0.0, np.nan, np.nan, np.nan, np.nan]
+                ),
+                "estimator": lambda: ParzenWindowClassifier(classes=[0, 1]),
+            },
+            "multi-label": {
+                "fit_y": np.array(
+                    [
+                        [0.0, 1.0],
+                        [1.0, 0.0],
+                        [0.0, 0.0],
+                        [1.0, 1.0],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                "subset_y": np.array(
+                    [
+                        [0.0, 1.0],
+                        [0.0, 1.0],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                "outside_y": np.array(
+                    [
+                        [2.0, 1.0],
+                        [0.0, 1.0],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                "estimator": lambda: SklearnClassifier(
+                    estimator=MultiOutputClassifier(GaussianNB()),
+                    classes=[[0, 1], [0, 1]],
+                    target_type="multi-label",
+                    proba_format="array",
+                ),
+            },
+        }
+
+        configurations = product(
+            ["least_confident", "margin_sampling"],
+            [False, True],
+            target_cases,
+            [False, True],
+            ["subset", "outside"],
+        )
+        for (
+            method,
+            has_cost,
+            target_type,
+            is_fitted,
+            vocabulary,
+        ) in configurations:
+            with self.subTest(
+                method=method,
+                has_cost=has_cost,
+                target_type=target_type,
+                is_fitted=is_fitted,
+                vocabulary=vocabulary,
+            ):
+                case = target_cases[target_type]
+                clf = case["estimator"]()
+                if is_fitted:
+                    clf.fit(X, case["fit_y"])
+                y = case[f"{vocabulary}_y"]
+                strategy = UncertaintySampling(
+                    method=method,
+                    cost_matrix=cost_matrix if has_cost else None,
+                    target_type=target_type,
+                    random_state=0,
+                )
+
+                unsupported = target_type == "multi-label" and has_cost
+                if vocabulary == "outside" or unsupported:
+                    with self.assertRaises(ValueError):
+                        strategy.query(X, y, clf, fit_clf=not is_fitted)
+                    assert_no_query_state(self, strategy)
+                else:
+                    query_idx = strategy.query(
+                        X, y, clf, fit_clf=not is_fitted
+                    )
+                    self.assertIn(query_idx[0], range(2, len(X)))
+
+    def test_default_single_output_classifier_query_remains_supported(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, 1.0, np.nan, np.nan])
+        clf = SklearnClassifier(estimator=GaussianNB()).fit(X, y)
+
+        query_idx = UncertaintySampling(random_state=0).query(
+            X, y, clf, fit_clf=False
+        )
+
+        self.assertEqual(clf.target_spec_.target_type, "single-output")
+        self.assertIn(query_idx[0], [2, 3])
+
+    def test_query_multilabel_multiclass_list_probas_raises(self):
+        query_params = {
+            "X": np.linspace(0, 1, 12).reshape(6, 2),
+            "y": np.array(
+                [
+                    [0.0, 0.0],
+                    [1.0, 1.0],
+                    [2.0, 0.0],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1, 2], [0, 1]],
+                proba_format="list",
+            ),
+        }
+
+        self.assertRaises(
+            ValueError, UncertaintySampling().query, **query_params
+        )
+
 
 class TestExpectedAveragePrecision(unittest.TestCase):
     def setUp(self):
@@ -169,7 +583,7 @@ class TestExpectedAveragePrecision(unittest.TestCase):
             probas=self.probas,
         )
         self.assertRaises(
-            ValueError,
+            TypeError,
             expected_average_precision,
             classes="string",
             probas=self.probas,
@@ -231,6 +645,7 @@ class TestExpectedAveragePrecision(unittest.TestCase):
 class TestUncertaintyScores(unittest.TestCase):
     def setUp(self):
         self.probas = np.array([[0.2, 0.5, 0.3], [0.1, 0.7, 0.2]])
+        self.multilabel_probas = np.array([[0.1, 0.5, 0.9], [0.2, 0.4, 0.6]])
         self.classes = np.array([0, 1, 2])
         self.cost_matrix = np.ones((3, 3))
 
@@ -241,6 +656,48 @@ class TestUncertaintyScores(unittest.TestCase):
             ValueError, uncertainty_scores, probas=[[0.6, 0.1, 0.2]]
         )
         self.assertRaises(ValueError, uncertainty_scores, probas="string")
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=np.array([[1.1, 0.2], [0.4, 0.6]]),
+            is_multilabel=True,
+        )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=np.array([[-0.1, 0.2], [0.4, 0.6]]),
+            is_multilabel=True,
+        )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=[np.ones((2, 3)), np.ones((2, 2))],
+            is_multilabel=True,
+        )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=[np.ones((2, 2)), np.ones((3, 2))],
+            is_multilabel=True,
+        )
+
+    def test_multilabel_per_output_distributions_are_valid(self):
+        valid_output = np.array([[0.6, 0.4], [0.4, 0.6]])
+        invalid_outputs = [
+            np.array([[0.9, 0.9], [0.8, 0.2]]),
+            np.array([[-0.2, 0.4], [0.4, 0.6]]),
+            np.array([[np.nan, 0.4], [0.4, 0.6]]),
+        ]
+
+        for invalid_output in invalid_outputs:
+            with self.subTest(invalid_output=invalid_output):
+                with self.assertRaisesRegex(
+                    ValueError, "'probas' are invalid"
+                ):
+                    uncertainty_scores(
+                        [invalid_output, valid_output],
+                        is_multilabel=True,
+                    )
 
     def test_init_param_method(self):
         self.assertRaises(
@@ -248,6 +705,13 @@ class TestUncertaintyScores(unittest.TestCase):
         )
         self.assertRaises(
             ValueError, uncertainty_scores, self.probas, method=1
+        )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            self.multilabel_probas,
+            method="String",
+            is_multilabel=True,
         )
 
     def test_param_cost_matrix(self):
@@ -267,6 +731,19 @@ class TestUncertaintyScores(unittest.TestCase):
             cost_matrix=np.ones((2, 2)),
         )
 
+    def test_multilabel_cost_matrix_raises(self):
+        for method in ["least_confident", "margin_sampling", "entropy"]:
+            with self.subTest(method=method):
+                with self.assertRaisesRegex(
+                    ValueError, "cost_matrix.*multi-label"
+                ):
+                    uncertainty_scores(
+                        self.multilabel_probas,
+                        cost_matrix=np.ones((3, 3)),
+                        method=method,
+                        is_multilabel=True,
+                    )
+
     def test_uncertainty_scores(self):
         # least_confident
         val_scores = np.array([0.5, 0.3])
@@ -280,3 +757,88 @@ class TestUncertaintyScores(unittest.TestCase):
         val_scores = np.array([0.8, 0.5])
         scores = uncertainty_scores(self.probas, method="margin_sampling")
         np.testing.assert_allclose(val_scores, scores)
+
+        # multilabel methods
+        val_scores = np.array([0.2333333333, 0.3333333333])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="least_confident",
+            is_multilabel=True,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.5, 0.4])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="least_confident",
+            is_multilabel=True,
+            multilabel_aggregation_fn=np.max,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.4477710424, 0.6154752525])
+        scores = uncertainty_scores(
+            self.multilabel_probas, method="entropy", is_multilabel=True
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.6931471804, 0.6730116670])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="entropy",
+            is_multilabel=True,
+            multilabel_aggregation_fn=np.max,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.4666666667, 0.6666666667])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="margin_sampling",
+            is_multilabel=True,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([1.0, 0.8])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="margin_sampling",
+            is_multilabel=True,
+            multilabel_aggregation_fn=np.max,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        multilabel_list = [
+            np.column_stack(
+                [
+                    1 - self.multilabel_probas[:, 0],
+                    self.multilabel_probas[:, 0],
+                ]
+            ),
+            np.column_stack(
+                [
+                    1 - self.multilabel_probas[:, 1],
+                    self.multilabel_probas[:, 1],
+                ]
+            ),
+            np.column_stack(
+                [
+                    1 - self.multilabel_probas[:, 2],
+                    self.multilabel_probas[:, 2],
+                ]
+            ),
+        ]
+        scores = uncertainty_scores(
+            multilabel_list, method="entropy", is_multilabel=True
+        )
+        np.testing.assert_allclose(
+            np.array([0.4477710424, 0.6154752525]), scores
+        )
+
+    def test_multilabel_entropy_is_zero_at_probability_endpoints(self):
+        certain_probas = np.array([[0.0, 1.0], [1.0, 0.0]])
+        scores = uncertainty_scores(
+            certain_probas, method="entropy", is_multilabel=True
+        )
+        np.testing.assert_array_equal(scores, np.zeros(2))
+        self.assertFalse(np.signbit(scores).any())

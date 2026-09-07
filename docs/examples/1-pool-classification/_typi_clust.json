@@ -5,7 +5,7 @@
     "method" : "Typical Clustering (TypiClust)",
     "category" : "Representativeness",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool", "regression", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Typical Clustering (TypiClust)",
     "refs" : ["hacohen2022active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

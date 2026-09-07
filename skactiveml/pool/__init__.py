@@ -44,6 +44,14 @@ from ._prob_cover import ProbCover
 from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
 from ._drop_query import DropQuery
+from ._max_loss_reduction_max_confidence import (
+    MaxLossReductionMaxConfidence,
+    max_loss_reduction_max_confidence,
+)
+from ._label_cardinality_inconsistency import (
+    LabelCardinalityInconsistency,
+    label_cardinality_inconsistency,
+)
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 from ._falcun import Falcun
 from ._max_herding import MaxHerding
@@ -79,6 +87,10 @@ __all__ = [
     "BatchBALD",
     "Clue",
     "DropQuery",
+    "LabelCardinalityInconsistency",
+    "label_cardinality_inconsistency",
+    "MaxLossReductionMaxConfidence",
+    "max_loss_reduction_max_confidence",
     "batch_bald",
     "CoreSet",
     "k_greedy_center",

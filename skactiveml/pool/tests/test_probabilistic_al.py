@@ -40,6 +40,9 @@ class TestProbabilisticAL(
             query_default_params_clf=query_default_params_clf,
         )
 
+    def test_fitted_multilabel_classifier_rejected_before_state(self):
+        self._test_fitted_multilabel_classifier_rejection()
+
     # Test init parameters
     def test_init_param_prior(self):
         test_cases = [(0, ValueError), (self.clf, TypeError)]

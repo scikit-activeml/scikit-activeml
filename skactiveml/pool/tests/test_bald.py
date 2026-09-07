@@ -73,6 +73,21 @@ class TestGeneralBALD(
         self.assertTrue(GreedyBALD().greedy_selection)
         self.assertFalse(BatchBALD().greedy_selection)
 
+    def test_target_capabilities_are_classification_only(self):
+        expected = frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+        for strategy in [_GeneralBALD(), BatchBALD(), GreedyBALD()]:
+            with self.subTest(strategy=type(strategy).__name__):
+                self.assertEqual(strategy._target_capabilities, expected)
+
+    def test_fitted_multilabel_classifier_rejected_before_state(self):
+        self._test_fitted_multilabel_classifier_rejection(
+            estimator_param="ensemble",
+            fit_param="fit_ensemble",
+            ensemble=True,
+        )
+
     def test_init_param_eps(self):
         test_cases = [
             (0, ValueError),

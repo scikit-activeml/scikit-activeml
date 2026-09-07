@@ -5,7 +5,7 @@
     "method" : "Core Set",
     "category" : "Representativeness",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool", "regression", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Core Set",
     "refs" : ["sener2018active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

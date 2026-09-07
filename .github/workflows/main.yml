@@ -177,6 +177,7 @@ jobs:
         pip install -r requirements_extra.txt
     - name: Create documentation with sphinx
       run: |
+        sphinx-build -b doctest docs docs/_build/doctest
         sphinx-build -b html docs docs/_build
         zip -r docs.zip docs
     - name: 'Upload Docs Artifact'

@@ -25,10 +25,10 @@ try:
 
         Annot-Mix [1]_ trains a multi-annotator classifier using an extension
         of MixUp [2]_. The main idea is to apply MixUp not only to samples
-        and class labels, but to sample–annotator pairs: it convexly combines
+        and class labels, but to sample-annotator pairs: it convexly combines
         inputs and their annotator-specific noisy labels and trains a one-stage
         model that jointly estimates the true label distribution and each
-        annotator’s reliability. In this way, Annot-Mix can handle multiple,
+        annotator's reliability. In this way, Annot-Mix can handle multiple,
         potentially conflicting labels per sample while using MixUp-style
         regularization to become more robust to label noise.
 
@@ -90,6 +90,9 @@ try:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : "auto" or "single-output", default="auto"
+            Declared target type. This classifier supports only single-output
+            classification with multiple annotators.
 
         References
         ----------
@@ -126,6 +129,7 @@ try:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
+            target_type="auto",
         ):
             super(AnnotMixClassifier, self).__init__(
                 multi_annotator_module=_AnnotMixModule,
@@ -137,6 +141,7 @@ try:
                 random_state=random_state,
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
+                target_type=target_type,
             )
             self.clf_module = clf_module
             self.alpha = alpha

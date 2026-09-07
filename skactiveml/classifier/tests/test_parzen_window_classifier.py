@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from sklearn.utils._testing import assert_allclose
 from sklearn.utils.validation import NotFittedError
 from skactiveml.tests.template_estimator import TemplateClassFrequencyEstimator
 
@@ -21,11 +22,26 @@ class TestParzenWindowClassifier(
             "y": ["tokyo", "nan", "paris"],
         }
         predict_default_params = {"X": [[1]]}
+        self.X_ml = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        self.y_ml = np.array([[0, 1], [0, 1], [1, 0], [1, 0]], dtype=float)
+        init_default_params_multilabel = {
+            "classes": [[0, 1], [0, 1]],
+            # `np.nan` widens the label encoder past the class dtype, so the
+            # narrowing of multi-label predictions is actually exercised.
+            "missing_label": np.nan,
+        }
+        fit_default_params_multilabel = {"X": self.X_ml, "y": self.y_ml}
+        predict_default_params_multilabel = {"X": self.X_ml}
         super().setUp(
             estimator_class=estimator_class,
             init_default_params=init_default_params,
             fit_default_params=fit_default_params,
             predict_default_params=predict_default_params,
+            init_default_params_multilabel=init_default_params_multilabel,
+            fit_default_params_multilabel=fit_default_params_multilabel,
+            predict_default_params_multilabel=(
+                predict_default_params_multilabel
+            ),
         )
         self.y_nan = ["nan", "nan", "nan"]
         self.w = [2, np.nan, 1]
@@ -92,6 +108,99 @@ class TestParzenWindowClassifier(
         pwc.fit(X=self.fit_default_params["X"], y=self.y_nan)
         after_metric_dict = deepcopy(pwc.metric_dict)
         self.assertEqual(before_metric_dict, after_metric_dict)
+
+    def test_multilabel_capability_and_target_metadata(self):
+        pwc = ParzenWindowClassifier(
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            X=[[0], [1]],
+            y=[["no", "on"], ["yes", "off"]],
+        )
+
+        self.assertIn(
+            ("classification", "multi-label", "single-annotator"),
+            pwc._target_capabilities,
+        )
+        self.assertIsInstance(pwc._target_capabilities, frozenset)
+        self.assertEqual(pwc.target_spec_.target_type, "multi-label")
+        self.assertEqual(
+            pwc.target_spec_.classes,
+            (("no", "yes"), ("off", "on")),
+        )
+        assert_allclose(
+            pwc.predict_freq([[0]]),
+            [[[1, np.exp(-1)], [np.exp(-1), 1]]],
+        )
+
+    def test_multilabel_precomputed_neighbor_predictions_and_weights(self):
+        fit_params = {
+            "X": [[0], [1], [2]],
+            "y": np.array(
+                [["no", "on"], [None, None], ["yes", "off"]],
+                dtype=object,
+            ),
+        }
+        init_params = {
+            "classes": [["no", "yes"], ["off", "on"]],
+            "missing_label": None,
+            "target_type": "multi-label",
+            "metric": "precomputed",
+            "n_neighbors": 1,
+            "class_prior": [[1, 1], [2, 2]],
+        }
+        pwc = ParzenWindowClassifier(**init_params).fit(
+            **fit_params, sample_weight=[2, np.nan, 3]
+        )
+
+        np.testing.assert_array_equal(
+            pwc.predict_freq([[1, 0, 0]]),
+            [[[2, 0], [0, 2]]],
+        )
+        assert_allclose(pwc.predict_proba([[1, 0, 0]]), [[0.25, 2 / 3]])
+        np.testing.assert_array_equal(pwc.predict([[1, 0, 0]]), [["no", "on"]])
+
+        pwc.fit(
+            **fit_params,
+            sample_weight=[[2, 4], [np.nan, np.nan], [3, 5]],
+        )
+        np.testing.assert_array_equal(
+            pwc.predict_freq(np.eye(3)),
+            [
+                [[2, 0], [0, 4]],
+                [[0, 0], [0, 0]],
+                [[0, 3], [5, 0]],
+            ],
+        )
+
+    def test_multilabel_cold_start_probabilities(self):
+        pwc = ParzenWindowClassifier(
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            X=[[0], [1]],
+            y=np.array([[None, None], [None, None]], dtype=object),
+        )
+
+        np.testing.assert_array_equal(
+            pwc.predict_freq([[0], [1]]), np.zeros((2, 2, 2))
+        )
+        np.testing.assert_array_equal(
+            pwc.predict_proba([[0], [1]]), np.full((2, 2), 0.5)
+        )
+
+        empty = ParzenWindowClassifier(
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(X=np.zeros((0, 1)), y=np.zeros((0, 2), dtype=object))
+
+        self.assertIsNone(empty.n_features_in_)
+        np.testing.assert_array_equal(
+            empty.predict_freq([[0], [1]]), np.zeros((2, 2, 2))
+        )
 
     def test_predict_freq(self):
         pwc = ParzenWindowClassifier(
@@ -309,3 +418,46 @@ class TestParzenWindowClassifier(
             for n in N
         ]
         self.assertTrue(np.all(np.diff(gamma) > 0))
+
+    def test_mean_gamma_counts_labeled_samples_independent_of_class(self):
+        X = np.arange(4).reshape(-1, 1)
+        params = {
+            "classes": [0, 1],
+            "metric_dict": {"gamma": "mean"},
+        }
+        gamma_a = (
+            ParzenWindowClassifier(**params)
+            .fit(X, [0, 1, 1, np.nan])
+            .metric_dict_["gamma"]
+        )
+        gamma_b = (
+            ParzenWindowClassifier(**params)
+            .fit(X, [1, 0, 0, np.nan])
+            .metric_dict_["gamma"]
+        )
+
+        self.assertEqual(gamma_a, gamma_b)
+
+    def test_mean_gamma_counts_complete_multilabel_rows_once(self):
+        X = np.arange(3).reshape(-1, 1)
+        gamma_single = (
+            ParzenWindowClassifier(
+                classes=[0, 1], metric_dict={"gamma": "mean"}
+            )
+            .fit(X, [0, 1, np.nan])
+            .metric_dict_["gamma"]
+        )
+        gamma_multilabel = (
+            ParzenWindowClassifier(
+                classes=[[0, 1], [0, 1]],
+                target_type="multi-label",
+                metric_dict={"gamma": "mean"},
+            )
+            .fit(
+                X,
+                [[0, 1], [1, 0], [np.nan, np.nan]],
+            )
+            .metric_dict_["gamma"]
+        )
+
+        self.assertEqual(gamma_single, gamma_multilabel)

@@ -86,7 +86,7 @@ class TestFixedUncertaintyBudgetManager(
             ([0, 1], None),
             (["False", "True"], None),
             (2, TypeError),
-            ("string", None),
+            ("string", TypeError),
             (-1, TypeError),
             (0, TypeError),
         ]

@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn import clone
 from sklearn.metrics import pairwise_distances, pairwise
 
 from skactiveml.base import (
@@ -14,6 +13,7 @@ from skactiveml.utils import (
     check_type,
     check_scalar,
 )
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
@@ -23,6 +23,10 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     Space (GSx) [1]_ that tries to select those samples that increase the
     diversity of the feature space the most. It does this by selecting those
     features that are the furthest away from all previously labeled samples.
+    Originally, this query strategy was only proposed for regression.
+    Nevertheless, it is task-agnostic such that it can handle class labels,
+    numerical targets, and multilabel targets represented by a
+    two-dimensional `y`.
 
     Parameters
     ----------
@@ -37,6 +41,10 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -44,15 +52,28 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
        Greedy Sampling. Inf. Sci., 474:90–105, 2019.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
+
     def __init__(
         self,
         metric=None,
         metric_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict
@@ -62,12 +83,16 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`.)
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates, ) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -75,8 +100,9 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
-            - If `candidates` is of shape `(n_candidates, ...)`, `candidates`
-              is considered as the candidate samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, ...)`, the candidate
+              samples are directly given in `candidates` (not necessarily
+              contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -107,14 +133,31 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        target_type = self._resolve_query_target_type(y)
+
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_type,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        # Determine candidate samples for selection.
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates, X=X, y=y, target_type=target_type
+        )
 
+        # Determine already labeled samples.
         sample_indices = np.arange(len(X), dtype=int)
-        selected_indices = labeled_indices(y, missing_label=self.missing_label)
+        selected_indices = labeled_indices(
+            y=y,
+            missing_label=self.missing_label,
+            target_type=target_type,
+        )
 
         if mapping is None:
             X_all = np.append(X, X_cand, axis=0)
@@ -192,6 +235,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. A fitted regressor's target specification is
+        authoritative when available. Only single-output regression is
+        supported.
 
     References
     ----------
@@ -209,9 +256,12 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         n_GSx_samples=1,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.method = method
         self.x_metric = x_metric
@@ -219,6 +269,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         self.x_metric_dict = x_metric_dict
         self.y_metric_dict = y_metric_dict
         self.n_GSx_samples = n_GSx_samples
+
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def query(
         self,
@@ -278,12 +332,29 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+        # Resolve through the regressor before acquisition state is changed.
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(SkactivemlRegressor,),
         )
 
-        check_type(reg, "reg", SkactivemlRegressor)
-        check_type(fit_reg, "fit_reg", bool)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
+
         if self.method is None:
             self.method = "GSi"
         check_type(self.method, "self.method", target_vals=["GSy", "GSi"])
@@ -295,14 +366,12 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         batch_size_x = max(0, min(self.n_GSx_samples - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
-
         sample_indices = np.arange(len(X), dtype=int)
-        selected_indices = labeled_indices(y)
+        selected_indices = labeled_indices(
+            y,
+            missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
+        )
         y_cand = reg.predict(X_cand)
 
         if mapping is None:

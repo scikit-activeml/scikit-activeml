@@ -7,19 +7,31 @@ from multiple annotators.
 import warnings
 from collections import deque
 from copy import deepcopy
+from dataclasses import dataclass
+import inspect
 
 import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
+from sklearn.utils import get_tags
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
+    column_or_1d,
 )
 
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
+from ..utils._target import (
+    _check_target_capability,
+    _check_target_spec_capability,
+)
+from ..utils._wrapper_state import (
+    _resolve_own_fitted_attribute,
+    _restore_wrapper_attributes,
+)
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
@@ -32,7 +44,10 @@ from ..utils import (
     check_scalar,
     match_signature,
     check_n_features,
+    _has_nested_classes,
+    resolve_target_spec,
 )
+from ..utils._validation import _check_probas_are_valid
 
 # used to defer import of capymoa as it may result in an error with pytest
 import importlib
@@ -63,17 +78,408 @@ except ImportError:  # pragma: no cover
     pass
 
 
-class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
-    """Sklearn Classifier
+def _declares_multilabel_support(estimator):
+    """Check whether `estimator` declares multi-label classification support.
 
-    Implementation of a wrapper class for `scikit-learn` classifiers such that
-    missing labels can be handled. Therefore, samples with missing labels are
-    filtered.
+    The decision is made from the estimator's own declarations only, never by
+    fitting or predicting on synthetic data, because such a probe can mutate
+    the estimator and report false negatives caused by estimator parameters,
+    data constraints, or minimum sample requirements.
+
+    Exposing `predict_proba` is not sufficient, since it says nothing about
+    whether an estimator accepts a two-dimensional target. Neither is the
+    presence of a tags object, because both tags default to negative. An
+    estimator therefore has to declare its capability positively.
 
     Parameters
     ----------
-    estimator : sklearn.base.ClassifierMixin with predict_proba method
-        The `scikit-learn` classifier to be wrapped.
+    estimator : object
+        The estimator whose declared capabilities are inspected.
+
+    Returns
+    -------
+    declares_multilabel_support : bool
+        `True`, if `estimator` is a classifier that exposes `predict_proba`
+        and positively declares either the `scikit-learn` multi-output or the
+        multi-label tag, and `False` otherwise.
+    """
+    if not is_classifier(estimator) or not hasattr(estimator, "predict_proba"):
+        return False
+    tags = get_tags(estimator)
+    return bool(
+        getattr(tags.target_tags, "multi_output", False)
+        or getattr(tags.classifier_tags, "multi_label", False)
+    )
+
+
+def _multilabel_capability_error(component, estimator):
+    """Compose the error message for a rejected multi-label `estimator`."""
+    return (
+        f"'{component}' does not support multi-label classification with "
+        f"the estimator '{estimator}'. A multi-label estimator must be a "
+        f"scikit-learn classifier, implement 'predict_proba', and positively "
+        f"declare either 'target_tags.multi_output' or "
+        f"'classifier_tags.multi_label' through its estimator tags. "
+        f"Estimators declaring neither are rejected because they are not "
+        f"guaranteed to accept a two-dimensional target. Either wrap the "
+        f"estimator, e.g., via 'sklearn.multioutput.MultiOutputClassifier', "
+        f"or use "
+        f"'target_type=\"single-output\"'."
+    )
+
+
+#: The class labels of one binary indicator column of a multi-label target.
+_INDICATOR_CLASSES = (0, 1)
+
+
+@dataclass(frozen=True)
+class _FittedTargetEvidence:
+    """Target evidence that a pre-fitted estimator publishes about itself.
+
+    A pre-fitted estimator's learned class vocabulary determines the meaning
+    of its predictions and probability columns. This value describes that
+    meaning as the estimator itself reports it, so that declared target
+    semantics can be reconciled with it before fitted wrapper state is
+    published. It is read from fitted attributes only, never by calling a
+    prediction method on invented input.
+
+    Parameters
+    ----------
+    kind : str
+        The kind of target evidence the estimator publishes, one of:
+
+        - `"single-output"`: one flat learned class vocabulary, describing one
+          categorical assignment per sample;
+        - `"label-vocabularies"`: one learned class vocabulary per label
+          output, as published by `sklearn.multioutput.MultiOutputClassifier`
+          and a multi-output `sklearn.ensemble.RandomForestClassifier`;
+        - `"label-outputs"`: flat learned classes identifying label outputs,
+          published together with explicit fitted multi-label metadata as by
+          `sklearn.multiclass.OneVsRestClassifier`; or
+        - `"unknown"`: no learned class vocabulary at all.
+    classes : numpy.ndarray or tuple of numpy.ndarray or None
+        The learned class vocabulary for `"single-output"`, one learned class
+        vocabulary per label output for `"label-vocabularies"`, and `None`
+        otherwise, because flat label-output identifiers are no class
+        vocabulary and an unknown vocabulary cannot be described.
+    n_label_outputs : int or None
+        The number of label outputs for `"label-vocabularies"` and
+        `"label-outputs"`, and `None` otherwise.
+    """
+
+    kind: str
+    classes: np.ndarray | tuple | None
+    n_label_outputs: int | None
+
+    @property
+    def describes_label_outputs(self):
+        """Whether the estimator's metadata describes several label outputs."""
+        return self.kind in {"label-vocabularies", "label-outputs"}
+
+
+def _discover_fitted_target_evidence(estimator):
+    """Read the target evidence a pre-fitted `estimator` publishes.
+
+    Parameters
+    ----------
+    estimator : object
+        The pre-fitted estimator whose fitted attributes are inspected.
+
+    Returns
+    -------
+    evidence : _FittedTargetEvidence
+        The target evidence published by `estimator`.
+    """
+    classes = getattr(estimator, "classes_", None)
+    if classes is None:
+        return _FittedTargetEvidence("unknown", None, None)
+    if _has_nested_classes(classes):
+        vocabularies = tuple(np.asarray(classes_j) for classes_j in classes)
+        return _FittedTargetEvidence(
+            "label-vocabularies", vocabularies, len(vocabularies)
+        )
+    classes = np.asarray(classes)
+    if bool(getattr(estimator, "multilabel_", False)):
+        # A fitted multi-label estimator such as `OneVsRestClassifier`
+        # publishes one flat identifier per label output instead of one class
+        # vocabulary per output.
+        return _FittedTargetEvidence("label-outputs", None, len(classes))
+    return _FittedTargetEvidence("single-output", classes, None)
+
+
+def _class_column(class_label, declared_classes):
+    """Locate one class label in a declared class vocabulary.
+
+    Class labels are compared by the same NaN-aware identity used by target
+    specifications, because a custom estimator may learn `numpy.nan` as an
+    ordinary class when the missing-label sentinel differs.
+
+    Parameters
+    ----------
+    class_label : scalar
+        The class label to locate, e.g., one an estimator learned during its
+        own fitting.
+    declared_classes : array-like of shape (n_classes,)
+        The class vocabulary of one output declared through the wrapper.
+
+    Returns
+    -------
+    class_index : int or None
+        The column `class_label` occupies in `declared_classes`, or `None` if
+        that vocabulary does not contain it.
+    """
+    for class_index, declared_class in enumerate(declared_classes):
+        if declared_class == class_label or (
+            declared_class != declared_class and class_label != class_label
+        ):
+            return class_index
+    return None
+
+
+def _format_class(class_label):
+    """Render one class label readably for an error message."""
+    return (
+        class_label.item()
+        if isinstance(class_label, np.generic)
+        else class_label
+    )
+
+
+def _format_classes(classes):
+    """Render a class vocabulary readably for an error message."""
+    return [_format_class(class_label) for class_label in classes]
+
+
+def _classes_missing_from(class_labels, declared_classes):
+    """Collect class labels that a declared class vocabulary lacks.
+
+    Parameters
+    ----------
+    class_labels : array-like of shape (n_class_labels,)
+        The class labels an estimator predicts for one output.
+    declared_classes : array-like of shape (n_classes,)
+        The class vocabulary of the same output declared through the wrapper.
+
+    Returns
+    -------
+    missing_classes : list
+        The class labels that `declared_classes` does not contain, compared by
+        class identity rather than position or count.
+    """
+    return [
+        class_label
+        for class_label in class_labels
+        if _class_column(class_label, declared_classes) is None
+    ]
+
+
+def _map_proba_columns(P, learned_classes, declared_classes, output_idx=None):
+    """Map probability columns onto a declared class vocabulary.
+
+    An estimator's probability columns follow its own learned class vocabulary,
+    which may be ordered differently from the declared one and may omit
+    declared classes. The columns are therefore mapped by class identity rather
+    than by position, so that equally wide vocabularies are never silently
+    reinterpreted. Declared classes the estimator never learned receive
+    zero-filled columns.
+
+    Parameters
+    ----------
+    P : numpy.ndarray of shape (n_samples, n_learned_classes)
+        The probabilities of one output as returned by the wrapped estimator.
+    learned_classes : array-like of shape (n_learned_classes,)
+        The class labels the estimator learned for that output, in the order of
+        its probability columns.
+    declared_classes : array-like of shape (n_classes,)
+        The class vocabulary of the same output declared through the wrapper.
+    output_idx : int or None, default=None
+        Index of the label output, or `None` for single-output classification.
+
+    Returns
+    -------
+    P_mapped : numpy.ndarray of shape (n_samples, n_classes)
+        The probabilities in the column order of `declared_classes`.
+
+    Raises
+    ------
+    ValueError
+        If the columns of `P` do not correspond to `learned_classes`, or if a
+        learned class label is not contained in `declared_classes`.
+    """
+    name = "`predict_proba`" if output_idx is None else f"P[{output_idx}]"
+    output = "" if output_idx is None else f" of output {output_idx}"
+    if P.shape[1] != len(learned_classes):
+        raise ValueError(
+            f"{name} has {P.shape[1]} columns but the fitted estimator "
+            f"reports {len(learned_classes)} classes{output}."
+        )
+    P_mapped = np.zeros((len(P), len(declared_classes)), dtype=float)
+    for column, learned_class in enumerate(learned_classes):
+        class_index = _class_column(learned_class, declared_classes)
+        if class_index is None:
+            raise ValueError(
+                f"Class {_format_class(learned_class)!r} learned by the "
+                f"wrapped estimator is not contained in the declared "
+                f"classes{output}."
+            )
+        P_mapped[:, class_index] = P[:, column]
+    return P_mapped
+
+
+def _check_fitted_target_evidence(estimator, evidence, target_spec):
+    """Reconcile a target specification with a pre-fitted estimator.
+
+    Declared target semantics may extend a pre-fitted estimator's learned
+    class vocabulary, but they can neither reinterpret its learned classes nor
+    change the number of outputs it predicts.
+
+    An estimator publishing no learned class vocabulary is accepted, because
+    its own metadata then contradicts nothing. The structure of what it
+    predicts is validated where it becomes observable, i.e., when `predict` or
+    `predict_proba` is called.
+
+    Parameters
+    ----------
+    estimator : object
+        The pre-fitted estimator, named in the raised errors.
+    evidence : _FittedTargetEvidence
+        The target evidence published by `estimator`.
+    target_spec : skactiveml.utils.TargetSpec
+        The resolved target specification that is about to be published.
+
+    Raises
+    ------
+    ValueError
+        If the resolved target semantics contradict the target evidence.
+    """
+    if evidence.kind == "unknown":
+        return
+    if target_spec.target_type != "multi-label":
+        if evidence.describes_label_outputs:
+            raise ValueError(
+                f"The pre-fitted estimator '{estimator}' predicts "
+                f"{evidence.n_label_outputs} label outputs, so it cannot be "
+                f"declared as a single-output classifier with the class "
+                f"vocabulary {_format_classes(target_spec.classes)}. Declare "
+                f"one binary class vocabulary per label output."
+            )
+        _check_learned_classes(
+            estimator, evidence.classes, target_spec.classes
+        )
+        return
+
+    n_outputs = len(target_spec.classes)
+    if not evidence.describes_label_outputs:
+        raise ValueError(
+            f"The pre-fitted estimator '{estimator}' learned one categorical "
+            f"class assignment per sample from the class vocabulary "
+            f"{_format_classes(evidence.classes)}, so it cannot be declared "
+            f"as a multi-label classifier with {n_outputs} label outputs. A "
+            f"pre-fitted multi-label estimator has to publish either one "
+            f"class vocabulary per label output, e.g., "
+            f"`sklearn.multioutput.MultiOutputClassifier`, or explicit fitted "
+            f"multi-label metadata, e.g., "
+            f"`sklearn.multiclass.OneVsRestClassifier`. Otherwise, fit the "
+            f"estimator through this wrapper, or declare "
+            f"`target_type='single-output'`."
+        )
+    if evidence.n_label_outputs != n_outputs:
+        raise ValueError(
+            f"The pre-fitted estimator '{estimator}' learned "
+            f"{evidence.n_label_outputs} label outputs, but {n_outputs} class "
+            f"vocabularies are declared. A pre-fitted estimator's number of "
+            f"outputs cannot be changed through `classes`."
+        )
+    if evidence.kind == "label-vocabularies":
+        for output_idx, learned_classes in enumerate(evidence.classes):
+            _check_learned_classes(
+                estimator,
+                learned_classes,
+                target_spec.classes[output_idx],
+                output_idx=output_idx,
+            )
+        return
+    # A fitted multi-label estimator publishing label-output identifiers
+    # predicts one binary indicator per output, so its outputs cannot carry
+    # declared class labels other than the indicator values themselves.
+    for output_idx, declared_classes in enumerate(target_spec.classes):
+        if _classes_missing_from(_INDICATOR_CLASSES, declared_classes):
+            raise ValueError(
+                f"The pre-fitted estimator '{estimator}' predicts a binary "
+                f"indicator per label output, so every declared class "
+                f"vocabulary has to consist of the indicator values "
+                f"{list(_INDICATOR_CLASSES)}. Output {output_idx} declares "
+                f"{_format_classes(declared_classes)}."
+            )
+
+
+def _check_learned_classes(
+    estimator, learned_classes, declared_classes, output_idx=None
+):
+    """Check that a declared class vocabulary contains the learned classes.
+
+    Parameters
+    ----------
+    estimator : object
+        The pre-fitted estimator, named in the raised error.
+    learned_classes : array-like of shape (n_learned_classes,)
+        The class labels `estimator` learned for one output.
+    declared_classes : tuple
+        The class vocabulary of the same output declared through the wrapper.
+    output_idx : int or None, default=None
+        Index of the label output, or `None` for single-output classification.
+
+    Raises
+    ------
+    ValueError
+        If a learned class label is missing from `declared_classes`.
+    """
+    missing_classes = _classes_missing_from(learned_classes, declared_classes)
+    if not missing_classes:
+        return
+    output = "" if output_idx is None else f" for label output {output_idx}"
+    raise ValueError(
+        f"The pre-fitted estimator '{estimator}' learned the class labels "
+        f"{_format_classes(missing_classes)}{output} that are not contained "
+        f"in the declared class vocabulary "
+        f"{_format_classes(declared_classes)}. Its learned classes determine "
+        f"the meaning of its predictions and probability columns, so "
+        f"`classes` can only extend them with additional classes, which then "
+        f"receive zero-filled probability columns."
+    )
+
+
+def _prior_matrix_from_counts(counts, n_samples):
+    counts = np.asarray(counts, dtype=float)
+    total = counts.sum()
+    k = counts.size
+
+    if total == 0:
+        return np.full((n_samples, k), 1.0 / k, dtype=float)
+
+    row = counts / total
+    return np.tile(row, (n_samples, 1))
+
+
+class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
+    """Sklearn Classifier
+
+    Implementation of a wrapper class for `scikit-learn` [1]_ classifiers such
+    that
+
+    - missing labels can be handled, e.g., by filtering them,
+    - classes can be fixed at initialization, e.g., to have consistent
+      probabilistic outputs even when there are no observed labels for each
+      class,
+    - cost-sensitive decisions can be made, e.g., to consider different types
+      of misclassification costs.
+
+    Parameters
+    ----------
+    estimator : sklearn.base.ClassifierMixin
+        The `scikit-learn` classifier to be wrapped. A `predict_proba`
+        method is only required when `predict_proba` or `cost_matrix`
+        based prediction is used.
     include_unlabeled_samples : bool, default=False
         - If `False`, only labeled samples are passed to the `fit` method of
           the `estimator`.
@@ -83,29 +489,108 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
           Otherwise, `missing_label` is interpreted as a regular class label.
           Note that semi-supervised classifiers of `sklearn` expect
           `missing_label=-1`.
-    classes : array-like of shape (n_classes,), default=None
-        Holds the label for each class. If `None`, the classes are determined
-        during `fit`.
+    classes : array-like of shape (n_classes,), or a list of such \
+            array-likes, default=None
+        - A flat vocabulary describes single-output classification.
+        - Nested binary vocabularies describe multi-label classification, one
+          class vocabulary per label output. With explicit
+          `target_type="multi-label"`, vocabularies can instead be resolved
+          from `y` when `classes=None` and both classes are observed in every
+          output.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not `None`.
+        `classes` is not `None` and in the case of single output problems.
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    proba_format : "auto" or "list" or "array", default="auto"
+    Output format of ``predict_proba``.
+
+    - Single-output: always returns an array of shape `(n_samples, n_classes)`.
+    - Multilabel (2D targets with binary classes per output):
+        * 'list'  -> list of `(n_samples, 2)` arrays
+        * 'array' -> array of shape `(n_samples, n_outputs)` with
+          `P(y=pos_label)`
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. Single-output classification is always supported.
+        Multi-label classification requires an estimator that implements
+        `predict_proba` and positively declares either
+        `target_tags.multi_output` or `classifier_tags.multi_label`, e.g.,
+        `sklearn.multioutput.MultiOutputClassifier`,
+        `sklearn.multiclass.OneVsRestClassifier`, or
+        `sklearn.ensemble.RandomForestClassifier`. An explicit
+        `"multi-label"` can resolve binary per-label vocabularies from
+        observed targets when `classes` is `None`.
 
     Attributes
     ----------
-    classes_ : numpy.ndarray of shape (n_classes,)
-        Holds the label for each class after fitting.
-    cost_matrix_ : numpy.ndarray of shape (classes, classes)
-        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
-        class `classes_[j]` for a sample of class `classes_[i]`.
-    estimator_ : sklearn.base.ClassifierMixin with predict_proba method
-        The scikit-learn classifier after calling the `fit` method.
+    target_spec_ : skactiveml.utils.TargetSpec
+        Immutable target specification established by a successful fit. Use
+        its `classes` field for canonical class ordering.
+
+    Notes
+    -----
+    A pre-fitted `estimator` already published the target semantics of its own
+    predictions, so its learned classes are reconciled with the declared ones
+    by class identity before any fitted attribute of this wrapper is published.
+    Declared `classes` may extend the learned class vocabulary, whose
+    additional classes then receive zero-filled probability columns in the
+    declared order, but they can neither reinterpret learned classes nor change
+    the number of predicted outputs. A flat `classes_` published together with
+    fitted multi-label metadata, e.g., by
+    `sklearn.multiclass.OneVsRestClassifier`, identifies binary indicator
+    outputs instead of describing one class vocabulary, so one binary indicator
+    vocabulary per output has to be declared through `classes`. A pre-fitted
+    estimator publishing neither one class vocabulary per label output nor
+    such metadata cannot be declared multi-label, because its flat learned
+    vocabulary is indistinguishable from single-output classification.
+
+    Attributes this wrapper does not hold itself are read from the wrapped
+    `estimator`. The fitted attributes it resolves itself, e.g. `classes_` and
+    `target_spec_`, never are: around a pre-fitted `estimator` they resolve
+    this wrapper's own target semantics on first access, and they raise the
+    usual not-fitted error while no such semantics exist. A pre-fitted
+    estimator's learned classes stay readable as `estimator.classes_`, which
+    states whose vocabulary they are.
+
+    Two degenerate training cases are part of this wrapper's contract and make
+    it predict the observed class label distribution instead of raising: an
+    empty labeled training subset, and an `estimator` rejecting a labeled
+    training subset that carries fewer than two distinct classes in at least
+    one output. Both set `is_fitted_` to `False` and emit a warning. Every
+    other `estimator` failure is raised.
+
+    References
+    ----------
+    .. [1] Fabian Pedregosa, Gaël Varoquaux, Alexandre Gramfort, Vincent
+       Michel, Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter
+       Prettenhofer, Ron Weiss, Vincent Dubourg, Jake Vanderplas, Alexandre
+       Passos, David Cournapeau, Matthieu Brucher, Matthieu Perrot, and Édouard
+       Duchesnay. 2011. Scikit-learn: Machine Learning in Python. J. Mach.
+       Learn. Res. 12, 2011, 2825–2830.
     """
+
+    #: Fitted attributes this wrapper resolves itself, which `__getattr__`
+    #: therefore never forwards to the wrapped `estimator`. `n_features_in_`
+    #: is deliberately absent: it describes the input data rather than the
+    #: target, both objects agree on it, and `partial_fit` reads it through
+    #: `hasattr` to decide whether to reset the feature count.
+    _own_fitted_attributes = frozenset(
+        {
+            "_label_counts",
+            "_le",
+            "check_X_dict_",
+            "classes_",
+            "cost_matrix_",
+            "estimator_",
+            "is_fitted_",
+            "random_state_",
+            "target_spec_",
+        }
+    )
 
     def __init__(
         self,
@@ -115,18 +600,57 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
+        proba_format="auto",
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
+        self.proba_format = proba_format
+
+    @property
+    def _target_capabilities(self):
+        capabilities = {
+            ("classification", "single-output", "single-annotator")
+        }
+        if _declares_multilabel_support(self.estimator):
+            capabilities.add(
+                ("classification", "multi-label", "single-annotator")
+            )
+        return frozenset(capabilities)
+
+    def _resolve_target_spec(self, y, classes=None):
+        target_spec = resolve_target_spec(
+            y,
+            task="classification",
+            target_type=self.target_type,
+            annotation_type="single-annotator",
+            classes=self.classes if classes is None else classes,
+            missing_label=self.missing_label,
+        )
+        if target_spec.target_type == "multi-label" and not (
+            _declares_multilabel_support(self.estimator)
+        ):
+            # The generic capability check below reports the unsupported
+            # semantic triple, which does not explain what is missing.
+            raise ValueError(
+                _multilabel_capability_error(
+                    type(self).__name__, self.estimator
+                )
+            )
+        _check_target_spec_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
 
     @match_signature("estimator", "fit")
-    def fit(self, X, y, sample_weight=None, **fit_kwargs):
+    def fit(self, X, y=None, sample_weight=None, **fit_kwargs):
         """Fit the model using `X` as training data and `y` as class labels.
 
         Parameters
@@ -134,22 +658,27 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `missing_label`). For multilabel
+            problems, a row `y[i]` must either contain only observed
+            labels or only `missing_label` values, i.e., no mixing
+            within a row. Note that `Y` (capitalized) is only accepted if the
+            wrapped estimator exposes this parameter name in its `fit`
+            signature.
+        sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            It contains the weights of the training samples' class labels.
+            Only supported if the wrapped `sklearn` classifier can handle
+            sample weights.
         fit_kwargs : dict-like
             Further parameters as input to the `fit` method of the `estimator`.
 
         Returns
         -------
         self: SklearnClassifier,
-            The `SklearnClassifier` fitted on the training data.
+            The `SklearnClassifier` object fitted on the training data.
         """
+        y = self._extract_target_arg(y, fit_kwargs)
         return self._fit(
             fit_function="fit",
             X=X,
@@ -159,7 +688,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
     @match_signature("estimator", "partial_fit")
-    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+    def partial_fit(self, X, y=None, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using `X` as training data and `y` as
         class labels.
 
@@ -168,14 +697,18 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `missing_label`). For multilabel
+            problems, a row `y[i]` must either contain only observed
+            labels or only `missing_label` values, i.e., no mixing
+            within a row. Note that `Y` (capitalized) is only accepted if the
+            wrapped estimator exposes this parameter name in its
+            `partial_fit` signature.
+        sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            It contains the weights of the training samples' class labels.
+            Only supported if the wrapped `sklearn` classifier can handle
+            sample weights.
         fit_kwargs : dict-like
             Further parameters as input to the `partial_fit` method of the
             `estimator`.
@@ -183,8 +716,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         Returns
         -------
         self : SklearnClassifier,
-            The `SklearnClassifier` is fitted on the training data.
+            The `SklearnClassifier` object fitted on the training data.
         """
+        y = self._extract_target_arg(y, fit_kwargs)
         return self._fit(
             fit_function="partial_fit",
             X=X,
@@ -207,7 +741,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        y_pred :  numpy.ndarray of shape (n_samples,)
+        y_pred : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
             Predicted class labels of the input samples.
         """
         check_is_fitted(self)
@@ -217,19 +751,40 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
+                if self._is_multilabel_target():
+                    y_pred = self._check_multilabel_predictions(
+                        y_pred, n_samples=len(X)
+                    )
+                y_pred = np.asarray(y_pred).astype(
+                    self._class_label_dtype(), copy=False
+                )
             else:
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
                     costs, random_state=self.random_state_, axis=1
                 )
+                y_pred = self._decode_class_labels(y_pred)
         else:
-            p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state_.choice(
-                np.arange(len(self.classes_)), len(X), replace=True, p=p
-            )
-            y_pred = self._le.inverse_transform(y_pred)
-        y_pred = y_pred.astype(self.classes_.dtype)
+            p = self.predict_proba([X[0]])
+            if self._is_multilabel_target():
+                if isinstance(p, np.ndarray) and p.ndim == 2:
+                    # Uniform sampling in (0, 1).
+                    rand_p = self.random_state_.random((len(X), len(p[0])))
+                    y_enc_pred = (rand_p < p).astype(np.int64)
+                else:
+                    y_enc_pred = [
+                        self.random_state_.choice(
+                            len(p_[0]), size=len(X), p=p_[0]
+                        )
+                        for p_ in p
+                    ]
+                    y_enc_pred = np.column_stack(y_enc_pred)
+            else:
+                y_enc_pred = self.random_state_.choice(
+                    np.arange(len(p[0])), len(X), replace=True, p=p[0]
+                )
+            y_pred = self._decode_class_labels(y_enc_pred)
         return y_pred
 
     @match_signature("estimator", "predict_proba")
@@ -246,43 +801,203 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        P : array-like of shape (n_samples, classes)
-            The class probabilities of the input samples. Classes are ordered
-            according to the attribute `self.classes_`.
+        P : numpy.ndarray of shape (n_samples, n_classes), \
+                numpy.ndarray of shape (n_samples, n_outputs), or list of \
+                numpy.ndarray
+            The class probabilities of the input samples. For single-output
+            classification, the return value has shape
+            `(n_samples, n_classes)`. For multilabel classification,
+            `proba_format='array'` returns shape `(n_samples, n_outputs)` with
+            positive-class probabilities and `proba_format='list'` returns one
+            `(n_samples, 2)` array per output.
         """
+        # Input parameter checks.
         check_is_fitted(self)
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        if self.is_fitted_:
-            P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-            # map the predicted classes to self.classes
-            if P.shape[1] != len(self.classes_):
-                P_ext = np.zeros((len(X), len(self.classes_)))
-                est_classes = self.estimator_.classes_
-                indices_est = np.where(np.isin(est_classes, self.classes_))[0]
-                class_indices = np.searchsorted(
-                    self.classes_, est_classes[indices_est]
-                )
-                P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
-                P = P_ext
-            if not np.any(np.isnan(P)):
-                return P
+        n_samples = len(X)
+        proba_format = self._resolve_proba_format()
 
+        if self.is_fitted_:
+            # Obtain class probabilities if wrapped classifier was successfully
+            # fitted.
+            P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
+
+            if not self._is_multilabel_target():
+                # Single output classification.
+                P = self._normalize_single_output_proba(P, n_samples=n_samples)
+                # Fall through to the label-count prior fallback if the
+                # fitted estimator yielded NaN probabilities.
+                if not np.any(np.isnan(P)):
+                    return P
+            else:
+                # Multi-label targets correspond to one binary class
+                # vocabulary per output.
+                n_outputs = len(self.classes_)
+                # A Python list can also be a row-oriented positive-class
+                # matrix. Only nested matrices identify the per-output form.
+                is_per_output_list = isinstance(P, list) and (
+                    len(P) == 0 or any(np.asarray(P_j).ndim >= 2 for P_j in P)
+                )
+                P_array = None if is_per_output_list else np.asarray(P)
+                estimator_classes = (
+                    self._estimator_classes_for_output(0, n_outputs)
+                    if n_outputs == 1
+                    else None
+                )
+                is_collapsed_binary_output = (
+                    P_array is not None
+                    and estimator_classes is not None
+                    and P_array.ndim == 2
+                    and P_array.shape[0] == n_samples
+                    and (
+                        P_array.shape[1] == len(estimator_classes)
+                        or (
+                            len(estimator_classes) == 1
+                            and P_array.shape[1] == 2
+                        )
+                    )
+                )
+                if is_per_output_list:
+                    P_list = self._normalize_multilabel_proba_list(
+                        P, n_samples=n_samples
+                    )
+                elif is_collapsed_binary_output:
+                    if len(estimator_classes) == 1 and P_array.shape[1] == 2:
+                        self._check_estimator_probas_are_valid(
+                            P_array, is_multilabel=False
+                        )
+                        # Both native columns belong to the sole learned
+                        # class; dropping either loses probability mass.
+                        P_array = P_array.sum(axis=1, keepdims=True)
+                    P_list = self._normalize_multilabel_proba_list(
+                        [P_array], n_samples=n_samples
+                    )
+                else:
+                    P_ml = self._check_multilabel_proba_array(
+                        P_array, n_samples=n_samples
+                    )
+                    P_list = [
+                        np.column_stack([1 - P_ml[:, j], P_ml[:, j]])
+                        for j in range(n_outputs)
+                    ]
+                # Fall through to the label-count prior fallback if the
+                # fitted estimator yielded NaN probabilities.
+                if not any(np.any(np.isnan(P_j)) for P_j in P_list):
+                    if proba_format == "array":
+                        # Binary per output: return positive-class
+                        # probabilities of shape (n_samples, n_outputs).
+                        return np.column_stack(
+                            [P_list[j][:, 1] for j in range(n_outputs)]
+                        )
+                    return P_list
+
+        # Fallback, if fitting of the underlying estimator failed.
         warnings.warn(
-            f"Since the 'base_estimator' could not be fitted when"
-            f" calling the `fit` method, the class label "
-            f"distribution`_label_counts={self._label_counts}` is used to "
-            f"make the predictions."
+            f"Since the 'estimator' could not be fitted when calling the "
+            f"`fit` method, the class label distribution "
+            f"`_label_counts={self._label_counts}` is used to make the "
+            f"predictions."
         )
-        if sum(self._label_counts) == 0:
-            return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
-        else:
-            return np.tile(
-                self._label_counts / np.sum(self._label_counts), [len(X), 1]
+
+        # Fallback for single output.
+        if not self._is_multilabel_target():
+            return _prior_matrix_from_counts(self._label_counts, len(X))
+
+        if proba_format == "array":
+            # Binary per task: return (n_samples, n_outputs) with P(y=1).
+            return np.column_stack(
+                [
+                    _prior_matrix_from_counts(counts_j, len(X))[:, 1]
+                    for counts_j in self._label_counts
+                ]
             )
 
+        # List format: return one probability matrix per label.
+        return [
+            _prior_matrix_from_counts(counts_j, len(X))
+            for counts_j in self._label_counts
+        ]
+
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        """Fit or partially fit this wrapper as a single transaction.
+
+        The snapshot taken here covers the entire fit, not only the estimator
+        call: a rejection raised while validating the estimator, the class
+        vocabulary, or the target specification rolls the wrapper back just as
+        a failing estimator fit does. Without that, a failing re-fit would
+        leave an already fitted wrapper reporting metadata from the abandoned
+        attempt, e.g. an `n_features_in_` that contradicts its `estimator_`.
+
+        The degenerate training cases are not failures and keep their state,
+        because `_validate_and_fit` returns `self` for them rather than
+        raising. The transaction also covers this wrapper only: as
+        `_restore_wrapper_attributes` documents, a `partial_fit` that already
+        mutated `estimator_` in place cannot be rolled back.
+
+        Parameters
+        ----------
+        fit_function : "fit" or "partial_fit"
+            Name of the estimator method to call.
+        X : array-like of shape (n_samples, ...)
+            The feature matrix representing the samples.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set, possibly including unlabeled ones.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
+        fit_kwargs : dict-like
+            Further parameters as input to `fit_function` of the `estimator`.
+
+        Returns
+        -------
+        self : SklearnClassifier
+            The wrapper fitted on the training data.
+        """
+        attributes_before = dict(self.__dict__)
+        try:
+            return self._validate_and_fit(
+                fit_function=fit_function,
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                **fit_kwargs,
+            )
+        except Exception:
+            _restore_wrapper_attributes(self, attributes_before)
+            raise
+
+    def _validate_and_fit(
+        self, fit_function, X, y, sample_weight=None, **fit_kwargs
+    ):
+        """Validate the inputs and fit the estimator, committing state freely.
+
+        This method may write fitted attributes before a later step rejects
+        the call, because its only caller `_fit` rolls them back. See `_fit`
+        for the parameters and the transactional guarantee.
+        """
+        is_incremental = fit_function == "partial_fit"
+        had_established_target_spec = (
+            is_incremental and getattr(self, "target_spec_", None) is not None
+        )
+        supplied_classes = (
+            fit_kwargs.get("classes") if is_incremental else None
+        )
+        if supplied_classes is not None and self.classes is not None:
+            configured_spec = self._resolve_fitting_target_spec(
+                y, classes=self.classes
+            )
+            self._resolve_fitting_target_spec(
+                y,
+                established_spec=configured_spec,
+                classes=supplied_classes,
+            )
+        target_spec = self._resolve_target_spec_for_fit(
+            y,
+            is_incremental=is_incremental,
+            classes=supplied_classes,
+        )
+
         # Check input parameters.
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
@@ -296,7 +1011,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
             reset=fit_function == "fit" or not hasattr(self, "n_features_in_"),
+            target_spec=target_spec,
         )
+        self.target_spec_ = target_spec
 
         # Check whether estimator is a valid classifier.
         if not is_classifier(estimator=self.estimator):
@@ -320,63 +1037,166 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 "'cost_matrix' can be only set, if 'estimator'"
                 "implements 'predict_proba'."
             )
+
+        # Include unlabeled samples, if requested, e.g., when wrapping
+        # semi-supervised classifiers from sklearn.
+        if self.include_unlabeled_samples:
+            is_included = np.ones(len(y), dtype=bool)
+        else:
+            is_included = is_labeled(
+                y=y,
+                missing_label=-1,
+                target_type=target_spec.target_type,
+            )
+
+        # An incremental batch without an effective training row validates
+        # the established target and feature contracts but must not discard an
+        # already trained estimator or its label counts. All-unlabeled rows
+        # remain effective for estimators that explicitly include them.
+        if had_established_target_spec and not np.any(is_included):
+            return self
+
         if hasattr(self, "estimator_"):
             if fit_function != "partial_fit":
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
-        # count labels per class
-        if self.include_unlabeled_samples:
-            is_included = np.full_like(y, fill_value=True, dtype=bool)
-        else:
-            is_included = is_labeled(y, missing_label=-1)
-        self._label_counts = [
-            np.sum(y[is_included] == c) for c in range(len(self._le.classes_))
-        ]
-        try:
-            X_train = X[is_included]
-            y_train = y[is_included].astype(np.int64)
-            y_train_inv = self._le.inverse_transform(y_train)
-            if np.sum(is_included) == 0:
-                raise ValueError("There is no labeled data.")
-            elif (
-                not has_fit_parameter(self.estimator, "sample_weight")
-                or sample_weight is None
-            ):
-                if fit_function == "partial_fit":
-                    fit_kwargs["classes"] = self.classes_
-                    self.estimator_.partial_fit(
-                        X=X_train, y=y_train_inv, **fit_kwargs
-                    )
-                elif fit_function == "fit":
-                    self.estimator_.fit(X=X_train, y=y_train_inv, **fit_kwargs)
-            else:
-                if fit_function == "partial_fit":
-                    fit_kwargs["classes"] = self.classes_
-                    fit_kwargs["sample_weight"] = sample_weight[is_included]
-                    self.estimator_.partial_fit(
-                        X=X_train,
-                        y=y_train_inv,
-                        **fit_kwargs,
-                    )
-                elif fit_function == "fit":
-                    fit_kwargs["sample_weight"] = sample_weight[is_included]
-                    self.estimator_.fit(X=X_train, y=y_train_inv, **fit_kwargs)
-            self.is_fitted_ = True
-        except Exception as e:
-            self.is_fitted_ = False
-            warnings.warn(
-                "The 'base_estimator' could not be fitted because of"
-                " '{}'. Therefore, the class labels of the samples "
-                "are counted and will be used to make predictions. "
-                "The class label distribution is `_label_counts={}`.".format(
-                    e, self._label_counts
+
+        # Count labels per class.
+        if self._is_multilabel_target():
+            self._label_counts = [
+                np.array(
+                    [
+                        np.sum(y[is_included, j] == class_idx)
+                        for class_idx in range(len(classes_j))
+                    ],
+                    dtype=int,
                 )
+                for j, classes_j in enumerate(self._le.classes_)
+            ]
+        else:
+            self._label_counts = [
+                np.sum(y[is_included] == c)
+                for c in range(len(self._le.classes_))
+            ]
+
+        X_train = X[is_included]
+        y_train = y[is_included].astype(np.int64)
+
+        # Degenerate training cases are part of the wrapper contract, e.g.,
+        # during an active learning cold start. An empty labeled training
+        # subset is recognized before the estimator is called at all.
+        if len(y_train) == 0:
+            self._fall_back_to_label_prior("there is no labeled data")
+            return self
+
+        y_train_inv = self._decode_labeled_targets(y_train)
+        sample_weight_train = (
+            None if sample_weight is None else sample_weight[is_included]
+        )
+        try:
+            self._call_estimator_fit(
+                fit_function=fit_function,
+                X=X_train,
+                y=y_train_inv,
+                sample_weight=sample_weight_train,
+                **fit_kwargs,
             )
+        except Exception as error:
+            # Only the second degenerate case is absorbed: many estimators
+            # reject a training subset carrying fewer than two distinct
+            # classes although others fit it, so the failure is discovered
+            # rather than predicted.
+            if self._has_degenerate_training_classes(y_train):
+                self._fall_back_to_label_prior(
+                    f"the estimator raised '{error}' on a labeled training "
+                    f"subset carrying fewer than two classes in at least one "
+                    f"output"
+                )
+                return self
+
+            # Every other failure states a genuinely broken estimator
+            # contract and must not be hidden behind prior-only predictions.
+            # The message is built before propagating, because `_fit` restores
+            # the pre-call state and with it the reported `estimator_`.
+            message = (
+                f"Calling '{fit_function}' of the estimator "
+                f"'{self.estimator_}' failed on {len(y_train)} labeled "
+                f"samples covering at least two classes per output. This is "
+                f"not one of the degenerate training cases for which the "
+                f"class label distribution is used as a fallback."
+            )
+            raise RuntimeError(message) from error
+
+        self.is_fitted_ = True
         return self
 
+    def _decode_labeled_targets(self, y_train):
+        """Decode a labeled training subset into its declared class dtype.
+
+        The label encoder decodes into a dtype that can also represent
+        `missing_label`, e.g., `object` for `missing_label=None`. A labeled
+        training subset never carries `missing_label`, so its decoded labels
+        are narrowed back to the dtype of the declared classes. Without this
+        narrowing, a wrapped estimator rejects an `object` target that only
+        contains ordinary class labels.
+
+        Parameters
+        ----------
+        y_train : numpy.ndarray of shape (n_labeled,) or \
+                (n_labeled, n_outputs)
+            The encoded class labels of the labeled training subset.
+
+        Returns
+        -------
+        y_train_inv : numpy.ndarray of shape (n_labeled,) or \
+                (n_labeled, n_outputs)
+            The decoded class labels passed on to the wrapped estimator.
+        """
+        return self._decode_class_labels(y_train)
+
+    def _has_degenerate_training_classes(self, y_train):
+        """Check whether an encoded training subset lacks two classes.
+
+        Parameters
+        ----------
+        y_train : numpy.ndarray of shape (n_labeled,) or \
+                (n_labeled, n_outputs)
+            The encoded class labels of the labeled training subset.
+
+        Returns
+        -------
+        is_degenerate : bool
+            `True`, if fewer than two distinct classes are observed, for
+            multi-label classification in at least one output, and `False`
+            otherwise.
+        """
+        if self._is_multilabel_target():
+            return any(
+                len(np.unique(y_train[:, j])) < 2
+                for j in range(y_train.shape[1])
+            )
+        return len(np.unique(y_train)) < 2
+
+    def _fall_back_to_label_prior(self, reason):
+        """Mark this wrapper as unfitted to predict the label distribution.
+
+        Parameters
+        ----------
+        reason : str
+            Description of the degenerate training case, completing the
+            sentence "The 'estimator' could not be fitted because ...".
+        """
+        self.is_fitted_ = False
+        warnings.warn(
+            f"The 'estimator' could not be fitted because {reason}. "
+            f"Therefore, the class labels of the samples are counted and "
+            f"will be used to make predictions. The class label distribution "
+            f"is `_label_counts={self._label_counts}`."
+        )
+
     def __sklearn_is_fitted__(self):
-        if hasattr(self, "is_fitted_"):
+        if "is_fitted_" in self.__dict__:
             return True
 
         try:
@@ -384,9 +1204,23 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         except NotFittedError:
             return False
 
+        estimator = deepcopy(self.estimator)
+        evidence = _discover_fitted_target_evidence(self.estimator)
+
+        # The target specification is resolved, validated, and reconciled with
+        # the pre-fitted estimator before any fitted attribute is written, such
+        # that a failing target contract leaves this wrapper exactly in its
+        # pre-call state.
+        label_state = self._resolve_label_state(self._prefit_classes(evidence))
+        _check_fitted_target_evidence(
+            self.estimator, evidence, label_state["target_spec"]
+        )
+        self._commit_label_state(label_state)
+        self._initialize_label_counts_from_classes()
+
         # set attributes that would be set by the fit function
         self.is_fitted_ = True
-        self.estimator_ = deepcopy(self.estimator)
+        self.estimator_ = estimator
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
@@ -397,10 +1231,494 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return True
 
     def __getattr__(self, item):
+        if item in self._own_fitted_attributes:
+            return _resolve_own_fitted_attribute(self, item)
         if "estimator_" in self.__dict__:
             return getattr(self.estimator_, item)
         else:
             return getattr(self.estimator, item)
+
+    def _prefit_classes(self, evidence):
+        """Determine the class vocabulary of a pre-fitted `estimator`.
+
+        The declared `classes` take precedence, because the label state is
+        resolved from the returned vocabulary and also validated against it.
+        Reconciliation with the estimator's own learned classes is a separate
+        step, so that it can report their contradiction rather than a generic
+        unknown-class error.
+
+        Parameters
+        ----------
+        evidence : _FittedTargetEvidence
+            The target evidence published by the pre-fitted `estimator`.
+
+        Returns
+        -------
+        classes : array-like of shape (n_classes,), or a list of such \
+                array-likes
+            The declared `classes` if they are given, and the estimator's
+            learned class vocabulary otherwise.
+
+        Raises
+        ------
+        ValueError
+            If neither this wrapper nor the pre-fitted `estimator` declares a
+            class vocabulary, because the estimator's predictions cannot be
+            interpreted without one.
+        """
+        if self.classes is not None:
+            return self.classes
+        if evidence.classes is not None:
+            return evidence.classes
+        if evidence.kind == "label-outputs":
+            example = [list(_INDICATOR_CLASSES)] * evidence.n_label_outputs
+            raise ValueError(
+                f"The pre-fitted estimator '{self.estimator}' declares "
+                f"multi-label classification with "
+                f"{evidence.n_label_outputs} label outputs, so its flat "
+                f"learned classes identify those outputs instead of one class "
+                f"vocabulary. Declare one binary indicator vocabulary per "
+                f"label output, i.e., `classes={example}`."
+            )
+        raise ValueError(
+            f"The pre-fitted estimator '{self.estimator}' exposes no learned "
+            f"class vocabulary through `classes_`, so its predictions cannot "
+            f"be interpreted. Declare `classes`."
+        )
+
+    def _resolve_label_state(self, classes):
+        """Resolve the label state for `classes` without committing it.
+
+        Every target resolution and validation step is performed on local
+        state only, such that a failure leaves this wrapper untouched.
+
+        Parameters
+        ----------
+        classes : array-like of shape (n_classes,), or a list of such \
+                array-likes
+            Class vocabulary to resolve the target specification from.
+
+        Returns
+        -------
+        label_state : dict
+            Resolved label state to be committed via `_commit_label_state`.
+        """
+        random_state = check_random_state(self.random_state)
+        effective_classes = (
+            self.classes if self.classes is not None else classes
+        )
+        y_dummy = (
+            np.empty(
+                (0, len(effective_classes)),
+                dtype=np.asarray(self.missing_label).dtype,
+            )
+            if _has_nested_classes(effective_classes)
+            else classes
+        )
+        target_spec = self._resolve_target_spec(
+            y_dummy, classes=effective_classes
+        )
+        check_classifier_params(
+            target_spec.classes, self.missing_label, self.cost_matrix
+        )
+        le = ExtLabelEncoder(
+            classes=target_spec.classes,
+            missing_label=self.missing_label,
+            target_type=target_spec.target_type,
+        )
+        le.fit(y_dummy)
+        if target_spec.target_type == "multi-label":
+            cost_matrix = None
+        else:
+            cost_matrix = (
+                1 - np.eye(len(le.classes_))
+                if self.cost_matrix is None
+                else self.cost_matrix
+            )
+        check_classifier_params(le.classes_, self.missing_label, cost_matrix)
+        return {
+            "random_state": random_state,
+            "target_spec": target_spec,
+            "le": le,
+            "cost_matrix": cost_matrix,
+        }
+
+    def _commit_label_state(self, label_state):
+        """Write a label state resolved by `_resolve_label_state`."""
+        self.random_state_ = label_state["random_state"]
+        self.target_spec_ = label_state["target_spec"]
+        self._le = label_state["le"]
+        self.classes_ = self._le.classes_
+        self.cost_matrix_ = label_state["cost_matrix"]
+
+    def _initialize_label_counts_from_classes(self):
+        """Initialize the per-class label counts with zeros.
+
+        This is used for pre-fitted estimators, where no labels are observed
+        through the wrapper's own `fit` method. The resulting all-zero counts
+        make the label-count prior fallback of `predict` and `predict_proba`
+        default to a uniform class distribution.
+        """
+        if self._is_multilabel_target():
+            self._label_counts = [
+                np.zeros(len(classes_j), dtype=int)
+                for classes_j in self.classes_
+            ]
+        else:
+            self._label_counts = [0 for _ in self.classes_]
+
+    @staticmethod
+    def _extract_target_arg(y, fit_kwargs):
+        if y is not None and "Y" in fit_kwargs:
+            raise TypeError("Pass only one of `y` and `Y`.")
+        return y if y is not None else fit_kwargs.pop("Y", None)
+
+    @staticmethod
+    def _target_parameter_name(fit_method):
+        fit_params = inspect.signature(fit_method).parameters
+        if "y" in fit_params:
+            return "y"
+        if "Y" in fit_params:
+            return "Y"
+        raise TypeError(
+            "The wrapped estimator's fit method must accept either `y` "
+            "or `Y` as target parameter."
+        )
+
+    def _call_estimator_fit(
+        self, fit_function, X, y, sample_weight=None, **fit_kwargs
+    ):
+        fit_method = getattr(self.estimator_, fit_function)
+        fit_params = inspect.signature(fit_method).parameters
+        target_param = self._target_parameter_name(fit_method)
+        call_kwargs = dict(fit_kwargs)
+        call_kwargs["X"] = X
+        call_kwargs[target_param] = y
+
+        if fit_function == "partial_fit" and "classes" in fit_params:
+            evidence = _discover_fitted_target_evidence(self.estimator_)
+            # A native multilabel learner's flat `classes_` can describe
+            # output identifiers or a collapsed binary vocabulary. Preserve
+            # its incremental contract rather than supplying nested classes.
+            call_kwargs["classes"] = (
+                self.estimator_.classes_
+                if self._is_multilabel_target()
+                and evidence.kind in {"label-outputs", "single-output"}
+                else self.classes_
+            )
+
+        if sample_weight is not None and (
+            "sample_weight" in fit_params
+            or any(
+                param.kind == inspect.Parameter.VAR_KEYWORD
+                for param in fit_params.values()
+            )
+        ):
+            call_kwargs["sample_weight"] = sample_weight
+
+        return fit_method(**call_kwargs)
+
+    def _check_multilabel_predictions(self, y_pred, n_samples):
+        """Validate the class label predictions of a multi-label estimator.
+
+        Parameters
+        ----------
+        y_pred : array-like
+            The predictions returned by the wrapped estimator's `predict`.
+        n_samples : int
+            Number of samples the predictions are expected to have.
+
+        Returns
+        -------
+        y_pred : numpy.ndarray of shape (n_samples, n_outputs)
+            The validated predictions.
+
+        Raises
+        ------
+        ValueError
+            If the predictions do not describe one class label per output.
+        """
+        n_outputs = len(self.classes_)
+        y_pred = np.asarray(y_pred)
+        if n_outputs == 1 and y_pred.shape == (n_samples,):
+            y_pred = y_pred[:, None]
+        expected_shape = (n_samples, n_outputs)
+        if y_pred.shape != expected_shape:
+            raise ValueError(
+                f"Expected `predict` of the wrapped estimator to return "
+                f"shape `(n_samples, {n_outputs})`, exactly "
+                f"`{expected_shape}`, for multi-label "
+                f"classification, got {y_pred.shape}."
+            )
+        for output_idx, classes_j in enumerate(self.classes_):
+            missing_classes = _classes_missing_from(
+                y_pred[:, output_idx], classes_j
+            )
+            if missing_classes:
+                class_label = _format_class(missing_classes[0])
+                raise ValueError(
+                    f"Class {class_label!r} predicted for output "
+                    f"{output_idx} is not contained in its declared class "
+                    f"vocabulary {_format_classes(classes_j)}."
+                )
+        return y_pred
+
+    def _check_multilabel_proba_array(self, P, n_samples):
+        """Validate a positive-class probability array of a multi-label fit.
+
+        Parameters
+        ----------
+        P : array-like
+            The probabilities returned by the wrapped estimator's
+            `predict_proba`, which are not given as one matrix per output.
+        n_samples : int
+            Number of samples the probabilities are expected to have.
+
+        Returns
+        -------
+        P_ml : numpy.ndarray of shape (n_samples, n_outputs)
+            The validated positive-class probabilities.
+
+        Raises
+        ------
+        ValueError
+            If the probabilities follow neither documented multi-label
+            probability contract.
+        """
+        n_outputs = len(self.classes_)
+        P_ml = np.asarray(P, dtype=float)
+        expected_shape = (n_samples, n_outputs)
+        if P_ml.shape != expected_shape:
+            raise ValueError(
+                f"Expected `predict_proba` of the wrapped estimator to "
+                f"return positive-class probabilities of shape "
+                f"`(n_samples, {n_outputs})`, exactly `{expected_shape}`, "
+                f"or one `(n_samples, 2)` array per output, for multi-label "
+                f"classification, got {P_ml.shape}."
+            )
+        self._check_estimator_probas_are_valid(P_ml, is_multilabel=True)
+        return P_ml
+
+    @staticmethod
+    def _check_estimator_probas_are_valid(P, is_multilabel):
+        """Validate estimator probabilities while preserving NaN fallback.
+
+        NaN values signal that the wrapper should use its label-count prior.
+        Other values still have to be finite and bounded, and complete rows
+        representing class distributions have to sum to one.
+
+        Parameters
+        ----------
+        P : numpy.ndarray
+            Probability values returned by the wrapped estimator.
+        is_multilabel : bool
+            Whether columns are independent positive-class probabilities.
+        """
+        values_without_nan = P[~np.isnan(P)].reshape(-1, 1)
+        _check_probas_are_valid(values_without_nan, is_multilabel=True)
+        if not is_multilabel:
+            complete_rows = P[~np.isnan(P).any(axis=1)]
+            _check_probas_are_valid(complete_rows, is_multilabel=False)
+
+    def _normalize_single_output_proba(self, P, n_samples):
+        """Align a single-output probability array to `classes_`.
+
+        The wrapped estimator's probability columns follow its own learned
+        class vocabulary, which may be ordered differently from `classes_` and
+        may omit declared classes. The columns are therefore mapped by class
+        identity rather than by position, so that equally wide vocabularies
+        are not silently reinterpreted. Declared classes the estimator never
+        learned receive zero-filled columns.
+
+        Parameters
+        ----------
+        P : array-like
+            The probabilities returned by the wrapped estimator's
+            `predict_proba`.
+        n_samples : int
+            Number of samples the probabilities are expected to have.
+
+        Returns
+        -------
+        P : numpy.ndarray of shape (n_samples, n_classes)
+            The probabilities in the column order of `classes_`.
+
+        Raises
+        ------
+        ValueError
+            If the probabilities can be reconciled with neither the learned
+            nor the declared class vocabulary.
+        """
+        P = np.asarray(P, dtype=float)
+        if P.ndim != 2 or P.shape[0] != n_samples:
+            raise ValueError(
+                f"Expected `predict_proba` of the wrapped estimator to return "
+                f"shape `({n_samples}, n_classes)` for single-output "
+                f"classification, got {P.shape}."
+            )
+
+        est_classes = getattr(self.estimator_, "classes_", None)
+        if est_classes is None:
+            if P.shape[1] != len(self.classes_):
+                raise ValueError(
+                    f"`predict_proba` returned {P.shape[1]} columns but "
+                    f"{len(self.classes_)} classes are declared, and the "
+                    f"wrapped estimator does not expose `classes_` to map "
+                    f"them. Provide an estimator exposing its learned "
+                    f"classes, declare `classes` matching the estimator, or "
+                    f"return probabilities for all declared classes."
+                )
+            return P
+
+        return _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+
+    def _normalize_multilabel_proba_list(self, P, n_samples):
+        """Align a list of per-output probability matrices to `classes_`.
+
+        The wrapped estimator may return, for each output, a probability
+        matrix whose columns follow its own class order and may omit classes
+        that were not observed during fitting. This method maps each such
+        matrix onto the declared classes of the corresponding output, filling
+        the probabilities of unobserved classes with zeros.
+
+        Parameters
+        ----------
+        P : list of array-like
+            One probability matrix of shape `(n_samples, n_classes)` per
+            output, as returned by the wrapped estimator's `predict_proba`.
+        n_samples : int
+            Number of samples the probability matrices are expected to have.
+
+        Returns
+        -------
+        P_list : list of numpy.ndarray
+            One probability matrix of shape `(n_samples, n_classes)` per
+            output, with columns aligned to `self.classes_`.
+
+        Raises
+        ------
+        ValueError
+            If the number of outputs, the shape of a matrix, or the class
+            mapping of an output cannot be reconciled with `self.classes_`.
+        """
+        n_outputs = len(self.classes_)
+        if len(P) != n_outputs:
+            raise ValueError(
+                f"Expected {n_outputs} outputs from `predict_proba`, got "
+                f"{len(P)}."
+            )
+
+        P_list = []
+        for j, P_j in enumerate(P):
+            P_j = np.asarray(P_j, dtype=float)
+            classes_j = np.asarray(self.classes_[j])
+            if P_j.ndim != 2:
+                raise ValueError(
+                    f"Expected P[{j}] to be of shape "
+                    f"(n_samples, n_classes), got {P_j.shape}."
+                )
+            if P_j.shape[0] != n_samples:
+                raise ValueError(
+                    f"Expected P[{j}] to contain {n_samples} samples, got "
+                    f"{P_j.shape[0]}."
+                )
+
+            est_classes_j = self._estimator_classes_for_output(j, n_outputs)
+            if est_classes_j is None:
+                if P_j.shape[1] != len(classes_j):
+                    raise ValueError(
+                        f"P[{j}] has {P_j.shape[1]} columns but output {j} "
+                        f"declares {len(classes_j)} classes, and the wrapped "
+                        f"estimator does not expose per-output classes to map "
+                        f"them. Provide an estimator that exposes `classes_` "
+                        f"(or per-output `estimators_`), declare `classes` "
+                        f"matching the estimator, or return probabilities for "
+                        f"all declared classes."
+                    )
+                P_j_normalized = P_j
+            else:
+                P_j_normalized = _map_proba_columns(
+                    P_j,
+                    np.asarray(est_classes_j),
+                    classes_j,
+                    output_idx=j,
+                )
+            self._check_estimator_probas_are_valid(
+                P_j_normalized, is_multilabel=False
+            )
+            P_list.append(P_j_normalized)
+
+        return P_list
+
+    def _estimator_classes_for_output(self, output_idx, n_outputs):
+        """Determine the class labels of the wrapped estimator for one output.
+
+        The aggregated `classes_` attribute is preferred because it holds the
+        per-output class vector for both `MultiOutputClassifier` and native
+        multilabel estimators. The `estimators_[output_idx].classes_` attribute
+        is only used as a fallback, since for ensembles the `estimators_` are
+        base learners trained on all outputs, so this attribute is a list of
+        per-output arrays rather than this output's class vector.
+
+        Parameters
+        ----------
+        output_idx : int
+            Index of the output whose class labels are requested.
+        n_outputs : int
+            Total number of outputs of the multilabel problem.
+
+        Returns
+        -------
+        classes_j : numpy.ndarray of shape (n_classes,) or None
+            The class labels of the wrapped estimator for the output
+            `output_idx`, or `None` if they cannot be determined.
+        """
+        # Collect class candidates in priority order.
+        candidates = []
+        est_classes = getattr(self.estimator_, "classes_", None)
+        if est_classes is not None:
+            if (
+                n_outputs == 1
+                and not _has_nested_classes(est_classes)
+                and not bool(getattr(self.estimator_, "multilabel_", False))
+            ):
+                candidates.append(est_classes)
+            elif len(est_classes) == n_outputs:
+                candidates.append(est_classes[output_idx])
+        if (
+            hasattr(self.estimator_, "estimators_")
+            and len(self.estimator_.estimators_) == n_outputs
+            and hasattr(self.estimator_.estimators_[output_idx], "classes_")
+        ):
+            candidates.append(self.estimator_.estimators_[output_idx].classes_)
+
+        for candidate in candidates:
+            classes_j = np.asarray(candidate)
+            # Accept only a flat vector of scalar class labels, rejecting
+            # scalars (ndim 0) and list-of-arrays specifications.
+            if classes_j.ndim == 1 and all(np.ndim(c) == 0 for c in classes_j):
+                return classes_j
+
+        return None
+
+    def _resolve_proba_format(self):
+        check_type(self.proba_format, "proba_format", str)
+        if self.proba_format not in ["auto", "list", "array"]:
+            raise ValueError(
+                "`proba_format` must be one of {'auto', 'list', 'array'}."
+            )
+        if not self._is_multilabel_target():
+            return "array"
+
+        if self.proba_format == "auto":
+            return "array"
+        return self.proba_format
+
+    def _is_multilabel_target(self):
+        return (
+            "target_spec_" in self.__dict__
+            and self.target_spec_.target_type == "multi-label"
+        )
 
 
 class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -434,7 +1752,47 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. It must remain compatible with the wrapped
+        estimator across incremental updates. The wrapper supports only
+        single-output classification.
+
+    Notes
+    -----
+    Attributes this wrapper does not hold itself are read from the wrapped
+    `estimator`, `classes_` among them: the wrapper resolves no class
+    vocabulary of its own, so the one its `SkactivemlClassifier` resolved is
+    the wrapper's own answer. The fitted attributes it does hold itself, e.g.
+    `target_spec_` and the sliding window in `X_train_`, are never read from
+    the `estimator` and raise the usual not-fitted error before a fit.
+
+    A `fit` or `partial_fit` that raises leaves this wrapper exactly as it
+    was, the sliding window included. The window therefore never advances past
+    what the wrapped `estimator` was trained on, and a rejected update leaves a
+    previously fitted wrapper able to predict as before.
     """
+
+    #: Fitted attributes this wrapper holds itself, which `__getattr__`
+    #: therefore never forwards to the wrapped `estimator`. `classes_` is
+    #: deliberately absent: this wrapper resolves no class vocabulary of its
+    #: own, so the one its `SkactivemlClassifier` estimator resolved is the
+    #: wrapper's own answer.
+    _own_fitted_attributes = frozenset(
+        {
+            "X_train_",
+            "check_X_dict_",
+            "estimator_",
+            "random_state_",
+            "sample_weight_train_",
+            "target_spec_",
+            "y_train_",
+        }
+    )
+
+    #: Fitted attributes holding the sliding window, which a fit updates in
+    #: place and `_snapshot_attributes` therefore copies rather than
+    #: referencing.
+    _window_attributes = ("X_train_", "y_train_", "sample_weight_train_")
 
     def __init__(
         self,
@@ -445,12 +1803,14 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         window_size=None,
         only_labeled=False,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.estimator = estimator
         self.only_labeled = only_labeled
@@ -464,15 +1824,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ----------
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,)
             It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            labels are represented by the attribute `self.missing_label_`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
         fit_kwargs : dict-like
             Further parameters as input to the `fit` method of the `estimator`.
 
@@ -481,39 +1837,15 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self: SlidingWindowClassifier,
             The `SlidingWindowClassifier` is fitted on the training data.
         """
-        # Check whether estimator is a valid classifier.
+        # Check whether estimator is a valid classifier. This precedes the
+        # transaction `_fit` opens, because it writes nothing itself.
         if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
                 "'{}' must be a SkactivemlClassifier"
                 "classifier.".format(self.estimator)
             )
-        self.check_X_dict_ = {
-            "ensure_min_samples": 0,
-            "ensure_min_features": 0,
-            "allow_nd": True,
-            "dtype": None,
-        }
-        X, y, sample_weight = self._validate_data(
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
-            check_X_dict=self.check_X_dict_,
-        )
 
-        self._add_samples("fit", X, y, sample_weight)
-        X_train = np.array(self.X_train_)
-        y_train = np.array(self.y_train_)
-        sample_weight_train = None
-        if self.sample_weight_train_ is not None:
-            sample_weight_train = np.array(
-                self.sample_weight_train_, dtype=float
-            )
-        return self._fit(
-            X=X_train,
-            y=y_train,
-            sample_weight=sample_weight_train,
-            **fit_kwargs,
-        )
+        return self._fit("fit", X, y, sample_weight, **fit_kwargs)
 
     @match_signature("estimator", "fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -525,15 +1857,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ----------
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,)
             It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            labels are represented by the attribute `self.missing_label_`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
         fit_kwargs : dict-like
             Further parameters as input to the `fit` method of the `estimator`.
 
@@ -542,26 +1870,86 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self : SlidingWindowClassifier,
             The SlidingWindowClassifier is fitted on the training data.
         """
-        # Check whether estimator is a valid classifier.
+        # Check whether estimator is a valid classifier. This precedes the
+        # transaction `_fit` opens, because it writes nothing itself.
         if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
                 "'{}' must be a SkactivemlClassifier.".format(self.estimator)
             )
+
+        return self._fit("partial_fit", X, y, sample_weight, **fit_kwargs)
+
+    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        """Fit or partially fit this wrapper as a single transaction.
+
+        The snapshot taken here covers the entire fit, including the sliding
+        window: `_validate_and_fit` extends the window before it trains, so a
+        later rejection (a `cost_matrix` without `predict_proba`, or the
+        wrapped estimator's own failure) would otherwise leave the window
+        carrying samples the estimator was never trained on.
+
+        The transaction covers this wrapper only. The wrapped estimator is
+        re-created from `estimator` on every fit, so a failing fit leaves no
+        half-trained estimator behind, but a snapshot cannot undo what that
+        estimator did to state of its own.
+
+        Parameters
+        ----------
+        fit_function : "fit" or "partial_fit"
+            Whether the window is replaced by `X` and `y` or extended by them.
+        X : array-like of shape (n_samples, ...)
+            The feature matrix representing the samples.
+        y : array-like of shape (n_samples,)
+            It contains the class labels of the training samples. Missing
+            labels are represented by the attribute `self.missing_label_`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
+        fit_kwargs : dict-like
+            Further parameters as input to the `fit` method of the `estimator`.
+
+        Returns
+        -------
+        self : SlidingWindowClassifier
+            The wrapper fitted on the sliding window.
+        """
+        snapshot_before = self._snapshot_attributes()
+        try:
+            return self._validate_and_fit(
+                fit_function, X, y, sample_weight, **fit_kwargs
+            )
+        except Exception:
+            self._restore_snapshot(snapshot_before)
+            raise
+
+    def _validate_and_fit(
+        self, fit_function, X, y, sample_weight=None, **fit_kwargs
+    ):
+        """Validate the inputs, fill the window, and fit the estimator.
+
+        This method may write fitted attributes and extend the sliding window
+        before a later step rejects the call, because its only caller `_fit`
+        rolls both back. See `_fit` for the parameters and the transactional
+        guarantee.
+        """
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "allow_nd": True,
             "dtype": None,
         }
-
         X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
+            established_spec=(
+                getattr(self, "target_spec_", None)
+                if fit_function == "partial_fit"
+                else None
+            ),
         )
 
-        self._add_samples("partial_fit", X, y, sample_weight)
+        self._add_samples(fit_function, X, y, sample_weight)
         X_train = np.array(self.X_train_)
         y_train = np.array(self.y_train_)
         sample_weight_train = None
@@ -569,12 +1957,69 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             sample_weight_train = np.array(
                 self.sample_weight_train_, dtype=float
             )
-        return self._fit(
-            X=X_train,
-            y=y_train,
-            sample_weight=sample_weight_train,
-            **fit_kwargs,
-        )
+
+        # Check whether estimator can deal with cost matrix.
+        if self.cost_matrix is not None and not hasattr(
+            self.estimator, "predict_proba"
+        ):
+            raise ValueError(
+                "'cost_matrix' can be only set, if 'estimator'"
+                "implements 'predict_proba'."
+            )
+
+        self.estimator_ = deepcopy(self.estimator)
+        if self.estimator_.classes is None:
+            self.estimator_.set_params(classes=self.target_spec_.classes)
+        if has_fit_parameter(self.estimator, "sample_weight"):
+            fit_kwargs["sample_weight"] = sample_weight_train
+        self.estimator_.fit(X=X_train, y=y_train, **fit_kwargs)
+
+        return self
+
+    def _snapshot_attributes(self):
+        """Snapshot this wrapper's attributes, sliding window included.
+
+        A plain `dict(self.__dict__)` is not enough here, because
+        `_add_samples` extends the window `deque`s in place: the snapshot would
+        hold the very objects the fit mutates. The window contents are
+        therefore copied alongside the attribute mapping.
+
+        The copy costs `O(window_size)` per fit, which is the cost every fit
+        already pays to hand the window to the wrapped estimator as an array.
+
+        Returns
+        -------
+        attributes : dict
+            Snapshot of `self.__dict__`.
+        window_contents : dict
+            Copied contents of each sliding window present in `attributes`.
+        """
+        attributes = dict(self.__dict__)
+        window_contents = {
+            name: list(attributes[name])
+            for name in self._window_attributes
+            if isinstance(attributes.get(name), deque)
+        }
+        return attributes, window_contents
+
+    def _restore_snapshot(self, snapshot):
+        """Restore this wrapper, sliding window included, to a snapshot.
+
+        The windows are refilled rather than replaced, so that a caller
+        holding a reference to `X_train_` observes the rollback as well.
+
+        Parameters
+        ----------
+        snapshot : tuple
+            Return value of `_snapshot_attributes`, taken before the failing
+            call.
+        """
+        attributes, window_contents = snapshot
+        _restore_wrapper_attributes(self, attributes)
+        for name, contents in window_contents.items():
+            window = attributes[name]
+            window.clear()
+            window.extend(contents)
 
     def _add_samples(self, fit_func, X, y, sample_weight=None):
         if not hasattr(self, "X_train_"):
@@ -604,33 +2049,36 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             self.sample_weight_train_ = None
 
-    def _fit(self, X, y, sample_weight=None, **fit_kwargs):
-        # Check whether estimator can deal with cost matrix.
-        if self.cost_matrix is not None and not hasattr(
-            self.estimator, "predict_proba"
-        ):
-            raise ValueError(
-                "'cost_matrix' can be only set, if 'estimator'"
-                "implements 'predict_proba'."
-            )
-
-        if hasattr(self, "estimator_"):
-            self.estimator_ = deepcopy(self.estimator)
-        else:
-            self.estimator_ = deepcopy(self.estimator)
-
-        if has_fit_parameter(self.estimator, "sample_weight"):
-            fit_kwargs["sample_weight"] = sample_weight
-
-        self.estimator_.fit(X=X, y=y, **fit_kwargs)
-
-        return self
-
-    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None):
-        # super._validate_data is not called because training with partial fit
-        # with only one single available class in y leads to an error if
-        # self.classes is not set, even though self.classes has no function in
-        # this class.
+    def _validate_data(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        established_spec=None,
+    ):
+        # super._validate_data is not called because a partial-fit window may
+        # contain only a subset of the established class vocabulary.
+        outer_classes = (
+            self.classes
+            if self.classes is not None
+            else self.estimator.classes
+        )
+        target_spec = self._resolve_fitting_target_spec(
+            y,
+            established_spec=established_spec,
+            classes=outer_classes,
+        )
+        inner_classes = (
+            self.estimator.classes
+            if self.estimator.classes is not None
+            else target_spec.classes
+        )
+        self.estimator._resolve_fitting_target_spec(
+            y,
+            established_spec=target_spec,
+            classes=inner_classes,
+        )
         if self.window_size is not None:
             check_scalar(
                 self.window_size,
@@ -651,17 +2099,19 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
+        y = column_or_1d(y, warn=True)
         if len(y) == 0:
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
-            if not np.array_equal(y.shape, sample_weight.shape):
+            sample_weight = column_or_1d(sample_weight)
+            if len(y) != len(sample_weight):
                 raise ValueError(
-                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"`y` has the length {len(y)} and `sample_weight` has the "
                     f"shape {sample_weight.shape}. Both need to have "
-                    f"identical shapes."
+                    f"the same one-dimensional shape."
                 )
 
         # Check common classifier parameters.
@@ -693,20 +2143,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         # if self.classes=None or self.estimator.classes=None then no checks
         # are done if general test is removed it should be checked again
-        if (
-            self.classes is not None
-            and self.estimator.classes is not None
-            and not np.array_equiv(self.classes, self.estimator.classes)
-        ):
-            raise ValueError(
-                "'classes' and estimator.classes must be equal. "
-                "Got {} is not equal to {}.".format(
-                    self.classes, self.estimator.classes
-                )
-            )
-
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
+        self.target_spec_ = target_spec
 
         return X, y, sample_weight
 
@@ -772,6 +2211,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return freq
 
     def __getattr__(self, item):
+        if item in self._own_fitted_attributes:
+            return _resolve_own_fitted_attribute(self, item)
         if "estimator_" in self.__dict__ and hasattr(self.estimator_, item):
             return getattr(self.estimator_, item)
         else:
@@ -791,9 +2232,11 @@ if successful_skorch_torch_import:
 
         Notes
         -----
-        Adjust your `criterion` and `module.forward` outputs consistently.
-        See the documentation of the parameters `forward_outputs` and
-        `criterion_output_keys` for further details.
+        - Adjust your `criterion` and `module.forward` outputs consistently.
+          See the documentation of the parameters `forward_outputs` and
+          `criterion_output_keys` for further details.
+        - Beyond multiclass classification, only multilabel classification is
+          supported, which corresponds to multiple binary classification tasks.
 
         Parameters
         ----------
@@ -801,16 +2244,22 @@ if successful_skorch_torch_import:
             A PyTorch `torch.nn.Module`. In general, the uninstantiated class
             should be passed, although instantiated modules will also work.
         criterion : torch.nn.Module or torch.nn.Module.__class__, \
-                default=torch.nn.CrossEntropyLoss
+                default=None
             The loss (criterion) used to optimize the module.
 
+            - If `None`, the torch.nn.Module is set to
+              `torch.nn.CrossEntropyLoss` in the case of a single output
+              classification problem and `torch.nn.BCEWithLogitsLoss` in the
+              case of a multi-label classification problem. The criterion is
+              therefore deferred until the target type is resolved, unlike
+              `SkorchRegressor`, which supports a single target type and
+              names a concrete default.
             - If a class (subclass of `torch.nn.Module`) is passed
               (e.g. `torch.nn.CrossEntropyLoss`), it is instantiated
               internally.
             - If an instance is passed (e.g. `torch.nn.CrossEntropyLoss()`),
               that instance (or a wrapped copy of it) is used.
 
-            By default, `torch.nn.CrossEntropyLoss` is used as criterion.
         forward_outputs : dict[str, tuple[int, Callable | None]] or None,\
                 default=None
             Dictionary that describes how to get and post-process the outputs
@@ -908,9 +2357,32 @@ if successful_skorch_torch_import:
             added. `module`, `criterion`, and `predict_nonlinearity` are not
             allowed in this dictionary.
         sample_dtype : str or type, default=np.float32
-            Dtype to which input samples are cast inside the estimator. If set
-            to `None`, the input dtype is preserved. The encoded label data
-            type is always  `np.int64`.
+            Data type to which input samples are cast inside the estimator. If
+            set to `None`, the input dtype is preserved.
+        target_dtype : str or type, default=None
+            Data type used to cast the internally encoded targets `y_enc`.
+            These encoded targets are integers in the range
+            `[0, n_classes - 1]`. Missing labels are encoded as `-1`.
+
+            - If `None`, infer a suitable dtype from the loss criterion; if
+              inference fails, default to `np.int64`.
+            - Otherwise, cast targets via
+              `y_enc.astype(target_dtype, copy=False)`.
+        target_type : "auto" or "single-output" or "multi-label", \
+                default="auto"
+            Declared target type. Multi-label classification is supported.
+        validate_proba : bool, default=True
+            Flag whether `predict_proba` checks that its first forward output
+            describes class probabilities. Since `forward_outputs` decides how
+            the module's outputs are read, a mapping without a suitable
+            transform lets raw scores pass as probabilities, which consumers
+            then misread. Values of a single-output target must sum to one,
+            values of a multi-label target must lie within `[0, 1]`.
+
+            - If `True`, invalid probabilities raise a `ValueError`.
+            - If `False`, the first forward output is passed on unchecked,
+              e.g., to interpret scores that are not probabilities. The
+              caller is then responsible for the consumers of these values.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
               of the estimator.
@@ -919,15 +2391,22 @@ if successful_skorch_torch_import:
               is able to handle unlabeled samples marked by `missing_label`.
               Otherwise, `missing_label` is interpreted as a regular class
               label.
-        classes : array-like of shape (n_classes,), default=None
-            Holds the label for each class. If `None`, the classes are
-            determined during the fit.
+        classes : array-like of shape (n_classes,) or a list of such \
+            array-likes, default=None
+        - If `classes` is not nested (`None` or one-dimensional), a single task
+          problem is assumed such that `y` can be shape `(n_samples,)` or
+          `(n_samples, n_annotators)`.
+        - If `classes` is nested (list of array-like objects), multilabel
+          classification is assumed in this wrapper and `y` must be shape
+          `(n_samples, n_tasks)` with `n_tasks == len(classes)`. Each task
+          must be binary.
         missing_label : scalar or str or np.nan or None, default=np.nan
             Value to represent a missing label.
-        cost_matrix : array-like of shape (n_classes, n_classes)
+        cost_matrix : array-like of shape (n_classes, n_classes), default=None
             Cost matrix with `cost_matrix[i, j]` indicating the cost of
             predicting class `classes[j]` for a sample of class
-            `classes[i]`. Can only be set if `classes` is not `None`.
+            `classes[i]`. Can only be set if `classes` is not `None` and for
+            single output problems.
         random_state : int or RandomState instance or None, default=None
             Determines random number generation for methods that rely on
             randomness (e.g. `predict` for stochastic models). Pass an int for
@@ -943,7 +2422,7 @@ if successful_skorch_torch_import:
         def __init__(
             self,
             module,
-            criterion=nn.CrossEntropyLoss,
+            criterion=None,
             forward_outputs=None,
             criterion_output_keys=None,
             neural_net_param_dict=None,
@@ -953,6 +2432,9 @@ if successful_skorch_torch_import:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
+            target_dtype=None,
+            target_type="auto",
+            validate_proba=True,
         ):
             super(SkorchClassifier, self).__init__(
                 classes=classes,
@@ -966,7 +2448,19 @@ if successful_skorch_torch_import:
             self.criterion_output_keys = criterion_output_keys
             self.neural_net_param_dict = neural_net_param_dict
             self.sample_dtype = sample_dtype
+            self.target_dtype = target_dtype
+            self.target_type = target_type
             self.include_unlabeled_samples = include_unlabeled_samples
+            self.validate_proba = validate_proba
+
+        @property
+        def _target_capabilities(self):
+            return frozenset(
+                {
+                    ("classification", "single-output", "single-annotator"),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            )
 
         def fit(self, X, y, **fit_params):
             """Initialize and fit the module.
@@ -976,12 +2470,15 @@ if successful_skorch_torch_import:
 
             Parameters
             ----------
-            X : matrix-like, shape (n_samples, n_features)
+            X : matrix-like, shape (n_samples, ...)
                 Training data set, usually complete, i.e. including the labeled
                 and unlabeled samples
-            y : array-like of shape (n_samples, )
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by self.missing_label)
+                ones indicated by self.missing_label). For multioutput
+                problems, a row `y[i]` must be either contain only observed
+                labels or only `missing_label` values, i.e., no mixing
+                within a row.
             fit_params : dict-like
                 Further parameters as input to the 'fit' method of the
                 `skorch.net.NeuralNet`.
@@ -1001,12 +2498,15 @@ if successful_skorch_torch_import:
 
             Parameters
             ----------
-            X : matrix-like, shape (n_samples, n_features)
+            X : matrix-like, shape (n_samples, ...)
                 Training data set, usually complete, i.e. including the labeled
                 and unlabeled samples
-            y : array-like of shape (n_samples, )
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by `self.missing_label`)
+                ones indicated by self.missing_label). For multioutput
+                problems, a row `y[i]` must either contain only observed
+                labels or only `missing_label` values, i.e., no mixing
+                within a row.
             fit_params : dict-like
                 Further parameters as input to the 'partial_fit' method of the
                 `skorch.net.NeuralNet`.
@@ -1057,7 +2557,8 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            y_pred : numpy.ndarray of shape (n_samples,)
+            y_pred : numpy.ndarray of shape (n_samples,) \
+                    or (n_samples, n_outputs)
                 Predicted class labels of the test samples.
             *extras : numpy.ndarray, optional
                 Additional outputs. Only present if `extra_outputs` is not
@@ -1128,6 +2629,7 @@ if successful_skorch_torch_import:
             check_n_features(
                 self, X, reset=not hasattr(self, "n_features_in_")
             )
+            self._check_prefit_prediction_ambiguity()
 
             # Resolve effective forward_outputs (either user-provided or
             # defaulted based on the criterion).
@@ -1141,10 +2643,41 @@ if successful_skorch_torch_import:
 
             # First element is expected to be the class probabilities.
             P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
+            check_scalar(self.validate_proba, "validate_proba", bool)
+            is_multilabel = self._uses_multilabel_target()
+            if is_multilabel:
+                target_spec = getattr(self, "target_spec_", None)
+                classes = (
+                    target_spec.classes
+                    if target_spec is not None
+                    else self.classes
+                )
+                n_outputs = len(classes)
+                expected_shape = (len(X), n_outputs)
+                if np.shape(P) != expected_shape:
+                    raise ValueError(
+                        "Expected `predict_proba` of the Skorch module to "
+                        "return positive-class probabilities of shape "
+                        f"`(n_samples, {n_outputs})`, exactly "
+                        f"`{expected_shape}`, for multi-label "
+                        f"classification, got {np.shape(P)}."
+                    )
+            if self.validate_proba:
+                _check_probas_are_valid(
+                    P,
+                    is_multilabel=is_multilabel,
+                    hint=(
+                        "The first output of `forward_outputs` is read as "
+                        "class probabilities, so set a transform producing "
+                        "them, e.g. `torch.nn.Softmax(dim=-1)` for logits. "
+                        "Set `validate_proba=False` to pass the values on "
+                        "unchecked instead."
+                    ),
+                )
             self._initialize_fallbacks(P)
             return fw_out
 
-        def _effective_forward_outputs(self):
+        def _effective_forward_outputs(self, y=None):
             """Return the effective `forward_outputs` mapping.
 
             If the user did not specify `forward_outputs`, choose a reasonable
@@ -1165,11 +2698,18 @@ if successful_skorch_torch_import:
                 return self.forward_outputs
 
             # No explicit mapping: handle common single-output cases.
-            crit_cls = (
-                self.criterion
-                if isinstance(self.criterion, type)
-                else self.criterion.__class__
-            )
+            if self.criterion is None:
+                crit_cls = (
+                    nn.BCEWithLogitsLoss
+                    if self._uses_multilabel_target(y=y)
+                    else nn.CrossEntropyLoss
+                )
+            else:
+                crit_cls = (
+                    self.criterion
+                    if isinstance(self.criterion, type)
+                    else self.criterion.__class__
+                )
 
             if crit_cls is nn.CrossEntropyLoss:
                 # Single-output network returning logits.
@@ -1179,9 +2719,46 @@ if successful_skorch_torch_import:
                 # Module returns log-probabilities.
                 return {"proba": (0, torch.exp)}
 
+            if crit_cls is nn.BCEWithLogitsLoss:
+                # Multi-label modules return logits per label.
+                return {"proba": (0, torch.sigmoid)}
+
             # Fallback: treat the single forward output as already in
             # probability space. Caller is responsible for making this true.
             return {"proba": (0, None)}
+
+        def _provisional_target_type(self, y=None):
+            """Resolve semantics needed while constructing an unfitted net."""
+            target_spec = getattr(self, "target_spec_", None)
+            if target_spec is not None:
+                return target_spec.target_type
+            if self.classes is not None:
+                y_dummy = self._declared_classes_target_dummy()
+                return self._resolve_target_spec(y_dummy).target_type
+
+            target_type = (
+                "single-output"
+                if self.target_type == "auto"
+                else self.target_type
+            )
+            _check_target_capability(
+                type(self).__name__,
+                ("classification", target_type, "single-annotator"),
+                self._target_capabilities,
+            )
+            return target_type
+
+        def _declared_classes_target_dummy(self):
+            """Build an empty target with the declared output structure."""
+            if _has_nested_classes(self.classes):
+                return np.empty(
+                    (0, len(self.classes)),
+                    dtype=np.asarray(self.missing_label).dtype,
+                )
+            return self.classes
+
+        def _uses_multilabel_target(self, y=None):
+            return self._provisional_target_type(y) == "multi-label"
 
         def _net_parts(self, X=None, y=None):
             """Assemble and validate network components.
@@ -1211,11 +2788,17 @@ if successful_skorch_torch_import:
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """
-            criterion = self.criterion
+            if self.criterion is None:
+                if self._uses_multilabel_target(y=y):
+                    criterion = nn.BCEWithLogitsLoss
+                else:
+                    criterion = nn.CrossEntropyLoss
+            else:
+                criterion = self.criterion
             criterion = make_criterion_tuple_aware(
                 criterion=criterion,
                 criterion_output_keys=self.criterion_output_keys,
-                forward_outputs=self._effective_forward_outputs(),
+                forward_outputs=self._effective_forward_outputs(y=y),
             )
             return (
                 self.module,
@@ -1242,7 +2825,9 @@ if successful_skorch_torch_import:
                 "include_unlabeled_samples",
                 bool,
             )
-            return {"check_X_dict": self.check_X_dict_}
+            return {
+                "check_X_dict": self.check_X_dict_,
+            }
 
         def _return_training_data(self, X, y):
             """Return only samples and labels required for training.
@@ -1264,12 +2849,22 @@ if successful_skorch_torch_import:
             """
             X_train, y_train = None, None
             if self.include_unlabeled_samples:
-                is_included = np.full_like(y, fill_value=True, dtype=bool)
+                is_included = np.ones(len(y), dtype=bool)
             else:
-                is_included = is_labeled(y, missing_label=-1)
+                is_included = is_labeled(
+                    y=y,
+                    missing_label=-1,
+                    target_type=self.target_spec_.target_type,
+                )
             if np.sum(is_included) > 0:
                 X_train = X[is_included]
-                y_train = y[is_included].astype(np.int64)
+                if self.target_dtype is None:
+                    y_dtype = self._infer_target_numpy_dtype(
+                        self.neural_net_.criterion
+                    )
+                else:
+                    y_dtype = self.target_dtype
+                y_train = y[is_included].astype(y_dtype)
             return X_train, y_train
 
         def _initialize_fallbacks(self, P):
@@ -1284,21 +2879,63 @@ if successful_skorch_torch_import:
             """
             self.random_state_ = check_random_state(self.random_state)
             if not hasattr(self, "_le"):
-                self._le = ExtLabelEncoder(
-                    classes=self.classes, missing_label=self.missing_label
-                )
                 if self.classes is not None:
-                    y_dummy = self.classes
+                    y_dummy = self._declared_classes_target_dummy()
                 else:
                     y_dummy = np.arange(P.shape[-1], dtype=int)
-                self._le.fit(y_dummy)
-                self.classes_ = self._le.classes_
-            if not hasattr(self, "cost_matrix_"):
-                self.cost_matrix_ = (
-                    1 - np.eye(len(self.classes_))
-                    if self.cost_matrix is None
-                    else self.cost_matrix
-                )
+                self._initialize_label_state(y_dummy)
+            check_classifier_params(
+                self.classes_, self.missing_label, self.cost_matrix_
+            )
+
+        def _check_prefit_prediction_ambiguity(self):
+            """Reject prefit prediction when the output task type is unknown.
+
+            Without fitted label state or user-provided `classes`, predictions
+            cannot be interpreted unambiguously as multiclass versus
+            multi-label. `_initialize_fallbacks` can infer
+            flat classes from `P.shape[-1]`, but that only yields the single-
+            output interpretation.
+            """
+            if hasattr(self, "_le") or self.classes is not None:
+                return
+            raise ValueError(
+                "`predict_proba` is ambiguous before fitting when "
+                "`classes=None`. Call `fit` first or provide `classes` to "
+                "disambiguate multiclass versus multilabel behavior."
+            )
+
+        def _infer_target_numpy_dtype(self, criterion, *, default=np.int64):
+            """Infer the NumPy dtype to use for encoded targets based on a
+            PyTorch loss.
+
+            Parameters
+            ----------
+            criterion : type or torch.nn.modules.loss._Loss
+                Loss class or instance. Only a small set of common
+                classification losses is handled explicitly.
+
+                - nn.CrossEntropyLoss, nn.NLLLoss -> np.int64 (class indices)
+                - nn.BCEWithLogitsLoss, nn.BCELoss -> np.float32
+                  (binary/multi-label targets)
+
+            default : np.dtype, default=np.int64
+                Fallback dtype if the criterion is not recognized.
+
+            Returns
+            -------
+            dtype : np.dtype
+                Inferred NumPy data type for casting targets before converting
+                to torch.
+            """
+            crit_cls = (
+                criterion if isinstance(criterion, type) else type(criterion)
+            )
+            if issubclass(crit_cls, (nn.BCEWithLogitsLoss, nn.BCELoss)):
+                return np.float32
+            if issubclass(crit_cls, (nn.CrossEntropyLoss, nn.NLLLoss)):
+                return np.int64
+            return default
 
 
 if successful_capymoa_import:
@@ -1333,6 +2970,9 @@ if successful_capymoa_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : "auto" or "single-output", default="auto"
+            Declared target type. This wrapper supports only single-output
+            classification.
 
         Attributes
         ----------
@@ -1361,12 +3001,14 @@ if successful_capymoa_import:
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
+            target_type="auto",
         ):
             super().__init__(
                 classes=classes,
                 missing_label=missing_label,
                 cost_matrix=cost_matrix,
                 random_state=random_state,
+                target_type=target_type,
             )
             self.estimator_class = estimator_class
             self.estimator_param_dict = estimator_param_dict
@@ -1475,9 +3117,61 @@ if successful_capymoa_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
+            """Fit or partially fit this wrapper as a single transaction.
+
+            This wrapper absorbs every estimator failure into its prior-only
+            fallback, which returns `self` and is therefore never rolled back.
+            The rejection of an `estimator_class` that is no capymoa
+            classifier does raise, though. The transaction ensures that such a
+            rejection leaves none of the fitted attributes of the abandoned
+            attempt behind, `n_features_in_` among them, so that an already
+            fitted wrapper keeps predicting on the data it was trained on.
+
+            Parameters
+            ----------
+            fit_function : "fit" or "partial_fit"
+                Whether the estimator is re-created or updated incrementally.
+            X : matrix-like of shape (n_samples, n_features)
+                Training data set, usually complete, i.e. including the labeled
+                and unlabeled samples.
+            y : array-like of shape (n_samples,)
+                Labels of the training data set, possibly including unlabeled
+                ones indicated by `self.missing_label`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                It contains the weights of the training samples' class labels.
+
+            Returns
+            -------
+            self : CapyMOAClassifier
+                The wrapper fitted on the training data.
+            """
+            attributes_before = dict(self.__dict__)
+            try:
+                return self._validate_and_fit(
+                    fit_function, X, y, sample_weight
+                )
+            except Exception:
+                _restore_wrapper_attributes(self, attributes_before)
+                raise
+
+        def _validate_and_fit(self, fit_function, X, y, sample_weight=None):
+            """Validate the inputs and train, committing state freely.
+
+            This method may write fitted attributes before a later step
+            rejects the call, because its only caller `_fit` rolls them back.
+            See `_fit` for the parameters and the transactional guarantee.
+            """
             import capymoa
             import capymoa.base
             import capymoa.instance
+
+            had_established_target_spec = (
+                fit_function == "partial_fit"
+                and getattr(self, "target_spec_", None) is not None
+            )
+            target_spec = self._resolve_target_spec_for_fit(
+                y, is_incremental=fit_function == "partial_fit"
+            )
 
             # Check input parameters.
             self.check_X_dict_ = {
@@ -1493,6 +3187,7 @@ if successful_capymoa_import:
                 check_X_dict=self.check_X_dict_,
                 reset=fit_function == "fit"
                 or not hasattr(self, "n_features_in_"),
+                target_spec=target_spec,
             )
 
             # Check whether estimator is a valid classifier.
@@ -1504,6 +3199,11 @@ if successful_capymoa_import:
                     "classifier.".format(self.estimator_class)
                 )
             is_included = is_labeled(y, missing_label=-1)
+            # A validated incremental call without training rows is a no-op
+            # for an already established streaming model.
+            if had_established_target_spec and not np.any(is_included):
+                return self
+
             self._label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
@@ -1619,6 +3319,9 @@ if successful_river_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : "auto" or "single-output", default="auto"
+            Declared target type. This wrapper supports only single-output
+            classification.
 
         Attributes
         ----------
@@ -1646,12 +3349,14 @@ if successful_river_import:
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
+            target_type="auto",
         ):
             super().__init__(
                 classes=classes,
                 missing_label=missing_label,
                 cost_matrix=cost_matrix,
                 random_state=random_state,
+                target_type=target_type,
             )
             self.estimator = estimator
 
@@ -1771,6 +3476,58 @@ if successful_river_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
+            """Fit or partially fit this wrapper as a single transaction.
+
+            This wrapper absorbs almost every estimator failure into its
+            prior-only fallback, which returns `self` and is therefore never
+            rolled back. The rejection of an `estimator` that is no river
+            classifier does raise, as does an unsupported `sample_weight`. The
+            transaction ensures that such a rejection leaves none of the
+            fitted attributes of the abandoned attempt behind, `n_features_in_`
+            among them, so that an already fitted wrapper keeps predicting on
+            the data it was trained on.
+
+            Parameters
+            ----------
+            fit_function : "fit" or "partial_fit"
+                Whether the estimator is re-created or updated incrementally.
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+                It contains the class labels of the training samples. Missing
+                labels are represented by the attribute `self.missing_label_`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                It contains the weights of the training samples' class labels.
+
+            Returns
+            -------
+            self : RiverClassifier
+                The wrapper fitted on the training data.
+            """
+            attributes_before = dict(self.__dict__)
+            try:
+                return self._validate_and_fit(
+                    fit_function, X, y, sample_weight
+                )
+            except Exception:
+                _restore_wrapper_attributes(self, attributes_before)
+                raise
+
+        def _validate_and_fit(self, fit_function, X, y, sample_weight=None):
+            """Validate the inputs and train, committing state freely.
+
+            This method may write fitted attributes before a later step
+            rejects the call, because its only caller `_fit` rolls them back.
+            See `_fit` for the parameters and the transactional guarantee.
+            """
+            had_established_target_spec = (
+                fit_function == "partial_fit"
+                and getattr(self, "target_spec_", None) is not None
+            )
+            target_spec = self._resolve_target_spec_for_fit(
+                y, is_incremental=fit_function == "partial_fit"
+            )
+
             # Check input parameters.
             self.check_X_dict_ = {
                 "ensure_min_samples": 0,
@@ -1785,6 +3542,7 @@ if successful_river_import:
                 check_X_dict=self.check_X_dict_,
                 reset=fit_function == "fit"
                 or not hasattr(self, "n_features_in_"),
+                target_spec=target_spec,
             )
 
             # Check whether estimator is a valid classifier.
@@ -1793,13 +3551,18 @@ if successful_river_import:
                     "'{}' must be a river classifier.".format(self.estimator)
                 )
 
+            is_included = is_labeled(y, missing_label=-1)
+            # A validated incremental call without training rows is a no-op
+            # for an already established streaming model.
+            if had_established_target_spec and not np.any(is_included):
+                return self
+
             if hasattr(self, "estimator_"):
                 if fit_function != "partial_fit":
                     self.estimator_ = deepcopy(self.estimator)
             else:
                 self.estimator_ = deepcopy(self.estimator)
             # count labels per class
-            is_included = is_labeled(y, missing_label=-1)
             self._label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))

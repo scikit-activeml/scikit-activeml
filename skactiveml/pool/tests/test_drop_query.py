@@ -5,11 +5,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
 from sklearn.cluster import SpectralClustering, KMeans, MiniBatchKMeans
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from skactiveml.pool import DropQuery
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelAggregationQueryStrategy,
 )
 from skactiveml.tests.utils import (
     ParzenWindowClassifierEmbedding,
@@ -18,7 +20,7 @@ from skactiveml.tests.utils import (
 
 
 class TestDropQuery(
-    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+    TemplateMultilabelAggregationQueryStrategy, unittest.TestCase
 ):
     def setUp(self):
         X = np.linspace(0, 1, 20).reshape(10, 2)
@@ -38,11 +40,46 @@ class TestDropQuery(
                 classes=self.classes,
             ),
         }
+        self.params_clf_multilabel = {
+            "X": X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=42,
+            ),
+        }
         cluster_dict = {"random_state": 0, "n_init": 1}
         super().setUp(
             qs_class=DropQuery,
             init_default_params={"cluster_algo_dict": cluster_dict},
             query_default_params_clf=self.query_default_params_clf,
+            query_default_params_clf_multilabel=self.params_clf_multilabel,
+        )
+
+    def test_target_contract(self):
+        self._test_classification_target_contract(
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            ),
         )
 
     def test_init_param_dropout_rate(self, test_cases=None):
@@ -71,6 +108,35 @@ class TestDropQuery(
             "init",
             "n_dropout_samples",
             test_cases,
+        )
+
+    def test_init_param_disagreement_threshold(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (1, TypeError),
+            (np.nan, ValueError),
+            (-0.1, ValueError),
+            (0.0, None),
+            (0.5, None),
+            (1.0, None),
+            (1.1, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "disagreement_threshold",
+            test_cases,
+        )
+        test_cases = [
+            (-0.1, None),
+            (1.1, None),
+            (np.nan, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "disagreement_threshold",
+            test_cases,
+            replace_query_params=self.params_clf_multilabel,
+            exclude_reg=True,
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):

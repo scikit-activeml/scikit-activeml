@@ -3,6 +3,8 @@ import unittest
 import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.linear_model import LogisticRegression
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier
@@ -52,11 +54,102 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 classes=self.classes, random_state=42
             ),
         }
+        self.qs_params_clf_multilabel = {
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=0,
+            ),
+        }
         super().setUp(
             qs_class=Badge,
             init_default_params={"random_state": 42},
             query_default_params_clf=self.query_default_params_clf,
+            query_default_params_clf_multilabel=self.qs_params_clf_multilabel,
         )
+
+    def test_target_contract(self):
+        self._test_classification_target_contract(
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            ),
+        )
+
+    def test_fit_clone_keeps_classifier_target_declaration(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        )
+
+        query_idx = Badge(random_state=0).query(X, y, clf, fit_clf=True)
+
+        self.assertIn(query_idx[0], [4, 5])
+        self.assertEqual(clf.target_type, "multi-label")
+        self.assertFalse(hasattr(clf, "target_spec_"))
+
+    def test_query_reuses_fitted_target_spec_without_class_evidence(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y_fit)
+        established_spec = clf.target_spec_
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+
+        query_idx, utilities = Badge(random_state=0).query(
+            X, y_query, clf, fit_clf=False, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
 
     def _duplicated_pool(self):
         """Builds a degenerate pool whose unlabeled candidates take only two
@@ -199,6 +292,69 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             badge_1.query(X_1, y_1, clf_8),
         )
 
+    def test_query_multilabel(self):
+        qs = Badge(random_state=42)
+        query_params = dict(self.query_default_params_clf_multilabel)
+
+        query_idx, utilities = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(len(query_idx), 2)
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+        query_idx_2, utilities_2 = qs.query(
+            **query_params,
+            candidates=np.arange(2, len(query_params["X"])),
+            batch_size=2,
+            return_utilities=True,
+        )
+        np.testing.assert_array_equal(query_idx, query_idx_2)
+        np.testing.assert_allclose(utilities, utilities_2, equal_nan=True)
+
+    def test_query_multilabel_list_probas(self):
+        qs = Badge(random_state=42)
+        query_params = dict(self.query_default_params_clf_multilabel)
+        query_params["clf"] = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=0,
+        )
+
+        query_idx, utilities = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(len(query_idx), 2)
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_multi_output_multiclass_list_probas_raises(self):
+        qs = Badge(random_state=42)
+        query_params = {
+            "X": np.linspace(0, 1, 12).reshape(6, 2),
+            "y": np.array(
+                [
+                    [0.0, 0.0],
+                    [1.0, 1.0],
+                    [2.0, 0.0],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1, 2], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="list",
+                random_state=0,
+            ),
+        }
+
+        self.assertRaises(ValueError, qs.query, **query_params)
+
     def test_query_distinct_indices_per_batch(self):
         # A pool whose candidates take only two distinct feature values must
         # not lead to a sample being selected twice within one batch.
@@ -337,29 +493,17 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertGreater(len(first_indices), 1)
 
     def test_query_labeled_candidates(self):
-        # If `candidates` contains labeled samples, `batch_size` is reduced to
-        # the number of unlabeled candidates.
-        X = np.random.RandomState(0).rand(10, 2)
-        y = np.hstack([np.tile([0, 1], 3), np.full(4, MISSING_LABEL)])
-        clf = SklearnClassifier(
-            LogisticRegression(), classes=self.classes, random_state=0
+        query_params = self.query_default_params_clf
+        query_indices, utilities = Badge(random_state=0).query(
+            query_params["X"],
+            query_params["y"],
+            query_params["clf"],
+            candidates=np.arange(2),
+            batch_size=2,
+            return_utilities=True,
         )
-        with self.assertWarns(UserWarning):
-            query_indices = Badge(random_state=0).query(
-                X, y, clf, candidates=np.arange(10), batch_size=5
-            )
-        np.testing.assert_array_equal(np.sort(query_indices), np.arange(6, 10))
-
-        # If `candidates` contains no unlabeled sample at all, there is
-        # nothing left to select.
-        self.assertRaises(
-            ValueError,
-            Badge(random_state=0).query,
-            X=X,
-            y=y,
-            clf=clf,
-            candidates=np.arange(6),
-        )
+        np.testing.assert_array_equal(np.sort(query_indices), [0, 1])
+        self.assertTrue(np.isfinite(utilities[0, :2]).all())
 
     def test_query_candidates_as_sample_matrix(self):
         # Candidates that are given as a sample matrix are indexed directly.

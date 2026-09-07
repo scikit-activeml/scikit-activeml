@@ -5,7 +5,7 @@ uncertainty and coverage.
 
 import numpy as np
 
-from scipy.special import softmax
+from scipy.special import expit, softmax
 from sklearn import clone
 from sklearn.metrics import pairwise_distances, pairwise_kernels
 from sklearn.model_selection import train_test_split
@@ -14,13 +14,15 @@ from sklearn.utils.validation import column_or_1d
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
+    ExtLabelEncoder,
     MISSING_LABEL,
-    check_equal_missing_label,
     check_scalar,
     check_type,
     labeled_indices,
     rand_argmax,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
+from ._target import _fit_and_resolve_estimator_target_spec
 from ._uncertainty_sampling import uncertainty_scores
 
 
@@ -35,6 +37,21 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     - select a temperature based on calibration via train/validation splits of
       the currently labeled set,
     - adapt the Gaussian kernel radius to the current labeled feature space.
+
+    UHerding was proposed for single-output classification. Multi-label support
+    in this implementation is an extension and not part of the original
+    proposal in [1]_. For resolved multi-label targets, the temperature-scaled
+    probabilities are the per-output sigmoids `expit(logits / tau)` with the
+    per-output temperature `tau` instead of a softmax, whenever logits are
+    available, and the per-label uncertainty of
+    the label output `j` is computed by `method` from its positive-class
+    probability `p_j` alone
+    (cf. `uncertainty_scores`). `multilabel_aggregation_fn` reduces these
+    per-label scores along the label axis to the uncertainty weight of one
+    sample, which then scales that sample's coverage gains. The coverage
+    objective itself is unchanged, because it operates on the sample
+    representations only. Correlations between label outputs therefore
+    influence neither the uncertainty weight nor the coverage objective.
 
     Parameters
     ----------
@@ -70,10 +87,20 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
 
     temperatures : float or array-like of shape (n_temperatures,) or None, \
             default=None
-        Candidate temperatures used during the calibration search. If a single
-        positive float or a length-one array is provided, that temperature is
-        used directly without internal calibration refits. If `None`,
-        `temperatures=np.logspace(-1, 1, 49)` is used.
+        Temperature specification for calibrating the uncertainty estimates.
+        Two behaviors are distinguished:
+
+        - A positive float or a length-one array-like is a fixed temperature
+          shared by every output. It is used directly, i.e. no calibration
+          train/validation split and no internal calibration refit take place.
+        - An array-like with more than one entry is a shared candidate grid
+          searched by expected calibration error on a validation split of the
+          currently labeled set. For a single-output target, one temperature is
+          selected. For a multi-label target, the grid is searched
+          independently per label output, yielding one selected temperature per
+          output.
+
+        If `None`, the candidate grid `np.logspace(-1, 1, 49)` is used.
     validation_size : float or int, default=0.2
         Validation size passed to the calibration train/validation split.
     n_ece_bins : int, default=15
@@ -92,6 +119,21 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable reducing the per-label uncertainty scores of one sample to
+        one uncertainty weight. It is only used for resolved multi-label
+        targets. It is called with the per-label scores of shape
+        `(n_samples, n_outputs)` and the label axis passed as the `axis`
+        keyword argument, and must return one score per sample within the
+        range of that sample's per-label scores, e.g. `np.mean`, `np.average`,
+        `np.median`, `np.min`, `np.max`, or a quantile. `np.sum` is not
+        supported, because its result grows with the number of label outputs.
+        Only the callability of the reduction is validated at runtime, so a
+        violating reduction silently changes the acquisition scale.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The strategy supports single-output and
+        multi-label classification. A fitted classifier's target specification
+        is authoritative when available.
 
     References
     ----------
@@ -114,9 +156,13 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         adaptive_sigma=True,
         missing_label=MISSING_LABEL,
         random_state=None,
+        multilabel_aggregation_fn=np.mean,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.method = method
         self.predict_proba_dict = predict_proba_dict
@@ -128,6 +174,16 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         self.metric = metric
         self.metric_dict = metric_dict
         self.adaptive_sigma = adaptive_sigma
+        self.multilabel_aggregation_fn = multilabel_aggregation_fn
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+            }
+        )
 
     def query(
         self,
@@ -147,22 +203,31 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, ...)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing `fit` and `predict_proba`. For
             temperature-scaled uncertainty estimation, the classifier should
             either provide logits via `predict_proba` extras or implement
             `decision_function`. Otherwise, the non-calibrated probabilities
-            are used as fallback.
+            are used as fallback. For multilabel classification,
+            `predict_proba` must return either shape `(n_samples, n_outputs)`
+            or a list of binary probability matrices with shape
+            `(n_samples, 2)` per output.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight` before evaluating the acquisition function.
             Independent of this flag, temporary cloned classifiers may still be
             fitted internally to select the temperature parameter.
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         candidates : None or array-like of shape (n_candidates,), dtype=int \
                 or array-like of shape (n_candidates, ...), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X, y)`
@@ -204,17 +269,38 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`,
               `utilities` refers to the indexing in `candidates`.
         """
+        # Resolve through the classifier before acquisition state is changed.
+        clf_eval, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
+        is_multilabel = target_spec.target_type == "multi-label"
+
         # Determine candidate samples and validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_scalar(fit_clf, "fit_clf", bool)
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, target_type=target_spec.target_type
+        )
         check_scalar(self.normalize_samples, "normalize_samples", bool)
         check_scalar(self.adaptive_sigma, "adaptive_sigma", bool)
         check_scalar(self.n_ece_bins, "n_ece_bins", int, min_val=1)
+        if not callable(self.multilabel_aggregation_fn):
+            raise TypeError("`multilabel_aggregation_fn` must be callable.")
         check_type(
             self.predict_proba_dict, "predict_proba_dict", (dict, type(None))
         )
@@ -279,41 +365,49 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             y=y,
             clf=clf,
             temperatures=temperatures,
+            target_spec=target_spec,
             sample_weight=sample_weight,
         )
 
-        # (Re-)fit classifier on full labeled data if requested.
-        if fit_clf:
-            if sample_weight is None:
-                clf_eval = clone(clf).fit(X, y)
-            else:
-                clf_eval = clone(clf).fit(X, y, sample_weight)
-        else:
-            clf_eval = clf
-
         # Infer probabilities and if available logits as well as embeddings.
+        n_outputs = len(target_spec.classes) if is_multilabel else None
         probas_cand, logits_cand, X_cand_repr = self._predict_with_extras(
-            clf_eval, X_cand
+            clf_eval, X_cand, is_multilabel=is_multilabel, n_outputs=n_outputs
         )
         if X_cand_repr is None:
             X_cand_repr = X_cand
         if logits_cand is not None:
-            probas_cand = softmax(logits_cand / tau, axis=1)
+            if is_multilabel:
+                probas_cand = expit(logits_cand / tau)
+            else:
+                probas_cand = softmax(logits_cand / tau, axis=1)
 
         # Compute uncertainty scores by either using the original probability
         # scores or the calibrated ones, if logits were available.
-        unc_cand = uncertainty_scores(probas=probas_cand, method=self.method)
+        unc_cand = uncertainty_scores(
+            probas=probas_cand,
+            method=self.method,
+            is_multilabel=is_multilabel,
+            multilabel_aggregation_fn=self.multilabel_aggregation_fn,
+        )
         if not np.all(np.isfinite(unc_cand)) or np.allclose(unc_cand, 0.0):
             # Fall back to pure coverage if the uncertainty model carries no
             # information, e.g. when only one class has been observed so far.
             unc_cand = np.ones_like(unc_cand)
 
         # Get embeddings for the labeled samples.
-        labeled_idx = labeled_indices(y=y, missing_label=self.missing_label_)
+        labeled_idx = labeled_indices(
+            y=y,
+            missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
+        )
         X_labeled_repr = None
         if len(labeled_idx) > 0:
             _, _, X_labeled_repr = self._predict_with_extras(
-                clf_eval, X[labeled_idx]
+                clf_eval,
+                X[labeled_idx],
+                is_multilabel=is_multilabel,
+                n_outputs=n_outputs,
             )
             if X_labeled_repr is None:
                 X_labeled_repr = X[labeled_idx]
@@ -367,8 +461,20 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             return query_indices, utilities
         return query_indices
 
-    def _select_temperature(self, X, y, clf, temperatures, sample_weight=None):
-        # Fallback if there is only one temperature candidate.
+    def _select_temperature(
+        self,
+        X,
+        y,
+        clf,
+        temperatures,
+        target_spec,
+        sample_weight=None,
+    ):
+        is_multilabel = target_spec.target_type == "multi-label"
+        n_outputs = len(target_spec.classes) if is_multilabel else None
+
+        # A scalar or length-one `temperatures` is one fixed temperature shared
+        # by every output, so no calibration split or refit is required.
         if np.isscalar(temperatures):
             return float(temperatures)
         if len(temperatures) == 1:
@@ -376,16 +482,20 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
 
         # Try to perform train-test split. If it not possilbe, return 1.0 as
         # temperature.
-        labeled_idx = labeled_indices(y=y, missing_label=self.missing_label_)
+        labeled_idx = labeled_indices(
+            y=y,
+            missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
+        )
         if len(labeled_idx) < 2:
-            return 1.0
+            return self._default_temperature(n_outputs)
         y_labeled = y[labeled_idx]
         split_kwargs = {
             "test_size": self.validation_size,
             "random_state": self.random_state_,
             "shuffle": True,
         }
-        if len(np.unique(y_labeled)) > 1:
+        if not is_multilabel and len(np.unique(y_labeled)) > 1:
             split_kwargs["stratify"] = y_labeled
         try:
             train_idx, val_idx = train_test_split(labeled_idx, **split_kwargs)
@@ -396,28 +506,63 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                     labeled_idx, **split_kwargs
                 )
             except ValueError:
-                return 1.0
+                return self._default_temperature(n_outputs)
 
         if len(train_idx) == 0 or len(val_idx) == 0:
-            return 1.0
+            return self._default_temperature(n_outputs)
         X_train = X[train_idx]
         y_train = y[train_idx]
         X_val = X[val_idx]
         y_val = y[val_idx]
-        sw_train = None if sample_weight is None else sample_weight[train_idx]
+        sw_train = (
+            None
+            if sample_weight is None
+            else np.asarray(sample_weight)[train_idx]
+        )
         try:
             if sw_train is None:
                 clf_cal = clone(clf).fit(X_train, y_train)
             else:
                 clf_cal = clone(clf).fit(X_train, y_train, sw_train)
         except Exception:
-            return 1.0
-        _, logits_val, _ = self._predict_with_extras(clf_cal, X_val)
+            return self._default_temperature(n_outputs)
+        _, logits_val, _ = self._predict_with_extras(
+            clf_cal,
+            X_val,
+            is_multilabel=is_multilabel,
+            n_outputs=n_outputs,
+        )
         if logits_val is None:
-            return 1.0
+            return self._default_temperature(n_outputs)
 
         # Select temperature by iterating over all candidates and selecting
-        # the one with the lowest expected calibration error.
+        # the one with the lowest expected calibration error. For a multi-label
+        # target, the shared candidate grid is searched independently per
+        # output, yielding one selected temperature per output.
+        if is_multilabel:
+            y_val_encoded = self._encode_multilabel_targets(
+                y_val, target_spec=target_spec
+            )
+            best_tau = np.ones(n_outputs, dtype=float)
+            for j in range(n_outputs):
+                y_val_j = y_val_encoded[:, j]
+                logits_val_j = np.asarray(logits_val[:, j], dtype=float)
+                if (
+                    not np.all(np.isfinite(logits_val_j))
+                    or len(np.unique(y_val_j)) < 2
+                ):
+                    continue
+                best_ece_j = np.inf
+                for tau in temperatures:
+                    probas_j = expit(logits_val_j / tau)
+                    ece_j = self._binary_expected_calibration_error(
+                        probas=probas_j, y_true=y_val_j
+                    )
+                    if ece_j < best_ece_j:
+                        best_tau[j] = float(tau)
+                        best_ece_j = ece_j
+            return best_tau
+
         best_tau = float(temperatures[0])
         best_ece = np.inf
         for tau in temperatures:
@@ -429,6 +574,37 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                 best_tau = float(tau)
                 best_ece = ece
         return best_tau
+
+    def _encode_multilabel_targets(self, y_observed, target_spec):
+        """Encode observed multi-label targets via the resolved vocabularies.
+
+        Each label output may use its own binary class vocabulary, e.g.
+        `[["no", "yes"], ["off", "on"]]`, so raw observations are not
+        necessarily numeric. Calibration compares an observation to the
+        positive-class probability of its output and therefore requires the
+        encoded target, where `1` denotes the second class of the resolved,
+        i.e. canonically ordered, vocabulary. That is exactly the class whose
+        probability and logit column the acquisition logic consumes.
+
+        Parameters
+        ----------
+        y_observed : array-like of shape (n_observed_samples, n_outputs)
+            Wholly observed multi-label rows, e.g. the calibration split.
+        target_spec : skactiveml.utils.TargetSpec
+            The resolved target specification providing one binary class
+            vocabulary per label output.
+
+        Returns
+        -------
+        y_encoded : numpy.ndarray of shape (n_observed_samples, n_outputs)
+            The encoded observations as floating point values.
+        """
+        label_encoder = ExtLabelEncoder(
+            classes=target_spec.classes,
+            missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
+        )
+        return label_encoder.fit_transform(y_observed).astype(float)
 
     def _resolve_metric_dict(self, X_cand_repr, X_labeled_repr, metric_dict):
         """
@@ -442,23 +618,23 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if X_labeled_repr is not None:
             # If there are labeled samples compute minimum distance as sigma.
             distances = self._nonzero_distances(X_labeled_repr)
-            sigma = np.min(distances)
+            reduce_fn = np.min
         else:
-            # If there are labeled samples compute median distance between
+            # If there are no labeled samples compute median distance between
             # candidate samples as sigma.
             distances = self._nonzero_distances(X_cand_repr)
-            sigma = np.median(distances)
+            reduce_fn = np.median
 
-        if sigma is None or sigma <= 0 or np.isnan(sigma):
-            # Fallback if no valid sigma could be computed.
-            sigma = 1.0
+        sigma = self._reduce_to_sigma(distances, reduce_fn)
 
         # Transform sigma to the gamma parameter expected by the RBF kernel
         # implementation in sklearn.
         metric_dict["gamma"] = 1.0 / (sigma**2)
         return metric_dict
 
-    def _predict_with_extras(self, clf, X):
+    def _predict_with_extras(
+        self, clf, X, is_multilabel=False, n_outputs=None
+    ):
         """
         Helper function to streamline required predictions.
         """
@@ -471,9 +647,39 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         probas, logits, emb = self._parse_predict_output(out)
 
         if logits is None:
-            logits = self._decision_function_logits(clf, X)
-        if probas is None and logits is not None:
-            probas = softmax(logits, axis=1)
+            logits = self._decision_function_logits(
+                clf, X, is_multilabel=is_multilabel
+            )
+        if is_multilabel:
+            if (
+                logits is not None
+                and n_outputs == 1
+                and np.asarray(logits).ndim == 1
+            ):
+                logits = np.asarray(logits)[:, None]
+            # Canonicalize both public multilabel probability formats before
+            # the acquisition logic consumes them.
+            probas = _canonicalize_multilabel_probas(
+                probas,
+                n_samples=len(X),
+                n_outputs=n_outputs,
+                allow_none=True,
+            )
+            logits = _canonicalize_multilabel_probas(
+                logits,
+                n_samples=len(X),
+                n_outputs=n_outputs,
+                allow_none=True,
+                validate_probabilities=False,
+            )
+            if probas is None and logits is not None:
+                probas = expit(logits)
+        else:
+            if logits is not None and np.asarray(logits).ndim == 1:
+                logits = np.asarray(logits)
+                logits = np.column_stack([np.zeros_like(logits), logits])
+            if probas is None and logits is not None:
+                probas = softmax(logits, axis=1)
 
         return probas, logits, emb
 
@@ -538,8 +744,29 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             ece += bin_weight * np.abs(bin_acc - bin_conf)
         return ece
 
+    def _binary_expected_calibration_error(self, probas, y_true):
+        """
+        Computes binary expected calibration error for multilabel targets.
+        """
+        probas = np.asarray(probas, dtype=float)
+        y_true = np.asarray(y_true, dtype=float)
+        bins = np.linspace(0.0, 1.0, self.n_ece_bins + 1)
+        ece = 0.0
+        for left, right in zip(bins[:-1], bins[1:]):
+            if right == 1.0:
+                mask = (probas >= left) & (probas <= right)
+            else:
+                mask = (probas >= left) & (probas < right)
+            if not np.any(mask):
+                continue
+            bin_weight = np.mean(mask)
+            bin_acc = np.mean(y_true[mask])
+            bin_conf = np.mean(probas[mask])
+            ece += bin_weight * np.abs(bin_acc - bin_conf)
+        return ece
+
     @staticmethod
-    def _decision_function_logits(clf, X):
+    def _decision_function_logits(clf, X, is_multilabel=False):
         """
         Helper function to compute logits from the decision function as a
         common method in sklearn.
@@ -552,8 +779,40 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             return None
         logits = np.asarray(logits)
         if logits.ndim == 1:
-            logits = np.column_stack([np.zeros_like(logits), logits])
+            if is_multilabel:
+                logits = logits[:, None]
+            else:
+                logits = np.column_stack([np.zeros_like(logits), logits])
         return logits
+
+    @staticmethod
+    def _default_temperature(n_outputs):
+        """Return the uncalibrated temperature, i.e. one value per output."""
+        if n_outputs is None:
+            return 1.0
+        return np.ones(n_outputs, dtype=float)
+
+    @staticmethod
+    def _reduce_to_sigma(distances, reduce_fn):
+        """
+        Helper function reducing a collection of pairwise distances to a
+        positive RBF scale `sigma`.
+
+        Degenerate collections, i.e., `None`, empty ones, and ones without any
+        finite positive entry, admit no estimable scale. Such pools, e.g., a
+        cold start with a single candidate or identical representations, are a
+        valid acquisition state and fall back to `sigma=1.0`.
+        """
+        fallback = 1.0
+        if distances is None:
+            return fallback
+        distances = np.asarray(distances, dtype=float).ravel()
+        # Also drops `nan` entries, since any comparison to `nan` is `False`.
+        distances = distances[distances > 0]
+        if len(distances) == 0:
+            return fallback
+        sigma = float(reduce_fn(distances))
+        return sigma if np.isfinite(sigma) else fallback
 
     @staticmethod
     def _nonzero_distances(X):

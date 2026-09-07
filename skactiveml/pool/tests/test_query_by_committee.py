@@ -12,6 +12,8 @@ from sklearn.ensemble import (
 )
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
@@ -60,6 +62,39 @@ class TestQueryByCommittee(
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
         )
+
+    def test_fitted_multilabel_classifier_rejected_before_state(self):
+        self._test_fitted_multilabel_classifier_rejection(
+            estimator_param="ensemble",
+            fit_param="fit_ensemble",
+            ensemble=True,
+        )
+
+    def test_explicit_target_type_conflicts_with_unfitted_estimator(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            target_type="multi-label",
+        )
+        strategy = QueryByCommittee(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "explicit `target_type`"):
+            strategy.query(X, y, ensemble=clf, fit_ensemble=True)
+
+    def test_explicit_target_type_conflicts_with_fitted_estimator(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            target_type="multi-label",
+        ).fit(X, y)
+        strategy = QueryByCommittee(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "fitted estimator"):
+            strategy.query(X, y, ensemble=clf, fit_ensemble=False)
 
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -406,14 +441,14 @@ class TestVoteEntropy(unittest.TestCase):
 
     def test_param_classes(self):
         self.assertRaises(
-            ValueError, vote_entropy, votes=self.votes, classes="string"
+            TypeError, vote_entropy, votes=self.votes, classes="string"
         )
         self.assertRaises(
-            ValueError, vote_entropy, votes=self.votes, classes="class"
+            TypeError, vote_entropy, votes=self.votes, classes="class"
         )
         self.assertRaises(TypeError, vote_entropy, votes=self.votes, classes=1)
         self.assertRaises(
-            TypeError, vote_entropy, votes=self.votes, classes=[[1]]
+            ValueError, vote_entropy, votes=self.votes, classes=[[1]]
         )
         self.assertRaises(
             ValueError,

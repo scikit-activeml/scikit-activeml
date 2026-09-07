@@ -69,9 +69,13 @@ class TestExpectedModelOutputChange(
             ("illegal", ValueError),
         ]
         self._test_param("query", "X_eval", test_cases)
+        # Without unlabeled samples, no evaluation set can be derived. The
+        # candidates are given explicitly, because an exhausted candidate pool
+        # is answered with an empty batch before `X_eval` is resolved.
         test_cases = [(None, ValueError)]
         query_params = deepcopy(self.query_default_params_reg)
         query_params["y"] = np.ones_like(self.query_default_params_reg["y"])
+        query_params["candidates"] = np.array([0])
         self._test_param(
             "query",
             "X_eval",

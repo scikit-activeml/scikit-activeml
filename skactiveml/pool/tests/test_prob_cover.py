@@ -22,6 +22,21 @@ class TestProbCover(
             ),
             "y": np.hstack([[0, 1], np.full(998, MISSING_LABEL)]),
         }
+        qs_params_clf_multilabel = {
+            "X": np.random.RandomState(0).uniform(
+                size=(1000, 10), low=-0.5, high=0.5
+            ),
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(998)
+                    ],
+                ]
+            ),
+        }
         super().setUp(
             qs_class=ProbCover,
             init_default_params={
@@ -30,6 +45,7 @@ class TestProbCover(
                 "cluster_algo_dict": {"n_init": 10},
             },
             query_default_params_clf=query_default_params_clf,
+            query_default_params_clf_multilabel=qs_params_clf_multilabel,
         )
 
     def test_init_param_n_classes(self, test_cases=None):
@@ -210,3 +226,50 @@ class TestProbCover(
 
         # Check whether error is raised for `candidates` being not in `X`.
         self.assertRaises(MappingError, qs.query, X, y, candidates=X)
+
+    def test_query_multilabel_n_classes_inference(self):
+        X = np.array(
+            [[0.0], [1.0], [2.0], [3.0], [4.0], [5.0]],
+            dtype=float,
+        )
+        y = np.array(
+            [
+                [0.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+
+        class ClusterRecorder:
+            seen_n_clusters = None
+
+            def __init__(self, n_clusters):
+                self.n_clusters = n_clusters
+                type(self).seen_n_clusters = n_clusters
+
+            def fit_predict(self, X):
+                return np.zeros(len(X), dtype=int)
+
+        qs = ProbCover(
+            deltas=np.array([0.2, 0.4]),
+            cluster_algo=ClusterRecorder,
+            cluster_algo_dict={},
+            random_state=0,
+            target_type="multi-label",
+        )
+        qs.query(X, y, update=True)
+        self.assertEqual(ClusterRecorder.seen_n_clusters, 3)
+
+    def test_query_with_default_deltas(self):
+        X = np.random.RandomState(0).uniform(size=(20, 2), low=-0.5, high=0.5)
+        y = np.hstack([[0, 1], np.full(18, MISSING_LABEL)])
+        qs = ProbCover(deltas=None, cluster_algo_dict={"random_state": 0})
+        query_idx, utilities = qs.query(
+            X, y, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(query_idx.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(X)))
+        self.assertGreaterEqual(qs.delta_max_, 0.0)

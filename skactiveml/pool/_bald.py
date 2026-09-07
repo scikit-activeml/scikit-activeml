@@ -20,6 +20,7 @@ from ..utils import (
     check_random_state,
     simple_batch,
 )
+from ._target import _resolve_estimator_target_spec
 
 
 class _GeneralBALD(QueryByCommittee):
@@ -67,6 +68,9 @@ class _GeneralBALD(QueryByCommittee):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. BALD strategies support only single-output
+        classification.
 
     References
     ----------
@@ -79,6 +83,12 @@ class _GeneralBALD(QueryByCommittee):
        Neural Inf. Process. Syst., 2019.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
     def __init__(
         self,
         n_MC_samples=None,
@@ -88,6 +98,7 @@ class _GeneralBALD(QueryByCommittee):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             eps=eps,
@@ -95,6 +106,7 @@ class _GeneralBALD(QueryByCommittee):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
         self.n_MC_samples = n_MC_samples
         self.greedy_selection = greedy_selection
@@ -176,29 +188,39 @@ class _GeneralBALD(QueryByCommittee):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Validate input parameters.
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
-        )
-        check_scalar(
-            self.greedy_selection, "greedy_selection", target_type=bool
-        )
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        # Validate classifier type.
         check_type(fit_ensemble, "fit_ensemble", bool)
-
         ensemble, est_arr, _, sample_func, sample_dict = _check_ensemble(
             ensemble=ensemble,
             X=X,
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label_,
+            missing_label=self.missing_label,
             estimator_types=[SkactivemlClassifier],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,
         )
+        target_estimator = (
+            ensemble
+            if isinstance(ensemble, SkactivemlClassifier)
+            else est_arr[0]
+        )
+        target_spec = _resolve_estimator_target_spec(self, target_estimator, y)
+
+        # Validate input parameters.
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
+        check_scalar(
+            self.greedy_selection, "greedy_selection", target_type=bool
+        )
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if sample_func is None:
             probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
@@ -283,6 +305,9 @@ class BatchBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. BatchBALD supports only single-output
+        classification.
 
     References
     ----------
@@ -299,6 +324,7 @@ class BatchBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -308,6 +334,7 @@ class BatchBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
 
 
@@ -351,6 +378,9 @@ class GreedyBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. GreedyBALD supports only single-output
+        classification.
 
     References
     ----------
@@ -367,6 +397,7 @@ class GreedyBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -376,6 +407,7 @@ class GreedyBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
 
 

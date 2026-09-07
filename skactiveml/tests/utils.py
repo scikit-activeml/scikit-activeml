@@ -5,6 +5,118 @@ from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
 
+def assert_no_query_state(test_case, strategy):
+    """Assert that semantic query failure did not commit public state."""
+    for attribute in (
+        "n_features_in_",
+        "missing_label_",
+        "random_state_",
+    ):
+        test_case.assertFalse(
+            hasattr(strategy, attribute),
+            msg=(
+                f"{type(strategy).__name__} committed query state "
+                f"`{attribute}` after semantic failure."
+            ),
+        )
+
+
+def assert_predicts_class_dtype(test_case, y_pred, classes):
+    """Assert that predictions carry the declared class dtype.
+
+    The label encoder decodes into a dtype that can also represent
+    `missing_label`, so predictions must be narrowed back to the dtype of
+    the declared classes to stay usable where those labels are expected.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case providing the assertion.
+    y_pred : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        The predicted class labels.
+    classes : numpy.ndarray or list of numpy.ndarray
+        The declared classes, i.e., one array per label output for a
+        multi-label target and one array otherwise.
+    """
+    if isinstance(classes, (list, tuple)):
+        expected_dtype = np.result_type(
+            *[np.asarray(classes_j).dtype for classes_j in classes]
+        )
+    else:
+        expected_dtype = np.asarray(classes).dtype
+    test_case.assertEqual(
+        np.asarray(y_pred).dtype,
+        expected_dtype,
+        msg="`predict` must return the declared class dtype.",
+    )
+
+
+def assert_attributes_unchanged(
+    test_case, estimator, attributes_before, ignored=()
+):
+    """Assert that `estimator` holds exactly the snapshotted attributes.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case reporting the failure.
+    estimator : object
+        The estimator to compare against the snapshot.
+    attributes_before : dict
+        Snapshot of `estimator.__dict__` taken before the failing call.
+    ignored : iterable of str, default=()
+        Names of attributes the caller changed after taking the snapshot,
+        e.g. an `estimator` replaced to make a re-fit fail.
+    """
+    test_case.assertEqual(
+        set(estimator.__dict__) - set(ignored),
+        set(attributes_before) - set(ignored),
+    )
+    for name, value in attributes_before.items():
+        if name not in ignored:
+            test_case.assertIs(estimator.__dict__[name], value)
+
+
+def assert_fit_failure_is_transactional(
+    test_case, estimator, action, expected_error, expected_message
+):
+    """Assert that a rejected fit raises as expected and commits no state.
+
+    This is the counterpart of `assert_no_query_state` for a fit, and is
+    strictly stronger: it compares the full `__dict__` by identity rather than
+    three named absences, so it holds for an already fitted estimator as well
+    as an unfitted one, and a same-valued replacement object fails it.
+
+    Comparing by identity is also its one blind spot: an estimator holding
+    fitted state that its fit updates in place, e.g. a sliding window, passes
+    this assertion while carrying mutated contents. Assert those contents
+    separately.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case reporting the failure.
+    estimator : object
+        The estimator whose fit is expected to be rejected. It is snapshotted
+        here, so a caller that mutated it beforehand still gets the full
+        identity comparison over every attribute. There is deliberately no
+        `ignored` parameter for that reason: it could only weaken the
+        comparison.
+    action : callable
+        Zero-argument callable performing the rejected fit.
+    expected_error : type
+        Exception type the rejection is expected to raise.
+    expected_message : str
+        Pattern the raised message is expected to match.
+    """
+    attributes_before = dict(estimator.__dict__)
+
+    with test_case.assertRaisesRegex(expected_error, expected_message):
+        action()
+
+    assert_attributes_unchanged(test_case, estimator, attributes_before)
+
+
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = []
