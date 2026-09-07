@@ -171,6 +171,40 @@ class TestEpistemicUncertaintySampling(
                 _interpolate(table, freq, cache), expected
             )
 
+    def test_precompute_candidate_subsets_match_fresh_queries(self):
+        X = np.array(
+            [[1, 0], [0, 1], [0.2, 0.7], [1.2, 1.7], [2.1, 2.1], [2, 0.5]]
+        )
+        y = np.array([0, 1, np.nan, np.nan, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1], metric="linear").fit(X, y)
+        qs = EpistemicUncertaintySampling(precompute=True, random_state=0)
+        for candidates, retained_shape in [
+            ([2, 3], (3, 3)),
+            ([5], (4, 3)),
+            (None, (4, 4)),
+            ([2, 3], (4, 4)),
+            ([2], (4, 4)),
+            ([4], (4, 4)),
+            (None, (4, 4)),
+        ]:
+            with self.subTest(candidates=candidates):
+                params = dict(
+                    X=X,
+                    y=y,
+                    clf=clf,
+                    fit_clf=False,
+                    candidates=candidates,
+                    return_utilities=True,
+                )
+                actual = qs.query(**params)
+                expected = EpistemicUncertaintySampling(
+                    precompute=True, random_state=0
+                ).query(**params)
+                for expected_part, actual_part in zip(expected, actual):
+                    np.testing.assert_array_equal(actual_part, expected_part)
+                # Narrowing candidates retains all expensive scalar values.
+                self.assertEqual(qs._precompute_array.shape, retained_shape)
+
     def test_pwc_ml_1(self):
         self.assertEqual(1.0, -_pwc_ml_1(None, 0.0, 0.0))
         self.assertEqual(0.0, -_pwc_ml_1(1, 0.5, 0.8))

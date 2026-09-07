@@ -177,11 +177,21 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 if getattr(self, "_precompute_array", None) is None:
                     self._precompute_array = np.full((2, 2), np.nan)
                     self._interpolation_cache = {}
+                # Reproduce the rectangle a fresh query would allocate.
+                # Delaunay diagonals can change with the surrounding grid,
+                # so interpolating the entire retained table changes scores.
+                interpolation_shape = tuple(
+                    2 if maximum <= 1 else int(maximum) + 2
+                    for maximum in np.max(freq, axis=0)
+                )
                 (
                     utilities_cand,
                     self._precompute_array,
                 ) = _epistemic_uncertainty_pwc(
-                    freq, self._precompute_array, self._interpolation_cache
+                    freq,
+                    self._precompute_array,
+                    self._interpolation_cache,
+                    interpolation_shape,
                 )
             else:
                 utilities_cand, _ = _epistemic_uncertainty_pwc(freq)
@@ -223,7 +233,10 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
 
 def _epistemic_uncertainty_pwc(
-    freq, precompute_array=None, interpolation_cache=None
+    freq,
+    precompute_array=None,
+    interpolation_cache=None,
+    interpolation_shape=None,
 ):
     """Computes the epistemic uncertainty score for a Parzen Window Classifier
     (PWC) [1]_.
@@ -240,6 +253,9 @@ def _epistemic_uncertainty_pwc(
     interpolation_cache : dict or None, default=None
         Interpolation state retained across queries by the strategy. Reused
         while the table shape is unchanged; existing values must not change.
+    interpolation_shape : tuple of int or None, default=None
+        Shape of the active grid rectangle. If `None`, use the entire table.
+        The remaining precomputed values are retained for subsequent queries.
 
     Returns
     -------
@@ -260,26 +276,22 @@ def _epistemic_uncertainty_pwc(
             "problems, {} classes were given."
             "".format(freq.shape[1])
         )
-    n = freq[:, 0]
-    p = freq[:, 1]
     utilities = np.full((len(freq)), np.nan)
     if precompute_array is not None:
-        # enlarges the precompute_array array if necessary:
-        if precompute_array.shape[0] < np.max(n) + 1:
-            new_shape = (
-                int(np.max(n)) - precompute_array.shape[0] + 2,
-                precompute_array.shape[1],
-            )
-            precompute_array = np.append(
-                precompute_array, np.full(new_shape, np.nan), axis=0
-            )
-        if precompute_array.shape[1] < np.max(p) + 1:
-            new_shape = (
-                precompute_array.shape[0],
-                int(np.max(p)) - precompute_array.shape[1] + 2,
-            )
-            precompute_array = np.append(
-                precompute_array, np.full(new_shape, np.nan), axis=1
+        # Enlarge the table without discarding previously computed values.
+        new_shape = [
+            int(maximum) + 2 if size < maximum + 1 else size
+            for size, maximum in zip(precompute_array.shape, np.max(freq, 0))
+        ]
+        if interpolation_shape is not None:
+            new_shape = np.maximum(new_shape, interpolation_shape)
+        padding = [
+            (0, new - old)
+            for old, new in zip(precompute_array.shape, new_shape)
+        ]
+        if any(after for _, after in padding):
+            precompute_array = np.pad(
+                precompute_array, padding, constant_values=np.nan
             )
 
         # precompute the epistemic uncertainty:
@@ -300,7 +312,13 @@ def _epistemic_uncertainty_pwc(
 
             pi = np.array([pi0, pi1])
             precompute_array[N, P] = np.min(pi, axis=0)
-        utilities = _interpolate(precompute_array, freq, interpolation_cache)
+        interpolation_table = precompute_array
+        if interpolation_shape is not None:
+            n_rows, n_columns = interpolation_shape
+            interpolation_table = precompute_array[:n_rows, :n_columns]
+        utilities = _interpolate(
+            interpolation_table, freq, interpolation_cache
+        )
     else:
         for i, f in enumerate(freq):
             pi1 = -minimize_scalar(
