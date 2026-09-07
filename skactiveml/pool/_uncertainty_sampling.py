@@ -521,10 +521,7 @@ def expected_average_precision(classes, probas):
         estimator=None,
     )
 
-    if (np.sum(probas, axis=1) - 1).all():
-        raise ValueError(
-            "probas are invalid. The sum over axis 1 must be " "one."
-        )
+    _check_probas_are_valid(probas, is_multilabel=False)
 
     # Check if `classes` are valid.
     check_classes(classes)
@@ -541,40 +538,37 @@ def expected_average_precision(classes, probas):
         probas, probas_sort_idx_per_class, axis=0
     )
 
-    g_arr_mask = np.arange(probas.shape[0] - 1) > 0
-    f_arr_mask = np.arange(probas.shape[0]) > 0
+    n_samples = len(probas)
+    # Batch omitted candidates and retain only the current recurrence rows.
+    # Process at most 128 omissions at once and limit each rolling table to
+    # about one million entries. Arithmetic is still cubic in the number of
+    # candidates, as in Algorithm 1 of [1].
+    chunk_size = max(1, min(128, 2**20 // n_samples))
+    t = np.arange(1, n_samples)
     for i in range(len(classes)):
-        for j in range(len(probas)):
-            # The i-th column of p without p[j,i]
-            p = np.delete(probas_sorted[:, i], [j])
-            # calculate g_arr
-            g_arr = np.zeros((len(p), len(p)))
-            if len(p) > 0:
-                g_arr[0, 0] = 1
-            for n in range(1, len(p)):
-                # p_n*g(n-1,t-1)
-                g_term_0 = p[n - 1] * np.pad(g_arr[n - 1], (1, 0))[:-1]
-                # (1-p_n)*g(n-1,t)
-                g_term_1 = (1 - p[n - 1]) * g_arr[n - 1]
-                g_arr[n] = (g_term_0 + g_term_1) * (g_arr_mask)
+        for start in range(0, n_samples, chunk_size):
+            stop = min(start + chunk_size, n_samples)
+            omitted = np.arange(start, stop)
+            g = np.zeros((len(omitted), n_samples))
+            f = np.zeros_like(g)
+            # Preserve the base cases in equations (17) and (18) of [1].
+            g[:, 0] = 1
+            f[:, 0] = 1
+            for n in range(1, n_samples):
+                # Skip each omitted candidate in the sorted probabilities.
+                indices = n - 1 + (n - 1 >= omitted)
+                p = probas_sorted[indices, i, None]
+                f[:, 1 : n + 1] = (
+                    p * f[:, :n]
+                    + p * g[:, :n] * (t[:n] / n)
+                    + (1 - p) * f[:, 1 : n + 1]
+                )
+                f[:, 0] = 0
+                if n < n_samples - 1:
+                    g[:, 1 : n + 1] = p * g[:, :n] + (1 - p) * g[:, 1 : n + 1]
+                    g[:, 0] = 0
 
-            # calculate f_arr
-            f_arr = np.zeros((len(p) + 1, len(p) + 1))
-            f_arr[0, 0] = 1
-            for n in range(1, len(p) + 1):
-                # p_n*f(n-1,t-1)
-                f_term_0 = p[n - 1] * np.pad(f_arr[n - 1], (1, 0))[:-1]
-                # p_n*t/n*g(n-1,t-1)
-                f_term_1 = p[n - 1] * np.pad(g_arr[n - 1], (1, 0))
-                f_term_1 *= np.arange(len(p) + 1) / n
-                # (1-p_n)*f(n-1,t)
-                f_term_2 = (1 - p[n - 1]) * f_arr[n - 1]
-                f_arr[n] = (f_term_0 + f_term_1 + f_term_2) * f_arr_mask
-
-            # calculate score
-            sample_index = probas_sort_idx_per_class[j, i]
-            score[sample_index] += np.sum(
-                f_arr[len(p), 1:] / np.arange(1, len(p) + 1)
-            )
+            sample_indices = probas_sort_idx_per_class[start:stop, i]
+            score[sample_indices] += np.sum(f[:, 1:] / t, axis=1)
 
     return score

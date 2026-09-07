@@ -1,6 +1,8 @@
 import unittest
 from copy import deepcopy
+from functools import lru_cache
 from itertools import product
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
@@ -379,6 +381,38 @@ class TestUncertaintySampling(
 
         assert_no_query_state(self, strategy)
 
+    def test_expected_precision_candidate_mapping_matches_recurrence(self):
+        X = np.random.RandomState(0).uniform(size=(8, 2))
+        y = np.array([0, 1, 0, np.nan, np.nan, np.nan, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
+        for candidates in [None, np.array([7, 3, 5]), X[[7, 3, 5]]]:
+            with self.subTest(candidates=candidates):
+                params = dict(
+                    X=X,
+                    y=y,
+                    clf=clf,
+                    fit_clf=False,
+                    candidates=candidates,
+                    batch_size=2,
+                    return_utilities=True,
+                )
+                strategy = UncertaintySampling(
+                    method="expected_average_precision", random_state=0
+                )
+                actual = strategy.query(**params)
+                with patch(
+                    "skactiveml.pool._uncertainty_sampling."
+                    "expected_average_precision",
+                    side_effect=lambda classes, probas: (
+                        TestExpectedAveragePrecision._reference(probas)
+                    ),
+                ):
+                    expected = strategy.query(**params)
+                np.testing.assert_array_equal(actual[0], expected[0])
+                np.testing.assert_allclose(
+                    actual[1], expected[1], rtol=1e-12, atol=1e-12
+                )
+
     def test_cost_sensitive_multilabel_methods_fail_before_acquisition_state(
         self,
     ):
@@ -570,6 +604,46 @@ class TestUncertaintySampling(
 
 
 class TestExpectedAveragePrecision(unittest.TestCase):
+    @staticmethod
+    def _reference(probas):
+        """Evaluate the published recurrences with scalar memoization."""
+
+        @lru_cache(None)
+        def precision(p):
+            @lru_cache(None)
+            def g(n, t):
+                if t > n or t < 0 or (t == 0 and n > 0):
+                    return 0.0
+                if n == 0:
+                    return 1.0
+                return p[n - 1] * g(n - 1, t - 1) + (1 - p[n - 1]) * g(
+                    n - 1, t
+                )
+
+            @lru_cache(None)
+            def f(n, t):
+                if t > n or t < 0 or (t == 0 and n > 0):
+                    return 0.0
+                if n == 0:
+                    return 1.0
+                return (
+                    p[n - 1] * f(n - 1, t - 1)
+                    + p[n - 1] * g(n - 1, t - 1) * t / n
+                    + (1 - p[n - 1]) * f(n - 1, t)
+                )
+
+            return sum(f(len(p), t) / t for t in range(1, len(p) + 1))
+
+        return np.asarray(
+            [
+                sum(
+                    precision(tuple(sorted(np.delete(p, j), reverse=True)))
+                    for p in np.asarray(probas).T
+                )
+                for j in range(len(probas))
+            ]
+        )
+
     def setUp(self):
         self.classes = np.array([0, 1])
         self.probas = np.array([[0.4, 0.6], [0.3, 0.7]])
@@ -640,6 +714,68 @@ class TestExpectedAveragePrecision(unittest.TestCase):
         )
         self.assertTrue(scores.shape == (len(self.probas),))
         np.testing.assert_array_equal(scores, self.scores_val)
+
+    def test_published_recurrence_equivalence(self):
+        rng = np.random.RandomState(42)
+        for n_samples in [1, 2, 5, 20]:
+            for n_classes in [2, 3, 5]:
+                for tied in [False, True]:
+                    probas = (
+                        np.ones((n_samples, n_classes)) / n_classes
+                        if tied
+                        else rng.dirichlet(np.ones(n_classes), n_samples)
+                    )
+                    with self.subTest(
+                        n_samples=n_samples,
+                        n_classes=n_classes,
+                        tied=tied,
+                    ):
+                        expected = self._reference(probas)
+                        actual = expected_average_precision(
+                            np.arange(n_classes), probas
+                        )
+                        np.testing.assert_allclose(
+                            actual, expected, rtol=1e-12, atol=1e-12
+                        )
+
+    def test_boundary_probabilities_and_permutations(self):
+        probas = np.array([[0, 1, 0], [1, 0, 0], [0.5, 0.5, 0], [0, 0, 1]])
+        before = probas.copy()
+        expected = self._reference(probas)
+        classes = ["a", "b", "c"]
+        actual = expected_average_precision(classes, probas)
+        np.testing.assert_allclose(actual, expected, atol=1e-14)
+        permutation = [3, 1, 0, 2]
+        actual = expected_average_precision(classes, probas[permutation])
+        np.testing.assert_allclose(actual, expected[permutation], atol=1e-14)
+        np.testing.assert_array_equal(probas, before)
+
+    def test_candidate_chunks(self):
+        probas = np.full((130, 2), 0.5)
+        np.testing.assert_allclose(
+            expected_average_precision(self.classes, probas),
+            self._reference(probas),
+            rtol=1e-12,
+            atol=1e-12,
+        )
+
+    def test_probability_validation_checks_every_row_and_bounds(self):
+        for probas in [
+            [[0.5, 0.5], [0.2, 0.2]],
+            [[1.1, -0.1], [0.5, 0.5]],
+        ]:
+            with self.subTest(probas=probas):
+                self.assertRaises(
+                    ValueError,
+                    expected_average_precision,
+                    self.classes,
+                    probas,
+                )
+        # Floating-point normalization need not produce a sum exactly one.
+        probas = np.array([[0.4, 0.6 + 1e-15]])
+        np.testing.assert_array_equal(
+            expected_average_precision(self.classes, probas), [0.0]
+        )
 
 
 class TestUncertaintyScores(unittest.TestCase):
