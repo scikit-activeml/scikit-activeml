@@ -1,12 +1,15 @@
 import unittest
+from unittest.mock import Mock
 
 import numpy as np
+from scipy.sparse import issparse
 from sklearn.cluster import KMeans, SpectralClustering
 from sklearn.datasets import make_blobs
 from sklearn.metrics import pairwise_distances, euclidean_distances
 from skactiveml.pool import ProbCover
+from skactiveml.pool._prob_cover import _radius_graph
 from skactiveml.exceptions import MappingError
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, check_random_state, rand_argmax
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
@@ -109,6 +112,84 @@ class TestProbCover(
             (1, ValueError),
         ]
         self._test_param("init", "n_classes", test_cases)
+
+    def test_query_matches_dense_coverage_reference(self):
+        rng = np.random.RandomState(12)
+        X = rng.uniform(size=(80, 2))
+        for density in [0, 0.02, 0.5, 1]:
+            for symmetric in [False, True]:
+                graph = rng.uniform(size=(len(X), len(X))) < density
+                if symmetric:
+                    graph |= graph.T
+                distances = np.where(graph, 0.0, 1.0)
+                for n_labeled in [0, 5]:
+                    with self.subTest(
+                        density=density,
+                        symmetric=symmetric,
+                        n_labeled=n_labeled,
+                    ):
+                        y = np.full(len(X), np.nan)
+                        y[:n_labeled] = np.arange(n_labeled) % 2
+                        candidates = rng.permutation(len(X))[:30]
+                        centers = ~np.isnan(y)
+                        available = np.zeros(len(X), dtype=bool)
+                        available[candidates] = True
+                        edges = graph.copy()
+                        expected_indices = []
+                        expected_utilities = np.full((10, len(X)), np.nan)
+                        random_state = check_random_state(
+                            0, len(X) - n_labeled + 1
+                        )
+                        for b in range(10):
+                            edges[:, edges[centers].any(axis=0)] = False
+                            expected_utilities[b, available] = edges[
+                                available
+                            ].sum(axis=1)
+                            idx = rand_argmax(
+                                expected_utilities[b],
+                                random_state=random_state,
+                            )[0]
+                            expected_indices.append(idx)
+                            available[idx] = False
+                            centers[idx] = True
+
+                        distance_func = Mock(return_value=distances)
+                        qs = ProbCover(
+                            deltas=[0.5],
+                            distance_func=distance_func,
+                            random_state=0,
+                        )
+                        for update in [False, False, True]:
+                            actual = qs.query(
+                                X,
+                                y,
+                                candidates=candidates,
+                                batch_size=10,
+                                return_utilities=True,
+                                update=update,
+                            )
+                            np.testing.assert_array_equal(
+                                actual[0], expected_indices
+                            )
+                            np.testing.assert_array_equal(
+                                actual[1], expected_utilities
+                            )
+                            np.testing.assert_array_equal(
+                                qs.distances_, distances
+                            )
+                        self.assertEqual(distance_func.call_count, 2)
+
+    def test_radius_graph_storage_and_boundary(self):
+        for distances, sparse in [
+            (np.ones((80, 80)) - np.eye(80), True),
+            (np.zeros((80, 80)), False),
+            (np.ones((1200, 1200)) - np.eye(1200), True),
+        ]:
+            expected = distances <= 0
+            graph = _radius_graph(distances, 0)
+            self.assertEqual(issparse(graph), sparse)
+            actual = graph.toarray() if sparse else graph
+            np.testing.assert_array_equal(actual, expected)
 
     def test_init_param_deltas(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

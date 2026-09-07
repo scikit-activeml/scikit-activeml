@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+from scipy.sparse import csr_matrix, issparse, vstack
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 from sklearn.utils.validation import column_or_1d
@@ -264,10 +265,17 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 cluster_algo_dict[self.n_cluster_param_name] = n_classes
                 cluster_obj = self.cluster_algo(**cluster_algo_dict)
                 y_cluster = cluster_obj.fit_predict(X)
-                is_impure = y_cluster[:, None] != y_cluster
                 for delta in deltas:
-                    edges = self.distances_ <= delta
-                    purity = 1 - (edges * is_impure).any(axis=1).mean()
+                    n_impure = 0
+                    chunk_size = max(1, 2**20 // len(X))
+                    for start in range(0, len(X), chunk_size):
+                        stop = start + chunk_size
+                        is_impure = y_cluster[start:stop, None] != y_cluster
+                        edges = self.distances_[start:stop] <= delta
+                        n_impure += np.count_nonzero(
+                            (edges & is_impure).any(axis=1)
+                        )
+                    purity = 1 - n_impure / len(X)
                     max_purity = max(max_purity, purity)
                     if purity < self.alpha:
                         break
@@ -283,23 +291,69 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 )
 
         # Compute edges of the graph with the samples as vertices.
-        edges = self.distances_ <= self.delta_max_
+        edges = _radius_graph(self.distances_, self.delta_max_)
+        incoming = edges.tocsc() if issparse(edges) else None
+        degrees = np.asarray(edges.sum(axis=1)).ravel()
+        covered = np.zeros(len(X), dtype=bool)
+
+        def cover(center):
+            if incoming is not None:
+                neighbors = edges.indices[
+                    edges.indptr[center] : edges.indptr[center + 1]
+                ]
+                newly_covered = neighbors[~covered[neighbors]]
+                covered[newly_covered] = True
+                for vertex in newly_covered:
+                    parents = incoming.indices[
+                        incoming.indptr[vertex] : incoming.indptr[vertex + 1]
+                    ]
+                    degrees[parents] -= 1
+            else:
+                newly_covered = np.flatnonzero(edges[center] & ~covered)
+                covered[newly_covered] = True
+                chunk_size = max(1, 2**20 // len(X))
+                for start in range(0, len(newly_covered), chunk_size):
+                    vertices = newly_covered[start : start + chunk_size]
+                    degrees[:] -= edges[:, vertices].sum(axis=1)
+
+        # A covered vertex decrements its predecessors' degrees only once.
+        for center in np.flatnonzero(is_center):
+            cover(center)
 
         # Perform sample-wise selection of the batch.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
         for b in range(batch_size):
-            # Step (ii) in [1]: Remove incoming edges for covered samples.
-            is_covered = edges[is_center].any(axis=0)
-            edges[:, is_covered] = False
             # Step (i) in [1]: Query the sample with the highest out-degree.
-            utilities[b][is_candidate] = edges[is_candidate].sum(axis=1)
+            utilities[b, is_candidate] = degrees[is_candidate]
             idx = rand_argmax(utilities[b], random_state=self.random_state_)[0]
             is_candidate[idx] = False
-            is_center[idx] = True
             query_indices[b] = idx
+            if b + 1 < batch_size:
+                cover(idx)
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
+
+
+def _radius_graph(distances, radius):
+    """Build adjacency in bounded row chunks, retaining dense graphs cheaply.
+
+    Sparse outgoing and incoming adjacency share the same edges. If their
+    combined storage exceeds one dense boolean matrix, retain that matrix
+    instead. The public distance matrix remains unchanged in either case.
+    """
+    blocks = []
+    storage = 0
+    chunk_size = max(1, 2**20 // len(distances))
+    for start in range(0, len(distances), chunk_size):
+        block = csr_matrix(distances[start : start + chunk_size] <= radius)
+        storage += (
+            block.data.nbytes + block.indices.nbytes + block.indptr.nbytes
+        )
+        if 2 * storage >= distances.size:
+            return distances <= radius
+        blocks.append(block)
+    return vstack(blocks, format="csr")
