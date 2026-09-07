@@ -175,6 +175,43 @@ class TestAnnotatorLogisticRegression(
         ]
         self._test_param("init", "classes", test_cases)
 
+    def test_sample_weights_follow_observed_rows(self):
+        X = np.array([[-2.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [2.0, 1.0]])
+        y = np.array([[0.0, 1.0], [np.nan, np.nan], [1.0, 1.0], [1.0, np.nan]])
+        observed = np.array([True, False, True, True])
+        params = {"classes": [0, 1], "random_state": 0, "max_iter": 3}
+        unweighted = AnnotatorLogisticRegression(**params).fit(X, y)
+        for weights in [
+            np.ones_like(y),
+            np.array([[8.0, 1.0], [100.0, 200.0], [1.0, 4.0], [2.0, 9.0]]),
+        ]:
+            with self.subTest(weights=weights):
+                fitted = AnnotatorLogisticRegression(**params).fit(
+                    X, y, sample_weight=weights
+                )
+                expected = AnnotatorLogisticRegression(**params).fit(
+                    X[observed], y[observed], sample_weight=weights[observed]
+                )
+                np.testing.assert_allclose(
+                    fitted.predict_proba(X), expected.predict_proba(X)
+                )
+                np.testing.assert_allclose(fitted.Alpha_, expected.Alpha_)
+                if np.all(weights == 1):
+                    np.testing.assert_allclose(
+                        fitted.predict_proba(X), unweighted.predict_proba(X)
+                    )
+                else:
+                    self.assertFalse(
+                        np.allclose(
+                            fitted.predict_proba(X),
+                            unweighted.predict_proba(X),
+                        )
+                    )
+        empty = AnnotatorLogisticRegression(**params).fit(
+            X, np.full_like(y, np.nan), sample_weight=np.ones_like(y)
+        )
+        np.testing.assert_allclose(empty.predict_proba(X), 0.5)
+
     def test_fit(self):
         # ---------------------Check trivial use cases.------------------------
         lr = AnnotatorLogisticRegression(

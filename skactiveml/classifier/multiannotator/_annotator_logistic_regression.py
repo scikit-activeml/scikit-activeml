@@ -314,6 +314,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         is_lbld = is_labeled(y, missing_label=-1).any(axis=-1)
         X = X[is_lbld]
         y = y[is_lbld]
+        if sample_weight is not None:
+            sample_weight = sample_weight[is_lbld]
         n_samples = X.shape[0]
         is_lbld = is_labeled(y, missing_label=-1)
 
