@@ -1,3 +1,3 @@
 skorch<=1.4.0
-river<=0.25.0
+river<=0.26.1
 capymoa<=0.13.0
