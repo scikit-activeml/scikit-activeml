@@ -153,7 +153,7 @@ try:
               `_SkorchMultiAnnotatorClassifier` object fitted on the training
               data.
             """
-            super().fit(X, y, **fit_params)
+            return super().fit(X, y, **fit_params)
 
         def partial_fit(self, X, y, **fit_params):
             """Fit the module without re-initialization.
@@ -181,7 +181,7 @@ try:
               `_SkorchMultiAnnotatorClassifier` object fitted on the training
               data.
             """
-            super().partial_fit(X, y, **fit_params)
+            return super().partial_fit(X, y, **fit_params)
 
         def _net_parts(self, X, y):
             # Check module parameters.

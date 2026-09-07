@@ -21,7 +21,31 @@ class Dummy:
         pass
 
 
-class TemplateEstimator:
+class _TemplateEstimatorFitContract:
+    """Shared fitting return-value contract for classifiers and regressors."""
+
+    def test_fit_returns_self(self):
+        estimator, fit_params = self._make_fit_contract_estimator()
+        for call in range(2):
+            with self.subTest(call=call):
+                self.assertIs(estimator.fit(**deepcopy(fit_params)), estimator)
+
+    def test_partial_fit_returns_self(self, replace_init_params=None):
+        estimator, fit_params = self._make_fit_contract_estimator()
+        if replace_init_params is not None:
+            estimator.set_params(**deepcopy(replace_init_params))
+        if not hasattr(estimator, "partial_fit"):
+            self.skipTest(
+                "The configured estimator does not support partial_fit."
+            )
+        for call in range(2):
+            with self.subTest(call=call):
+                self.assertIs(
+                    estimator.partial_fit(**deepcopy(fit_params)), estimator
+                )
+
+
+class TemplateEstimator(_TemplateEstimatorFitContract):
     def setUp(
         self,
         estimator_class,
@@ -67,6 +91,12 @@ class TemplateEstimator:
             self.estimator_class.predict,
             "predict",
             self.predict_default_params,
+        )
+
+    def _make_fit_contract_estimator(self):
+        return (
+            self.estimator_class(**deepcopy(self.init_default_params)),
+            self.fit_default_params,
         )
 
     def test_init_param_missing_label(
@@ -754,8 +784,14 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         self.assertAlmostEqual(estimator.score(X, y_true), expected_score)
 
 
-class TemplateMultiAnnotatorClassifier:
-    """Shared resolved-target contract for multi-annotator classifiers."""
+class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
+    """Shared fitting and target contracts for multi-annotator classifiers."""
+
+    def _make_fit_contract_estimator(self):
+        return (
+            self.target_contract_estimator_factory(),
+            self.target_contract_fit_params,
+        )
 
     def test_init_param_target_type(self):
         for target_type, error in [
