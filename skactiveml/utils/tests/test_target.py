@@ -92,22 +92,39 @@ class TestTargetSpec(unittest.TestCase):
             (("no", "yes"), ("cold", "warm")),
         )
 
-    def test_canonical_equality_treats_nan_classes_as_equal(self):
-        direct = TargetSpec(
+    def test_normalization_preserves_mixed_numpy_integer_scalars(self):
+        classes = [np.int64(2**53), np.uint64(2**53 + 1)]
+        target_spec = resolve_target_spec(
+            classes,
             task="classification",
-            target_type="single-output",
-            annotation_type="single-annotator",
-            classes=(np.nan, 1.0),
-        )
-        resolved = resolve_target_spec(
-            [1.0],
-            task="classification",
-            classes=(np.nan, 1.0),
-            missing_label=-1,
+            classes=classes,
+            missing_label=np.nan,
         )
 
-        self.assertEqual(direct, resolved)
-        self.assertEqual(hash(direct), hash(resolved))
+        self.assertEqual(
+            [int(value) for value in target_spec.classes],
+            [2**53, 2**53 + 1],
+        )
+
+    def test_rejects_nonfinite_classes(self):
+        # Nonfinite numbers are no categories, whether they are declared
+        # directly or resolved from a declaration.
+        for classes in ((np.nan, 1.0), (np.inf, 1.0)):
+            with self.subTest(classes=classes):
+                with self.assertRaises(ValueError):
+                    TargetSpec(
+                        task="classification",
+                        target_type="single-output",
+                        annotation_type="single-annotator",
+                        classes=classes,
+                    )
+                with self.assertRaises(ValueError):
+                    resolve_target_spec(
+                        [1.0],
+                        task="classification",
+                        classes=classes,
+                        missing_label=-1,
+                    )
 
     def test_rejects_duplicate_nan_classes_before_normalization(self):
         duplicate_nan_classes = (float("nan"), float("nan"))
@@ -279,42 +296,33 @@ class TestTargetSpec(unittest.TestCase):
 
 
 class TestResolveTargetSpec(unittest.TestCase):
-    def test_accepts_observed_nan_as_a_declared_class(self):
-        target_spec = resolve_target_spec(
-            [np.nan, 1.0],
-            task="classification",
-            classes=(np.nan, 1.0),
-            missing_label=-1,
-        )
-
-        self.assertEqual(
-            target_spec,
-            TargetSpec(
+    def test_rejects_observed_nan_that_is_not_the_missing_label(self):
+        # NaN is a missing label, never a category, so an observed NaN is
+        # an error unless it is the configured missing label.
+        with self.assertRaisesRegex(ValueError, "contains NaN"):
+            resolve_target_spec(
+                [np.nan, 1.0],
                 task="classification",
-                target_type="single-output",
-                annotation_type="single-annotator",
-                classes=(np.nan, 1.0),
-            ),
-        )
+                classes=(0.0, 1.0),
+                missing_label=-1,
+            )
+        with self.assertRaisesRegex(ValueError, "contains NaN"):
+            resolve_target_spec(
+                [0.0, np.nan, 1.0],
+                task="classification",
+                classes=None,
+                missing_label=None,
+            )
 
-    def test_multilabel_accepts_observed_nan_as_a_declared_class(self):
-        target_spec = resolve_target_spec(
-            [[np.nan, 0.0], [1.0, 1.0]],
-            task="classification",
-            target_type="multi-label",
-            classes=((np.nan, 1.0), (0.0, 1.0)),
-            missing_label=-1,
-        )
-
-        self.assertEqual(
-            target_spec,
-            TargetSpec(
+    def test_multilabel_rejects_nan_as_a_declared_class(self):
+        with self.assertRaisesRegex(ValueError, "contains NaN"):
+            resolve_target_spec(
+                [[np.nan, 0.0], [1.0, 1.0]],
                 task="classification",
                 target_type="multi-label",
-                annotation_type="single-annotator",
                 classes=((np.nan, 1.0), (0.0, 1.0)),
-            ),
-        )
+                missing_label=-1,
+            )
 
     def test_multilabel_accepts_numpy_floating_nan_sentinel(self):
         missing_label = np.float32(np.nan)
@@ -334,7 +342,7 @@ class TestResolveTargetSpec(unittest.TestCase):
 
     def test_rejects_unsupported_inferred_class_types(self):
         with self.assertRaisesRegex(
-            TypeError, "must contain only strings or numbers"
+            TypeError, "unsupported scalar label type"
         ):
             resolve_target_spec(
                 [date(2020, 1, 1), date(2020, 1, 2)],
@@ -762,14 +770,13 @@ class TestResolveTargetSpec(unittest.TestCase):
         )
 
     def test_multilabel_without_classes_rejects_heterogeneous_columns(self):
-        # The `classes=None` path derives one vocabulary per column, so the
-        # same contract has to hold for what it derives.
+        # One array holds every output of a sample, so its outputs cannot
+        # describe different label kinds, whether their vocabularies are
+        # declared or derived from the columns.
         y = np.empty((2, 2), dtype=object)
         y[:] = [["no", 0], ["yes", 1]]
 
-        with self.assertRaisesRegex(
-            ValueError, "one dtype across all label outputs"
-        ):
+        with self.assertRaisesRegex(TypeError, "one label family"):
             resolve_target_spec(
                 y,
                 task="classification",

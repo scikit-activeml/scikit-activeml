@@ -1,51 +1,21 @@
 import numpy as np
 
+from ._label_dtype import (
+    _LABELS,
+    _NUMERICAL_LABELS,
+    _TASK_AGNOSTIC_LABELS,
+    _as_label_array,
+    _check_missing_label_for_family,
+    _check_missing_label_value,
+    _missing_label_kind,
+    _matches_missing_label,
+    _missing_mask_and_family,
+    _target_type_family,
+)
+
 # Define constant for missing label used throughout the package.
 
 MISSING_LABEL = np.nan
-
-
-def _is_nan_missing_label(missing_label):
-    """Return whether a numeric missing-label scalar represents NaN."""
-    return np.issubdtype(type(missing_label), np.inexact) and bool(
-        np.isnan(missing_label)
-    )
-
-
-def _deepflatten(to_flatten):
-    """Flattens the iterable `to_flatten` recursively, in such a way that only
-    elementary items are returned in an one-dimensional list.
-
-    Parameters
-    ----------
-    to_flatten : Iterable
-        The iterable to flatten.
-
-    Returns
-    -------
-    flattened_list : list
-        A list that contains all elements of `to_flatten` without being nested.
-    """
-    # list to keep track of objects to flatten
-    iterables = [to_flatten]
-    # list to save all non-iterable elements
-    flattened_list = []
-
-    while iterables:
-        # remove last element and iterate over it
-        current_iterable = iterables.pop()
-        for e in current_iterable:
-            # check objects that return themselves as iterable (e.g. when
-            # iterating over strings)
-            if e == current_iterable:
-                flattened_list.append(e)
-            # if iterable, iterate over its elements
-            elif hasattr(e, "__iter__"):
-                iterables.append(e)
-            # if non-iterable element, append to flattened list
-            else:
-                flattened_list.append(e)
-    return flattened_list
 
 
 def is_unlabeled(
@@ -78,6 +48,23 @@ def is_unlabeled(
         - If `target_type="multi-label"`, `is_unlbld` is of shape
           `(n_samples,)`.
     """
+    role = _LABELS if target_type == "multi-label" else _TASK_AGNOSTIC_LABELS
+    return _is_unlabeled_with_role(
+        y,
+        missing_label=missing_label,
+        target_type=target_type,
+        role=role,
+    )
+
+
+def _is_unlabeled_with_role(
+    y,
+    missing_label=MISSING_LABEL,
+    *,
+    target_type="single-output",
+    role,
+):
+    """Return the missing mask after role-specific label validation."""
     check_missing_label(missing_label)
     if target_type == "auto":
         raise ValueError(
@@ -98,27 +85,7 @@ def is_unlabeled(
                 )
             return np.zeros(y.shape[0], dtype=bool)
         return np.array(y, dtype=bool)
-    if not isinstance(y, np.ndarray):
-        types = set(
-            t.__qualname__ for t in set(type(v) for v in _deepflatten(y))
-        )
-        types.add(type(missing_label).__qualname__)
-        is_number = False
-        is_character = False
-        for t in types:
-            t = object if t == "NoneType" else t
-            is_character = (
-                True if np.issubdtype(t, np.character) else is_character
-            )
-            is_number = True if np.issubdtype(t, np.number) else is_number
-            if is_character and is_number:
-                raise TypeError(
-                    "'y' must be uniformly strings or numbers. "
-                    "'NoneType' is allowed. Got {}".format(types)
-                )
-        y = np.asarray(y)
-    y_dtype = np.result_type(y, np.asarray(missing_label))
-    check_missing_label(missing_label, target_type=y_dtype, name="y")
+    y = _as_label_array(y)
 
     # Check requirements for labels `y`.
     if y.ndim not in (1, 2):
@@ -136,12 +103,12 @@ def is_unlabeled(
             "`y` must be two-dimensional when `target_type='multi-label'`."
         )
 
-    # Compute elementwise missing mask.
-    if _is_nan_missing_label(missing_label):
-        is_missing = np.isnan(y)
-    else:
-        y = y.astype(y_dtype)
-        is_missing = y == missing_label
+    is_missing, _ = _missing_mask_and_family(
+        y,
+        missing_label,
+        name="y",
+        role=role,
+    )
 
     # Handle single output.
     if target_type == "single-output":
@@ -194,6 +161,85 @@ def is_labeled(
         missing_label=missing_label,
         target_type=target_type,
     )
+
+
+def _check_labels(
+    y,
+    missing_label=MISSING_LABEL,
+    *,
+    target_type="single-output",
+    task="classification",
+):
+    """Check labels against the label and missing-value contract.
+
+    Components that only have to establish that `y` is admissible, without
+    using the resulting mask, call this instead of discarding the mask of
+    `is_unlabeled`.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        Class labels or numerical labels, including values equal to
+        `missing_label`.
+    missing_label : number or str or None or np.nan, default=np.nan
+        Value to represent a missing label.
+    target_type : "single-output" or "multi-label", default="single-output"
+        The resolved target type.
+    task : "classification" or "regression", default="classification"
+        The prediction task the labels describe. Numerical labels may mix
+        integer and floating-point values but are neither categories nor
+        strings.
+
+    Raises
+    ------
+    TypeError
+        If the labels are outside the label contract, mix label kinds, or
+        are incompatible with `missing_label`.
+    ValueError
+        If an observed label is nonfinite or an integer beyond 64 bits.
+    """
+    if task not in {"classification", "regression"}:
+        raise ValueError(
+            "`task` must be either 'classification' or 'regression'."
+        )
+    _is_unlabeled_with_role(
+        y,
+        missing_label=missing_label,
+        target_type=target_type,
+        role=_NUMERICAL_LABELS if task == "regression" else _LABELS,
+    )
+
+
+def _observed_numerical_labels(y, missing_label):
+    """Return the observed numerical labels as floating-point values.
+
+    Regression labels are stored as an object array whenever the missing
+    label and the labels have no common numeric dtype, e.g. for
+    `missing_label=None`. Object entries do not support the arithmetic a
+    regressor performs on them, so the observed labels are provided as an
+    ordinary floating-point view alongside the mask locating them.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples,)
+        Numerical labels including missing values.
+    missing_label : number or str or None or np.nan
+        Value to represent a missing label.
+
+    Returns
+    -------
+    is_lbld : numpy.ndarray of shape (n_samples,)
+        Boolean mask indicating observed labels in `y`.
+    y_observed : numpy.ndarray of shape (n_observed,)
+        The observed labels as `float64` values.
+    """
+    is_lbld = ~_is_unlabeled_with_role(
+        y,
+        missing_label,
+        role=_NUMERICAL_LABELS,
+    )
+    observed = _as_label_array(y)[is_lbld]
+    return is_lbld, np.asarray(observed, dtype=float)
 
 
 def unlabeled_indices(
@@ -281,37 +327,30 @@ def check_missing_label(missing_label, target_type=None, name=None):
     ----------
     missing_label : number or str or None or np.nan
         Value to represent a missing label.
-    target_type : Type or tuple, default=None
-        Acceptable data types for the parameter `missing_label` if it is not
-        set to None.
+    target_type : numpy.dtype or Type or tuple, default=None
+        The dtype or scalar type of the labels `missing_label` has to fit. If
+        `None`, only `missing_label` itself is checked. A dtype carrying no
+        label family, such as `object`, constrains no missing label; the
+        label-mask functions then check the missing label against the values
+        they see.
     name : str, default=None
         The name of the variable to which `missing_label` is not compatible.
         The name will be printed in error messages if it is not None.
+
+    Raises
+    ------
+    TypeError
+        If `missing_label` is no supported missing label, or belongs to another
+        label family than `target_type`.
+    ValueError
+        If `missing_label` is infinite or an integer beyond 64 bits.
     """
-    is_None = missing_label is None
-    is_character = np.issubdtype(type(missing_label), np.character)
-    is_number = np.issubdtype(type(missing_label), np.number)
-    if not is_number and not is_character and not is_None:
-        raise TypeError(
-            "'missing_label' has type '{}', but must be a either a number, "
-            "a string, np.nan, or None.".format(type(missing_label))
-        )
-    if target_type is not None:
-        is_object_type = np.issubdtype(target_type, np.object_)
-        is_character_type = np.issubdtype(target_type, np.character)
-        is_number_type = np.issubdtype(target_type, np.number)
-        if (
-            (is_character_type and is_number)
-            or (is_number_type and is_character)
-            or (is_object_type and not is_None)
-        ):
-            name = "target object" if name is None else str(name)
-            raise TypeError(
-                "'missing_label' has type '{}' and is not compatible to the "
-                "type '{}' of '{}'.".format(
-                    type(missing_label), target_type, name
-                )
-            )
+    if target_type is None:
+        _check_missing_label_value(missing_label)
+        return
+    _check_missing_label_for_family(
+        missing_label, _target_type_family(target_type), name=name
+    )
 
 
 def check_equal_missing_label(missing_label1, missing_label2):
@@ -326,11 +365,22 @@ def check_equal_missing_label(missing_label1, missing_label2):
 
     Raises
     -------
+    TypeError
+        If the two values mark missing labels of different kinds, e.g.
+        numeric `np.nan` and the string `"nan"`.
     ValueError
-        If the two missing labels are not equal.
+        If the two missing labels are of one kind but are not equal.
     """
-    if not is_unlabeled([missing_label1], missing_label=missing_label2)[0]:
-        raise ValueError(
-            f"missing_label1={missing_label1} and "
-            f"missing_label2={missing_label2} must be equal."
-        )
+    _check_missing_label_value(missing_label1)
+    _check_missing_label_value(missing_label2)
+    if _matches_missing_label(missing_label1, missing_label2):
+        return
+    message = (
+        f"missing_label1={missing_label1} and "
+        f"missing_label2={missing_label2} must be equal."
+    )
+    kind1 = _missing_label_kind(missing_label1)
+    kind2 = _missing_label_kind(missing_label2)
+    if kind1 is not None and kind2 is not None and kind1 != kind2:
+        raise TypeError(message)
+    raise ValueError(message)

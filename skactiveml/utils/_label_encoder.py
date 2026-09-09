@@ -4,8 +4,22 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from ._label import MISSING_LABEL, is_labeled, check_missing_label
-from ._validation import check_classifier_params, _has_nested_classes
+from ._label import (
+    MISSING_LABEL,
+    is_labeled,
+    check_missing_label,
+)
+from ._label_dtype import (
+    _as_class_vocabulary_array,
+    _as_label_array,
+    _check_compatible_kinds,
+    _lossless_decode_dtype,
+)
+from ._validation import (
+    check_classifier_params,
+    check_type,
+    _has_nested_classes,
+)
 
 
 class ExtLabelEncoder(BaseEstimator):
@@ -53,7 +67,7 @@ class ExtLabelEncoder(BaseEstimator):
             Returns an instance of `ExtLabelEncoder`.
         """
         y = check_array(
-            y,
+            _as_label_array(y),
             ensure_2d=False,
             ensure_all_finite=False,
             ensure_min_samples=0,
@@ -70,15 +84,7 @@ class ExtLabelEncoder(BaseEstimator):
                 "Nested `classes` require `target_type='multi-label'`, and "
                 "multi-label encoding requires nested `classes`."
             )
-        if y.size > 0:
-            # An empty `y` carries no dtype evidence: NumPy defaults it to
-            # `float64`, which would reject a string
-            # `missing_label`.
-            check_missing_label(
-                missing_label=self.missing_label, target_type=y.dtype
-            )
-        else:
-            check_missing_label(missing_label=self.missing_label)
+        check_missing_label(missing_label=self.missing_label)
         check_classifier_params(
             classes=self.classes, missing_label=self.missing_label
         )
@@ -103,28 +109,44 @@ class ExtLabelEncoder(BaseEstimator):
             self.n_labels_ = n_labels
             self._le = []
             self.classes_ = []
-            self._dtype = []
             for t, cls_t in enumerate(classes_outer):
-                cls_arr = np.asarray(list(cls_t))
+                cls_arr = _as_class_vocabulary_array(
+                    cls_t, name=f"classes[{t}]"
+                )
                 le = LabelEncoder()
                 le.fit(cls_arr)
                 self._le.append(le)
                 self.classes_.append(le.classes_)
-                self._dtype.append(le.classes_.dtype)
-            self._dtype.append(np.asarray(self.missing_label).dtype)
-            self._dtype = np.result_type(*self._dtype)
+            self._dtype = _lossless_decode_dtype(
+                self.classes_, self.missing_label
+            )
             return self
 
+        # `y` is the evidence the label contract is checked against, whether
+        # or not the class vocabulary is inferred from it. An empty `y`
+        # carries none, because NumPy defaults it to `float64`, which would
+        # reject a string `missing_label`; the label helpers accept it.
+        is_lbld = is_labeled(y, missing_label=self.missing_label)
+        if self.classes is None and not is_lbld.any():
+            raise ValueError(
+                "No class label is observed and `classes` is not defined."
+            )
+        if self.classes is not None:
+            # The wrapped `LabelEncoder` would report a string label beside
+            # numeric classes as an unparsable integer rather than as the
+            # incompatible label kind it is.
+            _check_compatible_kinds(y[is_lbld], self.classes, name="classes")
         self._le = LabelEncoder()
-        if self.classes is None:
-            is_lbld = is_labeled(y, missing_label=self.missing_label)
-            self._dtype = np.append(y, self.missing_label).dtype
-            self._le.fit(y[is_lbld])
-        else:
-            self._dtype = np.append(self.classes, self.missing_label).dtype
-            self._le.fit(self.classes)
-            self.classes_ = self._le.classes_
+        classes = (
+            _as_class_vocabulary_array(self.classes)
+            if self.classes is not None
+            else y[is_lbld]
+        )
+        self._le.fit(classes)
         self.classes_ = self._le.classes_
+        self._dtype = _lossless_decode_dtype(
+            [self.classes_], self.missing_label
+        )
 
         return self
 
@@ -158,7 +180,7 @@ class ExtLabelEncoder(BaseEstimator):
         """
         check_is_fitted(self, attributes=["classes_"])
         y = check_array(
-            y,
+            _as_label_array(y),
             ensure_2d=False,
             ensure_all_finite=False,
             ensure_min_samples=0,
@@ -189,18 +211,59 @@ class ExtLabelEncoder(BaseEstimator):
             y_enc[is_lbld] = self._le.transform(y[is_lbld].ravel())
         return y_enc
 
-    def inverse_transform(self, y):
+    def inverse_transform(self, y, *, prefer_class_dtype=False):
         """Transform labels back to original encoding.
 
         Parameters
         ----------
         y : numpy array of shape (n_samples,) or (n_samples, n_outputs)
             Encoded class labels.
+        prefer_class_dtype : bool, default=False
+            If `True`, decode fully observed targets directly into the class
+            dtype (a lossless common vocabulary dtype for multi-label targets,
+            using `object` if no common numeric dtype preserves the values).
+            Targets containing missing entries still use a lossless dtype
+            accommodating the missing label. If `False`, always use that
+            missing-capable dtype, preserving the default behavior.
 
         Returns
         -------
         y_dec : np.ndarray of shape (n_samples,) or (n_samples, n_outputs)
-            Decoded (original) class labels.
+            Decoded (original) class labels. Unless `prefer_class_dtype=True`
+            and no entries are missing, the dtype accommodates the class
+            vocabulary and missing label without losing values. It is
+            `object` if their ordinary common dtype would lose information.
+        """
+        check_type(prefer_class_dtype, "prefer_class_dtype", bool, np.bool_)
+        return self._inverse_transform(
+            y, allow_missing=True, prefer_class_dtype=prefer_class_dtype
+        )
+
+    def _inverse_transform(
+        self, y, *, allow_missing, prefer_class_dtype=False
+    ):
+        """Decode into a lossless missing-capable or fully observed dtype.
+
+        With `allow_missing=False`, reject missing codes and allocate directly
+        in the common class dtype, preserving integer prediction identities.
+        Otherwise `prefer_class_dtype` chooses the class dtype only when all
+        entries are observed. All paths share shape and code validation.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Encoded class labels, with `-1` indicating missing entries.
+        allow_missing : bool
+            Whether missing codes are permitted. If `False`, require fully
+            observed targets and use the lossless common class dtype.
+        prefer_class_dtype : bool, default=False
+            Prefer the class-only dtype for fully observed targets when
+            missing codes are permitted.
+
+        Returns
+        -------
+        y_dec : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
+            Original labels in a lossless dtype.
         """
         check_is_fitted(self, attributes=["classes_"])
         y = check_array(
@@ -210,10 +273,6 @@ class ExtLabelEncoder(BaseEstimator):
             ensure_min_samples=0,
             dtype=None,
         )
-        y_dec = np.full_like(
-            y, dtype=self._dtype, fill_value=self.missing_label
-        )
-
         if self.target_type == "multi-label":
             if y.ndim != 2 or y.shape[1] != self.n_labels_:
                 raise ValueError(
@@ -227,6 +286,30 @@ class ExtLabelEncoder(BaseEstimator):
                 missing_label=-1,
                 target_type="multi-label",
             )
+        else:
+            is_lbld = is_labeled(y, missing_label=-1)
+
+        has_missing = not np.all(is_lbld)
+        if not allow_missing and has_missing:
+            raise ValueError(
+                "`y` contains the encoded missing-label value -1; this "
+                "decoding path requires fully observed labels."
+            )
+
+        if allow_missing and (not prefer_class_dtype or has_missing):
+            y_dec = np.full_like(
+                y, dtype=self._dtype, fill_value=self.missing_label
+            )
+        else:
+            classes = (
+                self.classes_
+                if self.target_type == "multi-label"
+                else [self.classes_]
+            )
+            dtype = _lossless_decode_dtype(classes)
+            y_dec = np.empty_like(y, dtype=dtype)
+
+        if self.target_type == "multi-label":
             if is_lbld.any():
                 for t in range(self.n_labels_):
                     y_dec[is_lbld, t] = self._le[t].inverse_transform(
@@ -234,7 +317,6 @@ class ExtLabelEncoder(BaseEstimator):
                     )
             return y_dec
 
-        is_lbld = is_labeled(y, missing_label=-1)
         if is_lbld.any():
             y_dec[is_lbld] = self._le.inverse_transform(y[is_lbld].ravel())
         return y_dec

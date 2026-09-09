@@ -262,6 +262,40 @@ class TestValidation(unittest.TestCase):
             check_classes([iter([0, 1]), [0, 1]])
         self.assertIsNone(check_classes(None))
 
+    def test_check_classes_reports_the_declared_label_family(self):
+        cases = [
+            ([False, True], "bool"),
+            ([0, 1], "int"),
+            ([2**64 - 2, 2**64 - 1], "int"),
+            ([0.0, 1.5], "float"),
+            (["cat", "dog"], "str"),
+            ([["no", "yes"], ["off", "always"]], ("str", "str")),
+        ]
+        for classes, families in cases:
+            with self.subTest(classes=classes):
+                self.assertEqual(check_classes(classes), families)
+
+    def test_check_classes_rejects_values_that_are_no_categories(self):
+        cases = [
+            ([0, 1.5], TypeError, "one label family"),
+            ([False, 2], TypeError, "one label family"),
+            # `True` equals the integer `1`, so the mixture has to be
+            # reported before the duplicate that comparison would suggest.
+            ([True, 1], TypeError, "one label family"),
+            ([0.0, np.inf], ValueError, "infinite value"),
+            ([0.0, np.nan], ValueError, "contains NaN"),
+            ([1, 2**70], ValueError, "64-bit integer dtype"),
+            ([-1, 2**64 - 1], ValueError, "64-bit integer dtype"),
+            ([1 + 2j, 3 + 0j], TypeError, "unsupported scalar label type"),
+            ([b"cat", b"dog"], TypeError, "unsupported scalar label type"),
+        ]
+        for classes, error, message in cases:
+            with self.subTest(classes=classes):
+                with self.assertRaisesRegex(error, message):
+                    check_classes(classes)
+                with self.assertRaisesRegex(error, message):
+                    check_classes([classes, [0, 1]])
+
     def test_private_class_validation_helpers(self):
         self.assertFalse(_has_nested_classes(2))
         self.assertFalse(_has_nested_classes([0, 1]))

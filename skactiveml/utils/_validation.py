@@ -16,9 +16,14 @@ from sklearn.utils.validation import (
 
 from ._label import (
     MISSING_LABEL,
-    _is_nan_missing_label,
     check_missing_label,
-    is_unlabeled,
+)
+from ._label_dtype import (
+    _as_class_vocabulary_array,
+    _check_missing_label_for_family,
+    _is_nan_missing_label,
+    _label_family,
+    _matches_missing_label,
 )
 
 
@@ -173,13 +178,19 @@ def _check_1d_class_list(c, name="classes"):
     name : str, default="classes"
         Name used in error messages.
 
+    Returns
+    -------
+    family : "bool" or "int" or "float" or "str"
+        The label family the vocabulary declares.
+
     Raises
     ------
     TypeError
         If `c` is not iterable, contains unhashable or unsupported label
-        types, or mixes numeric and string labels.
+        types, or mixes label families.
     ValueError
-        If `c` is empty, not one-dimensional, or contains duplicate labels.
+        If `c` is empty, not one-dimensional, contains duplicate labels, or
+        contains a value that is no category, e.g. a nonfinite number.
     """
     if not _is_nonstring_iterable(c):
         raise TypeError(f"`{name}` must be iterable. Got {type(c)}.")
@@ -193,39 +204,36 @@ def _check_1d_class_list(c, name="classes"):
     if arr.size == 0:
         raise ValueError(f"`{name}` must be non-empty.")
 
-    # Ensure scalars are hashable and unique.
+    # NaN compares unequal to itself, so repeated NaNs are counted rather
+    # than detected as duplicate set entries.
+    values = arr.tolist()
+    nan_count = sum(
+        isinstance(value, numbers.Number) and bool(value != value)
+        for value in values
+    )
+    if nan_count > 1:
+        raise ValueError(f"Duplicate entries in `{name}`.")
+
+    # Ensure scalars are hashable, which detecting duplicates relies on.
     try:
-        values = arr.tolist()
-        nan_count = sum(
-            isinstance(value, numbers.Number) and bool(value != value)
-            for value in values
-        )
-        if len(set(values)) != arr.size or nan_count > 1:
-            raise ValueError(f"Duplicate entries in `{name}`.")
+        n_unique = len(set(values))
     except TypeError as e:
         raise TypeError(
             f"`{name}` must contain hashable scalar labels "
             f"(strings or numbers)."
         ) from e
 
-    # Enforce "uniformly strings or numbers"
-    kinds = set()
-    for v in arr.tolist():
-        if isinstance(v, (str, np.str_)):
-            kinds.add("str")
-        elif isinstance(v, (numbers.Number, np.number)):
-            kinds.add("num")
-        else:
-            raise TypeError(
-                f"`{name}` must contain only strings or numbers. "
-                f"Got element {v!r} of type {type(v)}."
-            )
+    # A declared vocabulary is short and its exact types define the dtype of
+    # predictions, so it is checked value by value rather than through the
+    # dtype its values would be converted to. The family is reported before
+    # any duplicate, because values of different families compare equal
+    # across them: `True` is no duplicate of the integer class `1` but a
+    # mixture with it.
+    family = _label_family(arr, name=name)
 
-    if len(kinds) != 1:
-        raise TypeError(
-            f"`{name}` must be uniformly strings or numbers. "
-            f"Got mixture: {sorted(kinds)}."
-        )
+    if n_unique != arr.size:
+        raise ValueError(f"Duplicate entries in `{name}`.")
+    return family
 
 
 def _check_probas_are_valid(probas, is_multilabel, hint=""):
@@ -369,8 +377,84 @@ def _canonicalize_multilabel_probas(
     return probas
 
 
+def _check_homogeneous_output_dtypes(classes):
+    """Check that every output declares classes of one dtype kind.
+
+    One sample's outputs are held by one row of a single array, so they cannot
+    carry different dtypes: the array coerces them to a common one, and the
+    labels a sample is then described by are no longer the labels that were
+    declared, e.g. the integer `0` of one output becomes the string `'0'` when
+    another output declares strings. Prediction and probability columns then
+    disagree about the vocabulary of the same output.
+
+    Only the dtype kind has to agree, so outputs may declare different
+    vocabularies and different widths of the same kind, e.g. `("no", "yes")`
+    beside `("off", "always")`. Signed and unsigned integers are different
+    kinds, however, and are therefore rejected beside each other. The kind is
+    read from the class labels themselves rather than from their container, so
+    that an object-valued array of strings agrees with a list of the same
+    strings. Mixing kinds *within* one vocabulary is rejected by
+    `_check_1d_class_list`.
+
+    Parameters
+    ----------
+    classes : sequence of array-like
+        One class vocabulary per output.
+
+    Raises
+    ------
+    ValueError
+        If the outputs do not share one dtype kind. The message names every
+        output and the dtype it declares, grouped by kind so that a single
+        deviating output stands out.
+    """
+    dtypes = [
+        _as_class_vocabulary_array(
+            classes_i, name=f"classes[{output_idx}]"
+        ).dtype
+        for output_idx, classes_i in enumerate(classes)
+    ]
+
+    outputs_per_kind = {}
+    for output_idx, dtype in enumerate(dtypes):
+        outputs_per_kind.setdefault(dtype.kind, []).append((output_idx, dtype))
+    if len(outputs_per_kind) <= 1:
+        return
+
+    # Binary vocabularies describe label outputs, as target resolution reads
+    # them, whereas wider ones describe recognized multi-output semantics.
+    outputs = (
+        "label outputs"
+        if all(len(classes_i) == 2 for classes_i in classes)
+        else "outputs"
+    )
+    described = " and ".join(
+        _describe_dtype_group(group) for group in outputs_per_kind.values()
+    )
+    raise ValueError(
+        f"Class vocabularies must declare one dtype across all {outputs}, "
+        f"because one array holds every output. Got {described}."
+    )
+
+
+def _describe_dtype_group(group):
+    """Describe the outputs sharing one dtype kind for an error message."""
+    output_indices = [output_idx for output_idx, _ in group]
+    dtype_names = sorted({str(dtype) for _, dtype in group})
+    quoted = ", ".join(repr(name) for name in dtype_names)
+    label = "dtype" if len(dtype_names) == 1 else "dtypes"
+    return f"{label} {quoted} for {_describe_outputs(output_indices)}"
+
+
+def _describe_outputs(output_indices):
+    """Name one or more outputs for an error message."""
+    if len(output_indices) == 1:
+        return f"output {output_indices[0]}"
+    return "outputs " + ", ".join(str(idx) for idx in output_indices)
+
+
 def check_classes(classes):
-    """Check whether class labels are uniformly strings or numbers.
+    """Check whether class labels follow the label and missing-value contract.
 
     Parameters
     ----------
@@ -378,19 +462,29 @@ def check_classes(classes):
             default=None
         The classes labels (single output setting), or a list of arrays of
         class labels (multioutput setting).
+
+    Returns
+    -------
+    families : str or tuple of str or None
+        The label family each vocabulary declares, i.e. `"bool"`, `"int"`,
+        `"float"`, or `"str"`. One family per output for a multioutput
+        setting, and `None` if `classes` is `None`.
     """
     if classes is None:
-        return
+        return None
 
     if not _is_nonstring_iterable(classes):
         raise TypeError(f"`classes` is not iterable. Got {type(classes)}.")
 
     if _has_nested_classes(classes):
         outer = list(classes)
-        for i, c in enumerate(outer):
+        families = tuple(
             _check_1d_class_list(c, name=f"classes[{i}]")
-    else:
-        _check_1d_class_list(classes, name="classes")
+            for i, c in enumerate(outer)
+        )
+        _check_homogeneous_output_dtypes(outer)
+        return families
+    return _check_1d_class_list(classes, name="classes")
 
 
 def check_classifier_params(classes, missing_label, cost_matrix=None):
@@ -422,8 +516,8 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
             )
         return
 
-    # Validates structure + duplicates + type-uniformity.
-    check_classes(classes)
+    # Validates structure, duplicates, and label families.
+    families = check_classes(classes)
 
     # Check whether `classes` contains one vocabulary per target label.
     has_nested_classes = _has_nested_classes(classes)
@@ -436,34 +530,49 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
                 "per-output vocabularies."
             )
         outer = list(classes)
-        # Missing_label type check and ensure missing_label not in any task's
-        # classes.
         for i, c in enumerate(outer):
-            c_arr = np.asarray(list(c))
-            check_missing_label(
-                missing_label, target_type=c_arr.dtype, name=f"classes[{i}]"
+            _check_vocabulary_missing_label(
+                c, missing_label, families[i], f"classes[{i}]"
             )
-            n_unlabeled = is_unlabeled(
-                y=c_arr, missing_label=missing_label
-            ).sum()
-            if n_unlabeled > 0:
-                raise ValueError(
-                    f"`classes[{i}]={list(c)}` contains "
-                    f"`missing_label={missing_label}`."
-                )
     else:
-        c_arr = np.asarray(list(classes))
-        check_missing_label(
-            missing_label, target_type=c_arr.dtype, name="classes"
+        _check_vocabulary_missing_label(
+            classes, missing_label, families, "classes"
         )
-        n_unlabeled = is_unlabeled(y=c_arr, missing_label=missing_label).sum()
-        if n_unlabeled > 0:
-            raise ValueError(
-                f"`classes={list(classes)}` contains "
-                f"`missing_label={missing_label}`."
-            )
         if cost_matrix is not None:
-            check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(c_arr))
+            check_cost_matrix(
+                cost_matrix=cost_matrix, n_classes=len(list(classes))
+            )
+
+
+def _check_vocabulary_missing_label(classes, missing_label, family, name):
+    """Check that a missing label fits a vocabulary without being a class.
+
+    Parameters
+    ----------
+    classes : array-like of shape (n_classes,)
+        One output's class vocabulary.
+    missing_label : scalar or string or np.nan or None
+        Value to represent a missing label.
+    family : "bool" or "int" or "float" or "str"
+        The label family `classes` declares.
+    name : str
+        The name of the vocabulary, used in error messages.
+
+    Raises
+    ------
+    TypeError
+        If the missing label belongs to another label family than the
+        classes.
+    ValueError
+        If the missing label is one of the classes, so that one value would
+        mean both a known category and an unknown label.
+    """
+    _check_missing_label_for_family(missing_label, family, name=name)
+    values = list(classes)
+    if any(_matches_missing_label(value, missing_label) for value in values):
+        raise ValueError(
+            f"`{name}={values}` contains `missing_label={missing_label}`."
+        )
 
 
 def check_class_prior(class_prior, n_classes):

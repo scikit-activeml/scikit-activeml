@@ -17,9 +17,9 @@ from ..base import SkactivemlClassifier, SkactivemlRegressor
 from ..utils import (
     check_equal_missing_label,
     check_type,
-    is_unlabeled,
     resolve_target_spec,
 )
+from ..utils._label import _check_labels
 from ..utils._target import (
     _class_vocabulary_key,
     _resolve_task_agnostic_target_type,
@@ -113,10 +113,11 @@ def _resolve_estimator_target_spec(
     _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )
-    is_unlabeled(
+    _check_labels(
         y,
-        missing_label=strategy.missing_label,
+        strategy.missing_label,
         target_type=target_spec.target_type,
+        task=target_spec.task,
     )
     return target_spec
 
