@@ -123,7 +123,9 @@ class IntervalEstimationAnnotModel(BaseEstimator):
             The fitted annotator model.
         """
         y_array = np.asarray(y)
-        check_missing_label(self.missing_label, target_type=y_array.dtype)
+        check_missing_label(
+            self.missing_label, target_type=y_array.dtype, name="y"
+        )
         target_spec = resolve_target_spec(
             y,
             task="classification",

@@ -16,6 +16,7 @@ from ..base import (
     ProbabilisticRegressor,
 )
 from ..classifier import ParzenWindowClassifier
+from ..utils._label_dtype import _holds_missing_label
 from ..utils import (
     MISSING_LABEL,
     is_labeled,
@@ -184,13 +185,24 @@ class IndexClassifierWrapper:
         check_type(self.use_speed_up, "use_speed_up", bool)
 
         # Check missing label
-        check_missing_label(self.missing_label)
+        check_missing_label(
+            self.missing_label, target_type=self.y.dtype, name="y"
+        )
         self.missing_label_ = self.missing_label
-        if not np.issubdtype(type(self.missing_label), self.y.dtype):
+        # Labels handed to `fit` and `partial_fit` are cast to the dtype of
+        # `self.y`, so a numeric one must be able to hold the missing label:
+        # integer labels beside `missing_label=np.nan` could not, and the
+        # missing label would silently become another label. Fixed-width
+        # Unicode arrays can truncate a longer missing marker in the same
+        # way, so they are checked as well.
+        if self.y.dtype.kind in "biufU" and not _holds_missing_label(
+            self.y, self.missing_label
+        ):
             raise TypeError(
-                f"`missing_label` has type {type(missing_label)}, "
-                f"which is not compatible with {self.y.dtype} as the "
-                f"type of `y`."
+                f"`missing_label={self.missing_label}` is not representable "
+                f"in the dtype '{self.y.dtype}' of `y`. Pass `y` in a dtype "
+                "holding both the labels and the missing label, e.g. "
+                "`float` for integer labels beside `np.nan`, or `object`."
             )
         check_equal_missing_label(self.clf.missing_label, self.missing_label_)
 
@@ -818,9 +830,16 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     """
 
     X = check_array(X, input_name="`X`")
+    # Keep the labels in their own dtype: converting them to a numeric one
+    # would turn a `missing_label=None` into a NaN and thereby into an
+    # unmarked missing label.
     y = column_or_1d(
         check_array(
-            y, ensure_all_finite=False, ensure_2d=False, input_name="`y`"
+            y,
+            ensure_all_finite=False,
+            ensure_2d=False,
+            dtype=None,
+            input_name="`y`",
         )
     )
     check_consistent_length(X, y)

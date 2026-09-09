@@ -14,7 +14,7 @@ from sklearn.utils.validation import (
 from ...base import SkactivemlClassifier
 from ...utils import (
     MISSING_LABEL,
-    is_labeled,
+    check_equal_missing_label,
     compute_vote_vectors,
     check_n_features,
 )
@@ -248,10 +248,11 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
                 f"as parameter."
             )
             try:
-                if is_labeled([self.missing_label], est.missing_label)[0]:
-                    raise TypeError(error_msg)
-            except TypeError:
-                raise TypeError(error_msg)
+                check_equal_missing_label(
+                    est.missing_label, self.missing_label
+                )
+            except (TypeError, ValueError) as error:
+                raise TypeError(error_msg) from error
             error_msg = (
                 f"{est} of 'estimators' has 'classes={est.classes}' "
                 f"as attribute being unequal to the given 'classes="

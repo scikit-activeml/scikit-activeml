@@ -24,6 +24,7 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
+from ..utils._label_dtype import _as_label_array
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
@@ -1090,7 +1091,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self._fall_back_to_label_prior("there is no labeled data")
             return self
 
-        y_train_inv = self._decode_labeled_targets(y_train)
+        y_train_inv = self._le.inverse_transform(
+            y_train, prefer_class_dtype=True
+        )
         sample_weight_train = (
             None if sample_weight is None else sample_weight[is_included]
         )
@@ -1130,30 +1133,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         self.is_fitted_ = True
         return self
-
-    def _decode_labeled_targets(self, y_train):
-        """Decode a labeled training subset into its declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, e.g., `object` for `missing_label=None`. A labeled
-        training subset never carries `missing_label`, so its decoded labels
-        are narrowed back to the dtype of the declared classes. Without this
-        narrowing, a wrapped estimator rejects an `object` target that only
-        contains ordinary class labels.
-
-        Parameters
-        ----------
-        y_train : numpy.ndarray of shape (n_labeled,) or \
-                (n_labeled, n_outputs)
-            The encoded class labels of the labeled training subset.
-
-        Returns
-        -------
-        y_train_inv : numpy.ndarray of shape (n_labeled,) or \
-                (n_labeled, n_outputs)
-            The decoded class labels passed on to the wrapped estimator.
-        """
-        return self._decode_class_labels(y_train)
 
     def _has_degenerate_training_classes(self, y_train):
         """Check whether an encoded training subset lacks two classes.
@@ -2126,7 +2105,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         }
 
         # Check input parameters.
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         y = column_or_1d(y, warn=True)
         if len(y) == 0:
             check_X_dict["ensure_2d"] = False

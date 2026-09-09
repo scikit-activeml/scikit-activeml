@@ -981,6 +981,29 @@ class SkactivemlClassifierTest(unittest.TestCase):
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
         self.assertEqual(extra_pred.dtype, np.float32)
 
+    def test_class_label_decoder_rejects_missing_prediction_codes(self):
+        # Predictions never carry a missing label, so an encoded `-1` is a
+        # caller error rather than an unlabeled sample. Training targets
+        # that do include missing entries use the encoder's public,
+        # missing-capable inverse transform instead.
+        X = np.arange(4).reshape(2, 2)
+        cases = [
+            ([0, 1], [0, 1], [0, -1], "auto"),
+            (
+                [[0, 1], [0, 1]],
+                [[0, 0], [1, 1]],
+                [[0, 0], [-1, -1]],
+                "multi-label",
+            ),
+        ]
+        for classes, y, codes, target_type in cases:
+            with self.subTest(classes=classes):
+                clf = DummySkactivemlClassifier(
+                    classes=classes, target_type=target_type
+                ).fit(X, y)
+                with self.assertRaisesRegex(ValueError, "`y`.*encoded.*-1"):
+                    clf._decode_class_labels(codes)
+
     def test_score_multilabel(self):
         X = np.arange(4).reshape(2, 2)
         y = np.array([[1, 1], [1, 1]])

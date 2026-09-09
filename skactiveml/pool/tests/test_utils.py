@@ -95,17 +95,43 @@ class TestIndexClassifierWrapper(unittest.TestCase):
             classes=np.unique(y), missing_label=MISSING_LABEL
         )
         y_known = np.full(len(y), MISSING_LABEL)
-        self.assertRaises(
-            TypeError,
-            IndexClassifierWrapper,
-            clf=clf,
-            X=X,
-            y=y,
-            missing_label=MISSING_LABEL,
-        )
+        # Labels handed to `fit` are cast to the dtype of `y`, so integer
+        # labels could not hold `np.nan` and would turn it into a class.
+        with self.assertRaisesRegex(TypeError, "is not representable"):
+            IndexClassifierWrapper(
+                clf=clf, X=X, y=y, missing_label=MISSING_LABEL
+            )
         y = y.astype(float)
         id_clf = IndexClassifierWrapper(clf, X, y, missing_label=MISSING_LABEL)
         id_clf.fit(np.arange(len(X)), y_known, set_base_clf=True)
+
+    def test_string_labels_accept_a_representable_missing_label(self):
+        X = np.linspace(0, 1, 3).reshape(-1, 1)
+        y = np.array(["cat", "dog", "unknown"])
+        clf = ParzenWindowClassifier(
+            classes=["cat", "dog"], missing_label="unknown"
+        )
+
+        id_clf = IndexClassifierWrapper(clf, X, y, missing_label="unknown")
+        id_clf.fit(np.arange(3))
+
+        np.testing.assert_array_equal(
+            is_unlabeled(id_clf.y, missing_label="unknown"),
+            [False, False, True],
+        )
+        np.testing.assert_array_equal(
+            id_clf.predict(np.arange(2)), ["cat", "dog"]
+        )
+
+    def test_string_labels_reject_a_truncated_missing_label(self):
+        X = np.linspace(0, 1, 2).reshape(-1, 1)
+        y = np.array(["cat", "dog"])
+        clf = ParzenWindowClassifier(
+            classes=["cat", "dog"], missing_label="unknown"
+        )
+
+        with self.assertRaisesRegex(TypeError, "is not representable"):
+            IndexClassifierWrapper(clf, X, y, missing_label="unknown")
 
     def test_init_param_X(self):
         self.assertTrue(hasattr(self.iclf(), "X"))
@@ -880,6 +906,42 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(y_new[2], 4)
 
         self.assertRaises(ValueError, _update_X_y, self.X, self.y, self.y_pot)
+
+    def test_update_X_y_preserves_the_missing_label(self):
+        # Converting the labels to a numeric dtype would turn a
+        # `missing_label=None` into a NaN, i.e. into an unmarked missing
+        # label that every regressor then rejects.
+        y = np.array([0, 1.5, None, None], dtype=object)
+        X = np.arange(4 * 2, dtype=float).reshape(4, 2)
+
+        _, y_new = _update_X_y(X, y, 2.5, idx_update=2)
+
+        self.assertEqual(y_new.dtype, np.dtype(object))
+        self.assertEqual(y_new.tolist(), [0, 1.5, 2.5, None])
+
+        _, y_new = _update_X_y(X, y, 2.5, X_update=X[0])
+
+        self.assertEqual(y_new.tolist(), [0, 1.5, None, None, 2.5])
+
+    def test_update_reg_accepts_regression_missing_labels(self):
+        # Every missing label of the contract survives the simulated labeling a
+        # regression strategy performs before refitting.
+        X = np.linspace(0.0, 1.0, 4).reshape(-1, 1)
+        for missing in (np.nan, None, -999):
+            with self.subTest(missing=missing):
+                y = np.array([0, 1.5, missing, missing], dtype=object)
+                reg = SklearnRegressor(
+                    LinearRegression(), missing_label=missing
+                )
+                reg_new = _update_reg(
+                    reg,
+                    X,
+                    y,
+                    y_update=2.5,
+                    idx_update=2,
+                    mapping=np.arange(len(X)),
+                )
+                self.assertEqual(len(reg_new.predict(X)), len(X))
 
     def test_update_reg(self):
         self.assertRaises(

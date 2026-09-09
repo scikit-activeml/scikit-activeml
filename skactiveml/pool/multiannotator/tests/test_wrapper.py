@@ -181,7 +181,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         for component in (wrapper, strategy):
             assert_no_query_state(self, component)
 
-    def test_prefitted_estimator_marker_rejection_precedes_query_state(self):
+    def test_prefitted_estimator_missing_label_rejection_precedes_query_state(
+        self,
+    ):
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
             classes=self.classes,

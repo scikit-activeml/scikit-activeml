@@ -139,7 +139,9 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertEqual(reg.target_spec_.annotation_type, "single-annotator")
         self.assertIsNone(reg.target_spec_.classes)
 
-    def test_prefitted_estimator_marker_does_not_skip_wrapper_contract(self):
+    def test_prefitted_estimator_missing_label_does_not_skip_wrapper_contract(
+        self,
+    ):
         X = np.arange(8, dtype=float).reshape(-1, 1)
         y = np.arange(8, dtype=float)
         estimator = LinearRegression().fit(X, y)
@@ -462,7 +464,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
                     "y": ["a", "b", "c", "d"],
                 },
                 "error": TypeError,
-                "message": "is not compatible to the type",
+                "message": "numerical labels",
             },
         }
 
@@ -515,7 +517,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             reg,
             lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
             TypeError,
-            "is not compatible to the type",
+            "numerical labels",
         )
 
         self.assertEqual(reg.n_features_in_, 1)
@@ -536,7 +538,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             reg,
             lambda: reg.partial_fit(X, ["a", "b", "c", "d"]),
             TypeError,
-            "is not compatible to the type",
+            "numerical labels",
         )
 
         np.testing.assert_allclose(reg.predict(X), expected_predictions)
@@ -821,7 +823,7 @@ class TestSklearnNormalRegressor(
             reg,
             lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
             TypeError,
-            "is not compatible to the type",
+            "numerical labels",
         )
 
         self.assertEqual(reg.n_features_in_, 1)

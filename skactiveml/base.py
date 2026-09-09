@@ -19,6 +19,7 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError, _ExhaustedCandidatePool
+from .utils._label_dtype import _as_label_array, _lossless_decode_dtype
 from .utils._target import (
     _check_target_capability,
     _has_no_class_evidence,
@@ -303,12 +304,15 @@ class PoolQueryStrategy(QueryStrategy):
 
         # Check labels
         y = check_array(
-            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
+            _as_label_array(y),
+            ensure_2d=False,
+            ensure_all_finite="allow-nan",
+            dtype=None,
         )
         check_consistent_length(X, y)
 
         # Check missing_label
-        check_missing_label(self.missing_label, target_type=y.dtype)
+        check_missing_label(self.missing_label, target_type=y.dtype, name="y")
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
@@ -1510,7 +1514,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         """Initialize resolved class metadata without fitting model state."""
         effective_classes = self.classes if classes is None else classes
         annotation_type = getattr(self, "_annotation_type", "single-annotator")
-        resolution_y = np.asarray(y)
+        resolution_y = _as_label_array(y)
         if annotation_type == "multi-annotator" and resolution_y.ndim == 1:
             resolution_y = resolution_y.reshape(-1, 1)
         target_spec = self._resolve_target_spec(
@@ -1554,19 +1558,17 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             The dtype of the declared class labels.
         """
         if self.target_spec_.target_type == "multi-label":
-            return np.result_type(*[c.dtype for c in self.classes_])
-        return self.classes_.dtype
+            return _lossless_decode_dtype(self.classes_)
+        return _lossless_decode_dtype([self.classes_])
 
     def _decode_class_labels(self, y_enc):
         """Decode encoded class labels into the declared class dtype.
 
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, e.g., `float64` for integer classes and
-        `missing_label=np.nan`. Encoded predictions never carry
-        `missing_label`, so their decoded labels are narrowed back to the
-        dtype of the declared classes. Without this narrowing, predictions
-        are no longer the labels that were declared and cannot be used
-        where those labels are expected, e.g., as indices.
+        Predictions never carry missing labels. Decode directly into the
+        declared class dtype so that large integer identifiers never pass
+        through a lossy floating-point representation. Missing codes are
+        rejected; training targets that include missing entries must use
+        the encoder's public, missing-capable inverse transform instead.
 
         Parameters
         ----------
@@ -1580,9 +1582,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 (n_samples, n_outputs)
             The decoded class labels in the declared class dtype.
         """
-        return self._le.inverse_transform(y_enc).astype(
-            self._class_label_dtype(), copy=False
-        )
+        return self._le._inverse_transform(y_enc, allow_missing=False)
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -1727,7 +1727,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         )
 
         # Check input parameters.
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         structured_target = (
             target_spec.target_type == "multi-label"
             or target_spec.annotation_type == "multi-annotator"
@@ -2182,7 +2182,10 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        y = check_array(y, **check_y_dict)
+        # The labels were already checked against the label contract
+        # while their target specification was resolved. `_as_label_array`
+        # keeps a sequence of large integer identifiers lossless here, too.
+        y = check_array(_as_label_array(y), **check_y_dict)
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
         else:

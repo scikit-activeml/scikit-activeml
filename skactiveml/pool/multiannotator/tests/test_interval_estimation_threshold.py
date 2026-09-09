@@ -41,6 +41,18 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
         ie_model = IntervalEstimationAnnotModel(classes=[0])
         self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
+    def test_fit_rejects_nested_label_entries(self):
+        y = np.empty((3, 1), dtype=object)
+        y[:, 0] = [0, 1, 0]
+        y[0, 0] = np.array([0, 1])
+        for missing in (np.nan, -1, None):
+            with self.subTest(missing=missing):
+                model = IntervalEstimationAnnotModel(
+                    classes=[0, 1], missing_label=missing
+                )
+                with self.assertRaisesRegex(TypeError, "scalar"):
+                    model.fit([[0.0], [1.0], [2.0]], y)
+
     def test_init_param_missing_label(self):
         ie_model = IntervalEstimationAnnotModel(missing_label=["test"])
         self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)

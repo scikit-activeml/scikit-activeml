@@ -17,8 +17,8 @@ from ..base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
 )
+from ..utils._label import _observed_numerical_labels
 from ..utils import (
-    is_labeled,
     match_signature,
     check_n_features,
     check_scalar,
@@ -109,11 +109,16 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         scikit-learn regressor.
     include_unlabeled_samples : bool, default=False
         - If `False`, only labeled samples are passed to the `fit` method of
-          the `estimator`.
+          the `estimator`. Their labels are converted to `float64`, so that
+          the `estimator` performs its arithmetic on ordinary floating-point
+          values however `y` stores them, e.g. as integers or as an object
+          array beside `missing_label=None`.
         - If `True`, all samples including the unlabeled ones are passed to
           the `fit` method of the `estimator`. Ensure that your `estimator`
           is able to handle unlabeled samples marked by `missing_label`.
           Otherwise, `missing_label` is interpreted as a regular target value.
+          `y` is passed on unchanged in this case, because only its raw
+          representation holds the missing label.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
@@ -325,13 +330,18 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             target_spec=target_spec,
         )
 
-        is_lbld = is_labeled(y, missing_label=self.missing_label_)
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
+        )
         if self.include_unlabeled_samples:
+            # The wrapped estimator is documented to handle the missing label
+            # itself, so its raw representation is passed on unchanged.
             is_included = np.full_like(y, True, dtype=bool)
+            y_train = y[is_included]
         else:
             is_included = is_lbld
+            y_train = y_observed
         X_train = X[is_included]
-        y_train = y[is_included]
         if (
             fit_function == "partial_fit"
             and len(X_train) == 0
@@ -345,8 +355,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         if sample_weight is not None:
             estimator_params["sample_weight"] = sample_weight[is_included]
 
-        self._label_mean = np.mean(y[is_lbld]) if np.sum(is_lbld) > 0 else 0
-        self._label_std = np.std(y[is_lbld]) if np.sum(is_lbld) > 1 else 1
+        self._label_mean = np.mean(y_observed) if len(y_observed) > 0 else 0
+        self._label_std = np.std(y_observed) if len(y_observed) > 1 else 1
         if fit_function != "partial_fit" or not hasattr(self, "estimator_"):
             self.estimator_ = deepcopy(self.estimator)
         try:
@@ -841,12 +851,15 @@ if successful_skorch_torch_import:
             always cast to  `np.float32`.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
-              of the `estimator`.
+              of the `estimator`. Their labels are converted to floating-point
+              values however `y` stores them, e.g. as integers or as an object
+              array beside `missing_label=None`.
             - If `True`, all samples including the unlabeled ones are passed to
               the `fit` method of the `estimator`. Ensure that the `criterion`
               is able to handle unlabeled samples marked by `missing_label`.
               Otherwise, `missing_label` is interpreted as a regular target
-              value.
+              value. The missing label is converted along with the labels,
+              so `missing_label=None` reaches the `criterion` as NaN.
         missing_label : scalar or string or np.nan or None, default=np.nan
             Value to represent a missing label.
         random_state : int or RandomState instance or None, default=None
@@ -1119,13 +1132,20 @@ if successful_skorch_torch_import:
                 Training labels or `None` if none exist.
             """
             X_train, y_train = None, None
+            is_lbld, y_observed = _observed_numerical_labels(
+                y, self.missing_label_
+            )
             if self.include_unlabeled_samples:
+                # The wrapped network is documented to handle the missing label
+                # itself, so its raw representation is passed on unchanged.
                 is_included = np.full_like(y, fill_value=True, dtype=bool)
+                y_included = y[is_included]
             else:
-                is_included = is_labeled(y, missing_label=self.missing_label_)
+                is_included = is_lbld
+                y_included = y_observed
             if np.sum(is_included) > 0:
                 X_train = X[is_included]
-                y_train = y[is_included]
-            if y_train is not None:
-                y_train = y_train.astype(np.float32, copy=True).reshape(-1, 1)
+                y_train = np.asarray(y_included, dtype=np.float32).reshape(
+                    -1, 1
+                )
             return X_train, y_train

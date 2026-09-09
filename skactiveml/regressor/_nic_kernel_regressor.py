@@ -6,12 +6,12 @@ from sklearn.utils.validation import check_is_fitted
 
 from skactiveml.base import ProbabilisticRegressor
 from skactiveml.utils import (
-    is_labeled,
     MISSING_LABEL,
     check_scalar,
     check_type,
     check_n_features,
 )
+from skactiveml.utils._label import _observed_numerical_labels
 
 
 class NICKernelRegressor(ProbabilisticRegressor):
@@ -94,7 +94,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
         X, y, sample_weight = self._validate_data(
             X, y, sample_weight, reset=self.metric != "precomputed"
         )
-        is_lbld = is_labeled(y, missing_label=self.missing_label_)
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
+        )
         for value, name in [
             (self.kappa_0, "self.kappa_0"),
             (self.nu_0, "self.nu_0"),
@@ -104,7 +106,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
         check_scalar(self.mu_0, "self.mu_0", (int, float))
 
         self.X_ = X[is_lbld]
-        self.y_ = y[is_lbld]
+        self.y_ = y_observed
 
         self.prior_params_ = (
             self.kappa_0,

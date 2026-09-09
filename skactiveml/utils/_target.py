@@ -6,14 +6,17 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.validation import check_array
 
-from ._label import MISSING_LABEL, is_unlabeled
+from ._label import MISSING_LABEL, _check_labels, is_unlabeled
+from ._label_dtype import (
+    _as_class_vocabulary_array,
+    _as_label_array,
+    _check_compatible_kinds,
+)
 from ._validation import (
     _has_nested_classes,
     check_classes,
     check_classifier_params,
 )
-
-_NAN_CLASS_HASH_KEY = object()
 
 
 @dataclass(frozen=True, eq=False)
@@ -114,8 +117,8 @@ class TargetSpec:
 def _class_vocabulary_key(classes):
     """Return a comparable key for a declared class vocabulary.
 
-    Unlike `_class_vocabulary_hash_key`, this helper also accepts the not yet
-    normalized vocabularies that estimators expose through `classes` or
+    Unlike `_class_vocabulary_identity_key`, this helper also accepts the not
+    yet normalized vocabularies that estimators expose through `classes` or
     `classes_`, i.e., arbitrarily nested sequences and arrays. The classes of
     one output are normalized as `TargetSpec` normalizes them, so that the same
     vocabulary declared in a different order yields the same key.
@@ -135,26 +138,14 @@ def _class_vocabulary_key(classes):
     if _has_nested_classes(classes):
         # The order of the label outputs is meaningful, whereas the order of
         # the classes within one output is not.
-        return _class_vocabulary_hash_key(
-            tuple(_sorted_classes(classes_j) for classes_j in classes)
-        )
-    return _class_vocabulary_hash_key(_sorted_classes(classes))
+        return tuple(_sorted_classes(classes_j) for classes_j in classes)
+    return _sorted_classes(classes)
 
 
 def _sorted_classes(classes):
     """Normalize one output's class vocabulary into sorted unique classes."""
+    classes = _as_class_vocabulary_array(classes)
     return tuple(LabelEncoder().fit(classes).classes_)
-
-
-def _class_vocabulary_hash_key(classes):
-    return tuple(
-        (
-            _class_vocabulary_hash_key(value)
-            if isinstance(value, tuple)
-            else _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value
-        )
-        for value in classes
-    )
 
 
 def _class_vocabulary_identity_key(classes):
@@ -170,17 +161,10 @@ def _class_vocabulary_identity_key(classes):
         (
             _class_vocabulary_identity_key(value)
             if isinstance(value, tuple)
-            else (
-                np.asarray(value).dtype.kind,
-                _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value,
-            )
+            else (np.asarray(value).dtype.kind, value)
         )
         for value in classes
     )
-
-
-def _is_nan_class(value):
-    return bool(value != value)
 
 
 def _validate_target_semantics(
@@ -229,8 +213,9 @@ def _check_class_vocabulary_structure(target_type, classes):
 
     Called both with the vocabularies a caller declares and with the resolved
     ones a `TargetSpec` is built from, so that every path reaches the same
-    structural contract. Homogeneity *within* one vocabulary is `check_classes`
-    business and is already established by both callers.
+    structural contract. Label families, both within one vocabulary and
+    across the outputs, are `check_classes` business and are already
+    established by both callers.
     """
     has_nested_classes = _has_nested_classes(classes)
     if target_type == "single-output" and has_nested_classes:
@@ -255,73 +240,7 @@ def _check_class_vocabulary_structure(target_type, classes):
                 "Each multi-label class vocabulary must contain exactly two "
                 "classes."
             )
-        _check_homogeneous_output_dtypes(target_type, classes)
     return has_nested_classes
-
-
-def _check_homogeneous_output_dtypes(target_type, classes):
-    """Check that every output declares classes of one dtype kind.
-
-    One sample's outputs are held by one row of a single array, so they cannot
-    carry different dtypes: the array coerces them to a common one, and the
-    labels a sample is then described by are no longer the labels that were
-    declared, e.g. the integer `0` of one output becomes the string `'0'` when
-    another output declares strings. Prediction and probability columns then
-    disagree about the vocabulary of the same output.
-
-    Only the dtype kind has to agree, so outputs may declare different
-    vocabularies and different widths of the same kind, e.g. `("no", "yes")`
-    beside `("off", "always")`. The kind is read from the class labels
-    themselves rather than from their container, so that an object-valued
-    array of strings agrees with a list of the same strings. Mixing kinds
-    *within* one vocabulary is rejected earlier by `check_classes`.
-
-    Parameters
-    ----------
-    target_type : "multi-label" or "multi-output"
-        The resolved target type naming the outputs in the error message.
-    classes : tuple of array-like
-        One class vocabulary per output.
-
-    Raises
-    ------
-    ValueError
-        If the outputs do not share one dtype kind. The message names every
-        output and the dtype it declares, grouped by kind so that a single
-        deviating output stands out.
-    """
-    dtypes = [np.asarray(list(classes_i)).dtype for classes_i in classes]
-
-    outputs_per_kind = {}
-    for output_idx, dtype in enumerate(dtypes):
-        outputs_per_kind.setdefault(dtype.kind, []).append((output_idx, dtype))
-    if len(outputs_per_kind) <= 1:
-        return
-
-    outputs = "label outputs" if target_type == "multi-label" else "outputs"
-    described = " and ".join(
-        _describe_dtype_group(group) for group in outputs_per_kind.values()
-    )
-    raise ValueError(
-        f"Class vocabularies must declare one dtype across all {outputs}, "
-        f"because one array holds every output. Got {described}."
-    )
-
-
-def _describe_dtype_group(group):
-    """Describe the outputs sharing one dtype kind for an error message."""
-    output_indices = [output_idx for output_idx, _ in group]
-    dtype_names = sorted({str(dtype) for _, dtype in group})
-    quoted = ", ".join(repr(name) for name in dtype_names)
-    label = "dtype" if len(dtype_names) == 1 else "dtypes"
-    return f"{label} {quoted} for {_describe_outputs(output_indices)}"
-
-
-def _describe_outputs(output_indices):
-    """Name one or more outputs for an error message."""
-    if len(output_indices) == 1:
-        return f"output {output_indices[0]}"
-    return "outputs " + ", ".join(str(idx) for idx in output_indices)
 
 
 def resolve_target_spec(
@@ -420,9 +339,14 @@ def resolve_target_spec(
     _validate_single_output_shape(y, task, annotation_type)
 
     normalized_classes = None
-    if task == "classification":
+    if task == "regression":
+        # Classification checks the labels while resolving a vocabulary from
+        # them; regression resolves none, so its labels are checked here
+        # rather than only by the regressor that is fitted on them.
+        _check_labels(y, missing_label, task="regression")
+    else:
         observed = np.asarray(y)[~is_unlabeled(y, missing_label=missing_label)]
-        declared = observed if classes is None else np.asarray(classes)
+        declared = observed if classes is None else classes
         if classes is None and len(observed) == 0:
             raise ValueError(
                 "No class label is observed and `classes` is not defined."
@@ -496,7 +420,7 @@ def _resolve_task_agnostic_target_type(
 
 
 def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
-    y_array = np.asarray(y)
+    y_array = _as_label_array(y)
     expected_ndim = 2 if annotation_type == "multi-annotator" else 1
     return (
         target_type in {"auto", "single-output"}
@@ -507,7 +431,7 @@ def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
 
 def _check_target_array(y):
     y = check_array(
-        y,
+        _as_label_array(y),
         ensure_2d=False,
         ensure_all_finite=False,
         ensure_min_samples=0,
@@ -547,7 +471,9 @@ def _resolve_multioutput(y, *, task, classes, missing_label):
         )
 
     normalized_classes = None
-    if task == "classification":
+    if task == "regression":
+        _check_labels(y, missing_label, task="regression")
+    else:
         if classes is not None and len(classes) != y.shape[1]:
             raise ValueError(
                 "Multi-output `classes` must contain one vocabulary per "
@@ -657,24 +583,9 @@ def _check_target_capability(component, capability, capabilities):
 
 
 def _normalize_class_vocabulary(declared, observed, name):
-    normalized = tuple(LabelEncoder().fit(declared).classes_)
-    observed_in_classes = np.isin(observed, normalized)
-    if any(_is_nan_class(value) for value in normalized):
-        observed_in_classes |= np.asarray(
-            [_is_nan_class(value) for value in observed], dtype=bool
-        )
-    if not observed_in_classes.all():
-        _raise_unknown_class_error(observed, normalized, name)
+    classes_array = _as_class_vocabulary_array(declared, name=name.strip("`"))
+    normalized = tuple(LabelEncoder().fit(classes_array).classes_)
+    _check_compatible_kinds(observed, normalized, name=name)
+    if not np.isin(observed, normalized).all():
+        raise ValueError(f"`y` contains labels outside {name}.")
     return normalized
-
-
-def _raise_unknown_class_error(observed, declared, name):
-    observed_dtype = np.asarray(observed).dtype
-    declared_dtype = np.asarray(declared).dtype
-    observed_is_numeric = np.issubdtype(observed_dtype, np.number)
-    declared_is_numeric = np.issubdtype(declared_dtype, np.number)
-    if observed_is_numeric != declared_is_numeric:
-        raise TypeError(
-            f"The labels in `y` are not type-compatible with {name}."
-        )
-    raise ValueError(f"`y` contains labels outside {name}.")

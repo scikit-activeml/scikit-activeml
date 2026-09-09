@@ -217,26 +217,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             tags.target_tags.multi_output = True
             return tags
 
-    class _NaNClassMultiOutputEstimator(_MultiOutputTaggedEstimator):
-        """Classifier learning a NaN class in a non-canonical order."""
-
-        def fit(self, X, y):
-            self.classes_ = [
-                np.array([np.nan, 1.0]),
-                np.array([1.0, 0.0]),
-            ]
-            self.n_features_in_ = np.shape(X)[1]
-            return self
-
-        def predict(self, X):
-            return np.tile([np.nan, 1.0], (len(X), 1))
-
-        def predict_proba(self, X):
-            return [
-                np.tile([0.75, 0.25], (len(X), 1)),
-                np.tile([0.6, 0.4], (len(X), 1)),
-            ]
-
     class _MultiLabelTaggedEstimator(_TwoOutputEstimator):
         """Two-output classifier declaring only `classifier_tags.multi_label`.
 
@@ -279,6 +259,130 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             self.calls.append("predict_proba")
             return super().predict_proba(X)
 
+    class _MissingTargetRecordingEstimator(ClassifierMixin, BaseEstimator):
+        """External estimator accepting and recording missing targets."""
+
+        def __sklearn_tags__(self):
+            tags = super().__sklearn_tags__()
+            tags.target_tags.multi_output = True
+            return tags
+
+        def fit(self, X, y, sample_weight=None):
+            self.targets_ = []
+            return self.partial_fit(X, y, sample_weight=sample_weight)
+
+        def partial_fit(self, X, y, classes=None, sample_weight=None):
+            if not hasattr(self, "targets_"):
+                self.targets_ = []
+            self.targets_.append(y.copy())
+            self.X_fit_ = X.copy()
+            self.weights_ = (
+                None if sample_weight is None else sample_weight.copy()
+            )
+            self.classes_ = (
+                [np.array([0, 1]) for _ in range(y.shape[1])]
+                if y.ndim == 2
+                else np.array([0, 1])
+            )
+            self.n_features_in_ = X.shape[1]
+            return self
+
+        def predict(self, X):
+            shape = (
+                (len(X), len(self.classes_))
+                if isinstance(self.classes_, list)
+                else (len(X),)
+            )
+            return np.zeros(shape, dtype=int)
+
+        def predict_proba(self, X):
+            probabilities = np.tile([0.5, 0.5], (len(X), 1))
+            return (
+                [probabilities.copy() for _ in self.classes_]
+                if isinstance(self.classes_, list)
+                else probabilities
+            )
+
+    def test_fit_and_partial_fit_preserve_included_missing_targets(self):
+        for multi_label in (False, True):
+            for missing in (np.nan, None, -2.5, -1):
+                for method in ("fit", "partial_fit"):
+                    with self.subTest(
+                        multi_label=multi_label, missing=missing, method=method
+                    ):
+                        y = np.asarray([0, 1, missing])
+                        if multi_label:
+                            y = np.column_stack([y, y])
+                        original = y.copy()
+                        X = np.arange(3.0).reshape(-1, 1)
+                        weights = np.array([1.0, 2.0, 3.0])
+                        clf = SklearnClassifier(
+                            self._MissingTargetRecordingEstimator(),
+                            classes=(
+                                [[0, 1], [0, 1]] if multi_label else [0, 1]
+                            ),
+                            missing_label=missing,
+                            include_unlabeled_samples=True,
+                        )
+                        for call in range(2 if method == "partial_fit" else 1):
+                            self.assertIs(
+                                getattr(clf, method)(
+                                    X, y, sample_weight=weights
+                                ),
+                                clf,
+                            )
+                            self.assertTrue(clf.is_fitted_)
+                            self.assertEqual(
+                                len(clf.estimator_.targets_), call + 1
+                            )
+                            received = clf.estimator_.targets_[-1]
+                            self.assertEqual(received.shape, y.shape)
+                            self.assertEqual(
+                                received[:2].tolist(), original[:2].tolist()
+                            )
+                            for value in received[-1:].ravel():
+                                if missing is None:
+                                    self.assertIs(value, None)
+                                elif np.isnan(missing):
+                                    self.assertTrue(np.isnan(value))
+                                else:
+                                    self.assertEqual(value, missing)
+                            np.testing.assert_array_equal(
+                                clf.estimator_.X_fit_, X
+                            )
+                            np.testing.assert_array_equal(
+                                clf.estimator_.weights_, weights
+                            )
+                            np.testing.assert_array_equal(y, original)
+
+    def test_fully_labeled_training_preserves_class_dtype(self):
+        for multi_label in (False, True):
+            for include_missing in (False, True):
+                for missing in (np.nan, None, -2.5, -1):
+                    with self.subTest(
+                        multi_label=multi_label,
+                        include_missing=include_missing,
+                        missing=missing,
+                    ):
+                        y = (
+                            np.array([[0, 1], [1, 0]])
+                            if multi_label
+                            else np.array([0, 1])
+                        )
+                        clf = SklearnClassifier(
+                            self._MissingTargetRecordingEstimator(),
+                            classes=(
+                                [[0, 1], [0, 1]] if multi_label else [0, 1]
+                            ),
+                            missing_label=missing,
+                            include_unlabeled_samples=include_missing,
+                        )
+                        for method in ("fit", "partial_fit"):
+                            getattr(clf, method)(np.array([[0.0], [1.0]]), y)
+                            received = clf.estimator_.targets_[-1]
+                            self.assertEqual(received.dtype, y.dtype)
+                            np.testing.assert_array_equal(received, y)
+
     class _BrokenEstimator(_MultiOutputTaggedEstimator):
         """Admitted classifier whose fit always fails unexpectedly."""
 
@@ -302,22 +406,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf._commit_label_state(clf._resolve_label_state(dummy_classes))
         clf.is_fitted_ = True
         return clf
-
-    def _fit_nan_class_multilabel_clf(self):
-        y = np.array(
-            [
-                [np.nan, 0.0],
-                [1.0, 1.0],
-                [np.nan, 1.0],
-                [1.0, 0.0],
-            ]
-        )
-        return SklearnClassifier(
-            estimator=self._NaNClassMultiOutputEstimator(),
-            classes=[[np.nan, 1.0], [0.0, 1.0]],
-            missing_label=-1,
-            proba_format="list",
-        ).fit(self.X_ml, y)
 
     def test_prior_matrix_from_counts(self):
         np.testing.assert_allclose(
@@ -819,24 +907,24 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         y_pred = clf.predict(X)
         self.assertEqual(y_pred.shape, y.shape)
 
-    def test_multilabel_predict_accepts_observed_nan_class(self):
-        clf = self._fit_nan_class_multilabel_clf()
-        predictions = clf.predict(self.X_ml)
-
-        self.assertTrue(np.isnan(predictions[:, 0]).all())
-        np.testing.assert_array_equal(predictions[:, 1], 1.0)
-
-    def test_multilabel_predict_proba_maps_observed_nan_class(self):
-        clf = self._fit_nan_class_multilabel_clf()
-        probabilities = clf.predict_proba(self.X_ml)
-
-        np.testing.assert_allclose(
-            probabilities[0],
-            np.tile([0.25, 0.75], (len(self.X_ml), 1)),
+    def test_multilabel_rejects_a_nan_class(self):
+        # NaN marks a missing label and is therefore no category, so no
+        # output vocabulary may declare it.
+        y = np.array(
+            [
+                [np.nan, 0.0],
+                [1.0, 1.0],
+                [np.nan, 1.0],
+                [1.0, 0.0],
+            ]
         )
-        np.testing.assert_allclose(
-            probabilities[1], np.tile([0.4, 0.6], (len(self.X_ml), 1))
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[np.nan, 1.0], [0.0, 1.0]],
+            missing_label=-1,
         )
+        with self.assertRaisesRegex(ValueError, "contains NaN"):
+            clf.fit(self.X_ml, y)
 
     def test_init_param_target_type(self):
         self._test_param(
@@ -1917,7 +2005,9 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 with self.assertRaises(NotFittedError):
                     getattr(clf, item)
 
-    def test_prefit_estimator_marker_does_not_skip_wrapper_contract(self):
+    def test_prefit_estimator_missing_label_does_not_skip_wrapper_contract(
+        self,
+    ):
         estimator = self._prefit_binary_estimator()
         estimator.is_fitted_ = True
         clf = SklearnClassifier(
@@ -2731,6 +2821,25 @@ class TestSlidingWindowClassifier(
         if replace_init_params is not None:
             init_params.update(replace_init_params)
         super().test_predict_dtype_matches_class_dtype(
+            replace_init_params=init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+    def test_fit_rejects_class_identities_beyond_64_bits(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        # The wrapped classifier must agree on `missing_label`, so the
+        # default estimator pinned to `"nan"` is replaced. Its declared
+        # string vocabulary would otherwise be the incompatibility reported,
+        # before the width of the class identifiers is looked at.
+        init_params = {
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label=np.nan
+            )
+        }
+        if replace_init_params is not None:
+            init_params.update(replace_init_params)
+        super().test_fit_rejects_class_identities_beyond_64_bits(
             replace_init_params=init_params,
             replace_fit_params=replace_fit_params,
         )

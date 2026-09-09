@@ -9,10 +9,10 @@ from skactiveml.utils import (
     rand_argmax,
     labeled_indices,
     MISSING_LABEL,
-    is_labeled,
     check_type,
     check_scalar,
 )
+from skactiveml.utils._label import _observed_numerical_labels
 from ._target import _fit_and_resolve_estimator_target_spec
 
 
@@ -362,7 +362,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        n_labeled = np.sum(is_labeled(y, missing_label=self.missing_label_))
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
+        )
+        n_labeled = np.sum(is_lbld)
         batch_size_x = max(0, min(self.n_GSx_samples - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
@@ -374,13 +377,18 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         )
         y_cand = reg.predict(X_cand)
 
+        # Distances are measured on the labels themselves, which are
+        # stored as objects whenever the missing label has no common numeric
+        # dtype with them, e.g. for `missing_label=None`.
+        y_float = np.full(len(y), np.nan, dtype=float)
+        y_float[is_lbld] = y_observed
         if mapping is None:
             X_all = np.append(X, X_cand, axis=0)
-            y_all = np.append(y, reg.predict(X_cand))
+            y_all = np.append(y_float, reg.predict(X_cand))
             candidate_indices = len(X) + np.arange(len(X_cand), dtype=int)
         else:
             X_all = X
-            y_all = y.copy()
+            y_all = y_float
             y_all[mapping] = y_cand
             candidate_indices = mapping
 
