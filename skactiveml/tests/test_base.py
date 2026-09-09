@@ -6,6 +6,9 @@ from unittest.mock import patch
 import numpy as np
 from sklearn.utils._testing import assert_allclose
 from sklearn.utils.validation import check_array
+from sklearn.linear_model import SGDClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.base import (
     QueryStrategy,
@@ -18,6 +21,7 @@ from skactiveml.base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
 )
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.exceptions import MappingError
 from skactiveml.pool import RandomSampling
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, match_signature
@@ -1208,6 +1212,64 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
 
     def test_query(self):
         self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
+
+    def test_target_capabilities(self):
+        self.assertEqual(
+            self.qs._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+
+    def test_resolve_clf_target_spec(self):
+        X = np.array([[0.0], [1.0], [2.0]])
+        y = np.array([0, 1, MISSING_LABEL])
+        capability_error = "does not support target capability"
+
+        # A fitted classifier is the authority through `target_spec_`.
+        fitted_clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
+        self.assertIs(
+            self.qs._resolve_clf_target_spec(fitted_clf, y),
+            fitted_clf.target_spec_,
+        )
+
+        # A wrapper around a pre-fitted estimator resolves its own
+        # specification on first access, even without labels.
+        prefitted_clf = SklearnClassifier(GaussianNB().fit(X, [0, 1, 0]))
+        target_spec = self.qs._resolve_clf_target_spec(prefitted_clf, None)
+        self.assertEqual(target_spec.classes, (0, 1))
+        self.assertIs(target_spec, prefitted_clf.target_spec_)
+
+        # An unfitted classifier resolves from `y` and its declarations, or
+        # from the declarations alone, without being fitted itself.
+        unfitted_clf = ParzenWindowClassifier(classes=[0, 1])
+        for labels in (y, None):
+            target_spec = self.qs._resolve_clf_target_spec(
+                unfitted_clf, labels
+            )
+            self.assertEqual(target_spec.target_type, "single-output")
+            self.assertEqual(target_spec.classes, (0, 1))
+        self.assertFalse(hasattr(unfitted_clf, "target_spec_"))
+        target_spec = self.qs._resolve_clf_target_spec(
+            ParzenWindowClassifier(), y
+        )
+        self.assertEqual(target_spec.classes, (0, 1))
+        with self.assertRaisesRegex(ValueError, "No class label is observed"):
+            self.qs._resolve_clf_target_spec(ParzenWindowClassifier(), None)
+
+        # Declared multi-label semantics are outside the capability, with
+        # the empty labels shaped by the nested vocabulary.
+        multilabel_clf = SklearnClassifier(
+            MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        )
+        for labels in (np.array([[0, 1], [1, 0], [-1, -1]]), None):
+            with self.assertRaisesRegex(ValueError, capability_error):
+                self.qs._resolve_clf_target_spec(multilabel_clf, labels)
 
     def test_update(self):
         self.assertRaises(

@@ -89,6 +89,9 @@ class TestFixedUncertaintyBudgetManager(
             ("string", TypeError),
             (-1, TypeError),
             (0, TypeError),
+            # The threshold counts classes, so nested per-output
+            # vocabularies would silently count label outputs instead.
+            ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)
 

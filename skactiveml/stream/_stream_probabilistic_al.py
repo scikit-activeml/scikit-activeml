@@ -309,6 +309,18 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        # The labels and the classifier are checked before any query state
+        # is committed, so that an unsupported target specification leaves
+        # the query strategy untouched.
+        X, y, sample_weight = self._validate_X_y_sample_weight(
+            X, y, sample_weight
+        )
+        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+        if self.metric is None and not hasattr(clf, "predict_freq"):
+            raise TypeError(
+                "clf has no predict_freq and metric was set to None"
+            )
+
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
@@ -330,18 +342,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 BalancedIncrementalQuantileFilter,
             )
 
-        X, y, sample_weight = self._validate_X_y_sample_weight(
-            X, y, sample_weight
-        )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates
         )
-
-        if self.metric is None and not hasattr(clf, "predict_freq"):
-            raise TypeError(
-                "clf has no predict_freq and metric was set to None"
-            )
 
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
@@ -412,6 +415,13 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         -------
         clf : skactiveml.base.SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
+
+        Raises
+        ------
+        ValueError
+            If the target specification of `clf`, taken from a fitted `clf`
+            or resolved from `y` and the declarations of an unfitted one, is
+            outside the target capabilities of this query strategy.
         """
         # Check if the classifier and its arguments are valid.
         check_type(clf, "clf", SkactivemlClassifier)
@@ -421,6 +431,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 clf = clone(clf).fit(X, y)
             else:
                 clf = clone(clf).fit(X, y, sample_weight)
+        self._resolve_clf_target_spec(clf, y)
         return clf
 
     def _validate_utility_weight(self, utility_weight, candidates):

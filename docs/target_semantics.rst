@@ -870,6 +870,77 @@ again from the shape of ``y``. In particular, use its ``target_type`` and
 ``annotation_type`` to choose downstream behavior and its ``classes`` as the
 canonical class vocabulary for classification.
 
+Stream Query Strategies
+-----------------------
+
+Stream query strategies declare the single-output single-annotator
+classification capability and have no ``target_type`` parameter, because they
+do not resolve the labels ``y`` themselves. The classifier passed to ``query``
+is the target authority. A fitted classifier carries its ``target_spec_``. An
+unfitted classifier declares the meaning of ``y`` through its ``classes``,
+``missing_label``, and ``target_type``, from which the specification is
+resolved together with ``y`` exactly as for pool query strategies; without
+``y``, only these declarations count. The specification is checked against
+that capability before committing any query state such as
+``budget_manager_``. A multi-label or multi-annotator classifier is therefore
+rejected with the capability error described above.
+
+The label-free baselines :class:`~skactiveml.stream.StreamRandomSampling` and
+:class:`~skactiveml.stream.PeriodicSampling` act on candidates and the budget
+only. Like the representation- and mask-only pool methods above, they are
+task-agnostic and declare single-output classification, multi-label
+classification, and regression. The budget managers consume utilities only.
+:class:`~skactiveml.stream.budgetmanager.FixedUncertaintyBudgetManager` merely
+requires a flat class vocabulary, because it computes its threshold from the
+number of classes.
+
+.. doctest::
+
+   >>> from sklearn.linear_model import SGDClassifier
+   >>> from skactiveml.stream import VariableUncertainty
+   >>> stream_X = np.array([[0.0], [1.0], [2.0], [3.0]])
+   >>> stream_y = np.array([[0, 1], [1, 0], [-1, -1], [-1, -1]])
+   >>> stream_clf = SklearnClassifier(
+   ...     MultiOutputClassifier(
+   ...         SGDClassifier(loss="log_loss", random_state=0)
+   ...     ),
+   ...     classes=[[0, 1], [0, 1]],
+   ...     missing_label=-1,
+   ...     target_type="multi-label",
+   ... ).fit(stream_X, stream_y)
+   >>> stream_qs = VariableUncertainty(random_state=0)
+   >>> stream_qs.query(  # doctest: +IGNORE_EXCEPTION_DETAIL
+   ...     candidates=stream_X, clf=stream_clf, X=stream_X, y=stream_y
+   ... )
+   Traceback (most recent call last):
+       ...
+   ValueError: VariableUncertainty does not support target capability ...
+   >>> hasattr(stream_qs, "budget_manager_")
+   False
+
+An unfitted classifier is the target authority through its declarations, so a
+declared multi-label vocabulary is rejected the same way, even without labels
+``y``.
+
+.. doctest::
+
+   >>> unfitted_clf = SklearnClassifier(
+   ...     MultiOutputClassifier(
+   ...         SGDClassifier(loss="log_loss", random_state=0)
+   ...     ),
+   ...     classes=[[0, 1], [0, 1]],
+   ...     missing_label=-1,
+   ...     target_type="multi-label",
+   ... )
+   >>> stream_qs.query(  # doctest: +IGNORE_EXCEPTION_DETAIL
+   ...     candidates=stream_X, clf=unfitted_clf
+   ... )
+   Traceback (most recent call last):
+       ...
+   ValueError: VariableUncertainty does not support target capability ...
+   >>> hasattr(stream_qs, "budget_manager_")
+   False
+
 .. _recognized-future-semantics:
 
 Recognized Future Semantics

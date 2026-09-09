@@ -10,6 +10,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.multioutput import MultiOutputClassifier
 
 from skactiveml.tests.utils import (
+    STREAM_QUERY_STATE_ATTRIBUTES,
     assert_no_query_state,
     check_positional_args,
     check_test_param_test_availability,
@@ -1696,6 +1697,139 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             "candidates": [[]],
             "queried_indices": [],
         }
+
+    def _stream_clf_query_params(self):
+        """Return a copy of the default classifier query parameters.
+
+        Returns `None` for a strategy consuming no classifier, because such
+        a strategy is never told which target semantics its labels have and
+        therefore has nothing to reject.
+        """
+        if "clf" not in inspect.signature(self.qs_class.query).parameters:
+            return None
+        return deepcopy(self.query_default_params_clf)
+
+    def _assert_query_rejects_clf(self, clf, y, error, pattern):
+        """Assert that a rejected classifier leaves no query state behind."""
+        query_params = self._stream_clf_query_params()
+        query_params["clf"] = clf
+        query_params["y"] = y
+        query_params["fit_clf"] = False
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        with self.assertRaisesRegex(error, pattern):
+            strategy.query(**query_params)
+
+        assert_no_query_state(
+            self, strategy, attributes=STREAM_QUERY_STATE_ATTRIBUTES
+        )
+
+    def test_target_capabilities(self):
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        capabilities = strategy._target_capabilities
+
+        self.assertIsInstance(capabilities, frozenset)
+        if "clf" in inspect.signature(self.qs_class.query).parameters:
+            # The classifier is the target authority and has to be a
+            # single-output classifier.
+            expected = {
+                ("classification", "single-output", "single-annotator"),
+            }
+        else:
+            # Label-free strategies see neither labels nor a model and are
+            # task-agnostic like their pool-based counterparts.
+            expected = {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        self.assertEqual(capabilities, frozenset(expected))
+
+    def test_query_rejects_fitted_multilabel_classifier(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+        X = np.asarray(query_params["X"])
+        y = np.full((len(X), 2), -1)
+        y[0], y[1] = [0, 1], [1, 0]
+        clf = SklearnClassifier(
+            MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        ).fit(X, y)
+
+        self._assert_query_rejects_clf(
+            clf,
+            y,
+            ValueError,
+            rf"{self.qs_class.__name__} does not support target capability",
+        )
+
+    def test_query_rejects_fitted_multiannotator_classifier(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+        X = np.asarray(query_params["X"])
+        y = np.full((len(X), 2), MISSING_LABEL)
+        y[0], y[1] = [0, 0], [1, 1]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[
+                ("pwc_0", ParzenWindowClassifier(classes=[0, 1])),
+                ("pwc_1", ParzenWindowClassifier(classes=[0, 1])),
+            ],
+            classes=[0, 1],
+        ).fit(X, y)
+
+        self._assert_query_rejects_clf(
+            clf,
+            y,
+            ValueError,
+            rf"{self.qs_class.__name__} does not support target capability",
+        )
+
+    def test_query_rejects_unfitted_multilabel_declaration(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+        X = np.asarray(query_params["X"])
+        y = np.full((len(X), 2), -1)
+        y[0], y[1] = [0, 1], [1, 0]
+        clf = SklearnClassifier(
+            MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        )
+        pattern = (
+            rf"{self.qs_class.__name__} does not support target capability"
+        )
+
+        # An unfitted classifier declares the meaning of `y` through its
+        # constructor, with `y` as evidence or, without `y`, on its own.
+        for labels in (y, None):
+            with self.subTest(labels=None if labels is None else "y"):
+                self._assert_query_rejects_clf(
+                    clone(clf), labels, ValueError, pattern
+                )
+
+    def test_query_rejects_unfitted_clf_without_class_evidence(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+
+        # Neither declared `classes` nor labels tell an unfitted classifier
+        # which classes exist, so no target specification can be resolved.
+        self._assert_query_rejects_clf(
+            ParzenWindowClassifier(),
+            None,
+            ValueError,
+            "No class label is observed",
+        )
 
     def test_query_param_clf(self, test_cases=None):
         # _model_comparison checks for the availability of the classifier

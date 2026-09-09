@@ -34,6 +34,7 @@ from .utils import (
     ExtLabelEncoder,
     rand_argmin,
     resolve_target_spec,
+    _has_nested_classes,
     check_classifier_params,
     check_random_state,
     check_cost_matrix,
@@ -1262,6 +1263,12 @@ class BudgetManager(ABC, BaseEstimator):
 class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies.
 
+    Stream query strategies have no `target_type` parameter, because they do
+    not resolve the labels `y` themselves. A strategy consuming a classifier
+    treats it as the target authority and supports single-output
+    classification only. Label-free strategies are task-agnostic and declare
+    the same capabilities as their pool-based counterparts.
+
     Parameters
     ----------
     budget : float
@@ -1274,6 +1281,80 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     def __init__(self, budget, random_state=None):
         super().__init__(random_state=random_state)
         self.budget = budget
+
+    @property
+    def _target_capabilities(self):
+        """Exact target semantics supported by a stream query strategy.
+
+        This conservative default covers the strategies consuming a
+        classifier, which is the authority for what `y` means and has to be
+        a single-output classifier. Label-free strategies override it with
+        the task-agnostic capabilities, because they see neither labels nor
+        a model.
+        """
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def _resolve_clf_target_spec(self, clf, y):
+        """Resolve the target specification `clf` is the authority for.
+
+        A fitted classifier carries its specification in `target_spec_`,
+        which a wrapper around a pre-fitted estimator resolves on first
+        access. An unfitted classifier declares the meaning of `y` through
+        its constructor parameters `classes`, `missing_label`, and
+        `target_type`, from which the specification is resolved together
+        with `y` exactly as the pool query strategies do. Without `y`, only
+        these declarations count. The specification is checked against
+        `_target_capabilities`.
+
+        Parameters
+        ----------
+        clf : skactiveml.base.SkactivemlClassifier
+            The classifier passed to `query`.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
+                None
+            Labels of the training data set, if any.
+
+        Returns
+        -------
+        target_spec : skactiveml.utils.TargetSpec
+            The resolved target specification.
+
+        Raises
+        ------
+        ValueError
+            If the target specification is outside `_target_capabilities`,
+            or if an unfitted `clf` declares no `classes` and `y` provides
+            no class evidence.
+        """
+        target_spec = getattr(clf, "target_spec_", None)
+        if target_spec is None:
+            classes = clf.classes
+            if y is None:
+                # Only the declared vocabulary is evidence. Its nesting
+                # decides the number of label outputs of the empty labels.
+                n_outputs = (
+                    len(classes)
+                    if classes is not None and _has_nested_classes(classes)
+                    else None
+                )
+                y = np.full(
+                    (0,) if n_outputs is None else (0, n_outputs),
+                    clf.missing_label,
+                )
+            target_spec = resolve_target_spec(
+                y,
+                task="classification",
+                target_type=getattr(clf, "target_type", "auto"),
+                annotation_type="single-annotator",
+                classes=classes,
+                missing_label=clf.missing_label,
+            )
+        _check_target_spec_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
 
     @abstractmethod
     def query(self, candidates, *args, return_utilities=False, **kwargs):

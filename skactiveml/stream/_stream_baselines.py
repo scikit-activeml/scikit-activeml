@@ -3,6 +3,16 @@ import numpy as np
 from ..base import SingleAnnotatorStreamQueryStrategy
 from ..utils import check_scalar
 
+# Label-free baselines consume neither labels nor a model. They declare the
+# same task-agnostic capabilities as their pool-based counterparts.
+_TASK_AGNOSTIC_CAPABILITIES = frozenset(
+    {
+        ("classification", "single-output", "single-annotator"),
+        ("classification", "multi-label", "single-annotator"),
+        ("regression", "single-output", "single-annotator"),
+    }
+)
+
 
 class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     """Random Sampling for Data Streams.
@@ -14,7 +24,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     position in the feature space and disregards any information about the
     sample. Thus, it should only be used as a baseline strategy. The
     `allow_exceeding_budget` parameter allows to configure the strategy to
-    strictly adhere to a given budget.
+    strictly adhere to a given budget. Neither labels nor a model are
+    consumed, so the strategy is task-agnostic and supports single-output and
+    multi-label classification as well as regression.
 
     Parameters
     ----------
@@ -34,6 +46,10 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.allow_exceeding_budget = allow_exceeding_budget
+
+    @property
+    def _target_capabilities(self):
+        return _TASK_AGNOSTIC_CAPABILITIES
 
     def query(self, candidates, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
@@ -195,7 +211,9 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     query strategy is to exhaust a given budget as soon as it is available.
     samples are queried regardless of their position in the feature space and
     disregards any information about the sample. Thus, it should only be used
-    as a baseline strategy.
+    as a baseline strategy. Neither labels nor a model are consumed, so the
+    strategy is task-agnostic and supports single-output and multi-label
+    classification as well as regression.
 
     Parameters
     ----------
@@ -208,6 +226,10 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
     def __init__(self, budget=None, random_state=None):
         super().__init__(budget=budget, random_state=random_state)
+
+    @property
+    def _target_capabilities(self):
+        return _TASK_AGNOSTIC_CAPABILITIES
 
     def query(self, candidates, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.

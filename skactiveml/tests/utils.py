@@ -4,14 +4,40 @@ import numpy as np
 from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
+# The public attributes a pool query strategy commits while validating.
+QUERY_STATE_ATTRIBUTES = (
+    "n_features_in_",
+    "missing_label_",
+    "random_state_",
+)
 
-def assert_no_query_state(test_case, strategy):
-    """Assert that semantic query failure did not commit public state."""
-    for attribute in (
-        "n_features_in_",
-        "missing_label_",
-        "random_state_",
-    ):
+# Stream query strategies expose no `missing_label_`, but commit the budget
+# state their budget manager is built from.
+STREAM_QUERY_STATE_ATTRIBUTES = (
+    "n_features_in_",
+    "random_state_",
+    "budget_",
+    "budget_manager_",
+)
+
+
+def assert_no_query_state(
+    test_case, strategy, attributes=QUERY_STATE_ATTRIBUTES
+):
+    """Assert that semantic query failure did not commit public state.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case providing the assertion.
+    strategy : skactiveml query strategy
+        The query strategy whose `query` failed.
+    attributes : iterable of str, default=QUERY_STATE_ATTRIBUTES
+        The attributes a failed query must not have committed. Stream query
+        strategies pass `STREAM_QUERY_STATE_ATTRIBUTES` instead, because they
+        commit other state.
+    """
+    for attribute in attributes:
         test_case.assertFalse(
             hasattr(strategy, attribute),
             msg=(
