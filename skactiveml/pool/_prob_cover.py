@@ -29,6 +29,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     uncertainty. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation can handle class
     labels and multilabel targets represented by a two-dimensional `y`.
+    Regression is not supported, because the default radius `delta` depends
+    on a class count, which continuous labels do not provide.
 
     Multi-label support in this implementation is an extension and not part of
     the original proposal in [1]_. Coverage is computed in the embedding space
@@ -87,7 +89,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             {
                 ("classification", "single-output", "single-annotator"),
                 ("classification", "multi-label", "single-annotator"),
-                ("regression", "single-output", "single-annotator"),
             }
         )
 

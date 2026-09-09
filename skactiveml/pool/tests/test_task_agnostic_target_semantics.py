@@ -12,7 +12,6 @@ from skactiveml.pool import (
     DiscriminativeAL,
     GreedySamplingX,
     MaxHerding,
-    ProbCover,
     RandomSampling,
     TypiClust,
 )
@@ -76,14 +75,6 @@ def _strategy_cases(target_type="auto"):
                 **common,
                 cluster_algo_dict={"n_init": 1},
                 k=2,
-            ),
-            {},
-        ),
-        (
-            ProbCover(
-                **common,
-                deltas=[0.2],
-                cluster_algo_dict={"n_init": 1},
             ),
             {},
         ),

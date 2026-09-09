@@ -119,10 +119,11 @@ MULTILABEL_PREDICTION_CONSUMERS = frozenset(
     }
 )
 
-# Task-agnostic strategies operating on the sample representations and the
+# Estimator-free strategies operating on the sample representations and the
 # label mask only, i.e., they never call `predict_proba` of a multi-label
-# classifier.
-MULTILABEL_TASK_AGNOSTIC = frozenset(
+# classifier. Not all of them are task-agnostic: ProbCover derives its default
+# radius from a class count and therefore declares classification only.
+MULTILABEL_ESTIMATOR_FREE = frozenset(
     {
         CoreSet,
         DiscriminativeAL,
@@ -163,7 +164,7 @@ def _multilabel_inventory():
     return (
         MULTILABEL_PROBA_CONSUMERS
         | MULTILABEL_PREDICTION_CONSUMERS
-        | MULTILABEL_TASK_AGNOSTIC
+        | MULTILABEL_ESTIMATOR_FREE
         | MULTILABEL_DELEGATING_WRAPPERS
     )
 
@@ -250,7 +251,7 @@ class TestMultilabelProbaFormatContract(unittest.TestCase):
         # keeps a misfiled strategy from passing the inventory silently.
         test_cases = _multilabel_test_cases_by_strategy()
         non_consumers = (
-            MULTILABEL_PREDICTION_CONSUMERS | MULTILABEL_TASK_AGNOSTIC
+            MULTILABEL_PREDICTION_CONSUMERS | MULTILABEL_ESTIMATOR_FREE
         )
 
         for strategy, consumes_probas in [
