@@ -16,7 +16,10 @@ from ..base import (
     ProbabilisticRegressor,
 )
 from ..classifier import ParzenWindowClassifier
-from ..utils._label_dtype import _holds_missing_label
+from ..utils._label_dtype import (
+    _holds_missing_label,
+    _lossless_decode_dtype,
+)
 from ..utils import (
     MISSING_LABEL,
     is_labeled,
@@ -856,13 +859,17 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
         )
         y_update = column_or_1d(y_update)
 
+    # Widen the labels before assigning: writing a fractional hypothetical
+    # target into an integer array would truncate it.
+    dtype = _lossless_decode_dtype([y, y_update])
+
     if idx_update is not None:
         if isinstance(idx_update, (int, np.integer)):
             idx_update = np.array([idx_update])
         idx_update = check_indices(idx_update, A=X, unique="check_unique")
         check_consistent_length(y_update, idx_update)
         X_new = X.copy()
-        y_new = y.copy()
+        y_new = y.astype(dtype)
         y_new[idx_update] = y_update
         return X_new, y_new
     elif X_update is not None:
@@ -874,7 +881,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
         check_consistent_length(X.T, X_update.T)
         check_consistent_length(y_update, X_update)
         X_new = np.append(X, X_update, axis=0)
-        y_new = np.append(y, y_update, axis=0)
+        y_new = np.append(y.astype(dtype), y_update.astype(dtype), axis=0)
         return X_new, y_new
     else:
         raise ValueError("`idx_update` or `X_update` must not be `None`")

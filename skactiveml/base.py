@@ -2042,8 +2042,9 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             R = random_state.standard_gamma(alphas)
             R_flat = R.reshape(-1, R.shape[-1])
             is_zero = R_flat.sum(axis=-1) == 0.0
-            sampled_class_indices = random_state.choice(
-                np.array(R.shape[-1]), size=is_zero.sum()
+            alphas_flat = alphas.reshape(-1, alphas.shape[-1])
+            sampled_class_indices = self._sample_dirichlet_vertices(
+                alphas_flat[is_zero], random_state
             )
             R_flat[np.flatnonzero(is_zero), sampled_class_indices] = 1.0
             return R / R.sum(axis=-1, keepdims=True)
@@ -2057,13 +2058,45 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         R = random_state.standard_gamma(alphas)
         R_sums = R.sum(axis=-1)
         is_zero = (R_sums == 0.0).ravel()
-        sampled_class_indices = random_state.choice(
-            np.array(R.shape[-1]), size=is_zero.sum()
+        sampled_class_indices = self._sample_dirichlet_vertices(
+            alphas[is_zero], random_state
         )
         R[is_zero, sampled_class_indices] = 1.0
         P = R / R.sum(axis=-1, keepdims=True)
         P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
         return P
+
+    @staticmethod
+    def _sample_dirichlet_vertices(alphas, random_state):
+        """Draw one simplex vertex per row with probability given by `alphas`.
+
+        A Dirichlet distribution degenerates to the vertices of the
+        probability simplex as its concentration parameters approach zero,
+        where vertex `i` carries the probability `alphas[i] / sum(alphas)`.
+
+        Parameters
+        ----------
+        alphas : numpy.ndarray of shape (n_rows, n_classes)
+            Strictly positive concentration parameters, one row per
+            degenerate Dirichlet sample.
+        random_state : numpy.random.RandomState
+            Random state used to draw one vertex per row.
+
+        Returns
+        -------
+        indices : numpy.ndarray of shape (n_rows,)
+            Index of the vertex drawn for each row.
+        """
+        if len(alphas) == 0:
+            return np.zeros(0, dtype=int)
+        # Scaling the uniform draws by the row total avoids dividing
+        # concentrations that small by each other.
+        cumulative = np.cumsum(alphas, axis=-1)
+        thresholds = (
+            random_state.random_sample(size=(len(alphas), 1))
+            * cumulative[:, -1:]
+        )
+        return np.argmax(cumulative > thresholds, axis=-1)
 
     def _validate_data(
         self,

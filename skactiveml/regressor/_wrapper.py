@@ -441,7 +441,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Returns
         -------
         y_samples : ndarray of shape (n_samples_X, n_samples)
-            Drawn random target samples.
+            Drawn random target samples. If the `estimator` could not be
+            fitted, the samples follow the same normal fallback distribution
+            that `predict` reports, defined by the empirical label mean and
+            standard deviation.
         """
         return self._sample(
             sample_function="sample_y",
@@ -472,7 +475,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Returns
         -------
         y_samples : ndarray of shape (n_samples_X, n_samples)
-            Drawn random target samples.
+            Drawn random target samples. If the `estimator` could not be
+            fitted, the samples follow the same normal fallback distribution
+            that `predict` reports, defined by the empirical label mean and
+            standard deviation.
         """
         return self._sample(
             sample_function="sample", X=X, n_samples=n_samples, **sample_kwargs
@@ -483,31 +489,34 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        try:
+        # Branch on this wrapper's own fit outcome, as `predict` does: after
+        # a failed refit, the copied estimator still answers from the
+        # superseded training data instead of raising `NotFittedError`.
+        if self.is_fitted_:
             return attrgetter(sample_function)(self.estimator_)(
                 X, n_samples, **sample_kwargs
             )
-        except NotFittedError:
-            warnings.warn(
-                f"Since the 'estimator' could not be fitted when"
-                f" calling the `fit` method, the label "
-                f"mean `_label_mean={self._label_mean}` and optionally the "
-                f"label standard deviation `_label_std={self._label_std}` is "
-                f"used to make the predictions."
-            )
-            random_state = sample_kwargs.get("random_state", None)
-            random_state = check_random_state(random_state)
-            check_scalar(
-                n_samples,
-                "n_samples",
-                min_val=1,
-                min_inclusive=True,
-                target_type=int,
-            )
-            y_samples = random_state.randn(len(X), n_samples)
-            y_samples *= self._label_std
-            y_samples += self._label_mean
-            return y_samples
+
+        warnings.warn(
+            f"Since the 'estimator' could not be fitted when"
+            f" calling the `fit` method, the label "
+            f"mean `_label_mean={self._label_mean}` and optionally the "
+            f"label standard deviation `_label_std={self._label_std}` is "
+            f"used to make the predictions."
+        )
+        random_state = sample_kwargs.get("random_state", None)
+        random_state = check_random_state(random_state)
+        check_scalar(
+            n_samples,
+            "n_samples",
+            min_val=1,
+            min_inclusive=True,
+            target_type=int,
+        )
+        y_samples = random_state.randn(len(X), n_samples)
+        y_samples *= self._label_std
+        y_samples += self._label_mean
+        return y_samples
 
     def __sklearn_is_fitted__(self):
         if "is_fitted_" in self.__dict__:

@@ -22,6 +22,7 @@ from skactiveml.pool.utils import (
     _update_X_y,
     _update_reg,
 )
+from skactiveml.pool import ExpectedModelOutputChange
 from skactiveml.pool._expected_model_change_maximization import (
     _bootstrap_estimators,
 )
@@ -922,6 +923,53 @@ class TestFunctions(unittest.TestCase):
         _, y_new = _update_X_y(X, y, 2.5, X_update=X[0])
 
         self.assertEqual(y_new.tolist(), [0, 1.5, None, None, 2.5])
+
+    def test_update_X_y_keeps_fractional_updates_out_of_integer_targets(self):
+        # Integer observations are valid regression targets, but hypothetical
+        # ones are fractional. Assigning into an unwidened integer buffer
+        # would truncate them, and the appended path would not.
+        X = np.arange(4 * 2, dtype=float).reshape(4, 2)
+        y_int = np.array([0, 2, -1, -1])
+
+        _, y_new = _update_X_y(X, y_int, [0.75], idx_update=[2])
+
+        np.testing.assert_array_equal(y_new, [0.0, 2.0, 0.75, -1.0])
+
+        # The same update through either path yields the same targets.
+        _, y_mapped = _update_X_y(X[:3], y_int[:3], 0.75, idx_update=2)
+        _, y_appended = _update_X_y(X[:2], y_int[:2], 0.75, X_update=X[2])
+
+        np.testing.assert_array_equal(y_mapped, y_appended)
+
+        # Widening never rounds a target: identifiers beyond the exact
+        # floating-point range keep their identity in an object buffer.
+        y_large = np.array([2**53, 2**53 + 1, -1])
+
+        _, y_new = _update_X_y(np.zeros((3, 1)), y_large, 0.5, idx_update=2)
+
+        self.assertEqual(y_new.dtype, np.dtype(object))
+        self.assertEqual(y_new.tolist(), [2**53, 2**53 + 1, 0.5])
+
+    def test_update_X_y_ranks_integer_and_float_targets_equally(self):
+        # A public lookahead strategy must not rank candidates differently
+        # just because equal target values are stored as integers.
+        X = np.random.RandomState(9).normal(size=(6, 1))
+        y = np.array([0, 2, 3, -1, -1, -1])
+
+        rankings = []
+        for dtype in (int, float):
+            qs = ExpectedModelOutputChange(missing_label=-1, random_state=0)
+            rankings.append(
+                qs.query(
+                    X,
+                    y.astype(dtype),
+                    reg=NICKernelRegressor(missing_label=-1),
+                    return_utilities=True,
+                )
+            )
+
+        np.testing.assert_array_equal(rankings[0][0], rankings[1][0])
+        np.testing.assert_allclose(rankings[0][1], rankings[1][1])
 
     def test_update_reg_accepts_regression_missing_labels(self):
         # Every missing label of the contract survives the simulated labeling a

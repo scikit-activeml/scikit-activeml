@@ -12,6 +12,7 @@ from sklearn import clone
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import ConstantKernel
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -615,7 +616,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         reg.fit(X=[], y=[])
         y_sample = reg.sample_y(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
-        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL))
+        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL, dtype=float))
         y_sample = reg.sample_y(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
 
@@ -640,7 +641,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         reg.fit(X=[], y=[])
         y_sample = reg.sample(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
-        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL))
+        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL, dtype=float))
         y_sample = reg.sample(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
 
@@ -650,6 +651,65 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         y_sample = reg.sample(X, 10)
         np.testing.assert_array_equal(y_sample, y_sample_exp)
         self.assertRaises(ValueError, reg.sample, X=[])
+
+    def test_sample_uses_the_same_fallback_as_predict(self):
+        # A refit that fails leaves the copied estimator answering from the
+        # superseded training data. Sampling must report the fallback target
+        # distribution `predict` reports, not those stale targets.
+        X, y = [[0.0]], [100.0]
+        estimator = GaussianProcessRegressor(
+            kernel=ConstantKernel(1.0), optimizer=None
+        ).fit(X, y)
+        reg = SklearnRegressor(estimator)
+        with self.assertWarns(UserWarning):
+            reg.fit(X, [MISSING_LABEL])
+        self.assertFalse(reg.is_fitted_)
+
+        with self.assertWarns(UserWarning):
+            y_samples = reg.sample_y(X, n_samples=2000, random_state=0)
+        with self.assertWarns(UserWarning):
+            mean, std = reg.predict(X, return_std=True)
+
+        self.assertEqual(y_samples.shape, (1, 2000))
+        np.testing.assert_allclose(y_samples.mean(), mean[0], atol=0.1)
+        np.testing.assert_allclose(y_samples.std(), std[0], atol=0.1)
+
+    def test_sample_falls_back_without_a_not_fitted_error(self):
+        # An estimator that was never fitted need not raise `NotFittedError`
+        # from its sampling method. A non-unit kernel would otherwise expose
+        # its prior instead of the fallback distribution.
+        X = [[0.0]]
+        reg = SklearnRegressor(
+            GaussianProcessRegressor(
+                kernel=ConstantKernel(4.0), optimizer=None
+            )
+        )
+        with self.assertWarns(UserWarning):
+            reg.fit(X, [MISSING_LABEL])
+
+        with self.assertWarns(UserWarning):
+            y_samples = reg.sample_y(X, n_samples=2000, random_state=0)
+
+        self.assertEqual(y_samples.shape, (1, 2000))
+        np.testing.assert_allclose(y_samples.mean(), 0.0, atol=0.1)
+        np.testing.assert_allclose(y_samples.std(), 1.0, atol=0.1)
+
+    def test_sample_delegates_after_a_successful_fit(self):
+        # Delegation is unchanged whenever the estimator could be fitted.
+        X, y = [[0.0], [1.0]], [1.0, 2.0]
+        kernel = ConstantKernel(1.0)
+        reg = SklearnRegressor(
+            GaussianProcessRegressor(kernel=kernel, optimizer=None)
+        ).fit(X, y)
+        expected = (
+            GaussianProcessRegressor(kernel=kernel, optimizer=None)
+            .fit(X, y)
+            .sample_y(X, 3, random_state=0)
+        )
+
+        np.testing.assert_array_equal(
+            reg.sample_y(X, 3, random_state=0), expected
+        )
 
     def test_pipeline(self):
         X = np.linspace(-3, 3, 100)

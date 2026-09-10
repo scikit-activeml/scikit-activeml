@@ -1141,6 +1141,48 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
             np.zeros((2, 1)),
         )
 
+    def test_sample_proba_follows_tiny_asymmetric_concentrations(self):
+        # Every gamma draw underflows to zero at these concentrations. The
+        # Dirichlet then degenerates to the simplex vertices, which carry the
+        # normalized concentrations rather than a uniform mass.
+        for prior, expected in (
+            ([1e-100, 9e-100], [0.1, 0.9]),
+            ([1e-3, 9e-3], [0.1, 0.9]),
+            ([1.0, 3.0], [0.25, 0.75]),
+        ):
+            with self.subTest(class_prior=prior):
+                clf = DummyClassFrequencyEstimator(
+                    freq=np.zeros((1, 2)),
+                    class_prior=prior,
+                    classes=[0, 1],
+                )
+                clf.classes_ = np.array([0, 1])
+                clf.class_prior_ = np.array(prior)
+
+                P = clf.sample_proba(
+                    np.zeros((1, 1)), n_samples=20000, random_state=0
+                )
+
+                assert_allclose(P.sum(axis=-1), 1)
+                assert_allclose(P.mean(axis=0)[0], expected, atol=0.02)
+
+    def test_multilabel_sample_proba_follows_tiny_concentrations(self):
+        # The multi-label implementation makes the same vertex choice, once
+        # per output.
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.zeros((1, 2, 2)),
+            class_prior=1,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(np.zeros((2, 1)), np.array([["no", "on"], ["yes", "off"]]))
+        clf.class_prior_ = np.array([[1e-100, 9e-100], [9e-100, 1e-100]])
+
+        P = clf.sample_proba(np.zeros((1, 1)), n_samples=20000, random_state=0)
+
+        assert_allclose(P.sum(axis=-1), 1)
+        assert_allclose(P.mean(axis=0)[0][..., 1], [0.9, 0.1], atol=0.02)
+
     def test_multilabel_sample_proba_returns_full_binary_vectors(self):
         clf = DummyMultilabelClassFrequencyEstimator(
             freq=np.array(
