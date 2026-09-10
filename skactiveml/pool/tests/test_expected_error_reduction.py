@@ -11,8 +11,8 @@ from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
-    _cmp_object_dict,
 )
+from skactiveml.tests.utils import assert_state_unchanged
 from skactiveml.utils import MISSING_LABEL, is_labeled
 
 
@@ -107,10 +107,11 @@ class TemplateTestExpectedErrorReduction(
 
                 qs = self.qs_class(**self.init_default_params)
                 qs.query(**query_params)
-                self.assertTrue(
-                    _cmp_object_dict(
-                        query_params["clf"].__dict__, clf.__dict__
-                    ),
+                assert_state_unchanged(
+                    self,
+                    query_params["clf"],
+                    clf,
+                    name="clf",
                     msg=f"Classifier changed after calling query for "
                     f"`fit_clf={fit_clf}`.",
                 )

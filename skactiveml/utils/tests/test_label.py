@@ -2,7 +2,10 @@ import unittest
 
 import numpy as np
 
-from skactiveml.utils._label import _observed_numerical_labels
+from skactiveml.utils._label import (
+    _check_labels,
+    _observed_numerical_labels,
+)
 from skactiveml.utils import (
     is_labeled,
     is_unlabeled,
@@ -427,6 +430,37 @@ class TestLabel(unittest.TestCase):
         self.assertRaises(
             TypeError, check_missing_label, missing_label="2", target_type=int
         )
+
+    def test_check_missing_label_maps_bytes_target_type_to_strings(self):
+        # A bytes dtype holds the string label family, so it constrains the
+        # missing label like any other string dtype.
+        check_missing_label("", target_type=np.dtype("S5"))
+        check_missing_label("none", target_type=np.dtype("S5"))
+        for missing_label in (np.nan, 2, True):
+            with self.subTest(missing_label=missing_label):
+                self.assertRaises(
+                    TypeError,
+                    check_missing_label,
+                    missing_label=missing_label,
+                    target_type=np.dtype("S5"),
+                )
+
+    def test_check_missing_label_ignores_unreadable_target_type(self):
+        # A `target_type` NumPy cannot read as a dtype lies outside the label
+        # contract and therefore constrains no missing label, just as an
+        # object dtype does. The label helpers reject the values instead.
+        for target_type in ("nonsense", object(), np.dtype(object)):
+            with self.subTest(target_type=target_type):
+                for missing_label in (np.nan, None, "none", 2):
+                    check_missing_label(missing_label, target_type=target_type)
+
+    def test_check_labels_rejects_an_unknown_task(self):
+        # A precondition of the private helper: its callers pass the task of
+        # a resolved target specification, so no public input reaches this.
+        with self.assertRaisesRegex(
+            ValueError, "'classification' or 'regression'"
+        ):
+            _check_labels(np.array([0, 1]), np.nan, task="ranking")
 
     def test_check_equal_missing_label(self):
         self.assertRaises(

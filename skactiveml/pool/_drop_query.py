@@ -2,6 +2,8 @@
 Module implementing the pool-based query strategy `DropQuery`.
 """
 
+from copy import copy, deepcopy
+
 import numpy as np
 from sklearn.cluster import KMeans
 
@@ -216,6 +218,15 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             fit_name="fit_clf",
             estimator_types=(SkactivemlClassifier,),
         )
+        if not fit_clf:
+            # A refitted classifier is already a clone, whereas a prefitted
+            # one is the caller's object. `predict` draws from its
+            # `random_state_` to break ties, so predicting on it would leave
+            # the caller with an advanced classifier. Only the generator is
+            # copied: a deep copy would duplicate the whole fitted model on
+            # every query, and the dropout predictions read the rest.
+            clf = copy(clf)
+            clf.random_state_ = deepcopy(clf.random_state_)
         is_multilabel = target_spec.target_type == "multi-label"
 
         # Check `__init__` and `query` parameters.

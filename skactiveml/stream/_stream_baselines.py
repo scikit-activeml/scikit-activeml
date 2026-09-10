@@ -14,6 +14,27 @@ _TASK_AGNOSTIC_CAPABILITIES = frozenset(
 )
 
 
+def _validate_update_state(strategy):
+    """Validate and commit the state an `update` needs.
+
+    This is the part of `_validate_data` not concerning the candidates, which
+    `update` counts rather than validates. It exists because `update` may be
+    called before the first `query`, and validating a placeholder batch
+    instead would commit the placeholder's feature count as the seen one.
+
+    Parameters
+    ----------
+    strategy : SingleAnnotatorStreamQueryStrategy
+        The query strategy being updated.
+    """
+    strategy._validate_random_state()
+    strategy._validate_budget()
+    if not hasattr(strategy, "observed_samples_"):
+        strategy.observed_samples_ = 0
+    if not hasattr(strategy, "queried_samples_"):
+        strategy.queried_samples_ = 0
+
+
 class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     """Random Sampling for Data Streams.
 
@@ -137,12 +158,14 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a random state is set
-        self._validate_data([[0]], False)
+        check_scalar(
+            self.allow_exceeding_budget, "allow_exceeding_budget", bool
+        )
+        _validate_update_state(self)
         # update observed samples and queried samples
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
-        self.observed_samples_ += candidates.shape[0]
+        self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
         # update the random state assuming, that query(..., simulate=True) was
         # used
@@ -309,8 +332,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a budgetmanager is set
-        self._validate_data(np.array([[0]]), False)
+        _validate_update_state(self)
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
         self.observed_samples_ += len(queried)

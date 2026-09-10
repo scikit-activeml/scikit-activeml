@@ -16,13 +16,12 @@ from docs.generate import (
     is_skactiveml_method,
 )
 from skactiveml import pool, stream
+from skactiveml.base import QueryStrategy
 
-from skactiveml.pool import ExpectedErrorReduction
+from skactiveml.pool import ExpectedErrorReduction, multiannotator
+from skactiveml.pool.tests._strategy_helpers import _instantiate
 from skactiveml.pool.tests.test_multilabel_contracts import (
-    MULTILABEL_DELEGATING_WRAPPERS,
-    MULTILABEL_PREDICTION_CONSUMERS,
-    MULTILABEL_PROBA_CONSUMERS,
-    MULTILABEL_TASK_AGNOSTIC,
+    MULTILABEL_CAPABILITY,
 )
 from skactiveml.stream import UncertaintyZliobaite, CognitiveDualQueryStrategy
 
@@ -31,6 +30,35 @@ QUERY_STRATEGY_EXCEPTIONS_LIST = [
     UncertaintyZliobaite,
     CognitiveDualQueryStrategy,
 ]
+
+# The subpackages contributing examples, i.e. the ones the gallery tags are
+# harvested from.
+EXAMPLE_SUBPACKAGES = (pool, multiannotator, stream)
+
+
+def _multilabel_capable_strategy_names():
+    """Collect the names of the strategies declaring multi-label support.
+
+    The declarations themselves are read rather than a hand-maintained list,
+    because a tag has to follow whatever its strategy declares. The scan spans
+    every subpackage contributing examples, whereas the enforced inventories
+    of `skactiveml.pool.tests.test_multilabel_contracts` cover pool strategies
+    only.
+
+    Capabilities are read from a default configuration, so a strategy
+    declaring them per parameter, e.g. `UncertaintySampling` through `method`,
+    is judged by its default.
+    """
+    names = set()
+    for module in EXAMPLE_SUBPACKAGES:
+        for name in dir(module):
+            obj = getattr(module, name)
+            if not inspect.isclass(obj) or not issubclass(obj, QueryStrategy):
+                continue
+            capabilities = _instantiate(obj)._target_capabilities
+            if MULTILABEL_CAPABILITY in capabilities:
+                names.add(obj.__name__)
+    return names
 
 
 class TestExamples(unittest.TestCase):
@@ -165,16 +193,8 @@ class TestExamples(unittest.TestCase):
                 self.assertEqual(expected, summarized)
                 self.assertEqual(expected, detailed)
 
-    def test_multilabel_tags_match_capability_inventory(self):
-        expected_strategies = {
-            strategy.__name__
-            for strategy in (
-                MULTILABEL_PROBA_CONSUMERS
-                | MULTILABEL_PREDICTION_CONSUMERS
-                | MULTILABEL_TASK_AGNOSTIC
-                | MULTILABEL_DELEGATING_WRAPPERS
-            )
-        }
+    def test_multilabel_tags_match_declared_capabilities(self):
+        expected_strategies = _multilabel_capable_strategy_names()
         examples_by_strategy = {}
         for root, dirs, files in os.walk(self.json_path, topdown=True):
             for filename in files:

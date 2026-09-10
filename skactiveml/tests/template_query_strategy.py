@@ -12,6 +12,7 @@ from sklearn.multioutput import MultiOutputClassifier
 from skactiveml.tests.utils import (
     STREAM_QUERY_STATE_ATTRIBUTES,
     assert_no_query_state,
+    assert_state_unchanged,
     check_positional_args,
     check_test_param_test_availability,
 )
@@ -333,11 +334,11 @@ class TemplateQueryStrategy:
 
                     qs = self.qs_class(**self.init_default_params)
                     qs.query(**query_params)
-                    self.assertTrue(
-                        _cmp_object_dict(
-                            query_params[f"{model_type}"].__dict__,
-                            mdl.__dict__,
-                        ),
+                    assert_state_unchanged(
+                        self,
+                        query_params[f"{model_type}"],
+                        mdl,
+                        name=model_type,
                         msg=f"{model_type} changed after calling query for "
                         f"`fit_{model_type}={fit_type}`.",
                     )
@@ -378,10 +379,11 @@ class TemplateQueryStrategy:
 
                 qs = self.qs_class(**self.init_default_params)
                 qs.query(**query_params)
-                self.assertTrue(
-                    _cmp_object_dict(
-                        query_params[f"{model_type}"].__dict__, mdl.__dict__
-                    ),
+                assert_state_unchanged(
+                    self,
+                    query_params[f"{model_type}"],
+                    mdl,
+                    name=model_type,
                     msg=f"`{model_type}` changed after calling query.",
                 )
 
@@ -2254,47 +2256,125 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                     (self.query_default_params_clf, exclude_clf),
                     (self.query_default_params_reg, exclude_reg),
                 ]:
-                    if not (query_params is None or exclude_case):
-                        query_params = deepcopy(query_params)
-                        for key, val in replace_query_params.items():
-                            query_params[key] = val
-                        update_params = deepcopy(self.update_params)
+                    if query_params is None or exclude_case:
+                        continue
+                    query_params = deepcopy(query_params)
+                    for key, val in replace_query_params.items():
+                        query_params[key] = val
+                    update_params = deepcopy(self.update_params)
 
-                        locals()[f"{test_func}_params"][test_param] = test_val
+                    params = {
+                        "init": init_params,
+                        "query": query_params,
+                        "update": update_params,
+                    }[test_func]
+                    params[test_param] = test_val
 
-                        qs = self.qs_class(**init_params)
-                        if err is None:
-                            qs.query(**query_params)
-                        elif test_func in ["query", "init"]:
-                            self.assertRaises(err, qs.query, **query_params)
-                        else:
-                            func = getattr(qs, test_func)
-                            self.assertRaises(err, func, **update_params)
+                    qs = self.qs_class(**init_params)
+                    # A constructor parameter is validated by the method it
+                    # reaches first, which is `query`. A `query` or `update`
+                    # parameter is validated by the method taking it, so both
+                    # the accepted and the rejected case have to reach that
+                    # method: dispatching an accepted `update` case to `query`
+                    # would test nothing about `update`.
+                    if test_func == "update":
+                        self._check_update_param(qs, update_params, err)
+                    elif err is None:
+                        qs.query(**query_params)
+                    else:
+                        self.assertRaises(err, qs.query, **query_params)
+
+    def _check_update_param(self, qs, update_params, err):
+        """Pass one `update` parameter case to `update` itself.
+
+        Parameters
+        ----------
+        qs : SingleAnnotatorStreamQueryStrategy
+            The freshly constructed query strategy under test.
+        update_params : dict
+            The `update` keyword arguments, holding the tested value.
+        err : type or None
+            The exception `update` is expected to raise, or `None` if it is
+            expected to accept the value.
+        """
+        if err is not None:
+            self.assertRaises(err, qs.update, **update_params)
+            return
+
+        counters_before = _stream_counters(qs)
+        returned = qs.update(**update_params)
+        self.assertIs(
+            returned,
+            qs,
+            msg="`update` has to return the updated query strategy itself.",
+        )
+
+        # `update` counts its candidates rather than validating them, so it
+        # must not commit a feature count. This strategy has not queried yet,
+        # so any `n_features_in_` here comes from `update`.
+        self.assertFalse(
+            hasattr(qs, "n_features_in_"),
+            msg="`update` must not commit `n_features_in_`.",
+        )
+
+        # An accepted batch has to be counted. Not every strategy keeps its
+        # own counters, so this holds wherever the documented counters exist,
+        # either on the strategy or on the budget manager it delegates to.
+        candidates = update_params["candidates"]
+        n_candidates = (
+            candidates.shape[0]
+            if hasattr(candidates, "shape")
+            else len(candidates)
+        )
+        queried_indices = np.asarray(update_params["queried_indices"])
+        expected_deltas = {
+            "observed_samples_": n_candidates,
+            "queried_samples_": len(np.unique(queried_indices)),
+        }
+        counters_after = _stream_counters(qs)
+        for owner, counters in counters_after.items():
+            for name, delta in expected_deltas.items():
+                if name not in counters:
+                    continue
+                before = counters_before.get(owner, {}).get(name, 0)
+                self.assertEqual(
+                    counters[name] - before,
+                    delta,
+                    msg=f"`update` has to advance `{name}` of the {owner} "
+                    f"by {delta}.",
+                )
 
 
-def _cmp_object_dict(d1, d2):
-    keys = np.union1d(d1.keys(), d2.keys())[0]
-    for key in keys:
-        if key not in d1.keys() or key not in d2.keys():
-            return False
-        if hasattr(d1[key], "__dict__") ^ hasattr(d1[key], "__dict__"):
-            return False
-        if hasattr(d1[key], "__dict__") and hasattr(d1[key], "__dict__"):
-            if not _cmp_object_dict(d1[key].__dict__, d2[key].__dict__):
-                return False
-        try:
-            if np.issubdtype(type(d1[key]), np.number) and np.issubdtype(
-                type(d1[key]), np.number
-            ):
-                if np.isnan(d1[key]) == np.isnan(d2[key]):
-                    pass
-                elif np.isnan(d1[key]) ^ np.isnan(d2[key]):
-                    return False
-                else:
-                    if not d1[key].__eq__(d2[key]):
-                        return False
-        except NotImplementedError:
-            pass
-        except Exception:
-            return False
-    return True
+def _stream_counters(qs):
+    """Collect the seen and queried counters of a stream query strategy.
+
+    A strategy either counts the observed and queried samples itself or
+    delegates the count to its budget manager, so both are collected. A
+    counter is reported only once it exists, because a strategy commits its
+    fitted state on its first `query` or `update`.
+
+    Parameters
+    ----------
+    qs : SingleAnnotatorStreamQueryStrategy
+        The query strategy to collect the counters of.
+
+    Returns
+    -------
+    counters : dict of str to dict of str to int
+        The existing counters per owning object, named for the assertion
+        message.
+    """
+    counters = {}
+    owners = {
+        "query strategy": qs,
+        "budget manager": getattr(qs, "budget_manager_", None),
+    }
+    for owner, obj in owners.items():
+        if obj is None:
+            continue
+        counters[owner] = {
+            name: getattr(obj, name)
+            for name in ("observed_samples_", "queried_samples_")
+            if hasattr(obj, name)
+        }
+    return counters

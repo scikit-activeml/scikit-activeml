@@ -1,4 +1,7 @@
 import inspect
+import numbers
+from collections.abc import Mapping, Sequence
+
 import numpy as np
 
 from ..classifier import ParzenWindowClassifier
@@ -45,6 +48,267 @@ def assert_no_query_state(
                 f"`{attribute}` after semantic failure."
             ),
         )
+
+
+def state_difference(actual, expected, name="state"):
+    """Describe the first difference between two object states.
+
+    The comparison is recursive and by value: objects are compared through
+    their attributes, mappings and sequences element by element, and numeric
+    arrays and scalars with equal-NaN semantics, so that two states holding
+    `nan` in the same place count as equal. Random generators are compared
+    through their drawn-from state, so that an advanced generator counts as a
+    difference.
+
+    Objects are only comparable when they have the same type. An object the
+    recursion cannot decompose falls back on `==` where its type defines one,
+    and counts as equal otherwise, because two copies of a state without
+    attributes and without value equality, e.g. a function, are
+    indistinguishable here.
+
+    Parameters
+    ----------
+    actual : object
+        The state to check, e.g. the estimator a query was given.
+    expected : object
+        The state to check against, e.g. a copy taken before the query.
+    name : str, default="state"
+        Name of the compared state, used to root the reported path.
+
+    Returns
+    -------
+    difference : str or None
+        Human-readable description of the first difference found, naming the
+        path to it, or `None` if both states are equal.
+    """
+    return _state_difference(actual, expected, name, set())
+
+
+def assert_state_unchanged(test_case, actual, expected, name="state", msg=""):
+    """Assert that two object states are equal by value.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case reporting the failure.
+    actual : object
+        The state to check, e.g. the estimator a query was given.
+    expected : object
+        The state to check against, e.g. a copy taken before the query.
+    name : str, default="state"
+        Name of the compared state, used to root the reported path.
+    msg : str, default=""
+        Message prefixed to the reported difference.
+    """
+    difference = state_difference(actual, expected, name=name)
+    test_case.assertIsNone(
+        difference, msg=f"{msg} {difference}" if msg else difference
+    )
+
+
+def _state_difference(actual, expected, path, seen):
+    """Return the first difference between two states, or `None`."""
+    if actual is expected:
+        return None
+    if type(actual) is not type(expected):
+        return (
+            f"`{path}` changed type from `{type(expected).__name__}` to "
+            f"`{type(actual).__name__}`."
+        )
+    # Guard against the cycles an estimator referring back to its owner
+    # creates. A pair under comparison is equal unless a difference is found
+    # elsewhere, which is what the enclosing call reports.
+    pair = (id(actual), id(expected))
+    if pair in seen:
+        return None
+    seen.add(pair)
+
+    if isinstance(actual, (str, bytes)):
+        return _compare_values(actual == expected, actual, expected, path)
+    if isinstance(actual, np.random.RandomState):
+        return _state_difference(
+            actual.get_state(), expected.get_state(), f"{path}.state", seen
+        )
+    if isinstance(actual, np.random.Generator):
+        return _state_difference(
+            actual.bit_generator.state,
+            expected.bit_generator.state,
+            f"{path}.bit_generator.state",
+            seen,
+        )
+    if isinstance(actual, np.ndarray):
+        return _array_difference(actual, expected, path, seen)
+    if isinstance(actual, (numbers.Number, np.bool_)):
+        return _compare_values(
+            _scalars_equal(actual, expected), actual, expected, path
+        )
+    if isinstance(actual, Mapping):
+        return _mapping_difference(actual, expected, path, seen)
+    if isinstance(actual, (set, frozenset)):
+        return _compare_values(actual == expected, actual, expected, path)
+    if isinstance(actual, Sequence):
+        return _sequence_difference(actual, expected, path, seen)
+
+    attributes = _attribute_state(actual)
+    expected_attributes = _attribute_state(expected)
+    if attributes is not None or expected_attributes is not None:
+        return _mapping_difference(
+            attributes or {}, expected_attributes or {}, path, seen
+        )
+    if type(actual).__eq__ is not object.__eq__:
+        return _compare_values(
+            _equal_or_identical(actual, expected), actual, expected, path
+        )
+    # Two objects of the same type without discoverable state and without
+    # value equality, e.g. a function, are indistinguishable here. Comparing
+    # them by identity would report every copy as a difference.
+    return None
+
+
+def _array_difference(actual, expected, path, seen):
+    """Return the first difference between two arrays, or `None`."""
+    if actual.shape != expected.shape:
+        return (
+            f"`{path}` changed shape from {expected.shape} to {actual.shape}."
+        )
+    if actual.dtype != expected.dtype:
+        return (
+            f"`{path}` changed dtype from `{expected.dtype}` to "
+            f"`{actual.dtype}`."
+        )
+    if actual.dtype.kind == "O":
+        # Object arrays hold arbitrary values, which only the general
+        # recursion can compare.
+        for index, (value, expected_value) in enumerate(
+            zip(actual.ravel(), expected.ravel())
+        ):
+            difference = _state_difference(
+                value, expected_value, f"{path}.ravel()[{index}]", seen
+            )
+            if difference is not None:
+                return difference
+        return None
+    equal = _elementwise_equal(actual, expected)
+    if equal is None:
+        return _compare_values(
+            _equal_or_identical(actual, expected), actual, expected, path
+        )
+    if equal.all():
+        return None
+    index = np.unravel_index(np.argmax(~equal), equal.shape)
+    position = "".join(f"[{axis}]" for axis in index)
+    return (
+        f"`{path}{position}` changed from {expected[index]!r} to "
+        f"{actual[index]!r}."
+    )
+
+
+def _elementwise_equal(actual, expected):
+    """Compare two arrays element by element, treating `nan` as equal."""
+    try:
+        with np.errstate(invalid="ignore"):
+            equal = np.asarray(actual == expected)
+        if actual.dtype.kind in "fc":
+            equal = equal | (np.isnan(actual) & np.isnan(expected))
+    except (TypeError, ValueError):
+        return None
+    if equal.dtype != bool or equal.shape != actual.shape:
+        return None
+    return equal
+
+
+def _mapping_difference(actual, expected, path, seen):
+    """Return the first difference between two mappings, or `None`."""
+    missing = [key for key in expected if key not in actual]
+    if missing:
+        return f"`{_key_path(path, missing[0])}` is missing."
+    added = [key for key in actual if key not in expected]
+    if added:
+        return f"`{_key_path(path, added[0])}` was added."
+    for key in expected:
+        difference = _state_difference(
+            actual[key], expected[key], _key_path(path, key), seen
+        )
+        if difference is not None:
+            return difference
+    return None
+
+
+def _sequence_difference(actual, expected, path, seen):
+    """Return the first difference between two sequences, or `None`."""
+    if len(actual) != len(expected):
+        return (
+            f"`{path}` changed length from {len(expected)} to {len(actual)}."
+        )
+    for index, (value, expected_value) in enumerate(zip(actual, expected)):
+        difference = _state_difference(
+            value, expected_value, f"{path}[{index}]", seen
+        )
+        if difference is not None:
+            return difference
+    return None
+
+
+def _key_path(path, key):
+    """Extend a state path by a mapping key or an attribute name."""
+    if isinstance(key, str) and key.isidentifier():
+        return f"{path}.{key}"
+    return f"{path}[{key!r}]"
+
+
+def _attribute_state(obj):
+    """Return the attributes holding an object's state, or `None`.
+
+    An object storing its state in `__slots__` or in a C extension exposes it
+    through `__getstate__` rather than through `__dict__`. An object with no
+    attributes at all reports `None`, so that the caller can fall back on
+    value equality instead of accepting an empty state as equal.
+    """
+    state = getattr(obj, "__dict__", None)
+    if state:
+        return dict(state)
+    try:
+        state = obj.__getstate__()
+    except (AttributeError, TypeError):
+        return None
+    return dict(state) if isinstance(state, Mapping) and state else None
+
+
+def _scalars_equal(actual, expected):
+    """Compare two numbers, treating `nan` as equal to `nan`."""
+    try:
+        actual_nan, expected_nan = bool(np.isnan(actual)), bool(
+            np.isnan(expected)
+        )
+    except (TypeError, ValueError):
+        return _equal_or_identical(actual, expected)
+    if actual_nan or expected_nan:
+        return actual_nan and expected_nan
+    return _equal_or_identical(actual, expected)
+
+
+def _equal_or_identical(actual, expected):
+    """Compare two values by `==`, falling back to identity."""
+    try:
+        return bool(actual == expected)
+    except Exception:
+        return actual is expected
+
+
+def _compare_values(equal, actual, expected, path):
+    """Report a value difference unless the two values are equal."""
+    if equal:
+        return None
+    return (
+        f"`{path}` changed from {_short_repr(expected)} to "
+        f"{_short_repr(actual)}."
+    )
+
+
+def _short_repr(value, limit=120):
+    """Return a repr short enough for an assertion message."""
+    text = repr(value)
+    return text if len(text) <= limit else f"{text[:limit - 3]}..."
 
 
 def assert_predicts_class_dtype(test_case, y_pred, classes):

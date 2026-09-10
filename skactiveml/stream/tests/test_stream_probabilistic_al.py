@@ -33,10 +33,12 @@ class TestStreamProbabilisticAL(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
+        # The default budget manager keeps one utility per candidate, so
+        # `utilities` has to align with `candidates`.
         self.update_params = {
             "candidates": np.array([[1, 2]]),
             "queried_indices": [],
-            "budget_manager_param_dict": {"utilities": 0.0},
+            "budget_manager_param_dict": {"utilities": [0.0]},
         }
 
     def test_query_preserves_constructor_parameters(self):

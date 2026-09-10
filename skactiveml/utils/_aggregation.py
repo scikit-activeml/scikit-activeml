@@ -37,13 +37,6 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     y[is_unlabeled_y] = 0
     y = y.astype(int)
 
-    if n_classes == 0:
-        raise ValueError(
-            "Number of classes can not be inferred. "
-            "There must be at least one assigned label or classes must not be"
-            "None. "
-        )
-
     w = (
         np.ones_like(y)
         if w is None

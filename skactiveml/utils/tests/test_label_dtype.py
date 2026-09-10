@@ -10,6 +10,7 @@ from skactiveml.utils._label_dtype import (
     _TASK_AGNOSTIC_LABELS,
     _as_class_vocabulary_array,
     _as_label_array,
+    _check_integer_labels,
     _check_missing_label_for_family,
     _check_missing_label_value,
     _holds_missing_label,
@@ -259,6 +260,18 @@ class TestLabelFamily(unittest.TestCase):
         self.assertEqual(_label_family(y, name="y"), "int")
         y = np.array([-1, 2**63 - 1], dtype=object)
         self.assertEqual(_label_family(y, name="y"), "int")
+
+    def test_integer_check_accepts_values_holding_no_integer(self):
+        # `_label_family` only asks for the integer range once an integer is
+        # present, so this guard is reached by a direct call alone.
+        for values in (
+            np.array(["a", "b"], dtype=object),
+            np.array([1.5, np.nan], dtype=object),
+            np.array([np.bool_(True)], dtype=object),
+            np.array([], dtype=object),
+        ):
+            with self.subTest(values=values.tolist()):
+                self.assertIsNone(_check_integer_labels(values, name="y"))
 
     def test_boolean_entries_do_not_constrain_the_integer_dtype(self):
         y = np.array([np.bool_(True), 2**64 - 1], dtype=object)
