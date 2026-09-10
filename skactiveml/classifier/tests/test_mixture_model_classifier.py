@@ -225,6 +225,16 @@ class TestMixtureModelClassifier(
                     cmm.predict_proba([[0], [1]]), np.full((2, 2), 0.5)
                 )
 
+    def test_predict_freq_rejects_negative_frequencies(self):
+        clf = MixtureModelClassifier(classes=[0, 1], random_state=0).fit(
+            np.array([[0.0], [1.0], [2.0], [3.0]]),
+            np.array([0, 1, 0, 1]),
+            sample_weight=np.array([-3.0, 1.0, 1.0, 1.0]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_freq(np.array([[0.0], [1.0], [2.0], [3.0]]))
+
     def test_predict_freq(self):
         mixture = BayesianGaussianMixture(n_components=1)
         mixture.fit(

@@ -1141,6 +1141,34 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
             np.zeros((2, 1)),
         )
 
+    def test_predict_proba_rejects_negative_frequencies(self):
+        clf = DummyClassFrequencyEstimator(
+            freq=np.array([[-2.0, 1.0]]),
+            class_prior=0.0,
+        )
+        clf.classes_ = np.array([0, 1])
+        clf.class_prior_ = np.array([0.0, 0.0])
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_proba(np.zeros((1, 1)))
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.sample_proba(np.zeros((1, 1)), random_state=0)
+
+    def test_multilabel_predict_proba_rejects_negative_frequencies(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.array([[[-2.0, 1.0], [1.0, 3.0]]]),
+            class_prior=0,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            np.zeros((2, 1)),
+            np.array([["no", "on"], ["yes", "off"]]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_proba(np.zeros((1, 1)))
+
     def test_sample_proba_follows_tiny_asymmetric_concentrations(self):
         # Every gamma draw underflows to zero at these concentrations. The
         # Dirichlet then degenerates to the simplex vertices, which carry the

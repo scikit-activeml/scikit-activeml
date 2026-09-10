@@ -25,7 +25,13 @@ class NICKernelRegressor(ProbabilisticRegressor):
     ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
+        `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
+        training targets, so it must not be negative for the given data.
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
+        so only for some data, and `'additive_chi2'` never does because it
+        is non-positive by construction. Prediction raises a `ValueError`
+        when the resulting kernel evidence is negative.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
     mu_0 : int or float, default=0
@@ -147,9 +153,44 @@ class NICKernelRegressor(ProbabilisticRegressor):
         scatter = np.sum(
             K * (self.y_[np.newaxis, :] - mu_ml[:, np.newaxis]) ** 2, axis=1
         )
+        # `N` is a pseudo-count and `scatter` a weighted sum of squares, so a
+        # kernel with negative values makes either negative. Both then reach
+        # the posterior and yield a `NaN` scale rather than any error. The
+        # scatter is checked separately because it can be negative while the
+        # mass stays positive.
+        self._check_kernel_evidence(N, "kernel mass")
+        self._check_kernel_evidence(
+            scatter, "weighted sum of squared deviations (scatter)"
+        )
         var_ml = np.divide(scatter, N, out=np.zeros_like(N), where=N != 0)
 
         return N, mu_ml, var_ml
+
+    def _check_kernel_evidence(self, values, name):
+        """Reject kernel evidence that cannot be a weighted count.
+
+        Parameters
+        ----------
+        values : numpy.ndarray of shape (n_samples,)
+            Kernel-weighted quantity to validate.
+        name : str
+            Name of the quantity reported in the error message.
+
+        Raises
+        ------
+        ValueError
+            If any value is negative.
+        """
+        if np.any(values < 0):
+            raise ValueError(
+                f"The {name} weighting the training targets is negative, the "
+                f"smallest being {np.min(values)}, so it cannot serve as a "
+                "pseudo-count. This happens when `sample_weight` contains "
+                f"negative values, or when `metric={self.metric!r}` produces "
+                "negative similarities on the given data. Use non-negative "
+                "sample weights and a non-negative kernel, e.g. 'rbf' or "
+                "'laplacian', or supply a non-negative 'precomputed' matrix."
+            )
 
     def _estimate_update_params(self, X):
         if len(self.X_) != 0:
@@ -217,7 +258,13 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
+        `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
+        training targets, so it must not be negative for the given data.
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
+        so only for some data, and `'additive_chi2'` never does because it
+        is non-positive by construction. Prediction raises a `ValueError`
+        when the resulting kernel evidence is negative.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
     missing_label : scalar or string or np.nan or or None, default=np.nan

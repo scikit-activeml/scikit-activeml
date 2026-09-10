@@ -122,6 +122,53 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
         pass
 
 
+class TestNICKernelEvidence(unittest.TestCase):
+    def test_predict_rejects_a_negative_kernel_mass(self):
+        # A signed kernel makes the pseudo-count negative, which previously
+        # reached the posterior and produced a `NaN` scale with no error.
+        reg = NICKernelRegressor(metric="linear").fit(
+            [[-2.0], [1.0]], [0.0, 5.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "kernel mass"):
+            reg.predict([[1.0]])
+        with self.assertRaisesRegex(ValueError, "kernel mass"):
+            reg.predict_target_distribution([[1.0]])
+
+    def test_predict_rejects_a_negative_scatter(self):
+        # The weighted sum of squares can be negative while the kernel mass
+        # stays positive, so it needs its own check.
+        reg = NICKernelRegressor(metric="linear").fit(
+            [[-1.0], [3.0]], [10.0, 0.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "scatter"):
+            reg.predict([[1.0]])
+
+    def test_predict_rejects_negative_sample_weights(self):
+        # A non-negative kernel still yields negative evidence when a weight
+        # is negative, so the message must not blame the metric alone.
+        reg = NICKernelRegressor().fit(
+            [[0.0], [1.0]], [0.0, 1.0], sample_weight=[-1.0, 2.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "sample_weight"):
+            reg.predict([[0.0]])
+
+    def test_predict_accepts_non_negative_kernels(self):
+        # The check must not reject the ordinary kernels.
+        for metric in ("rbf", "laplacian"):
+            with self.subTest(metric=metric):
+                reg = NICKernelRegressor(metric=metric).fit(
+                    [[-2.0], [1.0]], [0.0, 5.0]
+                )
+
+                mean, std = reg.predict([[1.0]], return_std=True)
+
+                self.assertTrue(np.all(np.isfinite(mean)))
+                self.assertTrue(np.all(std > 0))
+
+
 class TestNICKernelEstimator(
     TemplateTestNICKernelEstimator, unittest.TestCase
 ):

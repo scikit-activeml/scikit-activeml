@@ -281,6 +281,54 @@ class TestParzenWindowClassifier(
         ).predict_freq(np.ones_like(self.fit_default_params["X"]))
         np.testing.assert_array_equal(F_call, F_rbf)
 
+    def test_predict_freq_rejects_negative_frequencies(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="linear").fit(
+            [[-2.0], [1.0]], [0, 1]
+        )
+
+        for method in (pwc.predict_freq, pwc.predict_proba, pwc.predict):
+            with self.subTest(method=method.__name__):
+                with self.assertRaisesRegex(
+                    ValueError, "negative class frequency"
+                ):
+                    method([[1.0]])
+
+    def test_predict_freq_rejects_a_negative_entry_summing_to_one(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="linear").fit(
+            [[-2.0], [1.0], [3.0]], [0, 1, 1]
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            pwc.predict_proba([[1.0]])
+
+    def test_predict_freq_rejects_a_signed_precomputed_kernel(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="precomputed").fit(
+            np.array([[1.0, -0.5], [-0.5, 1.0]]), [0, 1]
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            pwc.predict_proba(np.array([[-0.5, 1.0]]))
+
+    def test_predict_freq_rejects_negative_sample_weights(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1]).fit(
+            [[0.0], [1.0]], [0, 1], sample_weight=[-1.0, 2.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            pwc.predict_freq([[0.0]])
+
+    def test_predict_freq_rejects_negative_frequencies_for_multi_label(self):
+        pwc = ParzenWindowClassifier(
+            classes=[[0, 1], [0, 1]], metric="linear"
+        ).fit([[-2.0], [1.0]], [[0, 1], [1, 0]])
+
+        for x in ([[1.0]], [[-1.0]]):
+            with self.subTest(x=x):
+                with self.assertRaisesRegex(
+                    ValueError, "negative class frequency"
+                ):
+                    pwc.predict_proba(x)
+
     def test_predict_freq_uses_contributing_samples_only(self):
         n_kernel_calls = 0
 

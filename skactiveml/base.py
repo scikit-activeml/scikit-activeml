@@ -1953,9 +1953,50 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
                 (n_samples, n_outputs, 2)
             The class frequency estimates of the test samples `X`. For
             multi-label targets, the final axis follows each output's
-            canonical binary class vocabulary.
+            canonical binary class vocabulary. Implementations must return
+            non-negative frequencies, because `predict_proba` and
+            `sample_proba` reject negative ones.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _check_frequencies(F, name="predict_freq"):
+        """Reject class frequency estimates that are not counts.
+
+        A frequency counts evidence for a class, so it can never be negative.
+        Normalizing a negative estimate would produce a vector that is not a
+        probability distribution, which every consumer downstream would take
+        at face value. Which inputs can drive an estimate negative depends on
+        the subclass, so the message stays general and refers the reader to
+        that subclass's own documentation.
+
+        Parameters
+        ----------
+        F : numpy.ndarray
+            Class frequency estimates to validate.
+        name : str, default="predict_freq"
+            Name of the quantity reported in the error message.
+
+        Returns
+        -------
+        F : numpy.ndarray
+            The validated estimates, unchanged.
+
+        Raises
+        ------
+        ValueError
+            If any estimate is negative.
+        """
+        if np.any(np.asarray(F) < 0):
+            raise ValueError(
+                f"`{name}` returned a negative class frequency, the smallest "
+                f"being {np.min(F)}. A frequency counts weighted evidence "
+                "for a class and can therefore never be negative. Check the "
+                "inputs and parameters this estimator derives its "
+                "frequencies from, whose documentation states which of them "
+                "must be non-negative."
+            )
+        return F
 
     def predict_proba(self, X, **kwargs):
         """Return probability estimates for the test data `X`.
@@ -1973,9 +2014,15 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             targets, each entry is the probability of the second class in the
             corresponding canonical binary class vocabulary. An output with
             zero estimated frequencies and zero prior has probability `0.5`.
+
+        Raises
+        ------
+        ValueError
+            If `predict_freq` returns a negative class frequency.
         """
         out = self.predict_freq(X, **kwargs)
         F = out[0] if isinstance(out, tuple) else out
+        self._check_frequencies(F)
         P = F + self.class_prior_
         target_type = getattr(
             getattr(self, "target_spec_", None),
@@ -1984,9 +2031,12 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         if target_type == "multi-label":
             normalizer = np.sum(P, axis=-1)
-            nonzero = normalizer > 0
-            P[nonzero] /= normalizer[nonzero, np.newaxis]
-            P[~nonzero] = 0.5
+            positive = normalizer > 0
+            P[positive] /= normalizer[positive, np.newaxis]
+            # Only a genuinely zero output can remain, because negative
+            # frequencies and priors are both rejected. Masking a negative
+            # one as `0.5` here would hide invalid evidence.
+            P[normalizer == 0] = 0.5
             return P[..., 1]
 
         normalizer = np.sum(P, axis=1)
@@ -2021,12 +2071,13 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Raises
         ------
         ValueError
-            If any class has zero frequency observations after adding the
-            prior. Set a positive `class_prior` to make every Dirichlet
-            parameter positive.
+            If `predict_freq` returns a negative class frequency, or if any
+            class has no frequency observations after adding the prior. Set a
+            positive `class_prior` to make every Dirichlet parameter positive.
         """
         random_state = check_random_state(random_state)
-        alphas = self.predict_freq(X) + self.class_prior_
+        alphas = self._check_frequencies(self.predict_freq(X))
+        alphas = alphas + self.class_prior_
         target_type = getattr(
             getattr(self, "target_spec_", None),
             "target_type",
@@ -2034,9 +2085,9 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         if target_type == "multi-label":
             alphas = np.repeat(alphas[np.newaxis], n_samples, axis=0)
-            if (alphas == 0).any():
+            if (alphas <= 0).any():
                 raise ValueError(
-                    "There are zero frequency observations. "
+                    "There are no frequency observations. "
                     "Set `class_prior > 0` to avoid this error."
                 )
             R = random_state.standard_gamma(alphas)
@@ -2050,9 +2101,9 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             return R / R.sum(axis=-1, keepdims=True)
 
         alphas = alphas.repeat(repeats=n_samples, axis=0)
-        if (alphas == 0).any():
+        if (alphas <= 0).any():
             raise ValueError(
-                "There are zero frequency observations. "
+                "There are no frequency observations. "
                 "Set `class_prior > 0` to avoid this error."
             )
         R = random_state.standard_gamma(alphas)

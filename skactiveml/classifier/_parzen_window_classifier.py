@@ -50,7 +50,14 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         non-negative prior number of samples per class for every output.
     metric : str or callable, default='rbf'
         The metric must be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
+        `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
+        class counts, so it must not be negative for the given data.
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
+        so only for some data, and `'additive_chi2'` never does because it
+        is non-positive by construction. A `'precomputed'` matrix and a
+        callable are the caller's responsibility. `predict_freq` raises a
+        `ValueError` when the resulting frequencies are negative.
     n_neighbors : int or None, default=None
         Number of nearest neighbours. The neighbours are selected among the
         training samples carrying class frequencies, i.e., the labeled samples
@@ -301,7 +308,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
                     F[i, :] = (
                         K[i, indices[i]] @ self._V_contributing[indices[i], :]
                     )
-        return F
+        return self._check_frequencies(F)
 
     def _cache_contributing_samples(self):
         """Cache the training samples with non-zero class frequencies.

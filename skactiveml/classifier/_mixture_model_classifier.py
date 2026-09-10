@@ -261,4 +261,4 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
                 else (len(X), len(self.classes_))
             )
             F = np.zeros(output_shape)
-        return F
+        return self._check_frequencies(F)
