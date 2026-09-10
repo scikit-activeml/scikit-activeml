@@ -1164,20 +1164,30 @@ def conditional_expect(
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
 
-            if quantile_method == "trapezoid":
-                expectation = integrate.trapezoid(
-                    output, dx=1 / n_integration_samples, axis=1
+            # The evaluation points are spaced `dx` apart and span the
+            # probability mass `covered`, leaving one such step at either end
+            # uncovered. Those tails cannot be evaluated because `ppf` is
+            # infinite at 0 and 1, so the closed rules integrate the interior
+            # only and are divided by the mass they actually cover. Without
+            # that division they would not even return a constant integrand
+            # unchanged.
+            dx = 1 / (n_integration_samples + 1)
+            covered = (n_integration_samples - 1) * dx
+
+            if quantile_method == "average" or covered == 0:
+                # A single evaluation point spans no interval, which leaves
+                # the closed rules nothing to integrate.
+                expectation = np.average(output, axis=-1)
+            elif quantile_method == "trapezoid":
+                expectation = (
+                    integrate.trapezoid(output, dx=dx, axis=1) / covered
                 )
             elif quantile_method == "simpson":
-                expectation = integrate.simpson(
-                    output, dx=1 / n_integration_samples, axis=1
+                expectation = (
+                    integrate.simpson(output, dx=dx, axis=1) / covered
                 )
-            elif quantile_method == "average":
-                expectation = np.average(output, axis=-1)
             else:  # quantile_method equals "romberg"
-                expectation = integrate.romb(
-                    output, dx=1 / n_integration_samples, axis=1
-                )
+                expectation = integrate.romb(output, dx=dx, axis=1) / covered
         else:  # quantile_method equals "quadrature"
 
             def fixed_quad_function_wrapper(inner_eval_points):

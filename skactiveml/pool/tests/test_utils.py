@@ -18,6 +18,7 @@ from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
     conditional_expect,
+    expected_target_val,
     _reshape_scipy_dist,
     _update_X_y,
     _update_reg,
@@ -859,6 +860,146 @@ class TestApproximation(unittest.TestCase):
             )
 
             np.testing.assert_array_equal(res, np.zeros(2))
+
+    def test_conditional_expectation_normalizes_every_quantile_method(self):
+        # A zero-valued integrand cannot detect a multiplicative error, so
+        # every quantile method is pinned against analytically known values.
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+        quantile_methods = [
+            "trapezoid",
+            "simpson",
+            "romberg",
+            "average",
+            "quadrature",
+        ]
+
+        # An even grid is covered because the default is even and because
+        # `simpson` corrects its final interval there, making its weights
+        # asymmetric. Normalization must hold regardless.
+        for quantile_method, vector_func, n_samples in itertools.product(
+            quantile_methods, [True, False, "both"], [9, 10]
+        ):
+            with self.subTest(
+                quantile_method=quantile_method,
+                vector_func=vector_func,
+                n_integration_samples=n_samples,
+            ):
+                kwargs = dict(
+                    X=X,
+                    reg=reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=n_samples,
+                    vector_func=vector_func,
+                )
+
+                # A constant integrand must come back unchanged, which only
+                # holds if the quadrature weights sum to one.
+                constant = conditional_expect(
+                    func=lambda idx, x, y: np.full_like(
+                        np.asarray(y, dtype=float), 2.5
+                    ),
+                    **kwargs,
+                )
+                np.testing.assert_allclose(constant, np.full(len(X), 2.5))
+
+                # Shifting the integrand must shift the expectation by the
+                # same amount.
+                plain = conditional_expect(
+                    func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,
+                    **kwargs,
+                )
+                shifted = conditional_expect(
+                    func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2 + 3,
+                    **kwargs,
+                )
+                np.testing.assert_allclose(shifted - plain, np.full(len(X), 3))
+
+    def test_expected_target_val_normalizes_a_constant_integrand(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+
+        for quantile_method in [
+            "trapezoid",
+            "simpson",
+            "romberg",
+            "average",
+            "quadrature",
+        ]:
+            with self.subTest(quantile_method=quantile_method):
+                result = expected_target_val(
+                    X,
+                    lambda y: np.full_like(np.asarray(y, dtype=float), 2.5),
+                    reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=9,
+                )
+                np.testing.assert_allclose(result, np.full(len(X), 2.5))
+
+    def test_conditional_expectation_recovers_the_target_mean(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+        expected = reg.predict(X)
+
+        for quantile_method in [
+            "trapezoid",
+            "simpson",
+            "romberg",
+            "average",
+            "quadrature",
+        ]:
+            with self.subTest(quantile_method=quantile_method):
+                result = conditional_expect(
+                    X=X,
+                    func=lambda idx, x, y: np.asarray(y, dtype=float),
+                    reg=reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=49,
+                    vector_func=True,
+                )
+                np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_conditional_expectation_handles_degenerate_quantile_grids(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+
+        for (
+            quantile_method,
+            n_integration_samples,
+            vector_func,
+        ) in itertools.product(
+            ["trapezoid", "simpson", "romberg", "average", "quadrature"],
+            [1, 2, 3],
+            [True, False],
+        ):
+            with self.subTest(
+                quantile_method=quantile_method,
+                n_integration_samples=n_integration_samples,
+                vector_func=vector_func,
+            ):
+                result = conditional_expect(
+                    X=X,
+                    func=lambda idx, x, y: np.ones_like(
+                        np.asarray(y, dtype=float)
+                    ),
+                    reg=reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=n_integration_samples,
+                    vector_func=vector_func,
+                )
+                np.testing.assert_allclose(result, np.ones(len(X)))
 
     def test_reshape_distribution(self):
         dist = norm(loc=np.array([0, 0]))
