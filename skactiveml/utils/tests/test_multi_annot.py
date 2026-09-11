@@ -1,11 +1,70 @@
 import unittest
 
 import numpy as np
+from sklearn.metrics import confusion_matrix
 
 from skactiveml.utils import ext_confusion_matrix
 
 
 class TestMultiAnnot(unittest.TestCase):
+    def test_ext_confusion_matrix_preserves_requested_class_order(self):
+        actual = ext_confusion_matrix([0, 0, 1], [0, 1, 1], classes=[1, 0])
+
+        np.testing.assert_array_equal(
+            actual,
+            [[[1, 0], [1, 1]]],
+        )
+
+    def test_ext_confusion_matrix_selects_requested_class_subset(self):
+        actual = ext_confusion_matrix([0, 0, 1], [0, 1, 1], classes=[0])
+
+        np.testing.assert_array_equal(actual, [[[1]]])
+
+    def test_ext_confusion_matrix_order_with_missing_annotator_labels(self):
+        y_true = np.array([0, 0, 0, 1, 1, 1, 1])
+        y_pred = np.array(
+            [
+                [0, 1],
+                [0, 0],
+                [1, np.nan],
+                [0, 0],
+                [0, 1],
+                [0, 0],
+                [np.nan, 0],
+            ]
+        )
+        classes = [1, 0]
+
+        for normalize in (None, "true", "pred", "all"):
+            with self.subTest(normalize=normalize):
+                actual = ext_confusion_matrix(
+                    y_true,
+                    y_pred,
+                    classes=classes,
+                    normalize=normalize,
+                )
+                expected = []
+                for predictions in y_pred.T:
+                    observed = ~np.isnan(predictions)
+                    expected.append(
+                        confusion_matrix(
+                            y_true[observed],
+                            predictions[observed],
+                            labels=classes,
+                            normalize=normalize,
+                        )
+                    )
+
+                np.testing.assert_array_equal(actual, expected)
+
+    def test_ext_confusion_matrix_keeps_unobserved_requested_classes(self):
+        actual = ext_confusion_matrix([0, 0, 1], [0, 1, 1], classes=[2, 1, 0])
+
+        np.testing.assert_array_equal(
+            actual,
+            [[[0, 0, 0], [0, 1, 0], [0, 1, 1]]],
+        )
+
     def test_ext_confusion_matrix(self):
         y_true = ["4", "7", None]
         y_pred = ["3", None, "8"]

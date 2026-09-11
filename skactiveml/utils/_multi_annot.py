@@ -7,6 +7,10 @@ from sklearn.utils.validation import (
 )
 
 from ._label import MISSING_LABEL, is_labeled, is_unlabeled
+from ._label_dtype import (
+    _as_class_vocabulary_array,
+    _check_compatible_kinds,
+)
 from ._label_encoder import ExtLabelEncoder
 
 
@@ -35,8 +39,10 @@ def ext_confusion_matrix(
         Estimated targets as returned by multiple annotators.
     classes : array-like of shape (n_classes,), default=None
         List of class labels to index the matrix. This may be used to reorder
-        or select a subset of labels. If `None` is given, those that appear
-        at least once in `y_true` or `y_pred` are used in sorted order.
+        or select a subset of labels. Rows and columns follow the supplied
+        order exactly. Pass an estimator's `classes_` to use its canonical
+        class order. If `None` is given, labels that appear at least once in
+        `y_true` or `y_pred` are used in sorted order.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     normalize : 'true' or 'pred' or 'all', default=None
@@ -73,12 +79,37 @@ def ext_confusion_matrix(
         raise ValueError(
             "'normalize' must be one of {'true', 'pred', 'all', " "None}."
         )
-    le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     y = np.column_stack((y_true, y_pred))
+    le = ExtLabelEncoder(missing_label=missing_label)
     y = le.fit_transform(y)
     if np.sum(is_unlabeled(y[:, 0], missing_label=-1)):
         raise ValueError("'y_true' is not allowed to contain missing labels.")
-    n_classes = len(le.classes_)
+
+    if classes is None:
+        class_indices = np.arange(len(le.classes_))
+    else:
+        # Validate the requested report labels independently from the observed
+        # class vocabulary. Unlike estimator vocabularies, their order defines
+        # the rows and columns of the returned matrices, and they may be a
+        # strict subset of the observed labels.
+        ExtLabelEncoder(classes=classes, missing_label=missing_label).fit([])
+        report_classes = _as_class_vocabulary_array(classes)
+        _check_compatible_kinds(le.classes_, report_classes, name="classes")
+
+        class_indices = []
+        next_unobserved_index = len(le.classes_)
+        for class_label in report_classes:
+            try:
+                class_index = le.transform([class_label])[0]
+            except ValueError:
+                # A requested but unobserved label needs a distinct index so
+                # that sklearn retains its all-zero row and column.
+                class_index = next_unobserved_index
+                next_unobserved_index += 1
+            class_indices.append(class_index)
+        class_indices = np.asarray(class_indices, dtype=int)
+
+    n_classes = len(class_indices)
     n_annotators = y_pred.shape[1]
 
     # Determine confusion matrix for each annotator.
@@ -89,7 +120,7 @@ def ext_confusion_matrix(
             cm = confusion_matrix(
                 y_true=y[is_not_nan_a, 0],
                 y_pred=y[is_not_nan_a, a + 1],
-                labels=np.arange(n_classes),
+                labels=class_indices,
             )
         else:
             cm = np.zeros((n_classes, n_classes))
