@@ -659,7 +659,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             query_default_params_reg,
         )
         self.update_params = {
-            "candidates": [[]],
+            "candidates": [[0]],
             "queried_indices": [],
         }
 
@@ -1048,7 +1048,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
     def test_update_param_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(Dummy, TypeError), ([[]], None), ([[0]], None)]
+        test_cases += [(Dummy, ValueError), ([[]], ValueError), ([[0]], None)]
         self._test_param("update", "candidates", test_cases)
 
     def test_update_param_queried_indices(self, test_cases=None):
