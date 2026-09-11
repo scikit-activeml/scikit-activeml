@@ -1001,6 +1001,62 @@ class TestApproximation(unittest.TestCase):
                 )
                 np.testing.assert_allclose(result, np.ones(len(X)))
 
+    def test_conditional_expectation_romberg_point_count(self):
+        # Romberg needs `2**k + 1` points. The count must be raised to the
+        # smallest such value that is not below the request, and a request
+        # already of that form must be left alone.
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+
+        for requested, expected in [
+            (1, 2),
+            (2, 2),
+            (3, 3),
+            (4, 5),
+            (5, 5),
+            (6, 9),
+            (8, 9),
+            (9, 9),
+            (10, 17),
+            (17, 17),
+        ]:
+            with self.subTest(n_integration_samples=requested):
+                used = []
+
+                def spy(idx, x, y):
+                    used.append(np.shape(y)[1])
+                    return np.zeros_like(np.asarray(y, dtype=float))
+
+                conditional_expect(
+                    X=X,
+                    func=spy,
+                    reg=reg,
+                    method="quantile",
+                    quantile_method="romberg",
+                    n_integration_samples=requested,
+                    vector_func=True,
+                )
+                self.assertEqual(used, [expected])
+
+    def test_conditional_expectation_names_the_sample_count_parameter(self):
+        # The bound check used to report a parameter name that the function
+        # does not accept.
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+
+        with self.assertRaisesRegex(ValueError, "n_integration_samples"):
+            conditional_expect(
+                X=np.arange(2 * 3).reshape((2, 3)),
+                func=lambda idx, x, y: np.zeros_like(
+                    np.asarray(y, dtype=float)
+                ),
+                reg=reg,
+                n_integration_samples=0,
+            )
+
     def test_reshape_distribution(self):
         dist = norm(loc=np.array([0, 0]))
         _reshape_scipy_dist(dist, shape=(2, 1))

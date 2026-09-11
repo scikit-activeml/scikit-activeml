@@ -1109,7 +1109,9 @@ def conditional_expect(
             None,
         ],
     )
-    check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
+    check_scalar(
+        n_integration_samples, "n_integration_samples", int, min_val=1
+    )
     check_type(quad_dict, "scipy_args", dict, target_vals=[None])
     check_type(vector_func, "vector_func", bool, target_vals=["both"])
     _check_callable(func, "func", n_positional_parameters=3)
@@ -1121,10 +1123,12 @@ def conditional_expect(
     if quad_dict is None:
         quad_dict = {}
     if method == "quantile" and quantile_method == "romberg":
-        # n_integration_samples need to be of the form 2**k + 1
-        n_integration_samples = (
-            2 ** int(np.log2(n_integration_samples) + 1) + 1
-        )
+        # `romb` needs `2**k + 1` points. Take the smallest such count that
+        # is not below the requested one, so a count already of that form is
+        # kept. Rounding the exponent through `log2` instead would raise
+        # every exact power of two by a further factor of two.
+        gaps = max(n_integration_samples - 1, 1)
+        n_integration_samples = (1 << (gaps - 1).bit_length()) + 1
     is_optional = vector_func == "both"
     if is_optional:
         vector_func = True
