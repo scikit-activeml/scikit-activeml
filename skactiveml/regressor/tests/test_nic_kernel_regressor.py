@@ -86,11 +86,13 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
         X = np.array([[0, 0], [1, 1], [2, 2]])
         y_missing = np.full(3, MISSING_LABEL)
         reg.fit(X, y_missing)
-        y_return = reg.predict([[0, 0]])
+        y_return, y_std, y_entropy = reg.predict(
+            [[0, 0]], return_std=True, return_entropy=True
+        )
+        np.testing.assert_array_equal(y_return, [0])
         if self.estimator_class_string == "NadarayaWatsonRegressor":
-            self.assertTrue(np.isnan(y_return[0]))
-        else:
-            self.assertEqual(y_return, 0)
+            np.testing.assert_array_equal(y_std, [1])
+            self.assertTrue(np.isfinite(y_entropy).all())
 
         start_params = self.start_parameter
         if self.estimator_class_string == "NICKernelRegressor":
@@ -123,6 +125,14 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
 
 
 class TestNICKernelEvidence(unittest.TestCase):
+    def test_predict_rejects_an_improper_prior_without_labels(self):
+        reg = NICKernelRegressor(kappa_0=0).fit([[0.0]], [np.nan])
+
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict([[0.0]])
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict_target_distribution([[0.0]])
+
     def test_predict_rejects_a_negative_kernel_mass(self):
         # A signed kernel makes the pseudo-count negative, which previously
         # reached the posterior and produced a `NaN` scale with no error.
@@ -154,6 +164,33 @@ class TestNICKernelEvidence(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "sample_weight"):
             reg.predict([[0.0]])
+
+    def test_predict_reports_samples_without_posterior_evidence(self):
+        # Nadaraya-Watson puts no weight on the prior mean, so a sample the
+        # kernel gives zero mass has an undefined mean. That used to be a
+        # silent `NaN` from a division rather than an error.
+        reg = NadarayaWatsonRegressor(metric_dict={"gamma": 500.0}).fit(
+            [[0.0], [1.0]], [0.0, 1.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict([[50.0]])
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict_target_distribution([[50.0]])
+
+        # A sample the kernel does reach is unaffected.
+        mean, std = reg.predict([[0.1]], return_std=True)
+        self.assertTrue(np.all(np.isfinite(mean)))
+        self.assertTrue(np.all(np.isfinite(std)))
+
+    def test_predict_falls_back_to_the_prior_with_a_positive_kappa(self):
+        # A positive `kappa_0` gives the prior mean enough weight to answer
+        # for a sample with no kernel mass, so nothing is rejected there.
+        reg = NICKernelRegressor(
+            mu_0=2.0, kappa_0=0.5, metric_dict={"gamma": 500.0}
+        ).fit([[0.0], [1.0]], [0.0, 1.0])
+
+        np.testing.assert_allclose(reg.predict([[50.0]]), [2.0])
 
     def test_predict_accepts_non_negative_kernels(self):
         # The check must not reject the ordinary kernels.

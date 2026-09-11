@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import t
+from scipy.stats import norm, t
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
@@ -221,6 +221,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
+        # Check before combining, because the combination is where the
+        # undefined mean would be divided into existence.
+        self._check_posterior_evidence(prior_params[0] + update_params[0])
         post_params = _combine_params(prior_params, update_params)
 
         kappa_post, nu_post, mu_post, sigma_sq_post = post_params
@@ -229,6 +232,37 @@ class NICKernelRegressor(ProbabilisticRegressor):
         loc = mu_post
         scale = np.sqrt((1 + kappa_post) / kappa_post * sigma_sq_post)
         return t(df=df, loc=loc, scale=scale)
+
+    def _check_posterior_evidence(self, kappa_post):
+        """Reject test samples the posterior says nothing about.
+
+        The posterior weight on the target mean is `kappa_0` plus the kernel
+        mass over the labeled training samples. A positive `kappa_0` lets a
+        test sample the kernel does not reach fall back to the prior mean.
+        When both are zero the mean is undefined, and the divisions
+        computing it would silently return `NaN` instead.
+
+        Parameters
+        ----------
+        kappa_post : numpy.ndarray of shape (n_samples,)
+            Posterior weight on the target mean, per test sample.
+
+        Raises
+        ------
+        ValueError
+            If any test sample carries no posterior weight.
+        """
+        without_evidence = kappa_post <= 0
+        if np.any(without_evidence):
+            raise ValueError(
+                f"{np.sum(without_evidence)} of {len(kappa_post)} test "
+                "samples carry no evidence for the target mean, so it is "
+                "undefined for them. The kernel gives them zero mass and "
+                f"`kappa_0={self.kappa_0}` puts no weight on the prior mean "
+                "either. Widen the kernel, e.g. with a smaller 'gamma' in "
+                "`metric_dict`, or use a positive `kappa_0` so that such "
+                "samples fall back to the prior mean."
+            )
 
 
 def _combine_params(prior_params, update_params):
@@ -275,6 +309,12 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     target_type : "auto" or "single-output", default="auto"
         Declared target type. This estimator supports only single-output
         regression.
+
+    Notes
+    -----
+    Without observed targets, the Nadaraya-Watson estimate is undefined. This
+    estimator then returns a standard normal fallback distribution, with mean
+    zero and standard deviation one, until labeled data are fitted.
     """
 
     def __init__(
@@ -295,3 +335,13 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
             nu_0=3,
             sigma_sq_0=1,
         )
+
+    def predict_target_distribution(self, X):
+        """Return the estimated or fallback target distribution."""
+        check_is_fitted(self)
+        if len(self.X_) != 0:
+            return super().predict_target_distribution(X)
+
+        X = check_array(X)
+        check_n_features(self, X, reset=False)
+        return norm(loc=np.zeros(len(X)), scale=np.ones(len(X)))
