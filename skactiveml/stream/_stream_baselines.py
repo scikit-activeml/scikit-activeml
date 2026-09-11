@@ -121,8 +121,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a random state is set
-        self._validate_data([[0]], False)
+        candidates, _ = self._validate_data(candidates, False)
         # update observed samples and queried samples
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
@@ -287,8 +286,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a budgetmanager is set
-        self._validate_data(np.array([[0]]), False)
+        candidates, _ = self._validate_data(candidates, False)
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
         self.observed_samples_ += len(queried)

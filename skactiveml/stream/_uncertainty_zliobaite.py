@@ -171,6 +171,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates, _ = super()._validate_data(candidates, False)
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
