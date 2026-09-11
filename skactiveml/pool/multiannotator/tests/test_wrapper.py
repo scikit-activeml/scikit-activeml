@@ -1,6 +1,7 @@
 from functools import wraps
 import unittest
 from unittest.mock import patch
+import warnings
 
 import numpy as np
 from sklearn.datasets import make_blobs
@@ -431,6 +432,51 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ),
             [],
         )
+
+    def test_nested_subsampling_uses_effective_wrapped_batch_size(self):
+        X = np.arange(10, dtype=float).reshape(5, 2)
+        y = np.full((5, 2), MISSING_LABEL)
+
+        for max_candidates, retained, expected_batch_size in (
+            (1, [4], 2),
+            (2, [3, 4], 3),
+        ):
+            with self.subTest(max_candidates=max_candidates):
+                wrapper = SingleAnnotatorWrapper(
+                    SubSamplingWrapper(
+                        RandomSampling(random_state=0),
+                        max_candidates=max_candidates,
+                        random_state=0,
+                    ),
+                    random_state=0,
+                )
+
+                with warnings.catch_warnings(record=True) as caught_warnings:
+                    warnings.simplefilter("always")
+                    query_indices, utilities = wrapper.query(
+                        X,
+                        y,
+                        batch_size=3,
+                        return_utilities=True,
+                    )
+
+                self.assertEqual(query_indices.shape, (expected_batch_size, 2))
+                self.assertEqual(
+                    utilities.shape, (expected_batch_size, len(X), y.shape[1])
+                )
+                self.assertEqual(
+                    len(np.unique(query_indices, axis=0)), expected_batch_size
+                )
+                self.assertTrue(np.isin(query_indices[:, 0], retained).all())
+                excluded = np.setdiff1d(np.arange(len(X)), retained)
+                self.assertTrue((~np.isfinite(utilities[:, excluded])).all())
+                if expected_batch_size < 3:
+                    self.assertTrue(
+                        any(
+                            "sample-annotator pairs" in str(warning.message)
+                            for warning in caught_warnings
+                        )
+                    )
 
     def test_init_param_strategy(self):
         wrapper = SingleAnnotatorWrapper(MixtureModelClassifier())
