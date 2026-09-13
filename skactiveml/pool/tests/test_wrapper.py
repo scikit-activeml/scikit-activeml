@@ -10,7 +10,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
-from skactiveml.regressor import SklearnRegressor
+from skactiveml.regressor import SklearnRegressor, NICKernelRegressor
 from skactiveml.pool import (
     SubSamplingWrapper,
     ParallelUtilityEstimationWrapper,
@@ -19,6 +19,8 @@ from skactiveml.pool import (
     UncertaintySampling,
     RandomSampling,
     CoreSet,
+    MonteCarloEER,
+    ExpectedModelOutputChange,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
@@ -643,6 +645,156 @@ class TestSubSamplingWrapper(
         ]
         self._test_param("init", "embed_samples_func", test_cases)
 
+    def _aligned_kwargs_setting(self):
+        """Return samples, labels, and a classifier for weighted queries."""
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+                [1.5, -2.0],
+                [0.5, 0.5],
+                [-0.5, -1.0],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1], y[2] = 0.0, 1.0, 0.0
+        clf = ParzenWindowClassifier(classes=[0, 1])
+        return X, y, clf
+
+    def test_query_param_sample_weight_aligned_to_samples(self):
+        X, y, clf = self._aligned_kwargs_setting()
+        sample_weight = np.linspace(0.2, 2.0, len(X))
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        for candidates in [None, candidate_indices, X[candidate_indices]]:
+            results = []
+            for exclude_non_subsample in [False, True]:
+                qs = SubSamplingWrapper(
+                    UncertaintySampling(random_state=0),
+                    max_candidates=3,
+                    exclude_non_subsample=exclude_non_subsample,
+                    random_state=0,
+                )
+                results.append(
+                    qs.query(
+                        X=X,
+                        y=y,
+                        candidates=candidates,
+                        clf=deepcopy(clf),
+                        sample_weight=sample_weight,
+                        return_utilities=True,
+                    )
+                )
+            np.testing.assert_array_equal(results[0][0], results[1][0])
+            np.testing.assert_allclose(results[0][1], results[1][1])
+
+    def test_query_param_weights_aligned_to_candidates(self):
+        X, y, clf = self._aligned_kwargs_setting()
+        candidates = X[unlabeled_indices(y, MISSING_LABEL)]
+        weights = np.linspace(0.5, 3.0, len(candidates))
+        for query_strategy, name in [
+            (UncertaintySampling(random_state=0), "utility_weight"),
+            (MonteCarloEER(random_state=0), "sample_weight_candidates"),
+        ]:
+            qs = SubSamplingWrapper(
+                deepcopy(query_strategy),
+                max_candidates=len(candidates),
+                random_state=0,
+            )
+            indices, utilities = qs.query(
+                X=X,
+                y=y,
+                candidates=candidates,
+                clf=deepcopy(clf),
+                return_utilities=True,
+                **{name: weights},
+            )
+            expected_indices, expected_utilities = deepcopy(
+                query_strategy
+            ).query(
+                X=X,
+                y=y,
+                candidates=candidates,
+                clf=deepcopy(clf),
+                return_utilities=True,
+                **{name: weights},
+            )
+            np.testing.assert_array_equal(indices, expected_indices)
+            np.testing.assert_allclose(utilities, expected_utilities)
+
+    def test_query_param_utility_weight_aligned_to_samples(self):
+        X, y, clf = self._aligned_kwargs_setting()
+        utility_weight = np.linspace(0.5, 3.0, len(X))
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        for candidates in [None, candidate_indices]:
+            results = []
+            for exclude_non_subsample in [False, True]:
+                qs = SubSamplingWrapper(
+                    UncertaintySampling(random_state=0),
+                    max_candidates=3,
+                    exclude_non_subsample=exclude_non_subsample,
+                    random_state=0,
+                )
+                results.append(
+                    qs.query(
+                        X=X,
+                        y=y,
+                        candidates=candidates,
+                        clf=deepcopy(clf),
+                        utility_weight=utility_weight,
+                        return_utilities=True,
+                    )
+                )
+            np.testing.assert_array_equal(results[0][0], results[1][0])
+            np.testing.assert_allclose(results[0][1], results[1][1])
+
+    def test_query_param_aligned_kwargs_leave_caller_arrays(self):
+        # Subsetting the aligned keyword arguments must not modify the
+        # arrays of the caller.
+        X, y, clf = self._aligned_kwargs_setting()
+        candidates = X[unlabeled_indices(y, MISSING_LABEL)]
+        sample_weight = np.linspace(0.2, 2.0, len(X))
+        utility_weight = np.linspace(0.5, 3.0, len(candidates))
+        expected_sample_weight = sample_weight.copy()
+        expected_utility_weight = utility_weight.copy()
+        qs = SubSamplingWrapper(
+            UncertaintySampling(random_state=0),
+            max_candidates=3,
+            exclude_non_subsample=True,
+            random_state=0,
+        )
+        qs.query(
+            X=X,
+            y=y,
+            candidates=candidates,
+            clf=deepcopy(clf),
+            sample_weight=sample_weight,
+            utility_weight=utility_weight,
+        )
+        np.testing.assert_array_equal(sample_weight, expected_sample_weight)
+        np.testing.assert_array_equal(utility_weight, expected_utility_weight)
+
+    def test_query_param_aligned_kwargs_of_wrong_length(self):
+        X, y, clf = self._aligned_kwargs_setting()
+        qs = SubSamplingWrapper(
+            UncertaintySampling(random_state=0),
+            max_candidates=3,
+            exclude_non_subsample=True,
+            random_state=0,
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            "sample_weight",
+            qs.query,
+            X=X,
+            y=y,
+            clf=deepcopy(clf),
+            sample_weight=np.ones(len(X) - 2),
+        )
+
     def test_query_param_candidates_embedded_like_samples(self):
         X = np.array(
             [
@@ -720,6 +872,87 @@ class TestSubSamplingWrapper(
                         np.testing.assert_allclose(
                             utilities, expected_utilities
                         )
+
+    def test_query_param_X_eval_embedded_like_samples(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+                [1.5, -2.0],
+                [0.5, 0.5],
+            ]
+        )
+        X_eval = np.array([[3.0, 3.0], [-3.0, -3.0], [0.5, 2.0]])
+        y_class = np.full(len(X), MISSING_LABEL)
+        y_class[0], y_class[1] = 0.0, 1.0
+        y_reg = np.full(len(X), np.nan)
+        y_reg[0], y_reg[1] = 0.3, 1.7
+        embed_samples_funcs = [
+            lambda x: x[:, :1],
+            lambda x: x + 5.0,
+            lambda x: x * np.array([1.0, 10.0]),
+        ]
+        strategies = [
+            (
+                MonteCarloEER(random_state=0),
+                y_class,
+                {"clf": ParzenWindowClassifier(classes=[0, 1])},
+            ),
+            (
+                ExpectedModelOutputChange(random_state=0),
+                y_reg,
+                {"reg": NICKernelRegressor()},
+            ),
+        ]
+        for query_strategy, y, query_kwargs in strategies:
+            for embed_samples_func in embed_samples_funcs:
+                for exclude_non_subsample in [False, True]:
+                    init_params = {
+                        "max_candidates": 3,
+                        "exclude_non_subsample": exclude_non_subsample,
+                        "random_state": 0,
+                    }
+                    qs = SubSamplingWrapper(
+                        deepcopy(query_strategy),
+                        embed_samples_func=embed_samples_func,
+                        **init_params,
+                    )
+                    indices, utilities = qs.query(
+                        X=X,
+                        y=y,
+                        X_eval=X_eval,
+                        return_utilities=True,
+                        **deepcopy(query_kwargs),
+                    )
+                    qs_expected = SubSamplingWrapper(
+                        deepcopy(query_strategy), **init_params
+                    )
+                    expected_indices, expected_utilities = qs_expected.query(
+                        X=embed_samples_func(X),
+                        y=y,
+                        X_eval=embed_samples_func(X_eval),
+                        return_utilities=True,
+                        **deepcopy(query_kwargs),
+                    )
+                    np.testing.assert_array_equal(indices, expected_indices)
+                    np.testing.assert_allclose(utilities, expected_utilities)
+
+    def test_query_param_X_eval_leaves_caller_array(self):
+        X, y, clf = self._aligned_kwargs_setting()
+        X_eval = np.array([[3.0, 3.0], [-3.0, -3.0]])
+        expected_X_eval = X_eval.copy()
+        qs = SubSamplingWrapper(
+            MonteCarloEER(random_state=0),
+            max_candidates=3,
+            embed_samples_func=lambda x: x * np.array([1.0, 10.0]),
+            random_state=0,
+        )
+        qs.query(X=X, y=y, clf=deepcopy(clf), X_eval=X_eval)
+        np.testing.assert_array_equal(X_eval, expected_X_eval)
 
     def test_query_param_embed_samples_func_preserving_dimensions(self):
         X = np.array(

@@ -184,8 +184,12 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
           two-dimensional array, preserving the number and order of samples,
           whereas the remaining dimensions may change. It is applied to
           `candidates`, too, if they are passed as samples instead of
-          indices, such that samples and candidates share a single feature
-          space.
+          indices, and to a sample set passed as the query argument
+          `X_eval`, such that all samples share a single feature space.
+          An estimator that is passed as an already fitted one, i.e., with a
+          query argument such as `fit_clf=False`, must have been fitted in
+          this embedded space, because `query_strategy` scores the embedded
+          samples with it.
         - If `embed_samples_func` is None, no action is performed.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -400,6 +404,28 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             new_X = X
             new_y = y
 
+        # Keyword arguments aligned to a sample set are subset like this
+        # sample set.
+        if candidates is not None and candidates.ndim > 1:
+            X_aligned_kwargs = ["sample_weight"]
+            # `utility_weight` weights the samples whose utilities are
+            # computed, which are the candidate samples in this case.
+            query_kwargs = self._subset_query_kwargs(
+                query_kwargs,
+                ["sample_weight_candidates", "utility_weight"],
+                new_candidate_indices,
+                len(candidates),
+            )
+        else:
+            X_aligned_kwargs = ["sample_weight", "utility_weight"]
+        if self.exclude_non_subsample:
+            query_kwargs = self._subset_query_kwargs(
+                query_kwargs,
+                X_aligned_kwargs,
+                subset_and_labeled_indices,
+                len(X),
+            )
+
         if self.embed_samples_func:
             new_X = self._embed_samples(new_X, "X")
             # Candidates passed as a feature matrix must also be embedded.
@@ -407,6 +433,9 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
                 new_candidates = self._embed_samples(
                     new_candidates, "candidates"
                 )
+            # A keyword argument holding an independent sample set is
+            # embedded but never subset, since it is not aligned to `X`.
+            query_kwargs = self._embed_query_kwargs(query_kwargs, ["X_eval"])
 
         qs_output = query_strategy.query(
             X=new_X,
@@ -472,6 +501,64 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             return new_queried_indices, new_utilities
         else:
             return new_queried_indices
+
+    def _subset_query_kwargs(self, query_kwargs, names, indices, n_aligned):
+        """Subset the keyword arguments in `names` by `indices`.
+
+        Parameters
+        ----------
+        query_kwargs : dict-like
+            Keyword arguments to be passed to the wrapped query strategy.
+        names : list of str
+            Names of the keyword arguments being aligned to the sample set
+            that is subset by `indices`.
+        indices : array-like of shape (n_subset_samples,)
+            Indices of the samples of this sample set being kept.
+        n_aligned : int
+            Number of samples of this sample set before subsetting.
+
+        Returns
+        -------
+        query_kwargs : dict-like
+            Keyword arguments whose aligned entries are subset, leaving the
+            arrays of the caller unchanged.
+        """
+        query_kwargs = dict(query_kwargs)
+        for name in names:
+            value = query_kwargs.get(name)
+            if value is None:
+                continue
+            value = np.asarray(value)
+            # Keyword arguments of an unexpected length are forwarded
+            # unchanged, such that the wrapped query strategy reports them
+            # instead of this wrapper subsetting them into a valid length.
+            if len(value) == n_aligned:
+                query_kwargs[name] = value[indices]
+        return query_kwargs
+
+    def _embed_query_kwargs(self, query_kwargs, names):
+        """Embed the sample sets given by the keyword arguments in `names`.
+
+        Parameters
+        ----------
+        query_kwargs : dict-like
+            Keyword arguments to be passed to the wrapped query strategy.
+        names : list of str
+            Names of the keyword arguments holding a sample set of their own.
+
+        Returns
+        -------
+        query_kwargs : dict-like
+            Keyword arguments whose sample sets are embedded, leaving the
+            arrays of the caller unchanged.
+        """
+        query_kwargs = dict(query_kwargs)
+        for name in names:
+            value = query_kwargs.get(name)
+            if value is None:
+                continue
+            query_kwargs[name] = self._embed_samples(value, name)
+        return query_kwargs
 
     def _embed_samples(self, samples, name):
         """Embed `samples` by applying `embed_samples_func`.

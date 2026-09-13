@@ -420,7 +420,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         ):
             raise ValueError(
                 "If `sample_weight_candidates` is set, it must have same "
-                "length as `X`."
+                "length as `candidates`."
             )
 
         # Concatenate samples
