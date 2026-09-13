@@ -18,6 +18,7 @@ from skactiveml.pool import (
     QueryByCommittee,
     UncertaintySampling,
     RandomSampling,
+    CoreSet,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
@@ -641,6 +642,152 @@ class TestSubSamplingWrapper(
             (func_invalid, TypeError),
         ]
         self._test_param("init", "embed_samples_func", test_cases)
+
+    def test_query_param_candidates_embedded_like_samples(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+                [1.5, -2.0],
+                [0.5, 0.5],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0.0, 1.0
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        embed_samples_funcs = [
+            lambda x: x[:, :1],
+            lambda x: x + 5.0,
+            lambda x: x * np.array([1.0, 10.0]),
+        ]
+        strategies = [
+            (
+                UncertaintySampling(random_state=0),
+                {"clf": ParzenWindowClassifier(classes=[0, 1])},
+            ),
+            (CoreSet(random_state=0), {}),
+        ]
+        for query_strategy, query_kwargs in strategies:
+            for embed_samples_func in embed_samples_funcs:
+                for candidates in [
+                    None,
+                    candidate_indices,
+                    X[candidate_indices],
+                ]:
+                    for exclude_non_subsample in [False, True]:
+                        init_params = {
+                            "max_candidates": 3,
+                            "exclude_non_subsample": exclude_non_subsample,
+                            "random_state": 0,
+                        }
+                        qs = SubSamplingWrapper(
+                            deepcopy(query_strategy),
+                            embed_samples_func=embed_samples_func,
+                            **init_params,
+                        )
+                        indices, utilities = qs.query(
+                            X=X,
+                            y=y,
+                            candidates=candidates,
+                            return_utilities=True,
+                            **deepcopy(query_kwargs),
+                        )
+                        if candidates is None or candidates.ndim == 1:
+                            expected_candidates = candidates
+                        else:
+                            expected_candidates = embed_samples_func(
+                                candidates
+                            )
+                        qs_expected = SubSamplingWrapper(
+                            deepcopy(query_strategy), **init_params
+                        )
+                        expected_indices, expected_utilities = (
+                            qs_expected.query(
+                                X=embed_samples_func(X),
+                                y=y,
+                                candidates=expected_candidates,
+                                return_utilities=True,
+                                **deepcopy(query_kwargs),
+                            )
+                        )
+                        np.testing.assert_array_equal(
+                            indices, expected_indices
+                        )
+                        np.testing.assert_allclose(
+                            utilities, expected_utilities
+                        )
+
+    def test_query_param_embed_samples_func_preserving_dimensions(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0.0, 1.0
+        embed_samples_funcs = [
+            (lambda x: x[:, 0], "X"),
+            (lambda x: x[:, 0] if len(x) < len(X) else x[:, :1], "candidates"),
+        ]
+        for embed_samples_func, name in embed_samples_funcs:
+            qs = SubSamplingWrapper(
+                UncertaintySampling(random_state=0),
+                max_candidates=2,
+                embed_samples_func=embed_samples_func,
+                random_state=0,
+            )
+            self.assertRaisesRegex(
+                ValueError,
+                f"embedding for `{name}`",
+                qs.query,
+                X=X,
+                y=y,
+                candidates=X[2:],
+                clf=ParzenWindowClassifier(classes=[0, 1]),
+            )
+
+    def test_query_param_embed_samples_func_preserving_samples(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0.0, 1.0
+        for embed_samples_func in [
+            lambda x: x[:-1],
+            lambda x: np.vstack([x, x]),
+        ]:
+            qs = SubSamplingWrapper(
+                UncertaintySampling(random_state=0),
+                max_candidates=2,
+                embed_samples_func=embed_samples_func,
+                random_state=0,
+            )
+            for candidates in [None, X[2:]]:
+                self.assertRaisesRegex(
+                    ValueError,
+                    "`embed_samples_func` returned",
+                    qs.query,
+                    X=X,
+                    y=y,
+                    candidates=candidates,
+                    clf=ParzenWindowClassifier(classes=[0, 1]),
+                )
 
     def test_query_param_query_kwargs(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

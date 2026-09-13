@@ -180,7 +180,12 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
         - If `False`, `X` and `y` stay the same.
     embed_samples_func : Callable or None, default=None
         - If `embed_samples_func` is a `Callable`, it must accept the samples
-          `X` as input and return the sample-wise embeddings.
+          `X` as input and return the sample-wise embeddings as an at least
+          two-dimensional array, preserving the number and order of samples,
+          whereas the remaining dimensions may change. It is applied to
+          `candidates`, too, if they are passed as samples instead of
+          indices, such that samples and candidates share a single feature
+          space.
         - If `embed_samples_func` is None, no action is performed.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -396,7 +401,12 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             new_y = y
 
         if self.embed_samples_func:
-            new_X = self.embed_samples_func(new_X)
+            new_X = self._embed_samples(new_X, "X")
+            # Candidates passed as a feature matrix must also be embedded.
+            if candidates is not None and candidates.ndim > 1:
+                new_candidates = self._embed_samples(
+                    new_candidates, "candidates"
+                )
 
         qs_output = query_strategy.query(
             X=new_X,
@@ -462,6 +472,37 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             return new_queried_indices, new_utilities
         else:
             return new_queried_indices
+
+    def _embed_samples(self, samples, name):
+        """Embed `samples` by applying `embed_samples_func`.
+
+        Parameters
+        ----------
+        samples : array-like of shape (n_samples, ...)
+            Samples to be embedded.
+        name : str
+            Name of `samples` being used for the error message.
+
+        Returns
+        -------
+        embedded_samples : array-like of shape (n_samples, ...)
+            The embedded samples in the order of `samples`.
+        """
+        embedded_samples = self.embed_samples_func(samples)
+        if np.ndim(embedded_samples) < 2:
+            raise ValueError(
+                f"`embed_samples_func` returned a "
+                f"{np.ndim(embedded_samples)}-dimensional embedding for "
+                f"`{name}` but must return an at least two-dimensional one."
+            )
+        if len(embedded_samples) != len(samples):
+            raise ValueError(
+                f"`embed_samples_func` returned "
+                f"{len(embedded_samples)} samples for the {len(samples)} "
+                f"samples of `{name}` but must preserve the number and "
+                f"order of samples."
+            )
+        return embedded_samples
 
 
 class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
