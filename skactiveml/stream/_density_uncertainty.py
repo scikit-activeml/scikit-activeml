@@ -216,12 +216,17 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         # calculate the margin used as utillities
         predict_proba = clf.predict_proba(candidates)
-        utilities_index = np.argpartition(predict_proba, -2)[:, -2:]
-        confidence = (
-            np.take_along_axis(predict_proba, utilities_index[:, [1]], 1)
-            - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
-        ).reshape([-1])
-        utilities = 1 - confidence
+        if predict_proba.shape[1] == 1:
+            # The only class has probability one and the implicit second class
+            # has probability zero, yielding zero margin uncertainty.
+            utilities = np.zeros(len(predict_proba))
+        else:
+            utilities_index = np.argpartition(predict_proba, -2)[:, -2:]
+            confidence = (
+                np.take_along_axis(predict_proba, utilities_index[:, [1]], 1)
+                - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
+            ).reshape([-1])
+            utilities = 1 - confidence
         budget_manager = _copy_budget_manager(self.budget_manager_)
         tmp_min_dist = self.min_dist_
         tmp_window = self.window_

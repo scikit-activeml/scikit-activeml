@@ -216,6 +216,22 @@ class TestFalcun(
         self.assertTrue(np.isfinite(utilities[0, 2:]).all())
         self.assertAlmostEqual(np.nansum(utilities), 1.0)
 
+    def test_query_single_class(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, *([MISSING_LABEL] * 3)])
+
+        query_indices, utilities = Falcun(random_state=0).query(
+            X,
+            y,
+            clf=ParzenWindowClassifier(random_state=0),
+            batch_size=2,
+            return_utilities=True,
+        )
+
+        self.assertEqual(len(np.unique(query_indices)), 2)
+        self.assertTrue(np.isfinite(utilities[0, 1:]).all())
+        self.assertAlmostEqual(np.nansum(utilities[0]), 1.0)
+
     def test_query_preserves_raw_nearest_distances_across_batch(self):
         probas = np.array(
             [

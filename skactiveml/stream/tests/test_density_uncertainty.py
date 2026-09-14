@@ -842,3 +842,18 @@ class TestStreamDensityBasedAL(
             5.1317648e-03,
         ]
         return super().test_query(expected_output, expected_utilities)
+
+    def test_query_single_class(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
+        clf = ParzenWindowClassifier(random_state=0).fit(X, y)
+
+        _, utilities = StreamDensityBasedAL(random_state=0).query(
+            X[1:],
+            clf,
+            X=X,
+            y=y,
+            return_utilities=True,
+        )
+
+        np.testing.assert_array_equal(utilities, np.zeros(3))

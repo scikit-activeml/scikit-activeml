@@ -445,16 +445,22 @@ def uncertainty_scores(
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
-            costs = np.partition(costs, 1, axis=1)[:, :2]
-            return costs[:, 0]
+            return np.min(costs, axis=1)
     elif method == "margin_sampling":
         if cost_matrix is None:
             if is_multilabel:
                 per_label_margin = 1 - np.abs(2 * probas - 1)
                 return multilabel_aggregation_fn(per_label_margin, axis=1)
+            if n_classes == 1:
+                return np.zeros(len(probas))
             probas = -(np.partition(-probas, 1, axis=1)[:, :2])
             return 1 - np.abs(probas[:, 0] - probas[:, 1])
         else:
+            if n_classes == 1:
+                raise ValueError(
+                    "Cost-sensitive margin sampling requires at least two "
+                    "classes."
+                )
             costs = probas @ cost_matrix
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return -np.abs(costs[:, 0] - costs[:, 1])

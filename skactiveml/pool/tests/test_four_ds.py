@@ -84,3 +84,30 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         )
         self.assertEqual(0, np.sum(utilities < 0))
         self.assertEqual(0, np.sum(utilities > 1))
+
+    def test_query_single_class(self):
+        X = np.arange(6, dtype=float).reshape(-1, 1)
+        y = np.array(
+            [
+                0.0,
+                MISSING_LABEL,
+                MISSING_LABEL,
+                MISSING_LABEL,
+                MISSING_LABEL,
+                MISSING_LABEL,
+            ]
+        )
+        mixture_model = BayesianGaussianMixture(
+            n_components=1, random_state=0
+        ).fit(X)
+        clf = MixtureModelClassifier(
+            mixture_model=mixture_model,
+            random_state=0,
+        )
+
+        query_indices, utilities = FourDs(random_state=0).query(
+            X, y, clf, return_utilities=True
+        )
+
+        self.assertIn(query_indices[0], range(1, len(X)))
+        self.assertTrue(np.isfinite(utilities[0, 1:]).all())

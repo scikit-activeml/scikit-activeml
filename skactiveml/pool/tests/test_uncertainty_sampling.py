@@ -243,6 +243,29 @@ class TestUncertaintySampling(
         self.assertEqual(utilities.shape, (1, len(candidates)))
         self.assertEqual(best_indices.shape, (1,))
 
+    def test_query_single_class(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
+        clf = ParzenWindowClassifier(random_state=0)
+
+        query_idx, utilities = UncertaintySampling(
+            method="margin_sampling", random_state=0
+        ).query(X, y, clf, return_utilities=True)
+
+        self.assertIn(query_idx[0], [1, 2, 3])
+        self.assertTrue(np.isnan(utilities[0, 0]))
+        np.testing.assert_array_equal(utilities[0, 1:], np.zeros(3))
+
+        _, utilities = UncertaintySampling(
+            method="least_confident", cost_matrix=[[0.0]], random_state=0
+        ).query(X, y, clf, return_utilities=True)
+        np.testing.assert_array_equal(utilities[0, 1:], np.zeros(3))
+
+        with self.assertRaisesRegex(ValueError, "requires at least two"):
+            UncertaintySampling(
+                method="margin_sampling", cost_matrix=[[0.0]]
+            ).query(X, y, clf)
+
     def test_query_multilabel_list_probas(self):
         query_params = deepcopy(self.query_default_params_clf_multilabel)
         query_params["clf"] = SklearnClassifier(
@@ -970,6 +993,28 @@ class TestUncertaintyScores(unittest.TestCase):
         np.testing.assert_allclose(
             np.array([0.4477710424, 0.6154752525]), scores
         )
+
+        single_class_probas = np.ones((2, 1))
+        for method in ["least_confident", "margin_sampling", "entropy"]:
+            with self.subTest(method=method):
+                scores = uncertainty_scores(
+                    single_class_probas,
+                    method=method,
+                )
+                np.testing.assert_array_equal(scores, np.zeros(2))
+
+        scores = uncertainty_scores(
+            single_class_probas,
+            method="least_confident",
+            cost_matrix=[[0.0]],
+        )
+        np.testing.assert_array_equal(scores, np.zeros(2))
+        with self.assertRaisesRegex(ValueError, "requires at least two"):
+            uncertainty_scores(
+                single_class_probas,
+                method="margin_sampling",
+                cost_matrix=[[0.0]],
+            )
 
     def test_multilabel_entropy_is_zero_at_probability_endpoints(self):
         certain_probas = np.array([[0.0, 1.0], [1.0, 0.0]])
