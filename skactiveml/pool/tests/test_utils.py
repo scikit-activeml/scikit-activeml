@@ -225,6 +225,18 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertWarns(Warning, iclf.predict_proba, [0])
         self.assertWarns(Warning, iclf.predict_freq, [0])
 
+        X = np.array([[0.0], [0.2], [1.0]])
+        y = np.array([10.0, 10.0, 20.0])
+        clf = ParzenWindowClassifier(classes=[10, 20]).fit(X, y)
+        iclf = IndexClassifierWrapper(clf, X, y, use_speed_up=True)
+        for pred in ["predict", "predict_proba", "predict_freq"]:
+            with self.subTest(msg="Test prefitted fallback", pred=pred):
+                with self.assertWarns(Warning):
+                    pred_iclf = getattr(iclf, pred)([0, 2])
+                np.testing.assert_allclose(
+                    pred_iclf, getattr(clf, pred)(X[[0, 2]])
+                )
+
     def test_init_param_missing_label(self):
         self.assertTrue(hasattr(self.iclf(), "missing_label"))
         self.assertTrue(

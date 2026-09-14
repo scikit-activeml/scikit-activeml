@@ -62,14 +62,14 @@ class IndexClassifierWrapper:
     set_base_clf : bool, default=False
         If `True`, the base classifier will be set to the newly fitted
         classifier.
-    ignore_partial_fit : bool, default=True
+    ignore_partial_fit : bool, default=False
         Specifies if the `partial_fit` function of `self.clf` should be used
         (if implemented).
     enforce_unique_samples : bool, default=False
         If `True`, `partial_fit` will not simply append additional samples but
         replace the current labels by the new one. If `False`, samples might
         appear multiple times if their indices are repeated.
-    use_speed_up : bool, default=True
+    use_speed_up : bool, default=False
         Specifies if potentially available speed ups should be used. Currently
         implemented for `skactiveml.classifier.ParzenWindowClassifier`, whose
         kernel matrix is then precomputed once. Its kernel parameters are
@@ -555,7 +555,7 @@ class IndexClassifierWrapper:
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
                 warnings.warn("Speed-up not possible when prefitted")
-                return self.clf.predict_proba(self.X[idx])
+                return self.clf.predict(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
@@ -623,7 +623,7 @@ class IndexClassifierWrapper:
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
                 warnings.warn("Speed-up not possible when prefitted")
-                return self.clf.predict_proba(self.X[idx])
+                return self.clf.predict_freq(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
