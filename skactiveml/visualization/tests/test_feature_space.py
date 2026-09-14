@@ -1,5 +1,6 @@
 import os
 import unittest
+import warnings
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -374,6 +375,65 @@ class TestFeatureSpace(unittest.TestCase):
                 confidence=None,
             )
 
+    def test_decision_boundary_predict_only_with_noncanonical_labels(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for labels in (
+            [10, 20, 20, 20, 20],
+            [10.0, 20.0, 20.0, 20.0, 20.0],
+            ["a", "b", "b", "b", "b"],
+        ):
+            with self.subTest(labels=labels[:2]):
+                clf = LinearSVC().fit(X, labels)
+                _, ax = plt.subplots()
+
+                returned_ax = plot_decision_boundary(
+                    clf,
+                    feature_bound=[[-3, -1], [3, 2]],
+                    ax=ax,
+                    res=5,
+                    confidence=None,
+                )
+
+                self.assertIs(returned_ax, ax)
+                self.assertGreater(len(ax.collections), 0)
+
+    def test_decision_boundary_is_invariant_to_relabeling(self):
+        reference_vertices = None
+        for classes in ([0, 1], [10, 20], ["a", "b"], [1.5, 2.5]):
+            with self.subTest(classes=classes):
+                clf = RelabeledPredictOnlyClassifier(classes)
+                _, ax = plt.subplots()
+
+                plot_decision_boundary(
+                    clf,
+                    feature_bound=[[-1, -1], [1, 1]],
+                    ax=ax,
+                    res=5,
+                    confidence=None,
+                )
+
+                vertices = ax.collections[0].get_paths()[0].vertices
+                if reference_vertices is None:
+                    reference_vertices = vertices
+                else:
+                    np.testing.assert_allclose(vertices, reference_vertices)
+
+    def test_decision_boundary_region_with_only_second_class(self):
+        clf = RelabeledPredictOnlyClassifier([0, 1], constant_class=1)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            returned_ax = plot_decision_boundary(
+                clf,
+                feature_bound=[[-1, -1], [1, 1]],
+                res=5,
+                confidence=None,
+            )
+
+        self.assertIsInstance(returned_ax, plt.Axes)
+
     # Tests for plot_utilities function
     def test__general_plot_utilities_param_qs(self):
         self.assertRaises(
@@ -552,6 +612,55 @@ class TestFeatureSpace(unittest.TestCase):
             contour_dict={"linestyles": "."},
         )
 
+    def test_plot_utilities_preserves_categorical_targets(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for missing_label in (None, "?"):
+            with self.subTest(missing_label=missing_label):
+                y = np.array(
+                    ["a", "b", missing_label, missing_label, missing_label],
+                    dtype=object,
+                )
+                qs = UncertaintySampling(missing_label=missing_label)
+                clf = ParzenWindowClassifier(
+                    classes=["a", "b"], missing_label=missing_label
+                )
+                _, ax = plt.subplots()
+
+                returned_ax = plot_utilities(qs, X, y, clf=clf, ax=ax, res=5)
+
+                self.assertIs(returned_ax, ax)
+                self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_utilities_preserves_categorical_multilabel_targets(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for missing_label in (None, "?"):
+            with self.subTest(missing_label=missing_label):
+                y = np.array(
+                    [
+                        ["a", "x"],
+                        ["b", "y"],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                    ],
+                    dtype=object,
+                )
+                qs = RandomSampling(
+                    missing_label=missing_label,
+                    target_type="multi-label",
+                    random_state=0,
+                )
+                _, ax = plt.subplots()
+
+                returned_ax = plot_utilities(qs, X, y, ax=ax, res=5)
+
+                self.assertIs(returned_ax, ax)
+                self.assertGreater(len(ax.collections), 0)
+
     def test_plot_utilities_multilabel_prediction_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
@@ -724,6 +833,62 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIs(returned_axes, axes)
         for ax in returned_axes:
             self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_annotator_utilities_preserves_categorical_targets(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for missing_label in (None, "?"):
+            with self.subTest(missing_label=missing_label):
+                y = np.array(
+                    [
+                        ["a", "a"],
+                        ["b", "b"],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                    ],
+                    dtype=object,
+                )
+                qs = SingleAnnotatorWrapper(
+                    RandomSampling(
+                        missing_label=missing_label, random_state=0
+                    ),
+                    missing_label=missing_label,
+                    random_state=0,
+                )
+
+                returned_axes = plot_annotator_utilities(qs, X, y, res=5)
+
+                self.assertEqual(returned_axes.shape, (2,))
+                for ax in returned_axes:
+                    self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_annotator_utilities_auto_creates_one_axis(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        y = np.array([0.0, 1.0, np.nan, np.nan, np.nan])
+        cases = (
+            (y[:, None], None),
+            (np.column_stack([y, y]), [1]),
+        )
+        for targets, plot_annotators in cases:
+            with self.subTest(plot_annotators=plot_annotators):
+                qs = SingleAnnotatorWrapper(
+                    RandomSampling(random_state=0), random_state=0
+                )
+
+                returned_axes = plot_annotator_utilities(
+                    qs,
+                    X,
+                    targets,
+                    plot_annotators=plot_annotators,
+                    res=5,
+                )
+
+                self.assertEqual(returned_axes.shape, (1,))
+                self.assertIsInstance(returned_axes[0], plt.Axes)
 
     def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
         qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
@@ -1332,6 +1497,19 @@ class TestFeatureSpace(unittest.TestCase):
 
 class TestClassifier(ClassifierMixin):
     pass
+
+
+class RelabeledPredictOnlyClassifier(ClassifierMixin):
+    def __init__(self, classes, constant_class=None):
+        self.classes_ = np.asarray(classes)
+        self.constant_class = constant_class
+
+    def predict(self, X):
+        if self.constant_class is not None:
+            class_indices = np.full(len(X), self.constant_class, dtype=int)
+        else:
+            class_indices = (X[:, 0] >= 0).astype(int)
+        return self.classes_[class_indices]
 
 
 class MultilabelTestClassifier(ClassifierMixin):
