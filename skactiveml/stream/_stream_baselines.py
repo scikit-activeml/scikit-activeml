@@ -121,11 +121,13 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_samples += 1
-            available_budget = (
-                tmp_observed_samples * self.budget_ - tmp_queried_samples
+            # Include exact boundaries that round one ULP below the limit.
+            budget_limit = np.nextafter(
+                tmp_observed_samples * self.budget_, np.inf
             )
             queried[i] = (
-                self.allow_exceeding_budget or available_budget > 1
+                self.allow_exceeding_budget
+                or tmp_queried_samples + 1 <= budget_limit
             ) and (utility >= 1 - self.budget_)
             tmp_queried_samples += queried[i]
 
