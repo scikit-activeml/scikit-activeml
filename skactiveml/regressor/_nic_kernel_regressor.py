@@ -25,8 +25,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
     ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
-        training targets, so it must not be negative for the given data.
+        `sklearn.metrics.pairwise.pairwise_kernels`, or `'precomputed'`.
+        Its values weight the training targets, so it must not be negative
+        for the given data.
         `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
         `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
         so only for some data, and `'additive_chi2'` never does because it
@@ -83,9 +84,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         Parameters
         ----------
-        X : matrix-like of shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features) or \
+                (n_samples, n_samples) if metric='precomputed'
             Training data set, usually complete, i.e., including the labeled
-            and unlabeled samples.
+            and unlabeled samples. If `metric='precomputed'`, `X` contains the
+            pairwise kernels between all training samples.
         y : array-like of shape (n_samples,) or (n_samples, n_targets)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
@@ -97,9 +100,12 @@ class NICKernelRegressor(ProbabilisticRegressor):
         self: SkactivemlRegressor,
             The SkactivemlRegressor is fitted on the training data.
         """
-        X, y, sample_weight = self._validate_data(
-            X, y, sample_weight, reset=self.metric != "precomputed"
-        )
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+        if self.metric == "precomputed" and X.shape[0] != X.shape[1]:
+            raise ValueError(
+                "For metric='precomputed', the training kernel matrix `X` "
+                "must have shape (n_train_samples, n_train_samples)."
+            )
         is_lbld, y_observed = _observed_numerical_labels(
             y, self.missing_label_
         )
@@ -111,6 +117,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
             check_scalar(value, name, (int, float), min_val=0)
         check_scalar(self.mu_0, "self.mu_0", (int, float))
 
+        self._is_lbld = is_lbld
         self.X_ = X[is_lbld]
         self.y_ = y_observed
 
@@ -139,10 +146,38 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         return self
 
+    def _validate_prediction_data(self, X):
+        """Validate feature data or a precomputed test kernel.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features) or \
+                (n_samples, n_train_samples) if metric='precomputed'
+            Input samples or kernels against all samples from the latest fit.
+
+        Returns
+        -------
+        X : numpy.ndarray
+            Validated input data.
+        """
+        X = check_array(X)
+        if self.metric == "precomputed":
+            if X.shape[1] != self.n_features_in_:
+                raise ValueError(
+                    "For metric='precomputed', the kernel matrix `X` must "
+                    "have shape (n_test_samples, n_train_samples)."
+                )
+        else:
+            check_n_features(self, X, reset=False)
+        return X
+
     def _estimate_ml_params(self, X):
-        K = pairwise_kernels(
-            X, self.X_, metric=self.metric, **self.metric_dict
-        )
+        if self.metric == "precomputed":
+            K = X[:, self._is_lbld]
+        else:
+            K = pairwise_kernels(
+                X, self.X_, metric=self.metric, **self.metric_dict
+            )
 
         if self.weights_ is not None:
             K = self.weights_.reshape(1, -1) * K
@@ -207,8 +242,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         Parameters
         ----------
-        X :  array-like of shape (n_samples, n_features)
-            Input samples.
+        X : array-like of shape (n_samples, n_features) or \
+                (n_samples, n_train_samples) if metric='precomputed'
+            Input samples. If `metric='precomputed'`, `X` contains kernels
+            between the test samples and every sample passed to the latest
+            `fit` call.
 
         Returns
         -------
@@ -216,8 +254,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
             The distribution of the targets at the test samples.
         """
         check_is_fitted(self)
-        X = check_array(X)
-        check_n_features(self, X, reset=False)
+        X = self._validate_prediction_data(X)
 
         prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
@@ -292,8 +329,9 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
-        training targets, so it must not be negative for the given data.
+        `sklearn.metrics.pairwise.pairwise_kernels`, or `'precomputed'`.
+        Its values weight the training targets, so it must not be negative
+        for the given data.
         `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
         `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
         so only for some data, and `'additive_chi2'` never does because it
@@ -342,6 +380,5 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
         if len(self.X_) != 0:
             return super().predict_target_distribution(X)
 
-        X = check_array(X)
-        check_n_features(self, X, reset=False)
+        X = self._validate_prediction_data(X)
         return norm(loc=np.zeros(len(X)), scale=np.ones(len(X)))

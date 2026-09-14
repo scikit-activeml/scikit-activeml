@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 from sklearn.exceptions import NotFittedError
+from sklearn.metrics.pairwise import pairwise_kernels
 
 from skactiveml.regressor._nic_kernel_regressor import (
     NICKernelRegressor,
@@ -120,8 +121,68 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
             np.testing.assert_almost_equal(sigma, 0.0245, decimal=3)
 
     def test_predict_target_distribution(self):
-        # TODO: Test is missing
-        pass
+        reg = self.estimator_class(**self.start_parameter).fit(
+            **self.fit_default_params
+        )
+        X = self.predict_default_params["X"]
+
+        y_pred = reg.predict_target_distribution(X).logpdf(0)
+
+        self.assertEqual(y_pred.shape, (len(X),))
+
+    def test_precomputed_matches_feature_kernel_on_fit_and_refit(self):
+        X = np.array([[-1.0, 0.0], [0.0, 0.5], [1.0, 1.5], [2.0, 1.0]])
+        X_test = np.array([[-0.5, 0.25], [0.5, 1.0], [1.5, 1.25]])
+        gamma = 0.7
+        training_sets = [
+            (X, np.array([0.0, 1.0, 3.0, 2.0])),
+            (X[:3], np.array([0.0, np.nan, 3.0])),
+            (X, np.full(4, np.nan)),
+        ]
+
+        precomputed = self.estimator_class(metric="precomputed")
+        for X_train, y in training_sets:
+            K_train = pairwise_kernels(X_train, metric="rbf", gamma=gamma)
+            precomputed.fit(K_train, y)
+            self.assertEqual(precomputed.n_features_in_, len(X_train))
+
+            feature = self.estimator_class(
+                metric="rbf", metric_dict={"gamma": gamma}
+            ).fit(X_train, y)
+            for X_test_batch in (X_test[:1], X_test):
+                K_test = pairwise_kernels(
+                    X_test_batch, X_train, metric="rbf", gamma=gamma
+                )
+                expected = feature.predict(
+                    X_test_batch, return_std=True, return_entropy=True
+                )
+                actual = precomputed.predict(
+                    K_test, return_std=True, return_entropy=True
+                )
+                for actual_part, expected_part in zip(actual, expected):
+                    np.testing.assert_allclose(actual_part, expected_part)
+
+    def test_precomputed_fit_requires_a_square_training_kernel(self):
+        with self.assertRaisesRegex(
+            ValueError, "n_train_samples, n_train_samples"
+        ):
+            self.estimator_class(metric="precomputed").fit(
+                np.ones((3, 2)), [0.0, 1.0, 2.0]
+            )
+
+    def test_precomputed_prediction_requires_all_training_columns(self):
+        X = np.array([[-1.0, 0.0], [0.0, 0.5], [1.0, 1.5], [2.0, 1.0]])
+        X_test = np.array([[-0.5, 0.25], [0.5, 1.0], [1.5, 1.25]])
+        y = np.array([0.0, np.nan, 3.0, np.nan])
+        gamma = 0.7
+        K_train = pairwise_kernels(X, metric="rbf", gamma=gamma)
+        reg = self.estimator_class(metric="precomputed").fit(K_train, y)
+        K_test = pairwise_kernels(X_test, X, metric="rbf", gamma=gamma)
+
+        with self.assertRaisesRegex(
+            ValueError, "n_test_samples, n_train_samples"
+        ):
+            reg.predict(K_test[:, [0, 2]])
 
 
 class TestNICKernelEvidence(unittest.TestCase):
