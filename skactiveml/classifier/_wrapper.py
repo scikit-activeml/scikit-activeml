@@ -3375,15 +3375,14 @@ if successful_river_import:
             ----------
             X : array-like of shape (n_samples, ...)
                 The feature matrix representing the samples.
-            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-                It contains the class labels of the training samples. Missing
-                labels are represented by the attribute `self.missing_label_`.
-                In case of multiple labels per sample (i.e., n_outputs > 1),
-                the samples are duplicated.
-            sample_weight : array-like of shape (n_samples,) or\
-                    (n_samples, n_outputs)
-                It contains the weights of the training samples' class labels.
-                It must have the same shape as `y`.
+            y : array-like of shape (n_samples,)
+                Class labels of the training samples, possibly including
+                missing labels indicated by `self.missing_label`. Only
+                single-output targets from one annotator are supported; see
+                :ref:`target-semantics`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                Weight of each training sample. It must have the same shape as
+                `y`.
 
             Returns
             -------
@@ -3405,15 +3404,14 @@ if successful_river_import:
             ----------
             X : array-like of shape (n_samples, ...)
                 The feature matrix representing the samples.
-            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-                It contains the class labels of the training samples. Missing
-                labels are represented the attribute `self.missing_label_`. In
-                case of multiple labels per sample (i.e., n_outputs > 1), the
-                samples are duplicated.
-            sample_weight : array-like of shape (n_samples,) or\
-                    (n_samples, n_outputs)
-                It contains the weights of the training samples' class labels.
-                It must have the same shape as `y`.
+            y : array-like of shape (n_samples,)
+                Class labels of the training samples, possibly including
+                missing labels indicated by `self.missing_label`. Only
+                single-output targets from one annotator are supported; see
+                :ref:`target-semantics`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                Weight of each training sample. It must have the same shape as
+                `y`.
 
             Returns
             -------
@@ -3497,9 +3495,9 @@ if successful_river_import:
                 Whether the estimator is re-created or updated incrementally.
             X : array-like of shape (n_samples, ...)
                 The feature matrix representing the samples.
-            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-                It contains the class labels of the training samples. Missing
-                labels are represented by the attribute `self.missing_label_`.
+            y : array-like of shape (n_samples,)
+                Class labels of the training samples, possibly including
+                missing labels indicated by `self.missing_label`.
             sample_weight : array-like of shape (n_samples,), default=None
                 It contains the weights of the training samples' class labels.
 
