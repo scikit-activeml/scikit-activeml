@@ -1,4 +1,6 @@
 import numpy as np
+
+from copy import deepcopy
 from scipy.stats import norm, t
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
@@ -139,9 +141,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
             self.weights_ = None
 
         check_type(self.metric, "self.metric", target_vals=self.METRICS)
-        self.metric_dict = {} if self.metric_dict is None else self.metric_dict
         check_type(
             self.metric_dict, "self.metric_dict", dict, target_vals=[None]
+        )
+        self.metric_dict_ = (
+            deepcopy(self.metric_dict) if self.metric_dict is not None else {}
         )
 
         return self
@@ -176,7 +180,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
             K = X[:, self._is_lbld]
         else:
             K = pairwise_kernels(
-                X, self.X_, metric=self.metric, **self.metric_dict
+                X, self.X_, metric=self.metric, **self.metric_dict_
             )
 
         if self.weights_ is not None:

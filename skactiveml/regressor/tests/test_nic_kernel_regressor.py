@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.metrics.pairwise import pairwise_kernels
 
@@ -310,6 +311,30 @@ class TestNICKernelEstimator(
 
         w = np.zeros_like(self.y)
         self.assertRaises(ValueError, reg.fit, self.X, self.y, w)
+
+    def test_fit_preserves_default_metric_dict_parameter(self):
+        reg = NICKernelRegressor()
+
+        reg.fit([[0.0], [1.0]], [0.0, 1.0])
+
+        self.assertIsNone(reg.metric_dict)
+        self.assertIsNone(reg.get_params()["metric_dict"])
+        self.assertIsNone(clone(reg).metric_dict)
+        self.assertEqual(reg.metric_dict_, {})
+
+    def test_prediction_uses_captured_metric_dict(self):
+        metric_dict = {"gamma": 0.5}
+        reg = NICKernelRegressor(metric_dict=metric_dict).fit(
+            [[0.0], [1.0]], [0.0, 1.0]
+        )
+        expected = reg.predict([[0.25]])
+
+        metric_dict["gamma"] = 50.0
+
+        self.assertIs(reg.metric_dict, metric_dict)
+        self.assertIsNot(reg.metric_dict_, metric_dict)
+        self.assertEqual(reg.metric_dict_, {"gamma": 0.5})
+        np.testing.assert_allclose(reg.predict([[0.25]]), expected)
 
     def test_missing_label(self):
         self.missing_label = -1
