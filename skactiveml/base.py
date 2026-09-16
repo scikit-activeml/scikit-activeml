@@ -26,6 +26,7 @@ from .utils._target import (
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
+from .utils._validation import _has_nested_classes
 from .utils import (
     MISSING_LABEL,
     is_labeled,
@@ -34,7 +35,6 @@ from .utils import (
     ExtLabelEncoder,
     rand_argmin,
     resolve_target_spec,
-    _has_nested_classes,
     check_classifier_params,
     check_random_state,
     check_cost_matrix,
@@ -65,7 +65,7 @@ try:
     from collections.abc import Sequence
     from skorch import NeuralNet
     from skorch.utils import to_numpy
-    from .utils import _check_forward_outputs
+    from .utils._validation import _check_forward_outputs
 
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover

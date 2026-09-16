@@ -12,9 +12,9 @@ from skactiveml.utils import (
     check_type,
     simple_batch,
     MISSING_LABEL,
-    _check_callable,
     is_unlabeled,
 )
+from skactiveml.utils._validation import _check_callable
 
 
 class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):

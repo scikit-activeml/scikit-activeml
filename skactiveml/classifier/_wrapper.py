@@ -45,10 +45,9 @@ from ..utils import (
     check_scalar,
     match_signature,
     check_n_features,
-    _has_nested_classes,
     resolve_target_spec,
 )
-from ..utils._validation import _check_probas_are_valid
+from ..utils._validation import _check_probas_are_valid, _has_nested_classes
 
 # used to defer import of capymoa as it may result in an error with pytest
 import importlib

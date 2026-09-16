@@ -33,7 +33,11 @@ from ..utils import (
 )
 from ..utils._wrapper_state import _resolve_own_fitted_attribute
 
-__all__ = ["IndexClassifierWrapper"]
+__all__ = [
+    "IndexClassifierWrapper",
+    "expected_target_val",
+    "conditional_expect",
+]
 
 from ..utils._validation import _check_callable
 

@@ -15,8 +15,8 @@ from skactiveml.utils import (
     MISSING_LABEL,
     check_X_y,
     check_random_state,
-    _check_callable,
 )
+from skactiveml.utils._validation import _check_callable
 
 
 class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
