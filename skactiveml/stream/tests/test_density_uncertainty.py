@@ -1,6 +1,5 @@
 import unittest
 from copy import deepcopy
-from collections import deque
 
 import numpy as np
 from skactiveml.base import BudgetManager
@@ -26,6 +25,7 @@ from sklearn.naive_bayes import GaussianNB
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorStreamQueryStrategy,
 )
+from skactiveml.tests.utils import assert_state_unchanged
 
 
 class RecordingBudgetManager(BudgetManager):
@@ -68,348 +68,237 @@ class FailingBudgetManager(RecordingBudgetManager):
         return self
 
 
-class TestDensityBatchBudget(unittest.TestCase):
-    def setUp(self):
-        self.clf = ParzenWindowClassifier(classes=[0, 1]).fit(
-            [[0.0]], [np.nan]
-        )
+def _empty_classifier():
+    return ParzenWindowClassifier(classes=[0, 1]).fit([[0.0]], [np.nan])
 
-    def test_batch_accounts_for_earlier_acquisitions(self):
-        candidates = (1 - 2.0 ** (-np.arange(20)))[:, None]
-        for strategy_type in (
-            StreamDensityBasedAL,
-            CognitiveDualQueryStrategy,
-        ):
-            with self.subTest(strategy=strategy_type.__name__):
-                kwargs = (
-                    {"force_full_budget": True}
-                    if strategy_type is CognitiveDualQueryStrategy
-                    else {}
-                )
-                strategy = strategy_type(
-                    budget_manager=DensityBasedSplitBudgetManager(
-                        budget=0.1, delta=0.001, random_state=0
-                    ),
-                    random_state=0,
-                    **kwargs,
-                )
-                queried = strategy.query(candidates, self.clf)
-                self.assertEqual(queried, [1, 10])
-                strategy.update(candidates, queried)
-                self.assertEqual(strategy.budget_manager_.t_, 20)
-                self.assertEqual(strategy.budget_manager_.u_, 2)
 
-    def test_update_accepts_its_own_filtered_query_indices(self):
-        strategy = CognitiveDualQueryStrategy(
-            budget_manager=FixedUncertaintyBudgetManager([0, 1], budget=0.1),
-            random_state=0,
-        )
-        candidates = np.array([[0.0], [0.5]])
-        queried = strategy.query(candidates, self.clf)
-        self.assertEqual(queried, [1])
-        self.assertIs(strategy.update(candidates, queried), strategy)
-        self.assertEqual(strategy.budget_manager_.u_t_, 1)
-        self.assertEqual(strategy.t_, 2)
+def _assert_acquisition_state_equal(test_case, actual, expected):
+    assert_state_unchanged(
+        test_case,
+        actual.budget_manager_.__dict__,
+        expected.budget_manager_.__dict__,
+        name="budget_manager",
+    )
+    for name in (
+        "window_",
+        "min_dist_",
+        "cognition_window_",
+        "theta_",
+        "s_",
+        "t_x_",
+        "f_",
+        "t_",
+        "random_state_",
+    ):
+        if hasattr(actual, name):
+            assert_state_unchanged(
+                test_case,
+                getattr(actual, name),
+                getattr(expected, name),
+                name=name,
+            )
 
-    def _assert_state_equal(self, actual, expected):
-        if isinstance(actual, np.random.RandomState):
-            self._assert_state_equal(actual.get_state(), expected.get_state())
-        elif isinstance(actual, dict):
-            self.assertEqual(actual.keys(), expected.keys())
-            for key in actual:
-                self._assert_state_equal(actual[key], expected[key])
-        elif isinstance(actual, (list, tuple, deque)):
-            self.assertEqual(len(actual), len(expected))
-            for a, e in zip(actual, expected):
-                self._assert_state_equal(a, e)
-        else:
-            np.testing.assert_array_equal(actual, expected)
 
-    def _assert_acquisition_state_equal(self, actual, expected):
-        self._assert_state_equal(
-            actual.budget_manager_.__dict__, expected.budget_manager_.__dict__
-        )
-        for name in (
-            "window_",
-            "min_dist_",
-            "cognition_window_",
-            "theta_",
-            "s_",
-            "t_x_",
-            "f_",
-            "t_",
-            "random_state_",
-        ):
-            if hasattr(actual, name):
-                self._assert_state_equal(
-                    getattr(actual, name), getattr(expected, name)
-                )
+def _assert_batch_accounts_for_earlier_acquisitions(test_case, strategy_type):
+    candidates = (1 - 2.0 ** (-np.arange(20)))[:, None]
+    kwargs = (
+        {"force_full_budget": True}
+        if strategy_type is CognitiveDualQueryStrategy
+        else {}
+    )
+    strategy = strategy_type(
+        budget_manager=DensityBasedSplitBudgetManager(
+            budget=0.1, delta=0.001, random_state=0
+        ),
+        random_state=0,
+        **kwargs,
+    )
+    queried = strategy.query(candidates, _empty_classifier())
+    test_case.assertEqual(queried, [1, 10])
+    strategy.update(candidates, queried)
+    test_case.assertEqual(strategy.budget_manager_.t_, 20)
+    test_case.assertEqual(strategy.budget_manager_.u_, 2)
 
-    def test_partition_invariance_for_all_variants(self):
-        candidates = np.concatenate(
-            [
-                np.repeat([0.0, 0.5, 0.75, 0.875], 2),
-                np.linspace(0.9, 0.999, 24),
-            ]
-        )[:, None]
-        original_global_state = np.random.get_state()
-        initial_global_state = np.random.RandomState(17).get_state()
-        try:
-            for strategy_type in (
-                StreamDensityBasedAL,
-                CognitiveDualQueryStrategy,
-                CognitiveDualQueryStrategyRan,
-                CognitiveDualQueryStrategyVarUn,
-                CognitiveDualQueryStrategyRanVarUn,
-                CognitiveDualQueryStrategyFixUn,
-            ):
-                modes = (
-                    [True]
-                    if strategy_type is StreamDensityBasedAL
-                    else [False, True]
-                )
-                for full in modes:
-                    for seed_type in ("integer", "instance", "global"):
-                        with self.subTest(
-                            strategy=strategy_type.__name__,
-                            full=full,
-                            seed=seed_type,
-                        ):
-                            results = []
-                            for boundaries in (
-                                list(range(1, 33)),
-                                [32],
-                                [3, 8, 19, 32],
-                            ):
-                                np.random.set_state(initial_global_state)
-                                seed = (
-                                    0
-                                    if seed_type == "integer"
-                                    else (
-                                        np.random.RandomState(0)
-                                        if seed_type == "instance"
-                                        else None
-                                    )
-                                )
-                                kwargs = {"random_state": seed, "budget": 0.3}
-                                if strategy_type is not StreamDensityBasedAL:
-                                    kwargs["force_full_budget"] = full
-                                if (
-                                    strategy_type
-                                    is CognitiveDualQueryStrategyFixUn
-                                ):
-                                    kwargs["classes"] = [0, 1]
-                                strategy = strategy_type(**kwargs)
-                                selected, utilities = [], []
-                                start = 0
-                                for stop in boundaries:
-                                    batch = candidates[start:stop]
-                                    q, u = strategy.query(
-                                        batch, self.clf, return_utilities=True
-                                    )
-                                    strategy.update(batch, q)
-                                    selected.extend(start + i for i in q)
-                                    utilities.extend(u)
-                                    start = stop
-                                results.append(
-                                    (selected, utilities, deepcopy(strategy))
-                                )
-                            for result in results[1:]:
-                                self.assertEqual(result[0], results[0][0])
-                                np.testing.assert_array_equal(
-                                    result[1], results[0][1]
-                                )
-                                self._assert_acquisition_state_equal(
-                                    result[2], results[0][2]
-                                )
-        finally:
-            np.random.set_state(original_global_state)
 
-    def test_filtered_updates_align_utilities_and_actual_acquisitions(self):
-        # The third copy of a location cannot improve its zero-distance
-        # nearest neighbors. Eligible positions are 1, 2, and 5: once the
-        # preceding location has zero-distance neighbors, a new location
-        # needs its second occurrence to improve any nearest neighbor.
-        candidates = np.array([0.0, 0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 0.875])[
-            :, None
-        ]
-        for full in (False, True):
-            with self.subTest(full=full):
-                strategy = CognitiveDualQueryStrategy(
-                    force_full_budget=full,
-                    budget_manager=RecordingBudgetManager(),
-                    random_state=0,
-                )
-                # Queries simulate utility-dependent updates without changing
-                # the persistent manager, including rejected observations.
-                q, u = strategy.query(
-                    candidates, self.clf, return_utilities=True
-                )
-                self.assertEqual(q, [2] if full else [1, 5])
-                self.assertEqual(strategy.budget_manager_.history_, [])
-                supplied_utilities = np.arange(8, dtype=float)
-                params = {"utilities": supplied_utilities, "marker": "kept"}
-                acquired = 2 if full else 5
-                strategy.update(candidates, [acquired], params)
-                history = strategy.budget_manager_.history_
-                expected_indices = list(range(8)) if full else [1, 2, 5]
-                self.assertEqual(
-                    [entry[2] for entry in history], expected_indices
-                )
-                self.assertEqual(
-                    [entry[1] for entry in history],
-                    [i == acquired for i in expected_indices],
-                )
-                self.assertTrue(all(entry[3] == "kept" for entry in history))
-                self.assertEqual(strategy.t_, len(candidates))
-                self.assertIs(params["utilities"], supplied_utilities)
-                np.testing.assert_array_equal(supplied_utilities, np.arange(8))
+def _assert_invalid_indices_do_not_advance_state(test_case, strategy_type):
+    strategy = strategy_type(random_state=0)
+    strategy.update([[0.0]], [])
+    before = deepcopy(strategy)
+    for indices in ([-1], [2], [0.5], [[0]], [True]):
+        with test_case.subTest(indices=indices):
+            with test_case.assertRaises(IndexError):
+                strategy.update([[0.5], [0.75]], indices)
+            _assert_acquisition_state_equal(test_case, strategy, before)
 
-    def test_invalid_indices_do_not_advance_state(self):
-        for strategy_type in (
-            StreamDensityBasedAL,
-            CognitiveDualQueryStrategy,
-        ):
-            strategy = strategy_type(random_state=0)
-            strategy.update([[0.0]], [])
+
+def _assert_query_isolates_rng_and_preserves_state(test_case, strategy_type):
+    candidates = (1 - 2.0 ** (-np.arange(20)))[:, None]
+    classifier = _empty_classifier()
+    kwargs = (
+        {"force_full_budget": True}
+        if strategy_type is CognitiveDualQueryStrategy
+        else {}
+    )
+    original_global_state = np.random.get_state()
+    try:
+        results = []
+        for boundaries in (list(range(1, 21)), [20], [4, 9, 20]):
+            np.random.seed(17)
+            strategy = strategy_type(
+                budget_manager=DensityBasedSplitBudgetManager(
+                    budget=0.3, delta=0.7, random_state=None
+                ),
+                random_state=0,
+                **kwargs,
+            )
+            selected = []
+            start = 0
+            for stop in boundaries:
+                batch = candidates[start:stop]
+                global_before = np.random.get_state()
+                queried, utilities = strategy.query(
+                    batch, classifier, return_utilities=True
+                )
+                assert_state_unchanged(
+                    test_case,
+                    np.random.get_state(),
+                    global_before,
+                    name="global_random_state",
+                )
+                before = deepcopy(strategy)
+                queried_again, utilities_again = strategy.query(
+                    batch, classifier, return_utilities=True
+                )
+                test_case.assertEqual(queried_again, queried)
+                np.testing.assert_array_equal(utilities_again, utilities)
+                _assert_acquisition_state_equal(test_case, strategy, before)
+                strategy.update(batch, queried)
+                selected.extend(start + i for i in queried)
+                start = stop
+            results.append(
+                (selected, deepcopy(strategy), np.random.get_state())
+            )
+        for result in results[1:]:
+            test_case.assertEqual(result[0], results[0][0])
+            _assert_acquisition_state_equal(
+                test_case, result[1], results[0][1]
+            )
+            assert_state_unchanged(
+                test_case,
+                result[2],
+                results[0][2],
+                name="global_random_state",
+            )
+    finally:
+        np.random.set_state(original_global_state)
+
+
+def _assert_query_failures_restore_state(test_case, strategy_type):
+    def failing_distance(X, Y):
+        if len(X) >= 2:
+            raise RuntimeError("Cannot measure this distance.")
+        return pairwise_distances(X, Y)
+
+    classifier = _empty_classifier()
+    for failure in ("distance", "manager"):
+        with test_case.subTest(failure=failure):
+            kwargs = (
+                {"force_full_budget": True}
+                if strategy_type is CognitiveDualQueryStrategy
+                else {}
+            )
+            if failure == "distance":
+                kwargs["dist_func"] = failing_distance
+                kwargs["budget_manager"] = DensityBasedSplitBudgetManager(
+                    random_state=None
+                )
+            else:
+                kwargs["budget_manager"] = FailingBudgetManager()
+            strategy = strategy_type(random_state=0, **kwargs)
+            # Initialize lazily, without committing observations.
+            strategy.query([[0.0]], classifier)
             before = deepcopy(strategy)
-            for indices in ([-1], [2], [0.5], [[0]], [True]):
-                with self.subTest(
-                    strategy=strategy_type.__name__, indices=indices
-                ):
-                    with self.assertRaises(IndexError):
-                        strategy.update([[0.5], [0.75]], indices)
-                    self._assert_acquisition_state_equal(strategy, before)
+            global_before = np.random.get_state()
+            with test_case.assertRaisesRegex(RuntimeError, "Cannot"):
+                strategy.query([[0.0], [0.5], [0.75]], classifier)
+            _assert_acquisition_state_equal(test_case, strategy, before)
+            assert_state_unchanged(
+                test_case,
+                np.random.get_state(),
+                global_before,
+                name="global_random_state",
+            )
 
-    def test_query_isolates_global_manager_rng_and_preserves_state(self):
-        candidates = (1 - 2.0 ** (-np.arange(20)))[:, None]
-        original_global_state = np.random.get_state()
-        try:
-            for strategy_type in (
-                StreamDensityBasedAL,
-                CognitiveDualQueryStrategy,
-            ):
-                kwargs = (
-                    {"force_full_budget": True}
-                    if strategy_type is CognitiveDualQueryStrategy
-                    else {}
-                )
-                results = []
-                for boundaries in (list(range(1, 21)), [20], [4, 9, 20]):
-                    np.random.seed(17)
-                    strategy = strategy_type(
-                        budget_manager=DensityBasedSplitBudgetManager(
-                            budget=0.3, delta=0.7, random_state=None
-                        ),
-                        random_state=0,
-                        **kwargs,
-                    )
-                    selected = []
-                    start = 0
-                    for stop in boundaries:
-                        batch = candidates[start:stop]
-                        global_before = np.random.get_state()
-                        q, utilities = strategy.query(
-                            batch, self.clf, return_utilities=True
-                        )
-                        self._assert_state_equal(
-                            np.random.get_state(), global_before
-                        )
-                        before = deepcopy(strategy)
-                        q_again, u_again = strategy.query(
-                            batch, self.clf, return_utilities=True
-                        )
-                        self.assertEqual(q_again, q)
-                        np.testing.assert_array_equal(u_again, utilities)
-                        self._assert_acquisition_state_equal(strategy, before)
-                        strategy.update(batch, q)
-                        selected.extend(start + i for i in q)
-                        start = stop
-                    results.append(
-                        (selected, deepcopy(strategy), np.random.get_state())
-                    )
-                for result in results[1:]:
-                    self.assertEqual(result[0], results[0][0])
-                    self._assert_acquisition_state_equal(
-                        result[1], results[0][1]
-                    )
-                    self._assert_state_equal(result[2], results[0][2])
-        finally:
-            np.random.set_state(original_global_state)
 
-    def test_query_failures_restore_density_and_budget_state(self):
-        def failing_distance(X, Y):
-            if len(X) >= 2:
-                raise RuntimeError("Cannot measure this distance.")
-            return pairwise_distances(X, Y)
-
-        for strategy_type in (
-            StreamDensityBasedAL,
-            CognitiveDualQueryStrategy,
-        ):
-            for failure in ("distance", "manager"):
-                with self.subTest(
-                    strategy=strategy_type.__name__, failure=failure
-                ):
-                    kwargs = (
-                        {"force_full_budget": True}
-                        if strategy_type is CognitiveDualQueryStrategy
-                        else {}
-                    )
-                    if failure == "distance":
-                        kwargs["dist_func"] = failing_distance
-                        kwargs["budget_manager"] = (
-                            DensityBasedSplitBudgetManager(random_state=None)
+def _assert_partition_invariance(test_case, strategy_type):
+    candidates = np.concatenate(
+        [
+            np.repeat([0.0, 0.5, 0.75, 0.875], 2),
+            np.linspace(0.9, 0.999, 24),
+        ]
+    )[:, None]
+    classifier = _empty_classifier()
+    modes = [True] if strategy_type is StreamDensityBasedAL else [False, True]
+    original_global_state = np.random.get_state()
+    initial_global_state = np.random.RandomState(17).get_state()
+    try:
+        for full in modes:
+            for seed_type in ("integer", "instance", "global"):
+                with test_case.subTest(full=full, seed=seed_type):
+                    results = []
+                    for boundaries in (
+                        list(range(1, 33)),
+                        [32],
+                        [3, 8, 19, 32],
+                    ):
+                        np.random.set_state(initial_global_state)
+                        seed = (
+                            0
+                            if seed_type == "integer"
+                            else (
+                                np.random.RandomState(0)
+                                if seed_type == "instance"
+                                else None
+                            )
                         )
-                    else:
-                        kwargs["budget_manager"] = FailingBudgetManager()
-                    strategy = strategy_type(random_state=0, **kwargs)
-                    # Initialize lazily, without committing observations.
-                    strategy.query([[0.0]], self.clf)
-                    before = deepcopy(strategy)
-                    global_before = np.random.get_state()
-                    with self.assertRaisesRegex(RuntimeError, "Cannot"):
-                        strategy.query([[0.0], [0.5], [0.75]], self.clf)
-                    self._assert_acquisition_state_equal(strategy, before)
-                    self._assert_state_equal(
-                        np.random.get_state(), global_before
-                    )
-
-    def test_no_eligible_candidates_and_zero_density_threshold(self):
-        candidates = np.zeros((6, 1))
-        for full in (False, True):
-            for threshold in (0, 100):
-                with self.subTest(full=full, threshold=threshold):
-                    strategy = CognitiveDualQueryStrategy(
-                        force_full_budget=full,
-                        density_threshold=threshold,
-                        budget_manager=RecordingBudgetManager(),
-                        random_state=0,
-                    )
-                    q, u = strategy.query(
-                        candidates, self.clf, return_utilities=True
-                    )
-                    self.assertEqual(q, [0, 2, 4] if threshold == 0 else [])
-                    np.testing.assert_array_equal(u, np.full(6, 0.5))
-                    strategy.update(candidates, q, {"utilities": u})
-                    self.assertEqual(strategy.t_, 6)
-                    self.assertEqual(
-                        len(strategy.budget_manager_.history_),
-                        6 if full or threshold == 0 else 0,
-                    )
-        strategy = StreamDensityBasedAL(
-            budget_manager=RecordingBudgetManager(), random_state=0
-        )
-        strategy.update(candidates[:2], [], {"utilities": np.ones(2)})
-        q, u = strategy.query(candidates, self.clf, return_utilities=True)
-        self.assertEqual(q, [])
-        strategy.update(candidates, q, {"utilities": u})
-        self.assertEqual(len(strategy.budget_manager_.history_), 8)
+                        kwargs = {"random_state": seed, "budget": 0.3}
+                        if strategy_type is not StreamDensityBasedAL:
+                            kwargs["force_full_budget"] = full
+                        if strategy_type is CognitiveDualQueryStrategyFixUn:
+                            kwargs["classes"] = [0, 1]
+                        strategy = strategy_type(**kwargs)
+                        selected, utilities = [], []
+                        start = 0
+                        for stop in boundaries:
+                            batch = candidates[start:stop]
+                            queried, batch_utilities = strategy.query(
+                                batch,
+                                classifier,
+                                return_utilities=True,
+                            )
+                            strategy.update(batch, queried)
+                            selected.extend(start + i for i in queried)
+                            utilities.extend(batch_utilities)
+                            start = stop
+                        results.append(
+                            (selected, utilities, deepcopy(strategy))
+                        )
+                    for result in results[1:]:
+                        test_case.assertEqual(result[0], results[0][0])
+                        np.testing.assert_array_equal(result[1], results[0][1])
+                        _assert_acquisition_state_equal(
+                            test_case, result[2], results[0][2]
+                        )
+    finally:
+        np.random.set_state(original_global_state)
 
 
 class TemplateCognitiveDualQueryStrategy(
     TemplateSingleAnnotatorStreamQueryStrategy
 ):
+    def test_partition_invariance(self):
+        _assert_partition_invariance(self, self.qs_class)
+
     def test_init_param_density_threshold(self):
         test_cases = []
         test_cases += [
@@ -508,6 +397,99 @@ class TestCognitiveDualQueryStrategy(
             init_default_params={"force_full_budget": True},
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_batch_accounts_for_earlier_acquisitions(self):
+        _assert_batch_accounts_for_earlier_acquisitions(self, self.qs_class)
+
+    def test_update_accepts_its_own_filtered_query_indices(self):
+        classifier = _empty_classifier()
+        strategy = CognitiveDualQueryStrategy(
+            budget_manager=FixedUncertaintyBudgetManager([0, 1], budget=0.1),
+            random_state=0,
+        )
+        candidates = np.array([[0.0], [0.5]])
+        queried = strategy.query(candidates, classifier)
+        self.assertEqual(queried, [1])
+        self.assertIs(strategy.update(candidates, queried), strategy)
+        self.assertEqual(strategy.budget_manager_.u_t_, 1)
+        self.assertEqual(strategy.t_, 2)
+
+    def test_filtered_updates_align_utilities_and_actual_acquisitions(self):
+        candidates = np.array([0.0, 0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 0.875])[
+            :, None
+        ]
+        classifier = _empty_classifier()
+        for full in (False, True):
+            with self.subTest(full=full):
+                strategy = CognitiveDualQueryStrategy(
+                    force_full_budget=full,
+                    budget_manager=RecordingBudgetManager(),
+                    random_state=0,
+                )
+                # Queries simulate utility-dependent updates without changing
+                # the persistent manager, including rejected observations.
+                queried, utilities = strategy.query(
+                    candidates, classifier, return_utilities=True
+                )
+                self.assertEqual(queried, [2] if full else [1, 5])
+                self.assertEqual(strategy.budget_manager_.history_, [])
+                supplied_utilities = np.arange(8, dtype=float)
+                params = {
+                    "utilities": supplied_utilities,
+                    "marker": "kept",
+                }
+                acquired = 2 if full else 5
+                strategy.update(candidates, [acquired], params)
+                history = strategy.budget_manager_.history_
+                expected_indices = list(range(8)) if full else [1, 2, 5]
+                self.assertEqual(
+                    [entry[2] for entry in history], expected_indices
+                )
+                self.assertEqual(
+                    [entry[1] for entry in history],
+                    [i == acquired for i in expected_indices],
+                )
+                self.assertTrue(all(entry[3] == "kept" for entry in history))
+                self.assertEqual(strategy.t_, len(candidates))
+                self.assertIs(params["utilities"], supplied_utilities)
+                np.testing.assert_array_equal(supplied_utilities, np.arange(8))
+
+    def test_invalid_indices_do_not_advance_state(self):
+        _assert_invalid_indices_do_not_advance_state(self, self.qs_class)
+
+    def test_query_isolates_global_manager_rng_and_preserves_state(self):
+        _assert_query_isolates_rng_and_preserves_state(self, self.qs_class)
+
+    def test_query_failures_restore_density_and_budget_state(self):
+        _assert_query_failures_restore_state(self, self.qs_class)
+
+    def test_no_eligible_candidates_and_zero_density_threshold(self):
+        candidates = np.zeros((6, 1))
+        classifier = _empty_classifier()
+        for full in (False, True):
+            for threshold in (0, 100):
+                with self.subTest(full=full, threshold=threshold):
+                    strategy = CognitiveDualQueryStrategy(
+                        force_full_budget=full,
+                        density_threshold=threshold,
+                        budget_manager=RecordingBudgetManager(),
+                        random_state=0,
+                    )
+                    queried, utilities = strategy.query(
+                        candidates, classifier, return_utilities=True
+                    )
+                    self.assertEqual(
+                        queried, [0, 2, 4] if threshold == 0 else []
+                    )
+                    np.testing.assert_array_equal(utilities, np.full(6, 0.5))
+                    strategy.update(
+                        candidates, queried, {"utilities": utilities}
+                    )
+                    self.assertEqual(strategy.t_, 6)
+                    self.assertEqual(
+                        len(strategy.budget_manager_.history_),
+                        6 if full or threshold == 0 else 0,
+                    )
 
     def test_query(self):
         # Reference: individual query/update calls, including the seed data.
@@ -759,6 +741,35 @@ class TestStreamDensityBasedAL(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_batch_accounts_for_earlier_acquisitions(self):
+        _assert_batch_accounts_for_earlier_acquisitions(self, self.qs_class)
+
+    def test_partition_invariance(self):
+        _assert_partition_invariance(self, self.qs_class)
+
+    def test_invalid_indices_do_not_advance_state(self):
+        _assert_invalid_indices_do_not_advance_state(self, self.qs_class)
+
+    def test_query_isolates_global_manager_rng_and_preserves_state(self):
+        _assert_query_isolates_rng_and_preserves_state(self, self.qs_class)
+
+    def test_query_failures_restore_density_and_budget_state(self):
+        _assert_query_failures_restore_state(self, self.qs_class)
+
+    def test_no_eligible_candidates(self):
+        candidates = np.zeros((6, 1))
+        classifier = _empty_classifier()
+        strategy = StreamDensityBasedAL(
+            budget_manager=RecordingBudgetManager(), random_state=0
+        )
+        strategy.update(candidates[:2], [], {"utilities": np.ones(2)})
+        queried, utilities = strategy.query(
+            candidates, classifier, return_utilities=True
+        )
+        self.assertEqual(queried, [])
+        strategy.update(candidates, queried, {"utilities": utilities})
+        self.assertEqual(len(strategy.budget_manager_.history_), 8)
 
     def test_init_param_window_size(self):
         test_cases = []

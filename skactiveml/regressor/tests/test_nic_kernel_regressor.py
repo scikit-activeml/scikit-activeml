@@ -186,88 +186,6 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
             reg.predict(K_test[:, [0, 2]])
 
 
-class TestNICKernelEvidence(unittest.TestCase):
-    def test_predict_rejects_an_improper_prior_without_labels(self):
-        reg = NICKernelRegressor(kappa_0=0).fit([[0.0]], [np.nan])
-
-        with self.assertRaisesRegex(ValueError, "no evidence"):
-            reg.predict([[0.0]])
-        with self.assertRaisesRegex(ValueError, "no evidence"):
-            reg.predict_target_distribution([[0.0]])
-
-    def test_predict_rejects_a_negative_kernel_mass(self):
-        # A signed kernel makes the pseudo-count negative, which previously
-        # reached the posterior and produced a `NaN` scale with no error.
-        reg = NICKernelRegressor(metric="linear").fit(
-            [[-2.0], [1.0]], [0.0, 5.0]
-        )
-
-        with self.assertRaisesRegex(ValueError, "kernel mass"):
-            reg.predict([[1.0]])
-        with self.assertRaisesRegex(ValueError, "kernel mass"):
-            reg.predict_target_distribution([[1.0]])
-
-    def test_predict_rejects_a_negative_scatter(self):
-        # The weighted sum of squares can be negative while the kernel mass
-        # stays positive, so it needs its own check.
-        reg = NICKernelRegressor(metric="linear").fit(
-            [[-1.0], [3.0]], [10.0, 0.0]
-        )
-
-        with self.assertRaisesRegex(ValueError, "scatter"):
-            reg.predict([[1.0]])
-
-    def test_predict_rejects_negative_sample_weights(self):
-        # A non-negative kernel still yields negative evidence when a weight
-        # is negative, so the message must not blame the metric alone.
-        reg = NICKernelRegressor().fit(
-            [[0.0], [1.0]], [0.0, 1.0], sample_weight=[-1.0, 2.0]
-        )
-
-        with self.assertRaisesRegex(ValueError, "sample_weight"):
-            reg.predict([[0.0]])
-
-    def test_predict_reports_samples_without_posterior_evidence(self):
-        # Nadaraya-Watson puts no weight on the prior mean, so a sample the
-        # kernel gives zero mass has an undefined mean. That used to be a
-        # silent `NaN` from a division rather than an error.
-        reg = NadarayaWatsonRegressor(metric_dict={"gamma": 500.0}).fit(
-            [[0.0], [1.0]], [0.0, 1.0]
-        )
-
-        with self.assertRaisesRegex(ValueError, "no evidence"):
-            reg.predict([[50.0]])
-        with self.assertRaisesRegex(ValueError, "no evidence"):
-            reg.predict_target_distribution([[50.0]])
-
-        # A sample the kernel does reach is unaffected.
-        mean, std = reg.predict([[0.1]], return_std=True)
-        self.assertTrue(np.all(np.isfinite(mean)))
-        self.assertTrue(np.all(np.isfinite(std)))
-
-    def test_predict_falls_back_to_the_prior_with_a_positive_kappa(self):
-        # A positive `kappa_0` gives the prior mean enough weight to answer
-        # for a sample with no kernel mass, so nothing is rejected there.
-        reg = NICKernelRegressor(
-            mu_0=2.0, kappa_0=0.5, metric_dict={"gamma": 500.0}
-        ).fit([[0.0], [1.0]], [0.0, 1.0])
-
-        np.testing.assert_allclose(reg.predict([[50.0]]), [2.0])
-
-    def test_predict_accepts_non_negative_kernels(self):
-        # The check must not reject the ordinary kernels.
-        for metric in ("rbf", "laplacian"):
-            with self.subTest(metric=metric):
-                reg = NICKernelRegressor(metric=metric).fit(
-                    [[-2.0], [1.0]], [0.0, 5.0]
-                )
-
-                mean, std = reg.predict([[1.0]], return_std=True)
-
-                self.assertTrue(np.all(np.isfinite(mean)))
-                self.assertTrue(np.all(std > 0))
-
-
 class TestNICKernelEstimator(
     TemplateTestNICKernelEstimator, unittest.TestCase
 ):
@@ -368,6 +286,52 @@ class TestNICKernelEstimator(
 
         np.testing.assert_almost_equal(prediction_1, prediction_2)
 
+    def test_predict_rejects_an_improper_prior_without_labels(self):
+        reg = NICKernelRegressor(kappa_0=0).fit([[0.0]], [np.nan])
+
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict([[0.0]])
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict_target_distribution([[0.0]])
+
+    def test_predict_rejects_a_negative_kernel_mass(self):
+        reg = NICKernelRegressor(metric="linear").fit(
+            [[-2.0], [1.0]], [0.0, 5.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "kernel mass"):
+            reg.predict([[1.0]])
+        with self.assertRaisesRegex(ValueError, "kernel mass"):
+            reg.predict_target_distribution([[1.0]])
+
+    def test_predict_rejects_a_negative_scatter(self):
+        reg = NICKernelRegressor(metric="linear").fit(
+            [[-1.0], [3.0]], [10.0, 0.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "scatter"):
+            reg.predict([[1.0]])
+
+    def test_predict_rejects_negative_sample_weights(self):
+        reg = NICKernelRegressor().fit(
+            [[0.0], [1.0]], [0.0, 1.0], sample_weight=[-1.0, 2.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "sample_weight"):
+            reg.predict([[0.0]])
+
+    def test_predict_accepts_non_negative_kernels(self):
+        for metric in ("rbf", "laplacian"):
+            with self.subTest(metric=metric):
+                reg = NICKernelRegressor(metric=metric).fit(
+                    [[-2.0], [1.0]], [0.0, 5.0]
+                )
+
+                mean, std = reg.predict([[1.0]], return_std=True)
+
+                self.assertTrue(np.all(np.isfinite(mean)))
+                self.assertTrue(np.all(std > 0))
+
     def test_zero_kernel_evidence_preserves_prior(self):
         params = dict(mu_0=2.0, kappa_0=3.0, nu_0=5.0, sigma_sq_0=4.0)
         reg = NICKernelRegressor(**params).fit(
@@ -386,6 +350,7 @@ class TestNICKernelEstimator(
             np.testing.assert_allclose(actual_part[:1], prior_part)
             np.testing.assert_allclose(actual_part[1:], nearby_part)
             self.assertTrue(np.isfinite(actual_part).all())
+        np.testing.assert_allclose(actual[0][:1], [params["mu_0"]])
         self.assertNotAlmostEqual(actual[0][1], params["mu_0"])
 
 
@@ -421,3 +386,18 @@ class TestNadarayaWatsonRegressor(
         reg.fit(X, y)
         y_pred = reg.predict([[0]])[0]
         self.assertEqual(y_pred, np.average(y))
+
+    def test_predict_reports_samples_without_posterior_evidence(self):
+        reg = NadarayaWatsonRegressor(metric_dict={"gamma": 500.0}).fit(
+            [[0.0], [1.0]], [0.0, 1.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict([[50.0]])
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict_target_distribution([[50.0]])
+
+        # A sample the kernel does reach is unaffected.
+        mean, std = reg.predict([[0.1]], return_std=True)
+        self.assertTrue(np.all(np.isfinite(mean)))
+        self.assertTrue(np.all(np.isfinite(std)))
