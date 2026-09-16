@@ -130,6 +130,29 @@ class TestStreamProbabilisticAL(
             expected_output, expected_utilities, budget_manager_param_dict
         )
 
+    def test_cold_start_tied_utilities_obey_budget(self):
+        candidates = np.arange(100)[:, np.newaxis]
+        clf = ParzenWindowClassifier(classes=self.classes).fit(
+            [[0]], [MISSING_LABEL]
+        )
+        qs = StreamProbabilisticAL(budget=0.1)
+        expected_output = np.arange(0, 100, 10)
+
+        for _ in range(2):
+            queried_indices, utilities = qs.query(
+                candidates=candidates, clf=clf, return_utilities=True
+            )
+            np.testing.assert_array_equal(queried_indices, expected_output)
+            self.assertEqual(len(np.unique(utilities)), 1)
+            qs.update(
+                candidates=candidates,
+                queried_indices=queried_indices,
+                budget_manager_param_dict={"utilities": utilities},
+            )
+
+        self.assertEqual(qs.budget_manager_.observed_samples_, 200)
+        self.assertEqual(qs.budget_manager_.queried_samples_, 20)
+
     def test_query_param_utility_weight(self):
         test_cases = []
         random_state = np.random.RandomState(0)
