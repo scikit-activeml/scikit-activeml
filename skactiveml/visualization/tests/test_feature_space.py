@@ -399,6 +399,31 @@ class TestFeatureSpace(unittest.TestCase):
                 self.assertIs(returned_ax, ax)
                 self.assertGreater(len(ax.collections), 0)
 
+    def test_decision_boundary_predict_only_without_classes(self):
+        clf = RelabeledPredictOnlyClassifier(["left", "right"])
+        del clf.classes_
+
+        returned_ax = plot_decision_boundary(
+            clf,
+            feature_bound=[[-1, -1], [1, 1]],
+            res=5,
+            confidence=None,
+        )
+
+        self.assertIsInstance(returned_ax, plt.Axes)
+
+    def test_decision_boundary_predict_only_with_unknown_class(self):
+        clf = RelabeledPredictOnlyClassifier([0, 1])
+        clf.classes_ = np.array([0])
+
+        with self.assertRaisesRegex(ValueError, "not present in.*classes_"):
+            plot_decision_boundary(
+                clf,
+                feature_bound=[[-1, -1], [1, 1]],
+                res=5,
+                confidence=None,
+            )
+
     def test_decision_boundary_is_invariant_to_relabeling(self):
         reference_vertices = None
         for classes in ([0, 1], [10, 20], ["a", "b"], [1.5, 2.5]):
@@ -1501,7 +1526,8 @@ class TestClassifier(ClassifierMixin):
 
 class RelabeledPredictOnlyClassifier(ClassifierMixin):
     def __init__(self, classes, constant_class=None):
-        self.classes_ = np.asarray(classes)
+        self._prediction_classes = np.asarray(classes)
+        self.classes_ = self._prediction_classes
         self.constant_class = constant_class
 
     def predict(self, X):
@@ -1509,7 +1535,7 @@ class RelabeledPredictOnlyClassifier(ClassifierMixin):
             class_indices = np.full(len(X), self.constant_class, dtype=int)
         else:
             class_indices = (X[:, 0] >= 0).astype(int)
-        return self.classes_[class_indices]
+        return self._prediction_classes[class_indices]
 
 
 class MultilabelTestClassifier(ClassifierMixin):
