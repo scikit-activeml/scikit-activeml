@@ -44,6 +44,34 @@ def is_skactiveml_method(class_name, method_name):
     )
 
 
+def get_skactiveml_methods():
+    """Return native method names for every public scikit-activeml class."""
+    methods_by_class = {}
+    visited_modules = set()
+
+    def collect_methods(module):
+        if module.__name__ in visited_modules:
+            return
+        visited_modules.add(module.__name__)
+
+        for item in module.__all__:
+            if not hasattr(module, item):
+                importlib.import_module(f"{module.__name__}.{item}")
+            obj = getattr(module, item)
+            if inspect.ismodule(obj):
+                collect_methods(obj)
+            elif inspect.isclass(obj):
+                class_name = f"{module.__name__}.{item}"
+                methods_by_class[class_name] = tuple(
+                    method_name
+                    for method_name in dir(obj)
+                    if is_skactiveml_method(class_name, method_name)
+                )
+
+    collect_methods(skactiveml)
+    return methods_by_class
+
+
 # Heading path of each gallery section in the strategy overview, as
 # `(scenario, task)`. The wording matches `docs/tutorials.rst` verbatim, so
 # that both pages name the same things the same way. `sphinx-gallery` cannot

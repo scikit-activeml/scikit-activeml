@@ -13,7 +13,7 @@ from docs.generate import (
     OVERVIEW_HEADINGS,
     generate_examples,
     generate_strategy_overview_rst,
-    is_skactiveml_method,
+    get_skactiveml_methods,
 )
 from skactiveml import pool, stream
 from skactiveml.base import QueryStrategy
@@ -120,6 +120,7 @@ class TestExamples(unittest.TestCase):
         environment = Environment(loader=FileSystemLoader(self.docs_path))
         environment.filters["underline"] = lambda value: value
         template = environment.get_template("_templates/class.rst")
+        skactiveml_methods = get_skactiveml_methods()
         test_cases = [
             (
                 "skactiveml.classifier.SklearnClassifier",
@@ -158,7 +159,7 @@ class TestExamples(unittest.TestCase):
                     name=name,
                     methods=methods,
                     attributes=["attribute"],
-                    is_skactiveml_method=is_skactiveml_method,
+                    skactiveml_methods=skactiveml_methods,
                     _=lambda value: value,
                 )
                 summarized = [

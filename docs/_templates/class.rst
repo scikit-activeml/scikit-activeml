@@ -6,18 +6,19 @@
    :no-members:
    :no-inherited-members:
 
+   {% set native_methods = skactiveml_methods.get(fullname, ()) %}
    {% block methods %}
    {% if methods %}
    .. rubric:: {{ _('Methods') }}
 
    .. autosummary::
    {% for item in methods %}
-   {%- if item != '__init__' and is_skactiveml_method(fullname, item) %}
+   {%- if item != '__init__' and item in native_methods %}
       ~{{ name }}.{{ item }}
    {%- endif %}
    {%- endfor %}
    {% for item in methods %}
-   {%- if item != '__init__' and not is_skactiveml_method(fullname, item) %}
+   {%- if item != '__init__' and item not in native_methods %}
       ~{{ name }}.{{ item }}
    {%- endif %}
    {%- endfor %}
@@ -36,12 +37,12 @@
    {% endblock %}
 
 {% for item in methods %}
-{%- if item != '__init__' and is_skactiveml_method(fullname, item) %}
+{%- if item != '__init__' and item in native_methods %}
 .. automethod:: {{ fullname }}.{{ item }}
 {%- endif %}
 {%- endfor %}
 {% for item in methods %}
-{%- if item != '__init__' and not is_skactiveml_method(fullname, item) %}
+{%- if item != '__init__' and item not in native_methods %}
 .. automethod:: {{ fullname }}.{{ item }}
 {%- endif %}
 {%- endfor %}

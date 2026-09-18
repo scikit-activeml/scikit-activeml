@@ -24,7 +24,7 @@ from docs.generate import (
     generate_examples,
     generate_tutorials,
     generate_switcher,
-    is_skactiveml_method,
+    get_skactiveml_methods,
 )
 
 # -- Project information -----------------------------------------------------
@@ -275,7 +275,7 @@ todo_include_todos = True
 # -- Generate files for strategy overview and api reference ------------------
 
 autosummary_generate = True
-autosummary_context = {"is_skactiveml_method": is_skactiveml_method}
+autosummary_context = {"skactiveml_methods": get_skactiveml_methods()}
 
 autodoc_default_options = {
     "members": True,
