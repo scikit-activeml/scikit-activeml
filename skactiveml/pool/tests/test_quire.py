@@ -128,8 +128,6 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def test_query_matches_full_quadratic_objective(self):
         rng = np.random.RandomState(42)
         X = rng.uniform(size=(19, 4))
-        # Include kernels that are not positive semidefinite, and nonconstant
-        # kernel diagonals, without relying on the optimized scoring identity.
         metrics = [
             ("rbf", {"gamma": 0.3}),
             ("linear", {}),
@@ -205,7 +203,6 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                         X, y, return_utilities=True
                     )
                 np.testing.assert_allclose(utilities[0], expected)
-                # With no labels, only bounded diagonal blocks are needed.
                 self.assertTrue(
                     all(
                         len(call.args[0]) <= 256
@@ -290,7 +287,6 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ]
         )
         y = np.array([np.nan, 0, np.nan, 1, np.nan, np.nan])
-        # Scores produced by the original inverse/downdate implementation.
         expected = [
             -1.62206740,
             np.nan,

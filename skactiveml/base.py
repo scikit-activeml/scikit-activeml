@@ -1284,29 +1284,13 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
     @property
     def _target_capabilities(self):
-        """Exact target semantics supported by a stream query strategy.
-
-        This conservative default covers the strategies consuming a
-        classifier, which is the authority for what `y` means and has to be
-        a single-output classifier. Label-free strategies override it with
-        the task-agnostic capabilities, because they see neither labels nor
-        a model.
-        """
+        """Exact target semantics supported by a stream query strategy."""
         return frozenset(
             {("classification", "single-output", "single-annotator")}
         )
 
     def _resolve_clf_target_spec(self, clf, y):
         """Resolve the target specification `clf` is the authority for.
-
-        A fitted classifier carries its specification in `target_spec_`,
-        which a wrapper around a pre-fitted estimator resolves on first
-        access. An unfitted classifier declares the meaning of `y` through
-        its constructor parameters `classes`, `missing_label`, and
-        `target_type`, from which the specification is resolved together
-        with `y` exactly as the pool query strategies do. Without `y`, only
-        these declarations count. The specification is checked against
-        `_target_capabilities`.
 
         Parameters
         ----------
@@ -1645,12 +1629,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     def _decode_class_labels(self, y_enc):
         """Decode encoded class labels into the declared class dtype.
 
-        Predictions never carry missing labels. Decode directly into the
-        declared class dtype so that large integer identifiers never pass
-        through a lossy floating-point representation. Missing codes are
-        rejected; training targets that include missing entries must use
-        the encoder's public, missing-capable inverse transform instead.
-
         Parameters
         ----------
         y_enc : numpy.ndarray of shape (n_samples,) or \
@@ -1963,13 +1941,6 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     def _check_frequencies(F, name="predict_freq"):
         """Reject class frequency estimates that are not counts.
 
-        A frequency counts evidence for a class, so it can never be negative.
-        Normalizing a negative estimate would produce a vector that is not a
-        probability distribution, which every consumer downstream would take
-        at face value. Which inputs can drive an estimate negative depends on
-        the subclass, so the message stays general and refers the reader to
-        that subclass's own documentation.
-
         Parameters
         ----------
         F : numpy.ndarray
@@ -2120,10 +2091,6 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     @staticmethod
     def _sample_dirichlet_vertices(alphas, random_state):
         """Draw one simplex vertex per row with probability given by `alphas`.
-
-        A Dirichlet distribution degenerates to the vertices of the
-        probability simplex as its concentration parameters approach zero,
-        where vertex `i` carries the probability `alphas[i] / sum(alphas)`.
 
         Parameters
         ----------
@@ -2347,9 +2314,6 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        # The labels were already checked against the label contract
-        # while their target specification was resolved. `_as_label_array`
-        # keeps a sequence of large integer identifiers lossless here, too.
         y = check_array(_as_label_array(y), **check_y_dict)
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y

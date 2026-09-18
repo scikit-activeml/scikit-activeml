@@ -160,9 +160,6 @@ class TestExpectedErrorReduction(unittest.TestCase):
         utilities = query({"gamma": "mean"})
         self.assertTrue(np.all(np.isfinite(utilities[0, 4:])))
 
-        # The mean criterion is re-estimated for every hypothetical label.
-        # Precomputing the kernel would instead freeze the bandwidth fitted
-        # on `X` and `y` and thereby change the utilities.
         frozen = (
             ParzenWindowClassifier(
                 classes=[0, 1], metric_dict={"gamma": "mean"}
@@ -515,8 +512,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
                                 X_eval=X_eval,
                                 sample_weight_eval=weights,
                             )
-                            # Unit weights equal the default; integer risk
-                            # weights equal repeated evaluation observations.
                             repeats = (
                                 np.ones(2, dtype=int)
                                 if weights is None

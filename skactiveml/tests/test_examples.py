@@ -31,24 +31,11 @@ QUERY_STRATEGY_EXCEPTIONS_LIST = [
     CognitiveDualQueryStrategy,
 ]
 
-# The subpackages contributing examples, i.e. the ones the gallery tags are
-# harvested from.
 EXAMPLE_SUBPACKAGES = (pool, multiannotator, stream)
 
 
 def _multilabel_capable_strategy_names():
-    """Collect the names of the strategies declaring multi-label support.
-
-    The declarations themselves are read rather than a hand-maintained list,
-    because a tag has to follow whatever its strategy declares. The scan spans
-    every subpackage contributing examples, whereas the enforced inventories
-    of `skactiveml.pool.tests.test_multilabel_contracts` cover pool strategies
-    only.
-
-    Capabilities are read from a default configuration, so a strategy
-    declaring them per parameter, e.g. `UncertaintySampling` through `method`,
-    is judged by its default.
-    """
+    """Collect the names of the strategies declaring multi-label support."""
     names = set()
     for module in EXAMPLE_SUBPACKAGES:
         for name in dir(module):

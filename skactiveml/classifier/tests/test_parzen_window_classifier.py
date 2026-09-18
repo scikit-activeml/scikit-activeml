@@ -165,9 +165,6 @@ class TestParzenWindowClassifier(
             **fit_params,
             sample_weight=[[2, 4], [np.nan, np.nan], [3, 5]],
         )
-        # The unlabeled training sample is the most similar one for the second
-        # kernel row, but it carries no class frequencies, so the labeled
-        # sample with a similarity of 0.5 is selected instead.
         np.testing.assert_array_equal(
             pwc.predict_freq([[1, 0, 0], [0.25, 1, 0.5], [0, 0, 1]]),
             [
@@ -346,14 +343,12 @@ class TestParzenWindowClassifier(
         }
         pwc = ParzenWindowClassifier(metric=counting_rbf, **params).fit(X, y)
         F = pwc.predict_freq(X)
-        # Only the two labeled training samples are evaluated.
         self.assertEqual(len(X) * 2, n_kernel_calls)
         pwc_labeled = ParzenWindowClassifier(metric="rbf", **params).fit(
             X[[0, 5]], [y[0], y[5]]
         )
         np.testing.assert_allclose(pwc_labeled.predict_freq(X), F)
 
-        # The unlabeled samples do not occupy the nearest neighbour slot.
         n_kernel_calls = 0
         pwc = ParzenWindowClassifier(
             metric=counting_rbf, n_neighbors=1, **params
@@ -565,7 +560,6 @@ class TestParzenWindowClassifier(
             ),
         )
 
-        # Moving an unlabeled sample must not move the bandwidth.
         X_moved = np.array([[0.0], [1.0], [100.0]])
         self.assertAlmostEqual(
             gamma,

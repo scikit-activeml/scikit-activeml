@@ -1145,8 +1145,6 @@ if successful_skorch_torch_import:
                 y, self.missing_label_
             )
             if self.include_unlabeled_samples:
-                # The wrapped network is documented to handle the missing label
-                # itself, so its raw representation is passed on unchanged.
                 is_included = np.full_like(y, fill_value=True, dtype=bool)
                 y_included = y[is_included]
             else:

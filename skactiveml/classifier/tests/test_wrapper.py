@@ -908,8 +908,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(y_pred.shape, y.shape)
 
     def test_multilabel_rejects_a_nan_class(self):
-        # NaN marks a missing label and is therefore no category, so no
-        # output vocabulary may declare it.
         y = np.array(
             [
                 [np.nan, 0.0],
@@ -2828,10 +2826,6 @@ class TestSlidingWindowClassifier(
     def test_fit_rejects_class_identities_beyond_64_bits(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        # The wrapped classifier must agree on `missing_label`, so the
-        # default estimator pinned to `"nan"` is replaced. Its declared
-        # string vocabulary would otherwise be the incompatibility reported,
-        # before the width of the class identifiers is looked at.
         init_params = {
             "estimator": SklearnClassifier(
                 GaussianProcessClassifier(), missing_label=np.nan

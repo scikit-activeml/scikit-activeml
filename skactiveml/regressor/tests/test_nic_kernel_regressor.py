@@ -397,7 +397,6 @@ class TestNadarayaWatsonRegressor(
         with self.assertRaisesRegex(ValueError, "no evidence"):
             reg.predict_target_distribution([[50.0]])
 
-        # A sample the kernel does reach is unaffected.
         mean, std = reg.predict([[0.1]], return_std=True)
         self.assertTrue(np.all(np.isfinite(mean)))
         self.assertTrue(np.all(np.isfinite(std)))

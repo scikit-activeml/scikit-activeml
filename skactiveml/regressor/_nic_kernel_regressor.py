@@ -187,16 +187,10 @@ class NICKernelRegressor(ProbabilisticRegressor):
             K = self.weights_.reshape(1, -1) * K
 
         N = np.sum(K, axis=1)
-        # Zero kernel mass contributes a neutral update to the prior.
         mu_ml = np.divide(K @ self.y_, N, out=np.zeros_like(N), where=N != 0)
         scatter = np.sum(
             K * (self.y_[np.newaxis, :] - mu_ml[:, np.newaxis]) ** 2, axis=1
         )
-        # `N` is a pseudo-count and `scatter` a weighted sum of squares, so a
-        # kernel with negative values makes either negative. Both then reach
-        # the posterior and yield a `NaN` scale rather than any error. The
-        # scatter is checked separately because it can be negative while the
-        # mass stays positive.
         self._check_kernel_evidence(N, "kernel mass")
         self._check_kernel_evidence(
             scatter, "weighted sum of squared deviations (scatter)"
@@ -262,8 +256,6 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
-        # Check before combining, because the combination is where the
-        # undefined mean would be divided into existence.
         self._check_posterior_evidence(prior_params[0] + update_params[0])
         post_params = _combine_params(prior_params, update_params)
 
@@ -276,12 +268,6 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
     def _check_posterior_evidence(self, kappa_post):
         """Reject test samples the posterior says nothing about.
-
-        The posterior weight on the target mean is `kappa_0` plus the kernel
-        mass over the labeled training samples. A positive `kappa_0` lets a
-        test sample the kernel does not reach fall back to the prior mean.
-        When both are zero the mean is undefined, and the divisions
-        computing it would silently return `NaN` instead.
 
         Parameters
         ----------

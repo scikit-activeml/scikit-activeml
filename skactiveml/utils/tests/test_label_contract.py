@@ -45,12 +45,9 @@ from skactiveml.utils import (
     resolve_target_spec,
 )
 
-# The evidence a row's verdict needs.
 LABELS = "labels"
 CLASSES = "classes"
 
-# Every row is repeated so that estimators see enough samples per class to
-# be fitted; the values a row is about stay the same.
 REPEATS = 3
 
 Row = namedtuple(
@@ -203,8 +200,6 @@ class TestSingleOutputContract(_ContractCase):
             ValueError,
             "outside `classes`",
             scope=CLASSES,
-            # The encoder rejects the undeclared class through the wrapped
-            # `LabelEncoder`, which words it as an unseen label.
             foreign_message=("ExtLabelEncoder", "majority_vote"),
         ),
         Row(
@@ -244,8 +239,6 @@ class TestSingleOutputContract(_ContractCase):
             ValueError,
             "No class label is observed",
             scope=CLASSES,
-            # Aggregation is the one consumer that needs no vocabulary for
-            # such a matrix; the test below states what it returns instead.
             skip=("majority_vote",),
         ),
     )
@@ -266,10 +259,6 @@ class TestSingleOutputContract(_ContractCase):
                 self.assert_row(name, expected, run, _containers(row.y))
 
     def test_majority_vote_needs_no_vocabulary_for_a_missing_matrix(self):
-        # The row rejecting an entirely missing `y` with `classes=None`
-        # covers the consumers that have to infer a vocabulary from it.
-        # Majority voting infers none, because every sample of such a matrix
-        # keeps the missing label whatever the classes are.
         for container, y in _containers([np.nan, np.nan]):
             with self.subTest(container=container):
                 aggregated = majority_vote(_annotator_column(y))
@@ -277,11 +266,6 @@ class TestSingleOutputContract(_ContractCase):
                 self.assertTrue(is_unlabeled(aggregated).all())
 
     def test_inferring_a_float_vocabulary_from_mixed_numbers(self):
-        # The list `[0, 1.5]` becomes a floating-point array, so `(0.0, 1.5)`
-        # is inferred from it. The equivalent object array carries no dtype
-        # to infer from and mixes an integer with a float, so it is rejected.
-        # `SklearnClassifier` is left out: scikit-learn estimators reject
-        # continuous targets themselves, whatever the contract allows.
         y = [0, 1.5] * REPEATS
         for targets in (y, np.asarray(y)):
             target_spec = resolve_target_spec(
@@ -400,8 +384,6 @@ class TestMultiLabelContract(_ContractCase):
                 )
 
     def test_inferring_binary_vocabularies_needs_both_classes(self):
-        # `classes=None` derives one binary vocabulary per column, so a
-        # column observing one category supplies no vocabulary.
         y = [[0, 0], [1, 0]] * REPEATS
         for targets in (y, np.asarray(y), np.asarray(y, dtype=object)):
             with self.subTest(container=type(targets).__name__):
@@ -440,14 +422,6 @@ class TestRegressionContract(_ContractCase):
         RegressionRow(np.nan, [0, 1.5, np.nan], None, ""),
         RegressionRow(None, [0, 1.5, None], None, ""),
         RegressionRow(-999, [0, 1.5, -999], None, ""),
-        # The message names what the container holds: a NumPy array of
-        # `[0, 1.5, "?"]` holds three strings and no numerical label at
-        # all,
-        # whereas a list or an object array holds a string missing label
-        # beside two numerical labels. Both are rejected. `RandomSampling`
-        # serves both tasks and is not told which one applies, so it reads
-        # that array as the string categories it also is; see the test
-        # below.
         RegressionRow(
             "?",
             [0, 1.5, "?"],
@@ -470,11 +444,6 @@ class TestRegressionContract(_ContractCase):
                 self.assert_row(name, expected, run, _containers(row.y))
 
     def test_a_task_agnostic_strategy_reads_strings_as_categories(self):
-        # A NumPy array of `[0, 1.5, "?"]` holds strings, so a strategy that
-        # is not told which task applies accepts it as string categories
-        # with a string missing label. A list or an object array keeps the
-        # numbers, which no string missing label can denote a missing one
-        # of.
         y = [0, 1.5, "?"] * REPEATS
         X = _samples(y)
         RandomSampling(missing_label="?").query(X, np.asarray(y), candidates=X)
@@ -494,8 +463,6 @@ class TestRegressionContract(_ContractCase):
             )
 
     def test_boolean_labels_are_rejected(self):
-        # The contract knows numerical labels only, and a Boolean
-        # array is not a numerical one however its values compare.
         y = np.array([True, False] * REPEATS)
         X = _samples(y)
         for targets in (y, list(y), y.astype(object)):
@@ -519,13 +486,6 @@ class TestDocumentedOutcomeTables(unittest.TestCase):
         ),
     }
 
-    # The documented row `classes=None`, `missing_label=NaN`, `y=[0, 1.5]`
-    # is the one row whose verdict depends on the container: the list
-    # becomes a floating-point array and is accepted, whereas the object
-    # array of the same values mixes families and is rejected. Every case of
-    # the sweep runs in all three containers, so
-    # `test_inferring_a_float_vocabulary_from_mixed_numbers` covers that row
-    # by naming its containers instead.
     ROWS_WITHOUT_A_SWEPT_CASE = {"Single-output classification outcomes": 1}
 
     def _documented_rows(self, title):
@@ -538,7 +498,6 @@ class TestDocumentedOutcomeTables(unittest.TestCase):
             if line.strip() and not line.startswith(" "):
                 break
             rows += bool(re.match(r"\s+\* - ", line))
-        # Every outcome table declares `:header-rows: 1`.
         return rows - 1
 
     def test_every_documented_outcome_row_is_swept(self):

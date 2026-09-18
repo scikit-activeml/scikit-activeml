@@ -214,7 +214,6 @@ def _check_1d_class_list(c, name="classes"):
     if nan_count > 1:
         raise ValueError(f"Duplicate entries in `{name}`.")
 
-    # Ensure scalars are hashable, which detecting duplicates relies on.
     try:
         n_unique = len(set(values))
     except TypeError as e:
@@ -380,22 +379,6 @@ def _canonicalize_multilabel_probas(
 def _check_homogeneous_output_dtypes(classes):
     """Check that every output declares classes of one dtype kind.
 
-    One sample's outputs are held by one row of a single array, so they cannot
-    carry different dtypes: the array coerces them to a common one, and the
-    labels a sample is then described by are no longer the labels that were
-    declared, e.g. the integer `0` of one output becomes the string `'0'` when
-    another output declares strings. Prediction and probability columns then
-    disagree about the vocabulary of the same output.
-
-    Only the dtype kind has to agree, so outputs may declare different
-    vocabularies and different widths of the same kind, e.g. `("no", "yes")`
-    beside `("off", "always")`. Signed and unsigned integers are different
-    kinds, however, and are therefore rejected beside each other. The kind is
-    read from the class labels themselves rather than from their container, so
-    that an object-valued array of strings agrees with a list of the same
-    strings. Mixing kinds *within* one vocabulary is rejected by
-    `_check_1d_class_list`.
-
     Parameters
     ----------
     classes : sequence of array-like
@@ -516,7 +499,6 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
             )
         return
 
-    # Validates structure, duplicates, and label families.
     families = check_classes(classes)
 
     # Check whether `classes` contains one vocabulary per target label.

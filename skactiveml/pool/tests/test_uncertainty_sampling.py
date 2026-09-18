@@ -794,7 +794,6 @@ class TestExpectedAveragePrecision(unittest.TestCase):
                     self.classes,
                     probas,
                 )
-        # Floating-point normalization need not produce a sum exactly one.
         probas = np.array([[0.4, 0.6 + 1e-15]])
         np.testing.assert_array_equal(
             expected_average_precision(self.classes, probas), [0.0]

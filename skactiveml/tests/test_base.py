@@ -986,10 +986,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         self.assertEqual(extra_pred.dtype, np.float32)
 
     def test_class_label_decoder_rejects_missing_prediction_codes(self):
-        # Predictions never carry a missing label, so an encoded `-1` is a
-        # caller error rather than an unlabeled sample. Training targets
-        # that do include missing entries use the encoder's public,
-        # missing-capable inverse transform instead.
         X = np.arange(4).reshape(2, 2)
         cases = [
             ([0, 1], [0, 1], [0, -1], "auto"),
@@ -1170,9 +1166,6 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
             clf.predict_proba(np.zeros((1, 1)))
 
     def test_sample_proba_follows_tiny_asymmetric_concentrations(self):
-        # Every gamma draw underflows to zero at these concentrations. The
-        # Dirichlet then degenerates to the simplex vertices, which carry the
-        # normalized concentrations rather than a uniform mass.
         for prior, expected in (
             ([1e-100, 9e-100], [0.1, 0.9]),
             ([1e-3, 9e-3], [0.1, 0.9]),
@@ -1195,8 +1188,6 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
                 assert_allclose(P.mean(axis=0)[0], expected, atol=0.02)
 
     def test_multilabel_sample_proba_follows_tiny_concentrations(self):
-        # The multi-label implementation makes the same vertex choice, once
-        # per output.
         clf = DummyMultilabelClassFrequencyEstimator(
             freq=np.zeros((1, 2, 2)),
             class_prior=1,
@@ -1296,22 +1287,17 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
         y = np.array([0, 1, MISSING_LABEL])
         capability_error = "does not support target capability"
 
-        # A fitted classifier is the authority through `target_spec_`.
         fitted_clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
         self.assertIs(
             self.qs._resolve_clf_target_spec(fitted_clf, y),
             fitted_clf.target_spec_,
         )
 
-        # A wrapper around a pre-fitted estimator resolves its own
-        # specification on first access, even without labels.
         prefitted_clf = SklearnClassifier(GaussianNB().fit(X, [0, 1, 0]))
         target_spec = self.qs._resolve_clf_target_spec(prefitted_clf, None)
         self.assertEqual(target_spec.classes, (0, 1))
         self.assertIs(target_spec, prefitted_clf.target_spec_)
 
-        # An unfitted classifier resolves from `y` and its declarations, or
-        # from the declarations alone, without being fitted itself.
         unfitted_clf = ParzenWindowClassifier(classes=[0, 1])
         for labels in (y, None):
             target_spec = self.qs._resolve_clf_target_spec(
@@ -1327,8 +1313,6 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "No class label is observed"):
             self.qs._resolve_clf_target_spec(ParzenWindowClassifier(), None)
 
-        # Declared multi-label semantics are outside the capability, with
-        # the empty labels shaped by the nested vocabulary.
         multilabel_clf = SklearnClassifier(
             MultiOutputClassifier(
                 SGDClassifier(loss="log_loss", random_state=0)

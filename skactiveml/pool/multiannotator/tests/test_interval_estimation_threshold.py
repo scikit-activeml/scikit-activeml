@@ -177,8 +177,6 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
             return_utilities=True,
         )
 
-        # Partial annotations remain valid training data, but their samples
-        # are not selected again to obtain the remaining annotations.
         self.assertEqual(query.shape, (2, 2))
         np.testing.assert_array_equal(np.sort(query[:, 1]), [0, 1])
         np.testing.assert_array_equal(query[:, 0], [3, 3])

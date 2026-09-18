@@ -3479,15 +3479,6 @@ if successful_river_import:
         def _fit(self, fit_function, X, y, sample_weight=None):
             """Fit or partially fit this wrapper as a single transaction.
 
-            This wrapper absorbs almost every estimator failure into its
-            prior-only fallback, which returns `self` and is therefore never
-            rolled back. The rejection of an `estimator` that is no river
-            classifier does raise, as does an unsupported `sample_weight`. The
-            transaction ensures that such a rejection leaves none of the
-            fitted attributes of the abandoned attempt behind, `n_features_in_`
-            among them, so that an already fitted wrapper keeps predicting on
-            the data it was trained on.
-
             Parameters
             ----------
             fit_function : "fit" or "partial_fit"

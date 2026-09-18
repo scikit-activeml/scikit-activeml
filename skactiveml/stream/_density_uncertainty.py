@@ -425,9 +425,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # The labels and the classifier are checked before any query state
-        # is committed, so that an unsupported target specification leaves
-        # the query strategy untouched.
         X, y, sample_weight = self._validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
@@ -502,13 +499,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         -------
         clf : skactiveml.base.SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
-
-        Raises
-        ------
-        ValueError
-            If the target specification of `clf`, taken from a fitted `clf`
-            or resolved from `y` and the declarations of an unfitted one, is
-            outside the target capabilities of this query strategy.
         """
         # Check if the classifier and its arguments are valid.
         check_type(clf, "clf", SkactivemlClassifier)
@@ -981,9 +971,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # The labels and the classifier are checked before any query state
-        # is committed, so that an unsupported target specification leaves
-        # the query strategy untouched.
         X, y, sample_weight = self._validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
@@ -1090,13 +1077,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         -------
         clf : skactiveml.base.SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
-
-        Raises
-        ------
-        ValueError
-            If the target specification of `clf`, taken from a fitted `clf`
-            or resolved from `y` and the declarations of an unfitted one, is
-            outside the target capabilities of this query strategy.
         """
         # Check if the classifier and its arguments are valid.
         check_type(clf, "clf", SkactivemlClassifier)

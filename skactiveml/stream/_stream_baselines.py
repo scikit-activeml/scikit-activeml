@@ -17,11 +17,6 @@ _TASK_AGNOSTIC_CAPABILITIES = frozenset(
 def _validate_update_state(strategy):
     """Validate and commit the state an `update` needs.
 
-    This is the part of `_validate_data` not concerning the candidates, which
-    `update` counts rather than validates. It exists because `update` may be
-    called before the first `query`, and validating a placeholder batch
-    instead would commit the placeholder's feature count as the seen one.
-
     Parameters
     ----------
     strategy : SingleAnnotatorStreamQueryStrategy

@@ -47,8 +47,6 @@ class TestFixedUncertainty(
         test_cases += [
             (None, TypeError),
             (FixedUncertainty, TypeError),
-            # The budget manager counts classes, so nested per-output
-            # vocabularies are rejected there.
             ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)

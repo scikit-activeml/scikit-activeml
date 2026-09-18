@@ -279,8 +279,6 @@ class TestValidation(unittest.TestCase):
         cases = [
             ([0, 1.5], TypeError, "one label family"),
             ([False, 2], TypeError, "one label family"),
-            # `True` equals the integer `1`, so the mixture has to be
-            # reported before the duplicate that comparison would suggest.
             ([True, 1], TypeError, "one label family"),
             ([0.0, np.inf], ValueError, "infinite value"),
             ([0.0, np.nan], ValueError, "contains NaN"),

@@ -119,10 +119,7 @@ MULTILABEL_PREDICTION_CONSUMERS = frozenset(
     }
 )
 
-# Estimator-free strategies operating on the sample representations and the
 # label mask only, i.e., they never call `predict_proba` of a multi-label
-# classifier. Not all of them are task-agnostic: ProbCover derives its default
-# radius from a class count and therefore declares classification only.
 MULTILABEL_ESTIMATOR_FREE = frozenset(
     {
         CoreSet,

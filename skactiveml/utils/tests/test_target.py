@@ -107,8 +107,6 @@ class TestTargetSpec(unittest.TestCase):
         )
 
     def test_rejects_nonfinite_classes(self):
-        # Nonfinite numbers are no categories, whether they are declared
-        # directly or resolved from a declaration.
         for classes in ((np.nan, 1.0), (np.inf, 1.0)):
             with self.subTest(classes=classes):
                 with self.assertRaises(ValueError):
@@ -297,8 +295,6 @@ class TestTargetSpec(unittest.TestCase):
 
 class TestResolveTargetSpec(unittest.TestCase):
     def test_rejects_observed_nan_that_is_not_the_missing_label(self):
-        # NaN is a missing label, never a category, so an observed NaN is
-        # an error unless it is the configured missing label.
         with self.assertRaisesRegex(ValueError, "contains NaN"):
             resolve_target_spec(
                 [np.nan, 1.0],
@@ -770,9 +766,6 @@ class TestResolveTargetSpec(unittest.TestCase):
         )
 
     def test_multilabel_without_classes_rejects_heterogeneous_columns(self):
-        # One array holds every output of a sample, so its outputs cannot
-        # describe different label kinds, whether their vocabularies are
-        # declared or derived from the columns.
         y = np.empty((2, 2), dtype=object)
         y[:] = [["no", 0], ["yes", 1]]
 

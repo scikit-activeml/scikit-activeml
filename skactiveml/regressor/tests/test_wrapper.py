@@ -653,9 +653,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertRaises(ValueError, reg.sample, X=[])
 
     def test_sample_uses_the_same_fallback_as_predict(self):
-        # A refit that fails leaves the copied estimator answering from the
-        # superseded training data. Sampling must report the fallback target
-        # distribution `predict` reports, not those stale targets.
         X, y = [[0.0]], [100.0]
         estimator = GaussianProcessRegressor(
             kernel=ConstantKernel(1.0), optimizer=None
@@ -675,9 +672,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         np.testing.assert_allclose(y_samples.std(), std[0], atol=0.1)
 
     def test_sample_falls_back_without_a_not_fitted_error(self):
-        # An estimator that was never fitted need not raise `NotFittedError`
-        # from its sampling method. A non-unit kernel would otherwise expose
-        # its prior instead of the fallback distribution.
         X = [[0.0]]
         reg = SklearnRegressor(
             GaussianProcessRegressor(
@@ -695,7 +689,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         np.testing.assert_allclose(y_samples.std(), 1.0, atol=0.1)
 
     def test_sample_delegates_after_a_successful_fit(self):
-        # Delegation is unchanged whenever the estimator could be fitted.
         X, y = [[0.0], [1.0]], [1.0, 2.0]
         kernel = ConstantKernel(1.0)
         reg = SklearnRegressor(
@@ -790,7 +783,6 @@ class TestSklearnNormalRegressor(
 
         class GaussianProcessRegressorDummy(GaussianProcessRegressor):
             def partial_fit(self, X, y, sample_weight=None):
-                # Accept weights for wrapper validation; GPR fits unweighted.
                 return self.fit(X, y)
 
         self.prob_reg_partial_fit = GaussianProcessRegressorDummy()

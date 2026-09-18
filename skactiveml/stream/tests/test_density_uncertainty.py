@@ -215,7 +215,6 @@ def _assert_query_failures_restore_state(test_case, strategy_type):
             else:
                 kwargs["budget_manager"] = FailingBudgetManager()
             strategy = strategy_type(random_state=0, **kwargs)
-            # Initialize lazily, without committing observations.
             strategy.query([[0.0]], classifier)
             before = deepcopy(strategy)
             global_before = np.random.get_state()
@@ -426,8 +425,6 @@ class TestCognitiveDualQueryStrategy(
                     budget_manager=RecordingBudgetManager(),
                     random_state=0,
                 )
-                # Queries simulate utility-dependent updates without changing
-                # the persistent manager, including rejected observations.
                 queried, utilities = strategy.query(
                     candidates, classifier, return_utilities=True
                 )
@@ -492,7 +489,6 @@ class TestCognitiveDualQueryStrategy(
                     )
 
     def test_query(self):
-        # Reference: individual query/update calls, including the seed data.
         expected_output = [1, 4, 5, 6, 10, 15]
         expected_utilities = [
             1.6358911e-04,
@@ -538,7 +534,6 @@ class TestCognitiveDualQueryStrategyVarUn(
         )
 
     def test_query(self):
-        # Reference: individual query/update calls, including the seed data.
         expected_output = [4, 5, 6, 7, 15]
         expected_utilities = [
             1.6358911e-04,
@@ -584,7 +579,6 @@ class TestCognitiveDualQueryStrategyRanVarUn(
         )
 
     def test_query(self):
-        # Reference: individual query/update calls, including the seed data.
         expected_output = [1, 4, 5, 6, 10, 15]
         expected_utilities = [
             1.6358911e-04,
@@ -630,7 +624,6 @@ class TestCognitiveDualQueryStrategyRan(
         )
 
     def test_query(self):
-        # Reference: individual query/update calls, including the seed data.
         expected_output = [11]
         expected_utilities = [
             1.6358911e-04,
@@ -705,8 +698,6 @@ class TestCognitiveDualQueryStrategyFixUn(
         test_cases += [
             (None, TypeError),
             (CognitiveDualQueryStrategyFixUn, TypeError),
-            # The budget manager counts classes, so nested per-output
-            # vocabularies are rejected there.
             ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)

@@ -172,10 +172,6 @@ def _check_labels(
 ):
     """Check labels against the label and missing-value contract.
 
-    Components that only have to establish that `y` is admissible, without
-    using the resulting mask, call this instead of discarding the mask of
-    `is_unlabeled`.
-
     Parameters
     ----------
     y : array-like of shape (n_samples,) or (n_samples, n_outputs)
@@ -212,12 +208,6 @@ def _check_labels(
 
 def _observed_numerical_labels(y, missing_label):
     """Return the observed numerical labels as floating-point values.
-
-    Regression labels are stored as an object array whenever the missing
-    label and the labels have no common numeric dtype, e.g. for
-    `missing_label=None`. Object entries do not support the arithmetic a
-    regressor performs on them, so the observed labels are provided as an
-    ordinary floating-point view alongside the mask locating them.
 
     Parameters
     ----------

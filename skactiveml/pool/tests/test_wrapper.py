@@ -752,8 +752,6 @@ class TestSubSamplingWrapper(
             np.testing.assert_allclose(results[0][1], results[1][1])
 
     def test_query_param_aligned_kwargs_leave_caller_arrays(self):
-        # Subsetting the aligned keyword arguments must not modify the
-        # arrays of the caller.
         X, y, clf = self._aligned_kwargs_setting()
         candidates = X[unlabeled_indices(y, MISSING_LABEL)]
         sample_weight = np.linspace(0.2, 2.0, len(X))

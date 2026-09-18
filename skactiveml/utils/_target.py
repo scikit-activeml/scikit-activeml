@@ -117,12 +117,6 @@ class TargetSpec:
 def _class_vocabulary_key(classes):
     """Return a comparable key for a declared class vocabulary.
 
-    Unlike `_class_vocabulary_identity_key`, this helper also accepts the not
-    yet normalized vocabularies that estimators expose through `classes` or
-    `classes_`, i.e., arbitrarily nested sequences and arrays. The classes of
-    one output are normalized as `TargetSpec` normalizes them, so that the same
-    vocabulary declared in a different order yields the same key.
-
     Parameters
     ----------
     classes : array-like or tuple of array-like or None
@@ -209,14 +203,7 @@ def _validate_target_semantics(
 
 
 def _check_class_vocabulary_structure(target_type, classes):
-    """Validate nesting, width, and output dtypes against a target type.
-
-    Called both with the vocabularies a caller declares and with the resolved
-    ones a `TargetSpec` is built from, so that every path reaches the same
-    structural contract. Label families, both within one vocabulary and
-    across the outputs, are `check_classes` business and are already
-    established by both callers.
-    """
+    """Validate nesting, width, and output dtypes against a target type."""
     has_nested_classes = _has_nested_classes(classes)
     if target_type == "single-output" and has_nested_classes:
         raise ValueError(
@@ -340,9 +327,6 @@ def resolve_target_spec(
 
     normalized_classes = None
     if task == "regression":
-        # Classification checks the labels while resolving a vocabulary from
-        # them; regression resolves none, so its labels are checked here
-        # rather than only by the regressor that is fitted on them.
         _check_labels(y, missing_label, task="regression")
     else:
         observed = np.asarray(y)[~is_unlabeled(y, missing_label=missing_label)]

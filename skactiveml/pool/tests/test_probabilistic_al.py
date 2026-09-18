@@ -325,8 +325,6 @@ class TestCostReduction(unittest.TestCase):
 
     def test_underflowing_beta_functions(self):
         for count, prior in [(1000, 1), (0, 1000), (1e6, 1e-3)]:
-            # With tied binary counts, one acquired label reduces the risk
-            # from 1/2 to alpha / (2 * alpha + 1).
             expected = 1 / (4 * (count + prior) + 2)
             actual = cost_reduction([[count, count]], m_max=1, prior=prior)
             np.testing.assert_allclose(actual, expected, rtol=1e-8)

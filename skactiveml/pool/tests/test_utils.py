@@ -67,11 +67,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         )
         expected = clone(clf).fit(self.X, self.y).metric_dict_
 
-        # The kernel is precomputed once, so the criterion is resolved once.
         iclf = IndexClassifierWrapper(clf, self.X, self.y, use_speed_up=True)
         self.assertEqual(expected, iclf.pwc_metric_dict_)
 
-        # An already fitted classifier contributes its own bandwidth.
         iclf = IndexClassifierWrapper(
             clone(clf).fit(self.X, self.y),
             self.X,
@@ -80,7 +78,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         )
         self.assertEqual(expected, iclf.pwc_metric_dict_)
 
-        # Numeric kernel parameters are passed through unchanged.
         iclf = IndexClassifierWrapper(
             ParzenWindowClassifier(classes=[0, 1], metric_dict={"gamma": 0.5}),
             self.X,
@@ -97,8 +94,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
             classes=np.unique(y), missing_label=MISSING_LABEL
         )
         y_known = np.full(len(y), MISSING_LABEL)
-        # Labels handed to `fit` are cast to the dtype of `y`, so integer
-        # labels could not hold `np.nan` and would turn it into a class.
         with self.assertRaisesRegex(TypeError, "is not representable"):
             IndexClassifierWrapper(
                 clf=clf, X=X, y=y, missing_label=MISSING_LABEL
@@ -874,8 +869,6 @@ class TestApproximation(unittest.TestCase):
             np.testing.assert_array_equal(res, np.zeros(2))
 
     def test_conditional_expectation_normalizes_every_quantile_method(self):
-        # A zero-valued integrand cannot detect a multiplicative error, so
-        # every quantile method is pinned against analytically known values.
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
@@ -888,9 +881,6 @@ class TestApproximation(unittest.TestCase):
             "quadrature",
         ]
 
-        # An even grid is covered because the default is even and because
-        # `simpson` corrects its final interval there, making its weights
-        # asymmetric. Normalization must hold regardless.
         for quantile_method, vector_func, n_samples in itertools.product(
             quantile_methods, [True, False, "both"], [9, 10]
         ):
@@ -908,8 +898,6 @@ class TestApproximation(unittest.TestCase):
                     vector_func=vector_func,
                 )
 
-                # A constant integrand must come back unchanged, which only
-                # holds if the quadrature weights sum to one.
                 constant = conditional_expect(
                     func=lambda idx, x, y: np.full_like(
                         np.asarray(y, dtype=float), 2.5
@@ -918,8 +906,6 @@ class TestApproximation(unittest.TestCase):
                 )
                 np.testing.assert_allclose(constant, np.full(len(X), 2.5))
 
-                # Shifting the integrand must shift the expectation by the
-                # same amount.
                 plain = conditional_expect(
                     func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,
                     **kwargs,
@@ -1014,9 +1000,6 @@ class TestApproximation(unittest.TestCase):
                 np.testing.assert_allclose(result, np.ones(len(X)))
 
     def test_conditional_expectation_romberg_point_count(self):
-        # Romberg needs `2**k + 1` points. The count must be raised to the
-        # smallest such value that is not below the request, and a request
-        # already of that form must be left alone.
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
@@ -1053,8 +1036,6 @@ class TestApproximation(unittest.TestCase):
                 self.assertEqual(used, [expected])
 
     def test_conditional_expectation_names_the_sample_count_parameter(self):
-        # The bound check used to report a parameter name that the function
-        # does not accept.
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
@@ -1118,9 +1099,6 @@ class TestFunctions(unittest.TestCase):
         self.assertRaises(ValueError, _update_X_y, self.X, self.y, self.y_pot)
 
     def test_update_X_y_preserves_the_missing_label(self):
-        # Converting the labels to a numeric dtype would turn a
-        # `missing_label=None` into a NaN, i.e. into an unmarked missing
-        # label that every regressor then rejects.
         y = np.array([0, 1.5, None, None], dtype=object)
         X = np.arange(4 * 2, dtype=float).reshape(4, 2)
 
@@ -1134,9 +1112,6 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(y_new.tolist(), [0, 1.5, None, None, 2.5])
 
     def test_update_X_y_keeps_fractional_updates_out_of_integer_targets(self):
-        # Integer observations are valid regression targets, but hypothetical
-        # ones are fractional. Assigning into an unwidened integer buffer
-        # would truncate them, and the appended path would not.
         X = np.arange(4 * 2, dtype=float).reshape(4, 2)
         y_int = np.array([0, 2, -1, -1])
 
@@ -1144,14 +1119,11 @@ class TestFunctions(unittest.TestCase):
 
         np.testing.assert_array_equal(y_new, [0.0, 2.0, 0.75, -1.0])
 
-        # The same update through either path yields the same targets.
         _, y_mapped = _update_X_y(X[:3], y_int[:3], 0.75, idx_update=2)
         _, y_appended = _update_X_y(X[:2], y_int[:2], 0.75, X_update=X[2])
 
         np.testing.assert_array_equal(y_mapped, y_appended)
 
-        # Widening never rounds a target: identifiers beyond the exact
-        # floating-point range keep their identity in an object buffer.
         y_large = np.array([2**53, 2**53 + 1, -1])
 
         _, y_new = _update_X_y(np.zeros((3, 1)), y_large, 0.5, idx_update=2)
@@ -1160,8 +1132,6 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(y_new.tolist(), [2**53, 2**53 + 1, 0.5])
 
     def test_update_X_y_ranks_integer_and_float_targets_equally(self):
-        # A public lookahead strategy must not rank candidates differently
-        # just because equal target values are stored as integers.
         X = np.random.RandomState(9).normal(size=(6, 1))
         y = np.array([0, 2, 3, -1, -1, -1])
 
@@ -1181,8 +1151,6 @@ class TestFunctions(unittest.TestCase):
         np.testing.assert_allclose(rankings[0][1], rankings[1][1])
 
     def test_update_reg_accepts_regression_missing_labels(self):
-        # Every missing label of the contract survives the simulated labeling a
-        # regression strategy performs before refitting.
         X = np.linspace(0.0, 1.0, 4).reshape(-1, 1)
         for missing in (np.nan, None, -999):
             with self.subTest(missing=missing):
@@ -1302,7 +1270,6 @@ class TestFunctions(unittest.TestCase):
         result = _cross_entropy(X_eval=X_1, true_reg=reg_1, other_reg=reg_2)
         self.assertEqual(y_1.shape, result.shape)
 
-        # Dynamic quadrature must evaluate each row's own distribution.
         expected = []
         for x in X_1:
             true_dist = reg_1.predict_target_distribution([x])

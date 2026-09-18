@@ -17,8 +17,6 @@ class TestLabelEncoder(unittest.TestCase):
         self.y7 = ["paris", "france", "tokyo", -1]
 
     def test_mixed_integer_vocabularies_are_rejected(self):
-        # One array holds every output of a sample, so a signed vocabulary
-        # beside an unsigned one has no common dtype to store them in.
         signed = np.array([2**53, 2**53 + 1], dtype=np.int64)
         unsigned = np.array([2**63, 2**63 + 1], dtype=np.uint64)
         encoder = ExtLabelEncoder(
@@ -140,7 +138,6 @@ class TestLabelEncoder(unittest.TestCase):
                         np.testing.assert_array_equal(
                             encoder.transform(decoded), codes
                         )
-                        # Fit on the lossless representation, too.
                         np.testing.assert_array_equal(
                             encoder.fit_transform(decoded), codes
                         )

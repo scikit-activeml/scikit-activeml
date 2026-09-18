@@ -74,8 +74,6 @@ class TestAggregation(unittest.TestCase):
         np.testing.assert_array_equal(y_aggregated_exp, y_aggregated_rec)
 
     def test_majority_vote_no_label(self):
-        # Aggregating a matrix without any observed label needs no class
-        # vocabulary: every sample keeps the missing label of `y`.
         y = np.full(shape=(3, 2), fill_value=np.nan)
 
         y_aggregate_exp = np.full(shape=(3,), fill_value=np.nan)

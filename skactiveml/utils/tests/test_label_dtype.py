@@ -179,8 +179,6 @@ class TestLabelFamily(unittest.TestCase):
                 self.assertEqual(_label_family(y, name="y"), family)
 
     def test_lists_are_judged_by_their_array_representation(self):
-        # `[0, 1.5]` becomes a floating-point array, whereas the equivalent
-        # object array mixes an integer with a float.
         self.assertEqual(_label_family([0, 1.5], name="classes"), "float")
         with self.assertRaisesRegex(TypeError, "one label family"):
             _label_family(np.array([0, 1.5], dtype=object), name="classes")
@@ -262,8 +260,6 @@ class TestLabelFamily(unittest.TestCase):
         self.assertEqual(_label_family(y, name="y"), "int")
 
     def test_integer_check_accepts_values_holding_no_integer(self):
-        # `_label_family` only asks for the integer range once an integer is
-        # present, so this guard is reached by a direct call alone.
         for values in (
             np.array(["a", "b"], dtype=object),
             np.array([1.5, np.nan], dtype=object),
@@ -448,8 +444,6 @@ class TestMissingLabelChecks(unittest.TestCase):
 
 class TestMissingMaskAndFamily(unittest.TestCase):
     def test_missing_label_is_checked_against_the_dtype_of_an_array(self):
-        # The dtype announces the family, so an incompatible missing label
-        # is named as such instead of the missing values it fails to mark.
         y = np.array([0.0, np.nan, 1.0])
         with self.assertRaisesRegex(TypeError, "is not compatible with"):
             _missing_mask_and_family(y, "nan", name="y")
@@ -459,8 +453,6 @@ class TestMissingMaskAndFamily(unittest.TestCase):
         is_missing, family = _missing_mask_and_family(y, "?", name="y")
         np.testing.assert_array_equal(is_missing, [False, True, False])
         self.assertEqual(family, "str")
-        # The missing label is checked against the observed values, not
-        # against the object dtype, which announces no family.
         y = np.array(["cat", -1, "dog"], dtype=object)
         with self.assertRaisesRegex(TypeError, "is not compatible with"):
             _missing_mask_and_family(y, -1, name="y")
@@ -520,8 +512,6 @@ class TestMissingMaskAndFamily(unittest.TestCase):
             _missing_mask_and_family(y, "?", name="y", role=_NUMERICAL_LABELS)
 
     def test_incompatible_missing_label_names_the_observed_family(self):
-        # The numerical and task-agnostic roles decide compatibility for the
-        # merged numeric family, but the message names what `y` holds.
         cases = [
             (np.array([1, 2]), _TASK_AGNOSTIC_LABELS, "integer"),
             (np.array([1, 2]), _NUMERICAL_LABELS, "integer"),

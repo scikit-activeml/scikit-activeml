@@ -122,19 +122,12 @@ class ExtLabelEncoder(BaseEstimator):
             )
             return self
 
-        # `y` is the evidence the label contract is checked against, whether
-        # or not the class vocabulary is inferred from it. An empty `y`
-        # carries none, because NumPy defaults it to `float64`, which would
-        # reject a string `missing_label`; the label helpers accept it.
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         if self.classes is None and not is_lbld.any():
             raise ValueError(
                 "No class label is observed and `classes` is not defined."
             )
         if self.classes is not None:
-            # The wrapped `LabelEncoder` would report a string label beside
-            # numeric classes as an unparsable integer rather than as the
-            # incompatible label kind it is.
             _check_compatible_kinds(y[is_lbld], self.classes, name="classes")
         self._le = LabelEncoder()
         classes = (
@@ -243,11 +236,6 @@ class ExtLabelEncoder(BaseEstimator):
         self, y, *, allow_missing, prefer_class_dtype=False
     ):
         """Decode into a lossless missing-capable or fully observed dtype.
-
-        With `allow_missing=False`, reject missing codes and allocate directly
-        in the common class dtype, preserving integer prediction identities.
-        Otherwise `prefer_class_dtype` chooses the class dtype only when all
-        entries are observed. All paths share shape and code validation.
 
         Parameters
         ----------

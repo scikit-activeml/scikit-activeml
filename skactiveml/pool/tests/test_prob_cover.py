@@ -52,8 +52,6 @@ class TestProbCover(
         )
 
     def test_target_capabilities_are_classification_only(self):
-        # The default radius depends on a class count, which continuous
-        # labels do not provide, so regression is not declared.
         qs = ProbCover(**self.init_default_params)
         self.assertEqual(
             qs._target_capabilities,

@@ -7,15 +7,12 @@ import numpy as np
 from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
-# The public attributes a pool query strategy commits while validating.
 QUERY_STATE_ATTRIBUTES = (
     "n_features_in_",
     "missing_label_",
     "random_state_",
 )
 
-# Stream query strategies expose no `missing_label_`, but commit the budget
-# state their budget manager is built from.
 STREAM_QUERY_STATE_ATTRIBUTES = (
     "n_features_in_",
     "random_state_",
@@ -115,9 +112,6 @@ def _state_difference(actual, expected, path, seen):
             f"`{path}` changed type from `{type(expected).__name__}` to "
             f"`{type(actual).__name__}`."
         )
-    # Guard against the cycles an estimator referring back to its owner
-    # creates. A pair under comparison is equal unless a difference is found
-    # elsewhere, which is what the enclosing call reports.
     pair = (id(actual), id(expected))
     if pair in seen:
         return None
@@ -159,9 +153,6 @@ def _state_difference(actual, expected, path, seen):
         return _compare_values(
             _equal_or_identical(actual, expected), actual, expected, path
         )
-    # Two objects of the same type without discoverable state and without
-    # value equality, e.g. a function, are indistinguishable here. Comparing
-    # them by identity would report every copy as a difference.
     return None
 
 
@@ -177,8 +168,6 @@ def _array_difference(actual, expected, path, seen):
             f"`{actual.dtype}`."
         )
     if actual.dtype.kind == "O":
-        # Object arrays hold arbitrary values, which only the general
-        # recursion can compare.
         for index, (value, expected_value) in enumerate(
             zip(actual.ravel(), expected.ravel())
         ):
@@ -257,13 +246,7 @@ def _key_path(path, key):
 
 
 def _attribute_state(obj):
-    """Return the attributes holding an object's state, or `None`.
-
-    An object storing its state in `__slots__` or in a C extension exposes it
-    through `__getstate__` rather than through `__dict__`. An object with no
-    attributes at all reports `None`, so that the caller can fall back on
-    value equality instead of accepting an empty state as equal.
-    """
+    """Return the attributes holding an object's state, or `None`."""
     state = getattr(obj, "__dict__", None)
     if state:
         return dict(state)

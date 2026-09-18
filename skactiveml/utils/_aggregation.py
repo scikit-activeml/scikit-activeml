@@ -115,21 +115,14 @@ def majority_vote(
     # infer encoding
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     if not np.any(is_labeled_y):
-        # Every sample of an entirely missing matrix aggregates to the
-        # missing label, which `y` already holds in the caller's dtype. No
-        # vocabulary is needed to return it, so none is inferred; a declared
-        # one is still fitted, because it constrains these labels as it does
-        # everywhere else.
         if classes is not None:
             le.fit(y)
         return y[:, 0].copy()
     le.fit(y)
     y_aggregated = np.full((n_samples,), missing_label, dtype=le._dtype)
 
-    # transform labels
     y_labeled_transformed = le.transform(y_labeled)
 
-    # perform voting
     vote_matrix = compute_vote_vectors(
         y_labeled_transformed,
         w=w[is_labeled_y],
@@ -139,9 +132,7 @@ def majority_vote(
 
     vote_vector = rand_argmax(vote_matrix, random_state, axis=1)
 
-    # inverse transform labels
     y_labeled_inverse_transformed = le.inverse_transform(vote_vector)
-    # assign labels
     y_aggregated[is_labeled_y] = y_labeled_inverse_transformed
 
     return y_aggregated

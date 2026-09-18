@@ -340,11 +340,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
 
 
 def _radius_graph(distances, radius):
-    """Build adjacency in bounded row chunks, retaining dense graphs cheaply.
-
-    Sparse outgoing and incoming adjacency share the same edges. If their
-    combined storage exceeds one dense boolean matrix, retain that matrix
-    instead. The public distance matrix remains unchanged in either case.
+    """Build adjacency in bounded row chunks, retaining dense
+    graphs cheaply.
     """
     blocks = []
     storage = 0

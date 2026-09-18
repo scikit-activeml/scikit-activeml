@@ -202,7 +202,6 @@ class TestEpistemicUncertaintySampling(
                 ).query(**params)
                 for expected_part, actual_part in zip(expected, actual):
                     np.testing.assert_array_equal(actual_part, expected_part)
-                # Narrowing candidates retains all expensive scalar values.
                 self.assertEqual(qs._precompute_array.shape, retained_shape)
 
     def test_pwc_ml_1(self):

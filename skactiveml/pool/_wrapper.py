@@ -404,8 +404,6 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             new_X = X
             new_y = y
 
-        # Keyword arguments aligned to a sample set are subset like this
-        # sample set.
         if candidates is not None and candidates.ndim > 1:
             X_aligned_kwargs = ["sample_weight"]
             # `utility_weight` weights the samples whose utilities are
@@ -428,7 +426,6 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
 
         if self.embed_samples_func:
             new_X = self._embed_samples(new_X, "X")
-            # Candidates passed as a feature matrix must also be embedded.
             if candidates is not None and candidates.ndim > 1:
                 new_candidates = self._embed_samples(
                     new_candidates, "candidates"

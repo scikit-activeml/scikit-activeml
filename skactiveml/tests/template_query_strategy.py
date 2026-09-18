@@ -1701,12 +1701,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         }
 
     def _stream_clf_query_params(self):
-        """Return a copy of the default classifier query parameters.
-
-        Returns `None` for a strategy consuming no classifier, because such
-        a strategy is never told which target semantics its labels have and
-        therefore has nothing to reject.
-        """
+        """Return a copy of the default classifier query parameters."""
         if "clf" not in inspect.signature(self.qs_class.query).parameters:
             return None
         return deepcopy(self.query_default_params_clf)
@@ -1732,14 +1727,10 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
         self.assertIsInstance(capabilities, frozenset)
         if "clf" in inspect.signature(self.qs_class.query).parameters:
-            # The classifier is the target authority and has to be a
-            # single-output classifier.
             expected = {
                 ("classification", "single-output", "single-annotator"),
             }
         else:
-            # Label-free strategies see neither labels nor a model and are
-            # task-agnostic like their pool-based counterparts.
             expected = {
                 ("classification", "single-output", "single-annotator"),
                 ("classification", "multi-label", "single-annotator"),
@@ -1811,8 +1802,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             rf"{self.qs_class.__name__} does not support target capability"
         )
 
-        # An unfitted classifier declares the meaning of `y` through its
-        # constructor, with `y` as evidence or, without `y`, on its own.
         for labels in (y, None):
             with self.subTest(labels=None if labels is None else "y"):
                 self._assert_query_rejects_clf(
@@ -1824,8 +1813,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         if query_params is None:
             return
 
-        # Neither declared `classes` nor labels tell an unfitted classifier
-        # which classes exist, so no target specification can be resolved.
         self._assert_query_rejects_clf(
             ParzenWindowClassifier(),
             None,
@@ -2271,12 +2258,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                     params[test_param] = test_val
 
                     qs = self.qs_class(**init_params)
-                    # A constructor parameter is validated by the method it
-                    # reaches first, which is `query`. A `query` or `update`
-                    # parameter is validated by the method taking it, so both
-                    # the accepted and the rejected case have to reach that
-                    # method: dispatching an accepted `update` case to `query`
-                    # would test nothing about `update`.
                     if test_func == "update":
                         self._check_update_param(qs, update_params, err)
                     elif err is None:
@@ -2309,17 +2290,11 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             msg="`update` has to return the updated query strategy itself.",
         )
 
-        # `update` counts its candidates rather than validating them, so it
-        # must not commit a feature count. This strategy has not queried yet,
-        # so any `n_features_in_` here comes from `update`.
         self.assertFalse(
             hasattr(qs, "n_features_in_"),
             msg="`update` must not commit `n_features_in_`.",
         )
 
-        # An accepted batch has to be counted. Not every strategy keeps its
-        # own counters, so this holds wherever the documented counters exist,
-        # either on the strategy or on the budget manager it delegates to.
         candidates = update_params["candidates"]
         n_candidates = (
             candidates.shape[0]
@@ -2347,11 +2322,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
 def _stream_counters(qs):
     """Collect the seen and queried counters of a stream query strategy.
-
-    A strategy either counts the observed and queried samples itself or
-    delegates the count to its budget manager, so both are collected. A
-    counter is reported only once it exists, because a strategy commits its
-    fitted state on its first `query` or `update`.
 
     Parameters
     ----------

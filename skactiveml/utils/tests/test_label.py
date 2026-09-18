@@ -215,9 +215,6 @@ class TestLabel(unittest.TestCase):
                         is_unlabeled(y, missing)
 
     def test_numeric_arrays_reject_string_missing_labels(self):
-        # Numeric NaN and the string `"nan"` are different values, so the
-        # missing label is incompatible instead of matching the missing
-        # entries.
         y = np.array([0.0, np.nan, 1.0])
         with self.assertRaisesRegex(TypeError, "is not compatible with"):
             is_unlabeled(y, missing_label="nan")
@@ -306,7 +303,6 @@ class TestLabel(unittest.TestCase):
                     is_unlabeled(y, missing_label=missing_label)
 
     def test_is_unlabeled_rejects_nan_under_a_none_missing_label(self):
-        # Only the configured missing label denotes missingness.
         for targets in (
             [0.0, np.nan, 1.0],
             np.array([0.0, np.nan, 1.0]),
@@ -432,8 +428,6 @@ class TestLabel(unittest.TestCase):
         )
 
     def test_check_missing_label_maps_bytes_target_type_to_strings(self):
-        # A bytes dtype holds the string label family, so it constrains the
-        # missing label like any other string dtype.
         check_missing_label("", target_type=np.dtype("S5"))
         check_missing_label("none", target_type=np.dtype("S5"))
         for missing_label in (np.nan, 2, True):
@@ -446,17 +440,12 @@ class TestLabel(unittest.TestCase):
                 )
 
     def test_check_missing_label_ignores_unreadable_target_type(self):
-        # A `target_type` NumPy cannot read as a dtype lies outside the label
-        # contract and therefore constrains no missing label, just as an
-        # object dtype does. The label helpers reject the values instead.
         for target_type in ("nonsense", object(), np.dtype(object)):
             with self.subTest(target_type=target_type):
                 for missing_label in (np.nan, None, "none", 2):
                     check_missing_label(missing_label, target_type=target_type)
 
     def test_check_labels_rejects_an_unknown_task(self):
-        # A precondition of the private helper: its callers pass the task of
-        # a resolved target specification, so no public input reaches this.
         with self.assertRaisesRegex(
             ValueError, "'classification' or 'regression'"
         ):

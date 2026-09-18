@@ -17,15 +17,6 @@ _FAMILY_DESCRIPTIONS = {
     "str": "string",
 }
 
-# The three roles labels play in the contract, each with its own rule for
-# combining the families found among them.
-#
-# Classification vocabularies and observed labels hold exactly one family.
-# Regression labels may combine integers and floating-point values, but
-# neither Boolean values nor strings describe a numerical target. Public
-# single-output mask helpers are task-agnostic: they accept values valid for
-# either task, which adds only the integer/float mixture to the single-family
-# classification domain.
 _VOCABULARY = "vocabulary"
 _LABELS = "labels"
 _NUMERICAL_LABELS = "numerical labels"
@@ -104,13 +95,6 @@ def _as_label_array(y):
 def _as_class_vocabulary_array(classes, *, name="classes"):
     """Convert one class vocabulary without changing its label family.
 
-    NumPy promotes a mixture of signed and unsigned 64-bit integer scalars to
-    ``float64``. That conversion can merge neighboring integers above the
-    exact floating-point range before ``LabelEncoder`` sees them. Declared
-    classes are therefore checked value by value and converted to a common
-    integer dtype explicitly when ordinary NumPy promotion would leave the
-    integer family.
-
     Parameters
     ----------
     classes : iterable of scalar labels
@@ -137,12 +121,6 @@ def _as_class_vocabulary_array(classes, *, name="classes"):
 
 def _lossless_decode_dtype(vocabularies, missing_label=_NO_MISSING_LABEL):
     """Choose a common dtype without changing class or missing-label values.
-
-    Numeric conversions are checked by casting back to each original dtype
-    before comparing. This avoids both Python loops over class vocabularies
-    and integer-to-float promotion during equality checks. Numeric missing
-    labels must never be converted into strings, even if they could be
-    parsed back.
 
     Parameters
     ----------
@@ -180,7 +158,6 @@ def _lossless_decode_dtype(vocabularies, missing_label=_NO_MISSING_LABEL):
             ):
                 continue
         elif array.dtype.kind == dtype.kind and dtype.kind in "SU":
-            # result_type widens strings of the same kind without truncation.
             continue
         return np.dtype(object)
     return dtype
@@ -188,10 +165,6 @@ def _lossless_decode_dtype(vocabularies, missing_label=_NO_MISSING_LABEL):
 
 def _dtype_family(dtype, *, name):
     """Return the label family a NumPy dtype belongs to.
-
-    The dtype of an ordinary label array already determines its family, so
-    no value has to be inspected. Only object arrays carry no such evidence
-    and are scanned by `_scan_object_labels` instead.
 
     Parameters
     ----------
@@ -272,12 +245,6 @@ def _scalar_label_family(value, *, name):
 def _scan_object_labels(y, missing_label, *, name):
     """Locate the missing labels and the label families of an object array.
 
-    An object dtype carries no information about the values it holds, so its
-    entries are the only evidence about both the missing mask and the label
-    families. Both are collected in one pass. Entries equal to
-    `missing_label` are missing values rather than labels and are therefore
-    excluded from the families.
-
     Parameters
     ----------
     y : numpy.ndarray of dtype object
@@ -308,10 +275,6 @@ def _scan_object_labels(y, missing_label, *, name):
 def _check_object_values(values, families, *, name):
     """Check that the entries of an object array are storable labels.
 
-    Called once the families of the entries are known to agree, so that a
-    mixture of numbers and strings is reported as such rather than through
-    the value of one of them, e.g. a NaN beside string labels.
-
     Parameters
     ----------
     values : numpy.ndarray of dtype object
@@ -339,11 +302,6 @@ def _check_object_values(values, families, *, name):
 
 def _combine_families(families, *, name, role):
     """Reduce label families to the one family the values describe.
-
-    The rule follows the role the values play: `_VOCABULARY` and `_LABELS`
-    admit one family, `_NUMERICAL_LABELS` admits the integer and floating-point
-    families, and `_TASK_AGNOSTIC_LABELS` accepts values valid for either
-    classification or regression.
 
     Parameters
     ----------
@@ -393,12 +351,6 @@ def _combine_families(families, *, name, role):
 def _label_family(values, *, name, role=_VOCABULARY):
     """Return the one label family of a class vocabulary or of labels.
 
-    The representation of `values` decides how they are judged, as described
-    by the label and missing-value contract: an ordinary array is judged by
-    its dtype, whereas an object array is scanned value by value. Callers
-    pass an object array to have short, declared vocabularies checked value
-    by value, and the converted label array otherwise.
-
     Parameters
     ----------
     values : array-like
@@ -428,8 +380,6 @@ def _label_family(values, *, name, role=_VOCABULARY):
         return None
     if values.dtype.kind == "O":
         _, families = _scan_object_labels(values, _NO_MISSING_LABEL, name=name)
-        # No missing label is in play here, so a nonfinite value is a nonfinite
-        # value: it is reported as such whatever the other values are.
         _check_object_values(values, families, name=name)
         return _combine_families(families, name=name, role=role)
     family = _dtype_family(values.dtype, name=name)
@@ -459,8 +409,6 @@ def _check_missing_label_value(missing_label):
     if isinstance(missing_label, (bool, np.bool_)):
         raise TypeError(_missing_label_value_message(missing_label))
     if isinstance(missing_label, (int, np.integer)):
-        # NumPy integers always fit; a Python integer has arbitrary
-        # precision, so its value decides whether it is storable.
         if isinstance(missing_label, int) and not (
             _INT64_MIN <= missing_label <= _UINT64_MAX
         ):
@@ -486,11 +434,6 @@ def _check_missing_label_for_family(
     missing_label, family, *, name=None, description=None
 ):
     """Check that a missing label is compatible with a label family.
-
-    Encodes the missing-label compatibility of the label contract: `None`
-    denotes a missing label in every family, numeric missing labels
-    including NaN belong to Boolean, integer, and floating-point labels, and
-    string missing labels belong to string labels.
 
     Parameters
     ----------
@@ -539,12 +482,6 @@ def _check_missing_label_for_family(
 def _check_compatible_kinds(observed, declared, *, name):
     """Check that observed labels and declared classes share one label kind.
 
-    A comparison of labels and classes of different kinds cannot report
-    which class a label missed, because none of them could ever match: a
-    string label is not a numeric category however it is spelled. Widths and
-    numeric families may differ, so the observed `0.0` of a declared integer
-    class `0`, or of a declared `False`, remains that class.
-
     Parameters
     ----------
     observed : array-like
@@ -572,10 +509,6 @@ def _check_compatible_kinds(observed, declared, *, name):
 def _label_kind(values, *, name):
     """Return the coarse kind observed labels and declared classes share.
 
-    Integer and floating-point labels describe the same categories, e.g. an
-    observed `0.0` matches a declared integer class `0`, so labels and
-    classes only have to agree on their kind rather than on their family.
-
     Parameters
     ----------
     values : array-like
@@ -594,12 +527,6 @@ def _label_kind(values, *, name):
 
 def _target_type_family(target_type):
     """Map the dtype or scalar type of labels to their label family.
-
-    `check_missing_label` accepts the dtype or Python type of the labels
-    rather than their family, so that its public signature stays unchanged.
-    Only the missing label is judged here, so a dtype outside the label
-    contract carries no family instead of being rejected, just as an object
-    dtype does; the label helpers reject it when they see the values.
 
     Parameters
     ----------
@@ -623,16 +550,6 @@ def _target_type_family(target_type):
 
 def _missing_mask_and_family(y, missing_label, *, name, role=_LABELS):
     """Locate missing labels and check the family of the observed ones.
-
-    This is the one place where the label and missing-value contract is
-    enforced for observed labels: which values are labels at all, which
-    value denotes a missing one, and which values remain as evidence about
-    the label family.
-
-    An ordinary array announces the family of its observed entries through
-    its dtype. Its mask is built first because an entirely missing array
-    provides no family evidence. An object array announces nothing, so its
-    mask and its families are collected in one scan.
 
     Parameters
     ----------
@@ -696,12 +613,6 @@ def _missing_mask_and_family(y, missing_label, *, name, role=_LABELS):
 
 def _typed_missing_mask(y, missing_label):
     """Locate a missing label in an array without coercing its values.
-
-    A missing label of another family than the labels cannot occur among
-    them, so the comparison is skipped rather than performed in a dtype that
-    both values are forced into. Numeric missing labels use a lossless
-    comparison dtype, so that neighboring large integer labels are not
-    merged onto the missing label.
 
     Parameters
     ----------
@@ -768,11 +679,6 @@ def _matches_missing_label(value, missing_label):
 def _holds_missing_label(values, missing_label):
     """Check whether an array can store the missing label without loss.
 
-    A dtype able to hold the labels need not be able to hold their missing
-    label, e.g. integer labels cannot store `np.nan` and a `float64` array
-    cannot store `None`. Components writing the missing label into an
-    existing label array require that it can.
-
     Parameters
     ----------
     values : numpy.ndarray
@@ -791,9 +697,6 @@ def _holds_missing_label(values, missing_label):
 
 def _missing_label_kind(missing_label):
     """Return the label kind a missing label belongs to.
-
-    `None` denotes a missing label in every family and therefore belongs to
-    no kind of its own.
 
     Parameters
     ----------
@@ -825,11 +728,6 @@ def _python_scalar(value):
 
 def _check_integer_labels(values, *, name):
     """Check that the integers among object entries fit a 64-bit dtype.
-
-    Python integers have arbitrary precision, so their values decide whether
-    they are storable. Individually storable integers can still lack a
-    *common* integer dtype, e.g. `-1` beside `2**64 - 1`. NumPy would then
-    promote them to `float64` and lose the identity of the large ones.
 
     Parameters
     ----------
@@ -897,11 +795,6 @@ def _check_finite_labels(values, *, name):
 
 def _describe_observed_families(families):
     """Name the label families found among observed labels.
-
-    The numerical and task-agnostic roles merge integers and floating-point
-    values into one family, because both describe a numerical label. An
-    error message names the labels rather than that merged family, so that
-    integer labels are not reported as floating-point ones.
 
     Parameters
     ----------

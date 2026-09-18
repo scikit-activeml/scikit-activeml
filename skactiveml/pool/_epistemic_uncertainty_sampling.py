@@ -278,7 +278,6 @@ def _epistemic_uncertainty_pwc(
         )
     utilities = np.full((len(freq)), np.nan)
     if precompute_array is not None:
-        # Enlarge the table without discarding previously computed values.
         new_shape = [
             int(maximum) + 2 if size < maximum + 1 else size
             for size, maximum in zip(precompute_array.shape, np.max(freq, 0))

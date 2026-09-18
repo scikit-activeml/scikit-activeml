@@ -1008,14 +1008,9 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        # A string missing label is incompatible with numerical labels.
         test_cases += [("nan", TypeError)]
         super().test_init_param_missing_label(test_cases)
 
-        # A fractional missing label is valid. Only the configured missing
-        # label denotes a missing label, so the targets have to use
-        # it: the NaN of the default targets would be an unmarked missing
-        # value.
         n_samples = len(self.fit_default_params["X"])
         self._test_param(
             "init",
@@ -1105,9 +1100,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             replace_init_params=replace_init_params,
         )
 
-        # A string missing label cannot denote a missing numerical label,
-        # so it is rejected with a message naming the missing label instead
-        # of failing in the arithmetic a regressor performs on the labels.
         n_samples = len(self.fit_default_params["X"])
         self._test_param(
             "fit",

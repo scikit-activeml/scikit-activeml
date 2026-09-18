@@ -394,8 +394,6 @@ class TestGreedySamplingHelper(unittest.TestCase):
             metric_dict_x={"Y_norm_squared": np.array([0.0])},
         )
         np.testing.assert_array_equal(utilities[0], np.arange(1, 6))
-        # The supplied center norm is deliberately reused by sklearn even
-        # after choosing a different center, as in the original helper.
         np.testing.assert_array_equal(utilities[1, :4], np.zeros(4))
         self.assertTrue(np.isnan(utilities[1, 4]))
         self.assertTrue(np.all(np.nan_to_num(utilities[2]) == 0))

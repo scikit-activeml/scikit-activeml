@@ -261,7 +261,6 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         if self.n_features_in_ is None:
             return np.zeros(output_shape)
 
-        # Check the input against the stored training data.
         if self.metric == "precomputed":
             if np.size(X, 1) != np.size(self.X_, 0):
                 raise ValueError(
@@ -271,12 +270,10 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         else:
             check_n_features(self, X, reset=False)
 
-        # Predict zeros because no training sample carries class frequencies.
         n_contributing = len(self._V_contributing)
         if n_contributing == 0:
             return np.zeros(output_shape)
 
-        # Compute kernel (metric) matrix for the contributing samples.
         if self.metric == "precomputed":
             K = X if self._all_contributing else X[:, self._contributing]
         else:
@@ -311,14 +308,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         return self._check_frequencies(F)
 
     def _cache_contributing_samples(self):
-        """Cache the training samples with non-zero class frequencies.
-
-        Training samples whose class frequency vector is zero, e.g. unlabeled
-        samples or samples with a weight of zero, contribute nothing to the
-        estimates of `predict_freq` and are not eligible as nearest
-        neighbours. Caching the remaining samples also avoids evaluating their
-        kernel columns, while `X_` and `V_` are left unchanged.
-        """
+        """Cache the training samples with non-zero class frequencies."""
         if np.ndim(self.V_) == 0:
             self._contributing = np.zeros(len(self.X_), dtype=bool)
             self._all_contributing = False
