@@ -183,6 +183,11 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
 
         # Compute distance according to Eq. 9 in [1].
         P_cand_sorted = np.sort(P_cand, axis=1)
+        if P_cand_sorted.shape[1] == 1:
+            # Interpret a missing second class as a zero-probability class.
+            P_cand_sorted = np.column_stack(
+                [np.zeros(len(P_cand_sorted)), P_cand_sorted[:, 0]]
+            )
         distance_cand = np.log(
             (P_cand_sorted[:, -1] + 1.0e-5) / (P_cand_sorted[:, -2] + 1.0e-5)
         )

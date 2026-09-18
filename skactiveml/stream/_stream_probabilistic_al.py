@@ -39,9 +39,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         `predict_freq` function of the `clf` will be used instead. If this is
         not defined, an Exception is raised.
     metric_dict : dict, default=None
-        Any further parameters are passed directly to the kernel function. If
-        metric_dict is None and metric is 'rbf' metric_dict is set to {'gamma':
-        'mean'}.
+        Further parameters passed directly to the kernel function. With
+        `metric_dict=None` and `metric="rbf"`, queries use `{"gamma": "mean"}`.
     prior : float, default=1.0e-3
         The prior value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
@@ -168,11 +167,14 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
-            if self.metric_dict is None and self.metric == "rbf":
-                self.metric_dict = {"gamma": "mean"}
+            metric_dict = (
+                {"gamma": "mean"}
+                if self.metric_dict is None and self.metric == "rbf"
+                else self.metric_dict
+            )
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
-                metric_dict=self.metric_dict,
+                metric_dict=metric_dict,
                 missing_label=clf.missing_label,
                 classes=clf.classes,
             )
@@ -307,6 +309,15 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        X, y, sample_weight = self._validate_X_y_sample_weight(
+            X, y, sample_weight
+        )
+        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+        if self.metric is None and not hasattr(clf, "predict_freq"):
+            raise TypeError(
+                "clf has no predict_freq and metric was set to None"
+            )
+
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
@@ -328,18 +339,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 BalancedIncrementalQuantileFilter,
             )
 
-        X, y, sample_weight = self._validate_X_y_sample_weight(
-            X, y, sample_weight
-        )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates
         )
-
-        if self.metric is None and not hasattr(clf, "predict_freq"):
-            raise TypeError(
-                "clf has no predict_freq and metric was set to None"
-            )
 
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
@@ -419,6 +421,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 clf = clone(clf).fit(X, y)
             else:
                 clf = clone(clf).fit(X, y, sample_weight)
+        self._resolve_clf_target_spec(clf, y)
         return clf
 
     def _validate_utility_weight(self, utility_weight, candidates):

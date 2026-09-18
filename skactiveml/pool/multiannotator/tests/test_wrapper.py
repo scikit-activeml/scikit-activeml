@@ -1,4 +1,7 @@
+from functools import wraps
 import unittest
+from unittest.mock import patch
+import warnings
 
 import numpy as np
 from sklearn.datasets import make_blobs
@@ -57,6 +60,42 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ],
             dtype=float,
         )
+
+    def test_default_aggregation_honors_missing_label(self):
+        X = np.arange(3)[:, None]
+        for missing_label, y, expected in [
+            (
+                None,
+                [["a", None, None], ["b", None, None], [None, None, None]],
+                ["a", "b", None],
+            ),
+            (-1, [[0, -1, -1], [1, -1, -1], [-1, -1, -1]], [0, 1, -1]),
+        ]:
+            with self.subTest(missing_label=missing_label):
+                strategy = RandomSampling(
+                    missing_label=missing_label, random_state=0
+                )
+                wrapper = SingleAnnotatorWrapper(
+                    strategy, missing_label=missing_label, random_state=0
+                )
+                aggregates = []
+
+                @wraps(majority_vote)
+                def vote(*args, **kwargs):
+                    result = majority_vote(*args, **kwargs)
+                    aggregates.append(result.copy())
+                    return result
+
+                with patch(
+                    "skactiveml.pool.multiannotator._wrapper.majority_vote",
+                    new=vote,
+                ):
+                    query = wrapper.query(X, np.asarray(y), batch_size=1)
+                self.assertEqual(query.shape, (1, 2))
+                self.assertEqual(len(aggregates), 2)
+                for aggregate in aggregates:
+                    np.testing.assert_array_equal(aggregate, expected)
+                self.assertIsNone(wrapper.y_aggregate)
 
     def test_init_param_target_type(self):
         wrapper = SingleAnnotatorWrapper(
@@ -143,7 +182,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         for component in (wrapper, strategy):
             assert_no_query_state(self, component)
 
-    def test_prefitted_estimator_marker_rejection_precedes_query_state(self):
+    def test_prefitted_estimator_missing_label_rejection_precedes_query_state(
+        self,
+    ):
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
             classes=self.classes,
@@ -356,7 +397,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                 "discriminator": SklearnClassifier(
                     GaussianNB(), classes=[0, 1]
                 ),
-                "fit_clf": True,
+                "fit_clf": False,
+                "fit_ensemble": False,
             }
         )
 
@@ -390,6 +432,51 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ),
             [],
         )
+
+    def test_nested_subsampling_uses_effective_wrapped_batch_size(self):
+        X = np.arange(10, dtype=float).reshape(5, 2)
+        y = np.full((5, 2), MISSING_LABEL)
+
+        for max_candidates, retained, expected_batch_size in (
+            (1, [4], 2),
+            (2, [3, 4], 3),
+        ):
+            with self.subTest(max_candidates=max_candidates):
+                wrapper = SingleAnnotatorWrapper(
+                    SubSamplingWrapper(
+                        RandomSampling(random_state=0),
+                        max_candidates=max_candidates,
+                        random_state=0,
+                    ),
+                    random_state=0,
+                )
+
+                with warnings.catch_warnings(record=True) as caught_warnings:
+                    warnings.simplefilter("always")
+                    query_indices, utilities = wrapper.query(
+                        X,
+                        y,
+                        batch_size=3,
+                        return_utilities=True,
+                    )
+
+                self.assertEqual(query_indices.shape, (expected_batch_size, 2))
+                self.assertEqual(
+                    utilities.shape, (expected_batch_size, len(X), y.shape[1])
+                )
+                self.assertEqual(
+                    len(np.unique(query_indices, axis=0)), expected_batch_size
+                )
+                self.assertTrue(np.isin(query_indices[:, 0], retained).all())
+                excluded = np.setdiff1d(np.arange(len(X)), retained)
+                self.assertTrue((~np.isfinite(utilities[:, excluded])).all())
+                if expected_batch_size < 3:
+                    self.assertTrue(
+                        any(
+                            "sample-annotator pairs" in str(warning.message)
+                            for warning in caught_warnings
+                        )
+                    )
 
     def test_init_param_strategy(self):
         wrapper = SingleAnnotatorWrapper(MixtureModelClassifier())

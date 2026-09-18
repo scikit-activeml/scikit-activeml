@@ -21,7 +21,31 @@ class Dummy:
         pass
 
 
-class TemplateEstimator:
+class _TemplateEstimatorFitContract:
+    """Shared fitting return-value contract for classifiers and regressors."""
+
+    def test_fit_returns_self(self):
+        estimator, fit_params = self._make_fit_contract_estimator()
+        for call in range(2):
+            with self.subTest(call=call):
+                self.assertIs(estimator.fit(**deepcopy(fit_params)), estimator)
+
+    def test_partial_fit_returns_self(self, replace_init_params=None):
+        estimator, fit_params = self._make_fit_contract_estimator()
+        if replace_init_params is not None:
+            estimator.set_params(**deepcopy(replace_init_params))
+        if not hasattr(estimator, "partial_fit"):
+            self.skipTest(
+                "The configured estimator does not support partial_fit."
+            )
+        for call in range(2):
+            with self.subTest(call=call):
+                self.assertIs(
+                    estimator.partial_fit(**deepcopy(fit_params)), estimator
+                )
+
+
+class TemplateEstimator(_TemplateEstimatorFitContract):
     def setUp(
         self,
         estimator_class,
@@ -67,6 +91,12 @@ class TemplateEstimator:
             self.estimator_class.predict,
             "predict",
             self.predict_default_params,
+        )
+
+    def _make_fit_contract_estimator(self):
+        return (
+            self.estimator_class(**deepcopy(self.init_default_params)),
+            self.fit_default_params,
         )
 
     def test_init_param_missing_label(
@@ -385,6 +415,40 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         y_pred = np.asarray(estimator.predict(**predict_params))
 
         assert_predicts_class_dtype(self, y_pred, estimator.classes_)
+
+    def test_fit_rejects_class_identities_beyond_64_bits(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        """Check that class identifiers beyond 64 bits are rejected.
+
+        An integer wider than a 64-bit dtype has no lossless storage, so the
+        contract rejects it instead of letting NumPy promote it to `float64`
+        and merge distinct identifiers onto one value. The rejection happens
+        in the shared validation chokepoint, before any estimator arithmetic,
+        so it holds whether the vocabulary is declared or inferred from `y`,
+        and the message names the offending integer rather than surfacing as
+        an opaque failure further in.
+        """
+        labels = [2**200, 2**200 + 1]
+        for declared in (False, True):
+            with self.subTest(declared=declared):
+                init_params = deepcopy(self.init_default_params)
+                init_params["classes"] = labels if declared else None
+                init_params["missing_label"] = np.nan
+                if replace_init_params is not None:
+                    init_params.update(deepcopy(replace_init_params))
+
+                fit_params = deepcopy(self.fit_default_params)
+                fit_params["y"] = [*labels, np.nan]
+                fit_params["X"] = np.zeros((3, 1))
+                if replace_fit_params is not None:
+                    fit_params.update(deepcopy(replace_fit_params))
+
+                estimator = self.estimator_class(**init_params)
+                with self.assertRaisesRegex(
+                    ValueError, "does not fit a 64-bit integer dtype"
+                ):
+                    self._call_with_target(estimator, "fit", fit_params)
 
     def _get_multilabel_params(self):
         if not self._has_multilabel_defaults():
@@ -754,8 +818,14 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         self.assertAlmostEqual(estimator.score(X, y_true), expected_score)
 
 
-class TemplateMultiAnnotatorClassifier:
-    """Shared resolved-target contract for multi-annotator classifiers."""
+class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
+    """Shared fitting and target contracts for multi-annotator classifiers."""
+
+    def _make_fit_contract_estimator(self):
+        return (
+            self.target_contract_estimator_factory(),
+            self.target_contract_fit_params,
+        )
 
     def test_init_param_target_type(self):
         for target_type, error in [
@@ -938,12 +1008,16 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(1.2, None)]
-        # TODO: check_missing_label is only used to check if missing_label
-        # is correct but strings are therfore also accepted
-        # after fixing this issue add test below again.
-        # ("nan", TypeError),
+        test_cases += [("nan", TypeError)]
         super().test_init_param_missing_label(test_cases)
+
+        n_samples = len(self.fit_default_params["X"])
+        self._test_param(
+            "init",
+            "missing_label",
+            [(1.2, None)],
+            replace_fit_params={"y": [1.2] + [1.0] * (n_samples - 1)},
+        )
 
     def test_init_param_target_type(self):
         self._test_param(
@@ -1025,20 +1099,45 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
         )
-        # TODO: Test schould throw a TypeError
-        # Wrapper classes are failing because of
-        # "numpy.core._exceptions._UFuncNoLoopError: ufunc 'add' did not
-        # contain a loop with signature matching types
-        # (dtype('<U32'), dtype('<U32')) -> None"
 
-        # test_cases = [([1.0, "nan", 0.9], None)]
-        replace_init_params = {"missing_label": "nan"}
+        n_samples = len(self.fit_default_params["X"])
         self._test_param(
             "fit",
             "y",
-            test_cases,
-            replace_init_params=replace_init_params,
+            [
+                ([np.nan] * n_samples, TypeError),
+                ([1.0] * (n_samples - 1) + ["nan"], TypeError),
+            ],
+            replace_init_params={"missing_label": "nan"},
         )
+
+    def test_fit_rejects_numerical_labels_beyond_64_bits(
+        self, replace_init_params=None, replace_fit_params=None
+    ):
+        """Check that numerical labels beyond 64 bits are rejected.
+
+        Regression labels are numerical, so an integer wider than a
+        64-bit dtype cannot be stored without NumPy promoting it to
+        `float64`. The contract rejects it in the shared validation
+        chokepoint, naming the offending integer, rather than letting the
+        silently rounded value reach the arithmetic a regressor performs.
+        """
+        n_samples = len(self.fit_default_params["X"])
+        init_params = deepcopy(self.init_default_params)
+        init_params["missing_label"] = np.nan
+        if replace_init_params is not None:
+            init_params.update(deepcopy(replace_init_params))
+
+        fit_params = deepcopy(self.fit_default_params)
+        fit_params["y"] = [2**200] * (n_samples - 1) + [np.nan]
+        if replace_fit_params is not None:
+            fit_params.update(deepcopy(replace_fit_params))
+
+        estimator = self.estimator_class(**init_params)
+        with self.assertRaisesRegex(
+            ValueError, "does not fit a 64-bit integer dtype"
+        ):
+            estimator.fit(**fit_params)
 
 
 class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):

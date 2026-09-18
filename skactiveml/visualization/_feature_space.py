@@ -29,6 +29,7 @@ from ..pool._target import (
     _collect_declared_authorities,
     _reconcile_target_declarations,
 )
+from ..utils._label_dtype import _as_label_array
 from ..utils._validation import _canonicalize_multilabel_probas
 from ..utils import (
     check_scalar,
@@ -352,11 +353,29 @@ def plot_decision_boundary(
                 "plotted."
             )
             confidence = None
-        predicted_classes = clf.predict(mesh_samples)
-        classes = np.arange(len(np.unique(predicted_classes)))
-        predictions = np.zeros((len(predicted_classes), len(classes)))
-        for idx, y in enumerate(predicted_classes):
-            predictions[idx, y] = 1
+        predicted_classes = column_or_1d(clf.predict(mesh_samples))
+        classifier_classes = getattr(clf, "classes_", None)
+        if classifier_classes is None:
+            _, encoded_predictions = np.unique(
+                predicted_classes, return_inverse=True
+            )
+            n_classes = np.max(encoded_predictions) + 1
+        else:
+            classifier_classes = column_or_1d(classifier_classes)
+            encoded_predictions = np.full(len(predicted_classes), -1)
+            for class_idx, class_label in enumerate(classifier_classes):
+                encoded_predictions[predicted_classes == class_label] = (
+                    class_idx
+                )
+            if np.any(encoded_predictions == -1):
+                raise ValueError(
+                    "`clf.predict` returned a class that is not present in "
+                    "`clf.classes_`."
+                )
+            n_classes = len(classifier_classes)
+        classes = np.arange(n_classes)
+        predictions = np.zeros((len(predicted_classes), n_classes))
+        predictions[np.arange(len(predicted_classes)), encoded_predictions] = 1
     else:
         raise AttributeError(
             "'clf' must implement 'predict' or " "'predict_proba'"
@@ -707,7 +726,12 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         raise ValueError("Samples in `X` must have 2 features.")
 
     # Check labels
-    y = check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
+    y = check_array(
+        _as_label_array(y),
+        dtype=None,
+        ensure_2d=False,
+        ensure_all_finite=False,
+    )
     check_consistent_length(X, y)
 
     is_multi_annotator = isinstance(qs, MultiAnnotatorPoolQueryStrategy)
@@ -746,7 +770,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
                 "Use `axes` instead."
             )
         if axes is None:
-            axes = plt.subplots(1, n_annotators)[1]
+            axes = plt.subplots(1, n_annotators, squeeze=False)[1].reshape(-1)
         else:
             [check_type(ax_, "ax", Axes) for ax_ in axes]
 

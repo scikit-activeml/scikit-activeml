@@ -6,6 +6,9 @@ from unittest.mock import patch
 import numpy as np
 from sklearn.utils._testing import assert_allclose
 from sklearn.utils.validation import check_array
+from sklearn.linear_model import SGDClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.base import (
     QueryStrategy,
@@ -18,6 +21,7 @@ from skactiveml.base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
 )
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.exceptions import MappingError
 from skactiveml.pool import RandomSampling
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, match_signature
@@ -497,6 +501,12 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
         self.qs = MultiAnnotatorPoolQueryStrategy()
         self.qs.missing_label_ = MISSING_LABEL
 
+    def test_validation_preserves_string_annotations(self):
+        y = np.array([["a", None], ["b", None], [None, None]], dtype=object)
+        strategy = DummyMultiAnnotatorPoolQueryStrategy(missing_label=None)
+        validated = strategy.query(X=np.arange(3)[:, None], y=y)
+        np.testing.assert_array_equal(validated[1], y)
+
     def test_query(self):
         self.assertRaises(
             NotImplementedError,
@@ -975,6 +985,25 @@ class SkactivemlClassifierTest(unittest.TestCase):
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
         self.assertEqual(extra_pred.dtype, np.float32)
 
+    def test_class_label_decoder_rejects_missing_prediction_codes(self):
+        X = np.arange(4).reshape(2, 2)
+        cases = [
+            ([0, 1], [0, 1], [0, -1], "auto"),
+            (
+                [[0, 1], [0, 1]],
+                [[0, 0], [1, 1]],
+                [[0, 0], [-1, -1]],
+                "multi-label",
+            ),
+        ]
+        for classes, y, codes, target_type in cases:
+            with self.subTest(classes=classes):
+                clf = DummySkactivemlClassifier(
+                    classes=classes, target_type=target_type
+                ).fit(X, y)
+                with self.assertRaisesRegex(ValueError, "`y`.*encoded.*-1"):
+                    clf._decode_class_labels(codes)
+
     def test_score_multilabel(self):
         X = np.arange(4).reshape(2, 2)
         y = np.array([[1, 1], [1, 1]])
@@ -1108,6 +1137,71 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
             np.zeros((2, 1)),
         )
 
+    def test_predict_proba_rejects_negative_frequencies(self):
+        clf = DummyClassFrequencyEstimator(
+            freq=np.array([[-2.0, 1.0]]),
+            class_prior=0.0,
+        )
+        clf.classes_ = np.array([0, 1])
+        clf.class_prior_ = np.array([0.0, 0.0])
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_proba(np.zeros((1, 1)))
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.sample_proba(np.zeros((1, 1)), random_state=0)
+
+    def test_multilabel_predict_proba_rejects_negative_frequencies(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.array([[[-2.0, 1.0], [1.0, 3.0]]]),
+            class_prior=0,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            np.zeros((2, 1)),
+            np.array([["no", "on"], ["yes", "off"]]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_proba(np.zeros((1, 1)))
+
+    def test_sample_proba_follows_tiny_asymmetric_concentrations(self):
+        for prior, expected in (
+            ([1e-100, 9e-100], [0.1, 0.9]),
+            ([1e-3, 9e-3], [0.1, 0.9]),
+            ([1.0, 3.0], [0.25, 0.75]),
+        ):
+            with self.subTest(class_prior=prior):
+                clf = DummyClassFrequencyEstimator(
+                    freq=np.zeros((1, 2)),
+                    class_prior=prior,
+                    classes=[0, 1],
+                )
+                clf.classes_ = np.array([0, 1])
+                clf.class_prior_ = np.array(prior)
+
+                P = clf.sample_proba(
+                    np.zeros((1, 1)), n_samples=20000, random_state=0
+                )
+
+                assert_allclose(P.sum(axis=-1), 1)
+                assert_allclose(P.mean(axis=0)[0], expected, atol=0.02)
+
+    def test_multilabel_sample_proba_follows_tiny_concentrations(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.zeros((1, 2, 2)),
+            class_prior=1,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(np.zeros((2, 1)), np.array([["no", "on"], ["yes", "off"]]))
+        clf.class_prior_ = np.array([[1e-100, 9e-100], [9e-100, 1e-100]])
+
+        P = clf.sample_proba(np.zeros((1, 1)), n_samples=20000, random_state=0)
+
+        assert_allclose(P.sum(axis=-1), 1)
+        assert_allclose(P.mean(axis=0)[0][..., 1], [0.9, 0.1], atol=0.02)
+
     def test_multilabel_sample_proba_returns_full_binary_vectors(self):
         clf = DummyMultilabelClassFrequencyEstimator(
             freq=np.array(
@@ -1179,6 +1273,57 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
 
     def test_query(self):
         self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
+
+    def test_target_capabilities(self):
+        self.assertEqual(
+            self.qs._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+
+    def test_resolve_clf_target_spec(self):
+        X = np.array([[0.0], [1.0], [2.0]])
+        y = np.array([0, 1, MISSING_LABEL])
+        capability_error = "does not support target capability"
+
+        fitted_clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
+        self.assertIs(
+            self.qs._resolve_clf_target_spec(fitted_clf, y),
+            fitted_clf.target_spec_,
+        )
+
+        prefitted_clf = SklearnClassifier(GaussianNB().fit(X, [0, 1, 0]))
+        target_spec = self.qs._resolve_clf_target_spec(prefitted_clf, None)
+        self.assertEqual(target_spec.classes, (0, 1))
+        self.assertIs(target_spec, prefitted_clf.target_spec_)
+
+        unfitted_clf = ParzenWindowClassifier(classes=[0, 1])
+        for labels in (y, None):
+            target_spec = self.qs._resolve_clf_target_spec(
+                unfitted_clf, labels
+            )
+            self.assertEqual(target_spec.target_type, "single-output")
+            self.assertEqual(target_spec.classes, (0, 1))
+        self.assertFalse(hasattr(unfitted_clf, "target_spec_"))
+        target_spec = self.qs._resolve_clf_target_spec(
+            ParzenWindowClassifier(), y
+        )
+        self.assertEqual(target_spec.classes, (0, 1))
+        with self.assertRaisesRegex(ValueError, "No class label is observed"):
+            self.qs._resolve_clf_target_spec(ParzenWindowClassifier(), None)
+
+        multilabel_clf = SklearnClassifier(
+            MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        )
+        for labels in (np.array([[0, 1], [1, 0], [-1, -1]]), None):
+            with self.assertRaisesRegex(ValueError, capability_error):
+                self.qs._resolve_clf_target_spec(multilabel_clf, labels)
 
     def test_update(self):
         self.assertRaises(

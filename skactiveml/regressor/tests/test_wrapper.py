@@ -1,3 +1,7 @@
+import pickle
+import subprocess
+import sys
+
 import random
 import unittest
 import numpy as np
@@ -8,6 +12,8 @@ from sklearn import clone
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import ConstantKernel
+from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVC
@@ -134,7 +140,9 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertEqual(reg.target_spec_.annotation_type, "single-annotator")
         self.assertIsNone(reg.target_spec_.classes)
 
-    def test_prefitted_estimator_marker_does_not_skip_wrapper_contract(self):
+    def test_prefitted_estimator_missing_label_does_not_skip_wrapper_contract(
+        self,
+    ):
         X = np.arange(8, dtype=float).reshape(-1, 1)
         y = np.arange(8, dtype=float)
         estimator = LinearRegression().fit(X, y)
@@ -178,6 +186,34 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             check_is_fitted(reg)
 
         self.assertFalse(hasattr(reg, "target_spec_"))
+
+    def test_prefitted_dual_coefficients_determine_output_structure(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        targets = [
+            np.arange(4, dtype=float),
+            np.arange(4, dtype=float).reshape(-1, 1),
+            np.arange(8, dtype=float).reshape(4, 2),
+        ]
+        for y in targets:
+            for target_type in ["auto", "single-output"]:
+                with self.subTest(shape=y.shape, target_type=target_type):
+                    estimator = Pipeline([("regressor", KernelRidge())]).fit(
+                        X, y
+                    )
+                    reg = SklearnRegressor(estimator, target_type=target_type)
+                    if y.ndim == 2 and y.shape[1] > 1:
+                        with self.assertRaisesRegex(
+                            ValueError, "does not support"
+                        ):
+                            reg.predict(X)
+                        self.assertNotIn("target_spec_", reg.__dict__)
+                    else:
+                        np.testing.assert_allclose(
+                            reg.predict(X), estimator.predict(X).ravel()
+                        )
+                        self.assertEqual(
+                            reg.target_spec_.target_type, "single-output"
+                        )
 
     def test_prefitted_multi_output_estimator_tags_are_rejected(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)
@@ -429,7 +465,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
                     "y": ["a", "b", "c", "d"],
                 },
                 "error": TypeError,
-                "message": "is not compatible to the type",
+                "message": "numerical labels",
             },
         }
 
@@ -482,7 +518,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             reg,
             lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
             TypeError,
-            "is not compatible to the type",
+            "numerical labels",
         )
 
         self.assertEqual(reg.n_features_in_, 1)
@@ -503,7 +539,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             reg,
             lambda: reg.partial_fit(X, ["a", "b", "c", "d"]),
             TypeError,
-            "is not compatible to the type",
+            "numerical labels",
         )
 
         np.testing.assert_allclose(reg.predict(X), expected_predictions)
@@ -580,7 +616,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         reg.fit(X=[], y=[])
         y_sample = reg.sample_y(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
-        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL))
+        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL, dtype=float))
         y_sample = reg.sample_y(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
 
@@ -605,7 +641,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         reg.fit(X=[], y=[])
         y_sample = reg.sample(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
-        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL))
+        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL, dtype=float))
         y_sample = reg.sample(X, 10)
         np.testing.assert_array_equal(y_sample.shape, [5, 10])
 
@@ -615,6 +651,58 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         y_sample = reg.sample(X, 10)
         np.testing.assert_array_equal(y_sample, y_sample_exp)
         self.assertRaises(ValueError, reg.sample, X=[])
+
+    def test_sample_uses_the_same_fallback_as_predict(self):
+        X, y = [[0.0]], [100.0]
+        estimator = GaussianProcessRegressor(
+            kernel=ConstantKernel(1.0), optimizer=None
+        ).fit(X, y)
+        reg = SklearnRegressor(estimator)
+        with self.assertWarns(UserWarning):
+            reg.fit(X, [MISSING_LABEL])
+        self.assertFalse(reg.is_fitted_)
+
+        with self.assertWarns(UserWarning):
+            y_samples = reg.sample_y(X, n_samples=2000, random_state=0)
+        with self.assertWarns(UserWarning):
+            mean, std = reg.predict(X, return_std=True)
+
+        self.assertEqual(y_samples.shape, (1, 2000))
+        np.testing.assert_allclose(y_samples.mean(), mean[0], atol=0.1)
+        np.testing.assert_allclose(y_samples.std(), std[0], atol=0.1)
+
+    def test_sample_falls_back_without_a_not_fitted_error(self):
+        X = [[0.0]]
+        reg = SklearnRegressor(
+            GaussianProcessRegressor(
+                kernel=ConstantKernel(4.0), optimizer=None
+            )
+        )
+        with self.assertWarns(UserWarning):
+            reg.fit(X, [MISSING_LABEL])
+
+        with self.assertWarns(UserWarning):
+            y_samples = reg.sample_y(X, n_samples=2000, random_state=0)
+
+        self.assertEqual(y_samples.shape, (1, 2000))
+        np.testing.assert_allclose(y_samples.mean(), 0.0, atol=0.1)
+        np.testing.assert_allclose(y_samples.std(), 1.0, atol=0.1)
+
+    def test_sample_delegates_after_a_successful_fit(self):
+        X, y = [[0.0], [1.0]], [1.0, 2.0]
+        kernel = ConstantKernel(1.0)
+        reg = SklearnRegressor(
+            GaussianProcessRegressor(kernel=kernel, optimizer=None)
+        ).fit(X, y)
+        expected = (
+            GaussianProcessRegressor(kernel=kernel, optimizer=None)
+            .fit(X, y)
+            .sample_y(X, 3, random_state=0)
+        )
+
+        np.testing.assert_array_equal(
+            reg.sample_y(X, 3, random_state=0), expected
+        )
 
     def test_pipeline(self):
         X = np.linspace(-3, 3, 100)
@@ -636,6 +724,40 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         check_is_fitted(reg)
         y_pred = reg.predict(X)
         np.testing.assert_array_equal(np.zeros_like(y_pred), y_pred)
+
+    def test_unlabeled_partial_fit_preserves_predictions_and_fallback(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        for loss in ("squared_error", "invalid"):
+            with self.subTest(loss=loss):
+                reg = SklearnRegressor(
+                    SGDRegressor(random_state=0, loss=loss)
+                ).fit(X, [10.0, 10.0, 20.0, 20.0])
+                before = reg.predict(X)
+                statistics = (reg._label_mean, reg._label_std)
+                fitted = reg.is_fitted_
+                estimator = reg.estimator_
+                spec = reg.target_spec_
+                self.assertIs(reg.partial_fit([[3.0]], [np.nan]), reg)
+                np.testing.assert_allclose(reg.predict(X), before)
+                self.assertEqual((reg._label_mean, reg._label_std), statistics)
+                self.assertEqual(reg.is_fitted_, fitted)
+                self.assertIs(reg.estimator_, estimator)
+                self.assertEqual(reg.target_spec_, spec)
+                with self.assertRaises(ValueError):
+                    reg.partial_fit([[3.0, 4.0]], [np.nan])
+                reg.set_params(target_type="multi-output")
+                with self.assertRaises(ValueError):
+                    reg.partial_fit([[3.0]], [np.nan])
+
+    def test_initial_unlabeled_partial_fit_can_learn_later(self):
+        reg = SklearnRegressor(SGDRegressor(random_state=0))
+        self.assertIs(reg.partial_fit([[0.0]], [np.nan]), reg)
+        np.testing.assert_allclose(reg.predict([[0.0]]), [0.0])
+        self.assertFalse(reg.is_fitted_)
+        reg.partial_fit([[0.0]], [np.nan])
+        reg.partial_fit([[0.0], [1.0]], [10.0, 20.0])
+        self.assertTrue(reg.is_fitted_)
+        self.assertGreater(reg.predict([[0.0]])[0], 0.0)
 
 
 class TestSklearnNormalRegressor(
@@ -661,7 +783,7 @@ class TestSklearnNormalRegressor(
 
         class GaussianProcessRegressorDummy(GaussianProcessRegressor):
             def partial_fit(self, X, y, sample_weight=None):
-                return self.fit(X, y, sample_weight=sample_weight)
+                return self.fit(X, y)
 
         self.prob_reg_partial_fit = GaussianProcessRegressorDummy()
 
@@ -684,6 +806,11 @@ class TestSklearnNormalRegressor(
         super().test_fit_param_sample_weight(
             test_cases,
             replace_init_params=replace_init_params,
+        )
+
+    def test_partial_fit_returns_self(self):
+        super().test_partial_fit_returns_self(
+            replace_init_params={"estimator": self.prob_reg_partial_fit}
         )
 
     def test_partial_fit_param_X(self, test_cases=None):
@@ -748,7 +875,7 @@ class TestSklearnNormalRegressor(
             reg,
             lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
             TypeError,
-            "is not compatible to the type",
+            "numerical labels",
         )
 
         self.assertEqual(reg.n_features_in_, 1)
@@ -965,6 +1092,45 @@ if successful_skorch_torch_import:
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
             )
+
+        def test_fitted_tuple_estimator_loads_in_fresh_interpreter(self):
+            X = np.arange(40, dtype=np.float32).reshape(4, 10) / 10
+            y = np.array([0, 0, 1, 1])
+            for criterion in [nn.MSELoss, nn.MSELoss()]:
+                with self.subTest(criterion=criterion):
+                    estimator = SkorchRegressor(
+                        module=TestNeuralNet,
+                        criterion=criterion,
+                        forward_outputs={"prediction": (0, None)},
+                        neural_net_param_dict={
+                            "max_epochs": 1,
+                            "train_split": None,
+                            "verbose": 0,
+                        },
+                        random_state=0,
+                    ).fit(X, y)
+                    expected = estimator.predict(X)
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-c",
+                            """
+import pickle
+import sys
+import numpy as np
+estimator, X, y, expected = pickle.loads(sys.stdin.buffer.read())
+np.testing.assert_allclose(estimator.predict(X), expected)
+assert estimator.partial_fit(X, y) is estimator
+assert np.isfinite(estimator.predict(X)).all()
+""",
+                        ],
+                        input=pickle.dumps((estimator, X, y, expected)),
+                        capture_output=True,
+                        timeout=60,
+                    )
+                    self.assertEqual(
+                        result.returncode, 0, result.stderr.decode()
+                    )
 
         def test_init_param_module(self, test_cases=None):
             reg = SkorchRegressor(module="Test")

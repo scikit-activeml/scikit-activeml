@@ -264,6 +264,10 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        X, y, sample_weight = self._validate_X_y_sample_weight(
+            X=X, y=y, sample_weight=sample_weight
+        )
+        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
@@ -271,10 +275,6 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             **check_candidates_params,
         )
         self._validate_random_state()
-        X, y, sample_weight = self._validate_X_y_sample_weight(
-            X=X, y=y, sample_weight=sample_weight
-        )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
 
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
@@ -341,6 +341,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 clf = clone(clf).fit(X, y)
             else:
                 clf = clone(clf).fit(X, y, sample_weight)
+        self._resolve_clf_target_spec(clf, y)
         return clf
 
     def _validate_X_y_sample_weight(self, X, y, sample_weight):

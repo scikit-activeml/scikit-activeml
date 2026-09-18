@@ -41,6 +41,18 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
         ie_model = IntervalEstimationAnnotModel(classes=[0])
         self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
+    def test_fit_rejects_nested_label_entries(self):
+        y = np.empty((3, 1), dtype=object)
+        y[:, 0] = [0, 1, 0]
+        y[0, 0] = np.array([0, 1])
+        for missing in (np.nan, -1, None):
+            with self.subTest(missing=missing):
+                model = IntervalEstimationAnnotModel(
+                    classes=[0, 1], missing_label=missing
+                )
+                with self.assertRaisesRegex(TypeError, "scalar"):
+                    model.fit([[0.0], [1.0], [2.0]], y)
+
     def test_init_param_missing_label(self):
         ie_model = IntervalEstimationAnnotModel(missing_label=["test"])
         self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)
@@ -153,6 +165,63 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.clf = AnnotatorLogisticRegression()
         self.A_cand = np.ones_like(self.y)
         self.sample_weight = np.ones_like(self.y)
+
+    def test_query_default_candidates_are_fully_unlabeled(self):
+        X = np.arange(4)[:, None]
+        y = np.array([[0.0, 0.0], [1.0, 1.0], [0.0, np.nan], [np.nan, np.nan]])
+        query, utilities = IntervalEstimationThreshold(random_state=0).query(
+            X,
+            y,
+            AnnotatorLogisticRegression(),
+            batch_size=2,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query.shape, (2, 2))
+        np.testing.assert_array_equal(np.sort(query[:, 1]), [0, 1])
+        np.testing.assert_array_equal(query[:, 0], [3, 3])
+        expected = np.zeros_like(y, dtype=bool)
+        expected[3] = True
+        np.testing.assert_array_equal(~np.isnan(utilities[0]), expected)
+
+    def test_query_requires_all_annotators_available(self):
+        X = np.arange(4)[:, None]
+        y = np.array(
+            [[0.0, 0.0], [1.0, 1.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            X, [0, 1, np.nan, np.nan]
+        )
+        for candidates in ([2, 3], X[2:] + 10):
+            for annotators in ([0], [[False, True], [True, True]]):
+                with self.subTest(
+                    candidates=candidates, annotators=annotators
+                ):
+                    query, utilities = IntervalEstimationThreshold(
+                        random_state=0
+                    ).query(
+                        X,
+                        y,
+                        clf,
+                        fit_clf=False,
+                        candidates=candidates,
+                        annotators=annotators,
+                        batch_size=2,
+                        return_utilities=True,
+                    )
+                    if np.ndim(annotators) == 1:
+                        self.assertEqual(query.shape, (0, 2))
+                        self.assertEqual(len(utilities), 0)
+                    else:
+                        n_samples = len(X) if np.ndim(candidates) == 1 else 2
+                        expected = np.zeros((n_samples, 2), dtype=bool)
+                        expected[-1] = True
+                        self.assertEqual(query.shape, (2, 2))
+                        self.assertEqual(len(np.unique(query, axis=0)), 2)
+                        self.assertTrue(expected[tuple(query.T)].all())
+                        np.testing.assert_array_equal(
+                            ~np.isnan(utilities[0]), expected
+                        )
 
     def test_init_param_target_type(self):
         ie_thresh = IntervalEstimationThreshold(target_type="auto")
@@ -749,6 +818,11 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         )
 
         self.assertEqual(len(query_indices), 4)
+        self.assertEqual(len(np.unique(query_indices, axis=0)), 4)
+        np.testing.assert_array_equal(query_indices[:, 0], np.zeros(4))
+        expected = np.zeros_like(A_cand)
+        expected[0] = True
+        np.testing.assert_array_equal(~np.isnan(utilities[0]), expected)
 
     def test_query_with_mapping(self):
         ie_thresh = IntervalEstimationThreshold()

@@ -1,7 +1,9 @@
 import unittest
 
 import numpy as np
+from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
+from sklearn.metrics.pairwise import pairwise_kernels
 
 from skactiveml.regressor._nic_kernel_regressor import (
     NICKernelRegressor,
@@ -86,11 +88,13 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
         X = np.array([[0, 0], [1, 1], [2, 2]])
         y_missing = np.full(3, MISSING_LABEL)
         reg.fit(X, y_missing)
-        y_return = reg.predict([[0, 0]])
+        y_return, y_std, y_entropy = reg.predict(
+            [[0, 0]], return_std=True, return_entropy=True
+        )
+        np.testing.assert_array_equal(y_return, [0])
         if self.estimator_class_string == "NadarayaWatsonRegressor":
-            self.assertTrue(np.isnan(y_return[0]))
-        else:
-            self.assertEqual(y_return, 0)
+            np.testing.assert_array_equal(y_std, [1])
+            self.assertTrue(np.isfinite(y_entropy).all())
 
         start_params = self.start_parameter
         if self.estimator_class_string == "NICKernelRegressor":
@@ -118,8 +122,68 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
             np.testing.assert_almost_equal(sigma, 0.0245, decimal=3)
 
     def test_predict_target_distribution(self):
-        # TODO: Test is missing
-        pass
+        reg = self.estimator_class(**self.start_parameter).fit(
+            **self.fit_default_params
+        )
+        X = self.predict_default_params["X"]
+
+        y_pred = reg.predict_target_distribution(X).logpdf(0)
+
+        self.assertEqual(y_pred.shape, (len(X),))
+
+    def test_precomputed_matches_feature_kernel_on_fit_and_refit(self):
+        X = np.array([[-1.0, 0.0], [0.0, 0.5], [1.0, 1.5], [2.0, 1.0]])
+        X_test = np.array([[-0.5, 0.25], [0.5, 1.0], [1.5, 1.25]])
+        gamma = 0.7
+        training_sets = [
+            (X, np.array([0.0, 1.0, 3.0, 2.0])),
+            (X[:3], np.array([0.0, np.nan, 3.0])),
+            (X, np.full(4, np.nan)),
+        ]
+
+        precomputed = self.estimator_class(metric="precomputed")
+        for X_train, y in training_sets:
+            K_train = pairwise_kernels(X_train, metric="rbf", gamma=gamma)
+            precomputed.fit(K_train, y)
+            self.assertEqual(precomputed.n_features_in_, len(X_train))
+
+            feature = self.estimator_class(
+                metric="rbf", metric_dict={"gamma": gamma}
+            ).fit(X_train, y)
+            for X_test_batch in (X_test[:1], X_test):
+                K_test = pairwise_kernels(
+                    X_test_batch, X_train, metric="rbf", gamma=gamma
+                )
+                expected = feature.predict(
+                    X_test_batch, return_std=True, return_entropy=True
+                )
+                actual = precomputed.predict(
+                    K_test, return_std=True, return_entropy=True
+                )
+                for actual_part, expected_part in zip(actual, expected):
+                    np.testing.assert_allclose(actual_part, expected_part)
+
+    def test_precomputed_fit_requires_a_square_training_kernel(self):
+        with self.assertRaisesRegex(
+            ValueError, "n_train_samples, n_train_samples"
+        ):
+            self.estimator_class(metric="precomputed").fit(
+                np.ones((3, 2)), [0.0, 1.0, 2.0]
+            )
+
+    def test_precomputed_prediction_requires_all_training_columns(self):
+        X = np.array([[-1.0, 0.0], [0.0, 0.5], [1.0, 1.5], [2.0, 1.0]])
+        X_test = np.array([[-0.5, 0.25], [0.5, 1.0], [1.5, 1.25]])
+        y = np.array([0.0, np.nan, 3.0, np.nan])
+        gamma = 0.7
+        K_train = pairwise_kernels(X, metric="rbf", gamma=gamma)
+        reg = self.estimator_class(metric="precomputed").fit(K_train, y)
+        K_test = pairwise_kernels(X_test, X, metric="rbf", gamma=gamma)
+
+        with self.assertRaisesRegex(
+            ValueError, "n_test_samples, n_train_samples"
+        ):
+            reg.predict(K_test[:, [0, 2]])
 
 
 class TestNICKernelEstimator(
@@ -166,6 +230,30 @@ class TestNICKernelEstimator(
         w = np.zeros_like(self.y)
         self.assertRaises(ValueError, reg.fit, self.X, self.y, w)
 
+    def test_fit_preserves_default_metric_dict_parameter(self):
+        reg = NICKernelRegressor()
+
+        reg.fit([[0.0], [1.0]], [0.0, 1.0])
+
+        self.assertIsNone(reg.metric_dict)
+        self.assertIsNone(reg.get_params()["metric_dict"])
+        self.assertIsNone(clone(reg).metric_dict)
+        self.assertEqual(reg.metric_dict_, {})
+
+    def test_prediction_uses_captured_metric_dict(self):
+        metric_dict = {"gamma": 0.5}
+        reg = NICKernelRegressor(metric_dict=metric_dict).fit(
+            [[0.0], [1.0]], [0.0, 1.0]
+        )
+        expected = reg.predict([[0.25]])
+
+        metric_dict["gamma"] = 50.0
+
+        self.assertIs(reg.metric_dict, metric_dict)
+        self.assertIsNot(reg.metric_dict_, metric_dict)
+        self.assertEqual(reg.metric_dict_, {"gamma": 0.5})
+        np.testing.assert_allclose(reg.predict([[0.25]]), expected)
+
     def test_missing_label(self):
         self.missing_label = -1
         start_params = self.start_parameter.copy()
@@ -197,6 +285,73 @@ class TestNICKernelEstimator(
         prediction_2 = reg.predict(X_test)
 
         np.testing.assert_almost_equal(prediction_1, prediction_2)
+
+    def test_predict_rejects_an_improper_prior_without_labels(self):
+        reg = NICKernelRegressor(kappa_0=0).fit([[0.0]], [np.nan])
+
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict([[0.0]])
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict_target_distribution([[0.0]])
+
+    def test_predict_rejects_a_negative_kernel_mass(self):
+        reg = NICKernelRegressor(metric="linear").fit(
+            [[-2.0], [1.0]], [0.0, 5.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "kernel mass"):
+            reg.predict([[1.0]])
+        with self.assertRaisesRegex(ValueError, "kernel mass"):
+            reg.predict_target_distribution([[1.0]])
+
+    def test_predict_rejects_a_negative_scatter(self):
+        reg = NICKernelRegressor(metric="linear").fit(
+            [[-1.0], [3.0]], [10.0, 0.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "scatter"):
+            reg.predict([[1.0]])
+
+    def test_predict_rejects_negative_sample_weights(self):
+        reg = NICKernelRegressor().fit(
+            [[0.0], [1.0]], [0.0, 1.0], sample_weight=[-1.0, 2.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "sample_weight"):
+            reg.predict([[0.0]])
+
+    def test_predict_accepts_non_negative_kernels(self):
+        for metric in ("rbf", "laplacian"):
+            with self.subTest(metric=metric):
+                reg = NICKernelRegressor(metric=metric).fit(
+                    [[-2.0], [1.0]], [0.0, 5.0]
+                )
+
+                mean, std = reg.predict([[1.0]], return_std=True)
+
+                self.assertTrue(np.all(np.isfinite(mean)))
+                self.assertTrue(np.all(std > 0))
+
+    def test_zero_kernel_evidence_preserves_prior(self):
+        params = dict(mu_0=2.0, kappa_0=3.0, nu_0=5.0, sigma_sq_0=4.0)
+        reg = NICKernelRegressor(**params).fit(
+            [[0.0], [1.0]], [0.0, 1.0], sample_weight=[2.0, 1.0]
+        )
+        prior = NICKernelRegressor(**params).fit(
+            [[0.0], [1.0]], [np.nan, np.nan]
+        )
+        nearby = reg.predict([[0.5]], return_std=True)
+        with np.errstate(divide="raise", invalid="raise"):
+            actual = reg.predict([[100.0], [0.5]], return_std=True)
+        expected_prior = prior.predict([[100.0]], return_std=True)
+        for actual_part, prior_part, nearby_part in zip(
+            actual, expected_prior, nearby
+        ):
+            np.testing.assert_allclose(actual_part[:1], prior_part)
+            np.testing.assert_allclose(actual_part[1:], nearby_part)
+            self.assertTrue(np.isfinite(actual_part).all())
+        np.testing.assert_allclose(actual[0][:1], [params["mu_0"]])
+        self.assertNotAlmostEqual(actual[0][1], params["mu_0"])
 
 
 class TestNadarayaWatsonRegressor(
@@ -231,3 +386,17 @@ class TestNadarayaWatsonRegressor(
         reg.fit(X, y)
         y_pred = reg.predict([[0]])[0]
         self.assertEqual(y_pred, np.average(y))
+
+    def test_predict_reports_samples_without_posterior_evidence(self):
+        reg = NadarayaWatsonRegressor(metric_dict={"gamma": 500.0}).fit(
+            [[0.0], [1.0]], [0.0, 1.0]
+        )
+
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict([[50.0]])
+        with self.assertRaisesRegex(ValueError, "no evidence"):
+            reg.predict_target_distribution([[50.0]])
+
+        mean, std = reg.predict([[0.1]], return_std=True)
+        self.assertTrue(np.all(np.isfinite(mean)))
+        self.assertTrue(np.all(np.isfinite(std)))

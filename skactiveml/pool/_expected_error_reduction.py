@@ -226,7 +226,12 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             set_base_clf=not fit_clf,
             ignore_partial_fit=ignore_partial_fit,
             enforce_unique_samples=True,
-            use_speed_up=True,
+            # Precomputing the kernel requires memory quadratic in the number
+            # of samples and fixes the kernel parameters for all hypothetical
+            # refits, which is incorrect for a data-dependent bandwidth such
+            # as `metric_dict={'gamma': 'mean'}`. It only pays off for
+            # high-dimensional samples and is slower otherwise.
+            use_speed_up=False,
             missing_label=self.missing_label_,
         )
 
@@ -415,7 +420,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         ):
             raise ValueError(
                 "If `sample_weight_candidates` is set, it must have same "
-                "length as `X`."
+                "length as `candidates`."
             )
 
         # Concatenate samples
@@ -473,7 +478,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
                     )
                 w_eval[idx_eval] = sample_weight_eval
             if w_full is not None:
-                w_full = np.concatenate([w_full, sample_weight_eval], axis=0)
+                w_full = np.concatenate([w_full, w_eval[idx_eval]], axis=0)
 
         return X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval
 
@@ -509,8 +514,13 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
                 * cost_matrix[np.newaxis, :, :]
             )
 
-    def _logloss_estimation(self, prob_true, prob_pred):
-        return -np.sum(prob_true * np.log(prob_pred + np.finfo(float).eps))
+    def _logloss_estimation(self, prob_true, prob_pred, sample_weight=None):
+        losses = -np.sum(
+            prob_true * np.log(prob_pred + np.finfo(float).eps), axis=1
+        )
+        if sample_weight is not None:
+            losses = sample_weight * losses
+        return np.sum(losses)
 
 
 class MonteCarloEER(ExpectedErrorReduction):
@@ -602,7 +612,7 @@ class MonteCarloEER(ExpectedErrorReduction):
                     probs, preds, self.cost_matrix_, w_eval[idx_eval]
                 )
             elif self.method == "log_loss":
-                err = self._logloss_estimation(probs, probs)
+                err = self._logloss_estimation(probs, probs, w_eval[idx_eval])
             return err
         else:
             return super()._estimate_current_error(
@@ -621,7 +631,7 @@ class MonteCarloEER(ExpectedErrorReduction):
                 probs, preds, self.cost_matrix_, w_eval[idx_eval]
             )
         elif self.method == "log_loss":
-            err = self._logloss_estimation(probs, probs)
+            err = self._logloss_estimation(probs, probs, w_eval[idx_eval])
         return err
 
     def _precompute_and_fit_clf(

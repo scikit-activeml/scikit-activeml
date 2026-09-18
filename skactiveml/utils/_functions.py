@@ -4,7 +4,8 @@ from makefun import with_signature
 
 successful_skorch_torch_import = False
 try:
-    import sys
+    import copyreg
+    from functools import lru_cache
     from collections.abc import Sequence
     from copy import deepcopy
     from torch import nn
@@ -181,11 +182,13 @@ if successful_skorch_torch_import:
         criterion.
 
         This utility generates (and caches) a dynamic subclass named
-        `TupleAware<LossName>Idx<...>` of the given base loss class. The
-        subclass overrides `forward` so that, if the `input` argument is a
-        tuple (e.g., `(logits, embeddings, ...)`), only the element(s)
-        selected by `criterion_output_keys` are passed to the base class's
-        `forward`. If `input` is not a tuple, it is forwarded unchanged.
+        `TupleAware<LossName>Idx<...>` of the given base loss class. Classes
+        and instances can be pickled across processes whenever the base loss
+        and its state are picklable. The subclass overrides `forward` so that,
+        if the `input` argument is a tuple (e.g., `(logits, embeddings, ...)`),
+        only the element(s) selected by `criterion_output_keys` are passed to
+        the base class's `forward`. If `input` is not a tuple, it is forwarded
+        unchanged.
 
         If no selection is required (i.e., `criterion_output_keys` is
         `None` and `forward_outputs` is `None` so that the full input
@@ -320,60 +323,8 @@ if successful_skorch_torch_import:
                 f"Names {selected_names!r} resolve to indices {indices!r}."
             )
 
-        # Build selector: int or tuple[int,...].
-        if len(indices) == 1:
-            selector = indices[0]
-            max_idx = selector
-        else:
-            selector = tuple(indices)
-            max_idx = max(selector)
-
-        # Build a class-name key from the selector for caching / pickling.
-        if isinstance(selector, int):
-            idx_key = str(selector)
-        else:
-            idx_key = "_".join(str(i) for i in selector)
-
-        cls_name = f"TupleAware{base_cls.__name__}Idx{idx_key}"
-
-        # Build the wrapper `forward`.
-        def forward(self, input, target, *args, **kwargs):
-            if isinstance(input, tuple):
-                if self._criterion_output_max_selector >= len(input):
-                    raise ValueError(
-                        f"`forward_outputs` references raw output index "
-                        f"{self._criterion_output_max_selector}, but "
-                        f"`module.forward` returned only {len(input)} "
-                        f"object(s)."
-                    )
-                if isinstance(self._criterion_output_selector, int):
-                    input = input[self._criterion_output_selector]
-                else:
-                    # selector is a tuple of indices
-                    input = tuple(
-                        input[i] for i in self._criterion_output_selector
-                    )
-            return base_cls.forward(self, input, target, *args, **kwargs)
-
-        # Keep signature/tool-tips identical.
-        forward.__signature__ = inspect.signature(base_cls.forward)
-        forward.__doc__ = base_cls.forward.__doc__
-
-        # Create/reuse subclass and expose it under this module.
-        mod = sys.modules[__name__]
-        TupleAwareCls = getattr(mod, cls_name, None)
-        if TupleAwareCls is None:
-            TupleAwareCls = type(
-                cls_name,
-                (base_cls,),
-                {
-                    "forward": forward,
-                    "__module__": mod.__name__,
-                    "_criterion_output_selector": selector,
-                    "_criterion_output_max_selector": max_idx,
-                },
-            )
-            setattr(mod, TupleAwareCls.__name__, TupleAwareCls)
+        selector = indices[0] if len(indices) == 1 else tuple(indices)
+        TupleAwareCls = _make_tuple_aware_criterion_class(base_cls, selector)
 
         if isinstance(criterion, nn.Module):
             wrapped = deepcopy(criterion)
@@ -381,3 +332,59 @@ if successful_skorch_torch_import:
             return wrapped
         else:
             return TupleAwareCls
+
+    def _reduce_tuple_aware_criterion_class(cls):
+        # User subclasses inherit our metaclass, but must retain their own
+        # definitions. A string reduction uses pickle's normal global lookup.
+        if "_criterion_base_class" not in cls.__dict__:
+            return cls.__qualname__
+        return _make_tuple_aware_criterion_class, (
+            cls._criterion_base_class,
+            cls._criterion_output_selector,
+        )
+
+    @lru_cache(maxsize=None)
+    def _make_tuple_aware_criterion_class(base_cls, selector):
+        """Reconstruct a loss subclass from its base class and raw selector."""
+        max_idx = selector if isinstance(selector, int) else max(selector)
+        idx_key = (
+            str(selector)
+            if isinstance(selector, int)
+            else "_".join(str(i) for i in selector)
+        )
+
+        def forward(self, input, target, *args, **kwargs):
+            if isinstance(input, tuple):
+                if max_idx >= len(input):
+                    raise ValueError(
+                        f"`forward_outputs` references raw output index "
+                        f"{max_idx}, but `module.forward` returned only "
+                        f"{len(input)} object(s)."
+                    )
+                if isinstance(selector, int):
+                    input = input[selector]
+                else:
+                    input = tuple(input[i] for i in selector)
+            return base_cls.forward(self, input, target, *args, **kwargs)
+
+        forward.__signature__ = inspect.signature(base_cls.forward)
+        forward.__doc__ = base_cls.forward.__doc__
+
+        # Pickle normally saves classes by module/name. A dedicated metaclass
+        # lets copyreg reconstruct this class even in a fresh interpreter.
+        # Inherit the base's metaclass to support custom loss metaclasses.
+        TupleAwareMeta = type(
+            "_TupleAwareCriterionMeta", (type(base_cls),), {}
+        )
+        copyreg.pickle(TupleAwareMeta, _reduce_tuple_aware_criterion_class)
+        return TupleAwareMeta(
+            f"TupleAware{base_cls.__name__}Idx{idx_key}",
+            (base_cls,),
+            {
+                "forward": forward,
+                "__module__": __name__,
+                "_criterion_base_class": base_cls,
+                "_criterion_output_selector": selector,
+                "_criterion_output_max_selector": max_idx,
+            },
+        )

@@ -3,7 +3,9 @@ import unittest
 from itertools import product
 
 import numpy as np
+from scipy.integrate import quad
 from scipy.stats import norm
+from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
@@ -16,10 +18,12 @@ from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
     conditional_expect,
+    expected_target_val,
     _reshape_scipy_dist,
     _update_X_y,
     _update_reg,
 )
+from skactiveml.pool import ExpectedModelOutputChange
 from skactiveml.pool._expected_model_change_maximization import (
     _bootstrap_estimators,
 )
@@ -57,6 +61,31 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         iclf = IndexClassifierWrapper(clf=clf, X=self.X, y=self.y)
         np.testing.assert_array_equal(clf.X_, iclf.clf_.X_)
 
+    def test_init_param_clf_mean_gamma_is_resolved(self):
+        clf = ParzenWindowClassifier(
+            classes=[0, 1], metric_dict={"gamma": "mean"}
+        )
+        expected = clone(clf).fit(self.X, self.y).metric_dict_
+
+        iclf = IndexClassifierWrapper(clf, self.X, self.y, use_speed_up=True)
+        self.assertEqual(expected, iclf.pwc_metric_dict_)
+
+        iclf = IndexClassifierWrapper(
+            clone(clf).fit(self.X, self.y),
+            self.X,
+            self.y,
+            use_speed_up=True,
+        )
+        self.assertEqual(expected, iclf.pwc_metric_dict_)
+
+        iclf = IndexClassifierWrapper(
+            ParzenWindowClassifier(classes=[0, 1], metric_dict={"gamma": 0.5}),
+            self.X,
+            self.y,
+            use_speed_up=True,
+        )
+        self.assertEqual({"gamma": 0.5}, iclf.pwc_metric_dict_)
+
     def test_dtype_error(self):
         X, y = make_blobs(
             n_samples=2000, centers=[(-2, 2), (2, -2)], n_features=2
@@ -65,17 +94,41 @@ class TestIndexClassifierWrapper(unittest.TestCase):
             classes=np.unique(y), missing_label=MISSING_LABEL
         )
         y_known = np.full(len(y), MISSING_LABEL)
-        self.assertRaises(
-            TypeError,
-            IndexClassifierWrapper,
-            clf=clf,
-            X=X,
-            y=y,
-            missing_label=MISSING_LABEL,
-        )
+        with self.assertRaisesRegex(TypeError, "is not representable"):
+            IndexClassifierWrapper(
+                clf=clf, X=X, y=y, missing_label=MISSING_LABEL
+            )
         y = y.astype(float)
         id_clf = IndexClassifierWrapper(clf, X, y, missing_label=MISSING_LABEL)
         id_clf.fit(np.arange(len(X)), y_known, set_base_clf=True)
+
+    def test_string_labels_accept_a_representable_missing_label(self):
+        X = np.linspace(0, 1, 3).reshape(-1, 1)
+        y = np.array(["cat", "dog", "unknown"])
+        clf = ParzenWindowClassifier(
+            classes=["cat", "dog"], missing_label="unknown"
+        )
+
+        id_clf = IndexClassifierWrapper(clf, X, y, missing_label="unknown")
+        id_clf.fit(np.arange(3))
+
+        np.testing.assert_array_equal(
+            is_unlabeled(id_clf.y, missing_label="unknown"),
+            [False, False, True],
+        )
+        np.testing.assert_array_equal(
+            id_clf.predict(np.arange(2)), ["cat", "dog"]
+        )
+
+    def test_string_labels_reject_a_truncated_missing_label(self):
+        X = np.linspace(0, 1, 2).reshape(-1, 1)
+        y = np.array(["cat", "dog"])
+        clf = ParzenWindowClassifier(
+            classes=["cat", "dog"], missing_label="unknown"
+        )
+
+        with self.assertRaisesRegex(TypeError, "is not representable"):
+            IndexClassifierWrapper(clf, X, y, missing_label="unknown")
 
     def test_init_param_X(self):
         self.assertTrue(hasattr(self.iclf(), "X"))
@@ -166,6 +219,18 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertWarns(Warning, iclf.predict, [0])
         self.assertWarns(Warning, iclf.predict_proba, [0])
         self.assertWarns(Warning, iclf.predict_freq, [0])
+
+        X = np.array([[0.0], [0.2], [1.0]])
+        y = np.array([10.0, 10.0, 20.0])
+        clf = ParzenWindowClassifier(classes=[10, 20]).fit(X, y)
+        iclf = IndexClassifierWrapper(clf, X, y, use_speed_up=True)
+        for pred in ["predict", "predict_proba", "predict_freq"]:
+            with self.subTest(msg="Test prefitted fallback", pred=pred):
+                with self.assertWarns(Warning):
+                    pred_iclf = getattr(iclf, pred)([0, 2])
+                np.testing.assert_allclose(
+                    pred_iclf, getattr(clf, pred)(X[[0, 2]])
+                )
 
     def test_init_param_missing_label(self):
         self.assertTrue(hasattr(self.iclf(), "missing_label"))
@@ -803,6 +868,188 @@ class TestApproximation(unittest.TestCase):
 
             np.testing.assert_array_equal(res, np.zeros(2))
 
+    def test_conditional_expectation_normalizes_every_quantile_method(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+        quantile_methods = [
+            "trapezoid",
+            "simpson",
+            "romberg",
+            "average",
+            "quadrature",
+        ]
+
+        for quantile_method, vector_func, n_samples in itertools.product(
+            quantile_methods, [True, False, "both"], [9, 10]
+        ):
+            with self.subTest(
+                quantile_method=quantile_method,
+                vector_func=vector_func,
+                n_integration_samples=n_samples,
+            ):
+                kwargs = dict(
+                    X=X,
+                    reg=reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=n_samples,
+                    vector_func=vector_func,
+                )
+
+                constant = conditional_expect(
+                    func=lambda idx, x, y: np.full_like(
+                        np.asarray(y, dtype=float), 2.5
+                    ),
+                    **kwargs,
+                )
+                np.testing.assert_allclose(constant, np.full(len(X), 2.5))
+
+                plain = conditional_expect(
+                    func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,
+                    **kwargs,
+                )
+                shifted = conditional_expect(
+                    func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2 + 3,
+                    **kwargs,
+                )
+                np.testing.assert_allclose(shifted - plain, np.full(len(X), 3))
+
+    def test_expected_target_val_normalizes_a_constant_integrand(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+
+        for quantile_method in [
+            "trapezoid",
+            "simpson",
+            "romberg",
+            "average",
+            "quadrature",
+        ]:
+            with self.subTest(quantile_method=quantile_method):
+                result = expected_target_val(
+                    X,
+                    lambda y: np.full_like(np.asarray(y, dtype=float), 2.5),
+                    reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=9,
+                )
+                np.testing.assert_allclose(result, np.full(len(X), 2.5))
+
+    def test_conditional_expectation_recovers_the_target_mean(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+        expected = reg.predict(X)
+
+        for quantile_method in [
+            "trapezoid",
+            "simpson",
+            "romberg",
+            "average",
+            "quadrature",
+        ]:
+            with self.subTest(quantile_method=quantile_method):
+                result = conditional_expect(
+                    X=X,
+                    func=lambda idx, x, y: np.asarray(y, dtype=float),
+                    reg=reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=49,
+                    vector_func=True,
+                )
+                np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_conditional_expectation_handles_degenerate_quantile_grids(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+
+        for (
+            quantile_method,
+            n_integration_samples,
+            vector_func,
+        ) in itertools.product(
+            ["trapezoid", "simpson", "romberg", "average", "quadrature"],
+            [1, 2, 3],
+            [True, False],
+        ):
+            with self.subTest(
+                quantile_method=quantile_method,
+                n_integration_samples=n_integration_samples,
+                vector_func=vector_func,
+            ):
+                result = conditional_expect(
+                    X=X,
+                    func=lambda idx, x, y: np.ones_like(
+                        np.asarray(y, dtype=float)
+                    ),
+                    reg=reg,
+                    method="quantile",
+                    quantile_method=quantile_method,
+                    n_integration_samples=n_integration_samples,
+                    vector_func=vector_func,
+                )
+                np.testing.assert_allclose(result, np.ones(len(X)))
+
+    def test_conditional_expectation_romberg_point_count(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+        X = np.arange(2 * 3).reshape((2, 3))
+
+        for requested, expected in [
+            (1, 2),
+            (2, 2),
+            (3, 3),
+            (4, 5),
+            (5, 5),
+            (6, 9),
+            (8, 9),
+            (9, 9),
+            (10, 17),
+            (17, 17),
+        ]:
+            with self.subTest(n_integration_samples=requested):
+                used = []
+
+                def spy(idx, x, y):
+                    used.append(np.shape(y)[1])
+                    return np.zeros_like(np.asarray(y, dtype=float))
+
+                conditional_expect(
+                    X=X,
+                    func=spy,
+                    reg=reg,
+                    method="quantile",
+                    quantile_method="romberg",
+                    n_integration_samples=requested,
+                    vector_func=True,
+                )
+                self.assertEqual(used, [expected])
+
+    def test_conditional_expectation_names_the_sample_count_parameter(self):
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
+        X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
+        reg.fit(X_train, np.array([-1.0, 2.0, 1.0, 4.0]))
+
+        with self.assertRaisesRegex(ValueError, "n_integration_samples"):
+            conditional_expect(
+                X=np.arange(2 * 3).reshape((2, 3)),
+                func=lambda idx, x, y: np.zeros_like(
+                    np.asarray(y, dtype=float)
+                ),
+                reg=reg,
+                n_integration_samples=0,
+            )
+
     def test_reshape_distribution(self):
         dist = norm(loc=np.array([0, 0]))
         _reshape_scipy_dist(dist, shape=(2, 1))
@@ -850,6 +1097,76 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(y_new[2], 4)
 
         self.assertRaises(ValueError, _update_X_y, self.X, self.y, self.y_pot)
+
+    def test_update_X_y_preserves_the_missing_label(self):
+        y = np.array([0, 1.5, None, None], dtype=object)
+        X = np.arange(4 * 2, dtype=float).reshape(4, 2)
+
+        _, y_new = _update_X_y(X, y, 2.5, idx_update=2)
+
+        self.assertEqual(y_new.dtype, np.dtype(object))
+        self.assertEqual(y_new.tolist(), [0, 1.5, 2.5, None])
+
+        _, y_new = _update_X_y(X, y, 2.5, X_update=X[0])
+
+        self.assertEqual(y_new.tolist(), [0, 1.5, None, None, 2.5])
+
+    def test_update_X_y_keeps_fractional_updates_out_of_integer_targets(self):
+        X = np.arange(4 * 2, dtype=float).reshape(4, 2)
+        y_int = np.array([0, 2, -1, -1])
+
+        _, y_new = _update_X_y(X, y_int, [0.75], idx_update=[2])
+
+        np.testing.assert_array_equal(y_new, [0.0, 2.0, 0.75, -1.0])
+
+        _, y_mapped = _update_X_y(X[:3], y_int[:3], 0.75, idx_update=2)
+        _, y_appended = _update_X_y(X[:2], y_int[:2], 0.75, X_update=X[2])
+
+        np.testing.assert_array_equal(y_mapped, y_appended)
+
+        y_large = np.array([2**53, 2**53 + 1, -1])
+
+        _, y_new = _update_X_y(np.zeros((3, 1)), y_large, 0.5, idx_update=2)
+
+        self.assertEqual(y_new.dtype, np.dtype(object))
+        self.assertEqual(y_new.tolist(), [2**53, 2**53 + 1, 0.5])
+
+    def test_update_X_y_ranks_integer_and_float_targets_equally(self):
+        X = np.random.RandomState(9).normal(size=(6, 1))
+        y = np.array([0, 2, 3, -1, -1, -1])
+
+        rankings = []
+        for dtype in (int, float):
+            qs = ExpectedModelOutputChange(missing_label=-1, random_state=0)
+            rankings.append(
+                qs.query(
+                    X,
+                    y.astype(dtype),
+                    reg=NICKernelRegressor(missing_label=-1),
+                    return_utilities=True,
+                )
+            )
+
+        np.testing.assert_array_equal(rankings[0][0], rankings[1][0])
+        np.testing.assert_allclose(rankings[0][1], rankings[1][1])
+
+    def test_update_reg_accepts_regression_missing_labels(self):
+        X = np.linspace(0.0, 1.0, 4).reshape(-1, 1)
+        for missing in (np.nan, None, -999):
+            with self.subTest(missing=missing):
+                y = np.array([0, 1.5, missing, missing], dtype=object)
+                reg = SklearnRegressor(
+                    LinearRegression(), missing_label=missing
+                )
+                reg_new = _update_reg(
+                    reg,
+                    X,
+                    y,
+                    y_update=2.5,
+                    idx_update=2,
+                    mapping=np.arange(len(X)),
+                )
+                self.assertEqual(len(reg_new.predict(X)), len(X))
 
     def test_update_reg(self):
         self.assertRaises(
@@ -952,6 +1269,26 @@ class TestFunctions(unittest.TestCase):
 
         result = _cross_entropy(X_eval=X_1, true_reg=reg_1, other_reg=reg_2)
         self.assertEqual(y_1.shape, result.shape)
+
+        expected = []
+        for x in X_1:
+            true_dist = reg_1.predict_target_distribution([x])
+            other_dist = reg_2.predict_target_distribution([x])
+            integral = quad(
+                lambda target: (
+                    -true_dist.pdf(target) * other_dist.logpdf(target)
+                ).item(),
+                -np.inf,
+                np.inf,
+            )[0]
+            expected.append(integral)
+        result = _cross_entropy(
+            X_eval=X_1,
+            true_reg=reg_1,
+            other_reg=reg_2,
+            integration_dict={"method": "dynamic_quad"},
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-9, atol=1e-11)
 
         for name, val in [
             ("X_eval", "illegal"),

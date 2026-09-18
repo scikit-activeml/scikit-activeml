@@ -1,4 +1,5 @@
 from inspect import signature, Parameter
+import warnings
 
 import numpy as np
 from scipy.stats import rankdata
@@ -240,7 +241,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             # Majority voting preserves the outer class vocabulary and always
             # produces one value per sample. A fixed local seed preflights the
             # aggregate without consuming query randomness.
-            preflight_aggregated_y = majority_vote(y, random_state=0)
+            preflight_aggregated_y = majority_vote(
+                y, missing_label=self.missing_label, random_state=0
+            )
         else:
             preflight_aggregated_y = y_aggregate(np.asarray(y))
 
@@ -310,7 +313,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         random_state = self.random_state_
         y_sq = (
-            majority_vote(y, random_state=random_state)
+            majority_vote(
+                y, missing_label=self.missing_label_, random_state=random_state
+            )
             if uses_default_aggregate
             else preflight_aggregated_y
         )
@@ -419,9 +424,24 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 [np.argwhere(mapping == i)[0, 0] for i in qs_indices]
             )
 
+        sample_indices = np.asarray(sample_indices, dtype=int)
+        effective_sample_batch_size = len(sample_indices)
+        pref_n_annotators = pref_n_annotators[:effective_sample_batch_size]
+        annotator_utilities = annotator_utilities[:effective_sample_batch_size]
+        pair_capacity = int(np.sum(A_cand[sample_indices]))
+        effective_pair_batch_size = min(batch_size, pair_capacity)
+        if effective_pair_batch_size < batch_size:
+            warnings.warn(
+                f"'batch_size={batch_size}' is larger than the number of "
+                "sample-annotator pairs available for the samples selected "
+                f"by `strategy`. Instead, 'batch_size="
+                f"{effective_pair_batch_size}' was set.",
+                stacklevel=2,
+            )
+
         re_val = self._query_annotators(
             A_cand,
-            batch_size,
+            effective_pair_batch_size,
             sample_utilities,
             annotator_utilities,
             return_utilities,
@@ -433,7 +453,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             return re_val
         elif return_utilities:
             w_indices, w_utilities = re_val
-            utilities = np.full((batch_size, n_samples, n_annotators), np.nan)
+            utilities = np.full(
+                (effective_pair_batch_size, n_samples, n_annotators), np.nan
+            )
             utilities[:, mapping, :] = w_utilities
             indices = np.zeros_like(w_indices)
             indices[:, 0] = mapping[w_indices[:, 0]]
@@ -519,9 +541,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         sample_indices,
         random_state,
     ):
-        nan_indices = np.argwhere(np.isnan(candidate_utilities))
+        nan_mask = np.isnan(candidate_utilities)
+        negative_inf_mask = np.isneginf(candidate_utilities)
+        negative_inf_mask[np.arange(len(sample_indices)), sample_indices] = (
+            False
+        )
 
-        candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = -np.inf
+        candidate_utilities[nan_mask] = -np.inf
 
         # force selected sample indices to have the maximum utility
         for i in range(len(sample_indices)):
@@ -536,7 +562,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             candidate_utilities[:, rand_permutation], method="ordinal", axis=1
         ).astype(float)
 
-        candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = np.nan
+        candidate_utilities[negative_inf_mask] = -np.inf
+        candidate_utilities[nan_mask] = np.nan
 
         annotator_utilities[:, ~A] = np.nan
 

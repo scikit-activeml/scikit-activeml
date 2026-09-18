@@ -3,6 +3,7 @@ from sklearn.utils import check_array, check_consistent_length
 
 from ._label import is_labeled, is_unlabeled
 from ._label_encoder import ExtLabelEncoder
+from ._label_dtype import _as_label_array
 from ._selection import rand_argmax
 
 
@@ -36,13 +37,6 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     y[is_unlabeled_y] = 0
     y = y.astype(int)
 
-    if n_classes == 0:
-        raise ValueError(
-            "Number of classes can not be inferred. "
-            "There must be at least one assigned label or classes must not be"
-            "None. "
-        )
-
     w = (
         np.ones_like(y)
         if w is None
@@ -72,6 +66,10 @@ def majority_vote(
     """Assigns a label to each sample based on weighted voting.
     Samples with no labels are assigned with `missing_label`.
 
+    A matrix without any observed label therefore aggregates to
+    `missing_label` for every sample. That result needs no class vocabulary,
+    so it is returned for `classes=None` as well.
+
     Parameters
     ----------
     y : array-like, shape (n_samples,) or (n_samples, n_annotators)
@@ -94,7 +92,12 @@ def majority_vote(
         Assigned labels for each sample.
     """
     # check input parameters
-    y = check_array(y, ensure_2d=False, dtype=None, ensure_all_finite=False)
+    y = check_array(
+        _as_label_array(y),
+        ensure_2d=False,
+        dtype=None,
+        ensure_all_finite=False,
+    )
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     n_samples = y.shape[0]
     w = (
@@ -111,26 +114,25 @@ def majority_vote(
 
     # infer encoding
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
+    if not np.any(is_labeled_y):
+        if classes is not None:
+            le.fit(y)
+        return y[:, 0].copy()
     le.fit(y)
     y_aggregated = np.full((n_samples,), missing_label, dtype=le._dtype)
 
-    if np.any(is_labeled_y):
-        # transform labels
-        y_labeled_transformed = le.transform(y_labeled)
+    y_labeled_transformed = le.transform(y_labeled)
 
-        # perform voting
-        vote_matrix = compute_vote_vectors(
-            y_labeled_transformed,
-            w=w[is_labeled_y],
-            missing_label=-1,
-            classes=np.arange(len(le.classes_)),
-        )
+    vote_matrix = compute_vote_vectors(
+        y_labeled_transformed,
+        w=w[is_labeled_y],
+        missing_label=-1,
+        classes=np.arange(len(le.classes_)),
+    )
 
-        vote_vector = rand_argmax(vote_matrix, random_state, axis=1)
+    vote_vector = rand_argmax(vote_matrix, random_state, axis=1)
 
-        # inverse transform labels
-        y_labeled_inverse_transformed = le.inverse_transform(vote_vector)
-        # assign labels
-        y_aggregated[is_labeled_y] = y_labeled_inverse_transformed
+    y_labeled_inverse_transformed = le.inverse_transform(vote_vector)
+    y_aggregated[is_labeled_y] = y_labeled_inverse_transformed
 
     return y_aggregated

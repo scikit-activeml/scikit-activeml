@@ -17,8 +17,8 @@ from ..base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
 )
+from ..utils._label import _observed_numerical_labels
 from ..utils import (
-    is_labeled,
     match_signature,
     check_n_features,
     check_scalar,
@@ -109,11 +109,16 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         scikit-learn regressor.
     include_unlabeled_samples : bool, default=False
         - If `False`, only labeled samples are passed to the `fit` method of
-          the `estimator`.
+          the `estimator`. Their labels are converted to `float64`, so that
+          the `estimator` performs its arithmetic on ordinary floating-point
+          values however `y` stores them, e.g. as integers or as an object
+          array beside `missing_label=None`.
         - If `True`, all samples including the unlabeled ones are passed to
           the `fit` method of the `estimator`. Ensure that your `estimator`
           is able to handle unlabeled samples marked by `missing_label`.
           Otherwise, `missing_label` is interpreted as a regular target value.
+          `y` is passed on unchanged in this case, because only its raw
+          representation holds the missing label.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
@@ -325,20 +330,33 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             target_spec=target_spec,
         )
 
-        is_lbld = is_labeled(y, missing_label=self.missing_label_)
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
+        )
         if self.include_unlabeled_samples:
+            # The wrapped estimator is documented to handle the missing label
+            # itself, so its raw representation is passed on unchanged.
             is_included = np.full_like(y, True, dtype=bool)
+            y_train = y[is_included]
         else:
             is_included = is_lbld
+            y_train = y_observed
         X_train = X[is_included]
-        y_train = y[is_included]
+        if (
+            fit_function == "partial_fit"
+            and len(X_train) == 0
+            and hasattr(self, "estimator_")
+        ):
+            # Validation still runs, but an empty update preserves both the
+            # learned model and any established fallback statistics.
+            return self
         estimator_params = dict(fit_kwargs) if fit_kwargs is not None else {}
 
         if sample_weight is not None:
             estimator_params["sample_weight"] = sample_weight[is_included]
 
-        self._label_mean = np.mean(y[is_lbld]) if np.sum(is_lbld) > 0 else 0
-        self._label_std = np.std(y[is_lbld]) if np.sum(is_lbld) > 1 else 1
+        self._label_mean = np.mean(y_observed) if len(y_observed) > 0 else 0
+        self._label_std = np.std(y_observed) if len(y_observed) > 1 else 1
         if fit_function != "partial_fit" or not hasattr(self, "estimator_"):
             self.estimator_ = deepcopy(self.estimator)
         try:
@@ -423,7 +441,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Returns
         -------
         y_samples : ndarray of shape (n_samples_X, n_samples)
-            Drawn random target samples.
+            Drawn random target samples. If the `estimator` could not be
+            fitted, the samples follow the same normal fallback distribution
+            that `predict` reports, defined by the empirical label mean and
+            standard deviation.
         """
         return self._sample(
             sample_function="sample_y",
@@ -454,7 +475,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Returns
         -------
         y_samples : ndarray of shape (n_samples_X, n_samples)
-            Drawn random target samples.
+            Drawn random target samples. If the `estimator` could not be
+            fitted, the samples follow the same normal fallback distribution
+            that `predict` reports, defined by the empirical label mean and
+            standard deviation.
         """
         return self._sample(
             sample_function="sample", X=X, n_samples=n_samples, **sample_kwargs
@@ -465,31 +489,34 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        try:
+        # Branch on this wrapper's own fit outcome, as `predict` does: after
+        # a failed refit, the copied estimator still answers from the
+        # superseded training data instead of raising `NotFittedError`.
+        if self.is_fitted_:
             return attrgetter(sample_function)(self.estimator_)(
                 X, n_samples, **sample_kwargs
             )
-        except NotFittedError:
-            warnings.warn(
-                f"Since the 'estimator' could not be fitted when"
-                f" calling the `fit` method, the label "
-                f"mean `_label_mean={self._label_mean}` and optionally the "
-                f"label standard deviation `_label_std={self._label_std}` is "
-                f"used to make the predictions."
-            )
-            random_state = sample_kwargs.get("random_state", None)
-            random_state = check_random_state(random_state)
-            check_scalar(
-                n_samples,
-                "n_samples",
-                min_val=1,
-                min_inclusive=True,
-                target_type=int,
-            )
-            y_samples = random_state.randn(len(X), n_samples)
-            y_samples *= self._label_std
-            y_samples += self._label_mean
-            return y_samples
+
+        warnings.warn(
+            f"Since the 'estimator' could not be fitted when"
+            f" calling the `fit` method, the label "
+            f"mean `_label_mean={self._label_mean}` and optionally the "
+            f"label standard deviation `_label_std={self._label_std}` is "
+            f"used to make the predictions."
+        )
+        random_state = sample_kwargs.get("random_state", None)
+        random_state = check_random_state(random_state)
+        check_scalar(
+            n_samples,
+            "n_samples",
+            min_val=1,
+            min_inclusive=True,
+            target_type=int,
+        )
+        y_samples = random_state.randn(len(X), n_samples)
+        y_samples *= self._label_std
+        y_samples += self._label_mean
+        return y_samples
 
     def __sklearn_is_fitted__(self):
         if "is_fitted_" in self.__dict__:
@@ -573,7 +600,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         if n_outputs is not None:
             return "single-output" if n_outputs == 1 else "multi-output"
 
-        for attr in ("y_train_", "_y"):
+        # Dual coefficients have one column per prediction output, just like
+        # stored training targets (e.g., for kernel ridge regression).
+        for attr in ("y_train_", "_y", "dual_coef_"):
             target_values = getattr(estimator, attr, None)
             if target_values is not None:
                 target_values = np.asarray(target_values)
@@ -831,12 +860,15 @@ if successful_skorch_torch_import:
             always cast to  `np.float32`.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
-              of the `estimator`.
+              of the `estimator`. Their labels are converted to floating-point
+              values however `y` stores them, e.g. as integers or as an object
+              array beside `missing_label=None`.
             - If `True`, all samples including the unlabeled ones are passed to
               the `fit` method of the `estimator`. Ensure that the `criterion`
               is able to handle unlabeled samples marked by `missing_label`.
               Otherwise, `missing_label` is interpreted as a regular target
-              value.
+              value. The missing label is converted along with the labels,
+              so `missing_label=None` reaches the `criterion` as NaN.
         missing_label : scalar or string or np.nan or None, default=np.nan
             Value to represent a missing label.
         random_state : int or RandomState instance or None, default=None
@@ -1109,13 +1141,18 @@ if successful_skorch_torch_import:
                 Training labels or `None` if none exist.
             """
             X_train, y_train = None, None
+            is_lbld, y_observed = _observed_numerical_labels(
+                y, self.missing_label_
+            )
             if self.include_unlabeled_samples:
                 is_included = np.full_like(y, fill_value=True, dtype=bool)
+                y_included = y[is_included]
             else:
-                is_included = is_labeled(y, missing_label=self.missing_label_)
+                is_included = is_lbld
+                y_included = y_observed
             if np.sum(is_included) > 0:
                 X_train = X[is_included]
-                y_train = y[is_included]
-            if y_train is not None:
-                y_train = y_train.astype(np.float32, copy=True).reshape(-1, 1)
+                y_train = np.asarray(y_included, dtype=np.float32).reshape(
+                    -1, 1
+                )
             return X_train, y_train

@@ -51,3 +51,64 @@ class TestBalancedIncrementalQuantileFilter(
     ):
         expected_output = [0, 1, 7, 8, 20]
         return super().test_query_by_utility(expected_output)
+
+    def test_tied_utilities_obey_budget(self):
+        expected_output = np.arange(0, 1000, 10)
+        candidates = np.zeros((1000, 1))
+
+        for utility_value in [0.0, 1.0]:
+            with self.subTest(utility_value=utility_value):
+                utilities = np.full(1000, utility_value)
+                bm = BalancedIncrementalQuantileFilter(budget=0.1)
+
+                queried_indices = bm.query_by_utility(utilities)
+                np.testing.assert_array_equal(queried_indices, expected_output)
+                np.testing.assert_array_equal(
+                    bm.query_by_utility(utilities), expected_output
+                )
+                self.assertEqual(bm.observed_samples_, 0)
+                self.assertEqual(bm.queried_samples_, 0)
+                self.assertEqual(list(bm.history_sorted_), [])
+
+                bm.update(candidates, queried_indices, utilities)
+                history_before_query = list(bm.history_sorted_)
+                queried_indices = bm.query_by_utility(utilities)
+                np.testing.assert_array_equal(queried_indices, expected_output)
+                self.assertEqual(bm.observed_samples_, 1000)
+                self.assertEqual(bm.queried_samples_, 100)
+                self.assertEqual(
+                    list(bm.history_sorted_), history_before_query
+                )
+
+                bm.update(candidates, queried_indices, utilities)
+                self.assertEqual(bm.observed_samples_, 2000)
+                self.assertEqual(bm.queried_samples_, 200)
+
+    def test_tied_utilities_batch_matches_sequential_queries(self):
+        utilities = np.ones(100)
+        expected_output = np.arange(0, 100, 10)
+
+        batch_bm = BalancedIncrementalQuantileFilter(budget=0.1)
+        batch_output = batch_bm.query_by_utility(utilities)
+
+        sequential_bm = BalancedIncrementalQuantileFilter(budget=0.1)
+        sequential_output = []
+        for i, utility in enumerate(utilities):
+            queried_indices = sequential_bm.query_by_utility(
+                np.array([utility])
+            )
+            if queried_indices:
+                sequential_output.append(i)
+            sequential_bm.update(
+                np.zeros((1, 1)), queried_indices, np.array([utility])
+            )
+
+        np.testing.assert_array_equal(batch_output, expected_output)
+        np.testing.assert_array_equal(sequential_output, expected_output)
+
+    def test_tied_utilities_with_full_budget(self):
+        utilities = np.ones(100)
+        bm = BalancedIncrementalQuantileFilter(budget=1.0)
+        np.testing.assert_array_equal(
+            bm.query_by_utility(utilities), np.arange(100)
+        )

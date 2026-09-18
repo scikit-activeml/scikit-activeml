@@ -24,8 +24,8 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
+from ..utils._label_dtype import _as_label_array
 from ..utils._target import (
-    _classes_equal,
     _check_target_capability,
     _check_target_spec_capability,
 )
@@ -45,10 +45,9 @@ from ..utils import (
     check_scalar,
     match_signature,
     check_n_features,
-    _has_nested_classes,
     resolve_target_spec,
 )
-from ..utils._validation import _check_probas_are_valid
+from ..utils._validation import _check_probas_are_valid, _has_nested_classes
 
 # used to defer import of capymoa as it may result in an error with pytest
 import importlib
@@ -230,7 +229,9 @@ def _class_column(class_label, declared_classes):
         that vocabulary does not contain it.
     """
     for class_index, declared_class in enumerate(declared_classes):
-        if _classes_equal(declared_class, class_label):
+        if declared_class == class_label or (
+            declared_class != declared_class and class_label != class_label
+        ):
             return class_index
     return None
 
@@ -867,7 +868,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         self._check_estimator_probas_are_valid(
                             P_array, is_multilabel=False
                         )
-                        P_array = P_array[:, :1]
+                        # Both native columns belong to the sole learned
+                        # class; dropping either loses probability mass.
+                        P_array = P_array.sum(axis=1, keepdims=True)
                     P_list = self._normalize_multilabel_proba_list(
                         [P_array], n_samples=n_samples
                     )
@@ -1087,7 +1090,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self._fall_back_to_label_prior("there is no labeled data")
             return self
 
-        y_train_inv = self._decode_labeled_targets(y_train)
+        y_train_inv = self._le.inverse_transform(
+            y_train, prefer_class_dtype=True
+        )
         sample_weight_train = (
             None if sample_weight is None else sample_weight[is_included]
         )
@@ -1127,30 +1132,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         self.is_fitted_ = True
         return self
-
-    def _decode_labeled_targets(self, y_train):
-        """Decode a labeled training subset into its declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, e.g., `object` for `missing_label=None`. A labeled
-        training subset never carries `missing_label`, so its decoded labels
-        are narrowed back to the dtype of the declared classes. Without this
-        narrowing, a wrapped estimator rejects an `object` target that only
-        contains ordinary class labels.
-
-        Parameters
-        ----------
-        y_train : numpy.ndarray of shape (n_labeled,) or \
-                (n_labeled, n_outputs)
-            The encoded class labels of the labeled training subset.
-
-        Returns
-        -------
-        y_train_inv : numpy.ndarray of shape (n_labeled,) or \
-                (n_labeled, n_outputs)
-            The decoded class labels passed on to the wrapped estimator.
-        """
-        return self._decode_class_labels(y_train)
 
     def _has_degenerate_training_classes(self, y_train):
         """Check whether an encoded training subset lacks two classes.
@@ -1332,6 +1313,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 if self.cost_matrix is None
                 else self.cost_matrix
             )
+            if self.classes is not None:
+                class_indices = np.argsort(self.classes)
+                cost_matrix = np.asarray(cost_matrix)[
+                    np.ix_(class_indices, class_indices)
+                ]
         check_classifier_params(le.classes_, self.missing_label, cost_matrix)
         return {
             "random_state": random_state,
@@ -1393,7 +1379,16 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         call_kwargs[target_param] = y
 
         if fit_function == "partial_fit" and "classes" in fit_params:
-            call_kwargs["classes"] = self.classes_
+            evidence = _discover_fitted_target_evidence(self.estimator_)
+            # A native multilabel learner's flat `classes_` can describe
+            # output identifiers or a collapsed binary vocabulary. Preserve
+            # its incremental contract rather than supplying nested classes.
+            call_kwargs["classes"] = (
+                self.estimator_.classes_
+                if self._is_multilabel_target()
+                and evidence.kind in {"label-outputs", "single-output"}
+                else self.classes_
+            )
 
         if sample_weight is not None and (
             "sample_weight" in fit_params
@@ -1758,6 +1753,10 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     was, the sliding window included. The window therefore never advances past
     what the wrapped `estimator` was trained on, and a rejected update leaves a
     previously fitted wrapper able to predict as before.
+
+    When a window mixes weighted and unweighted batches, samples from an
+    unweighted batch have unit weight. Their weights are retained until the
+    corresponding samples leave the window or a new `fit` replaces it.
     """
 
     #: Fitted attributes this wrapper holds itself, which `__getattr__`
@@ -1958,6 +1957,19 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator_ = deepcopy(self.estimator)
         if self.estimator_.classes is None:
             self.estimator_.set_params(classes=self.target_spec_.classes)
+        if (
+            self.cost_matrix is not None
+            and self.estimator_.cost_matrix is None
+        ):
+            # The member may declare the same vocabulary in a different order.
+            class_indices = [
+                list(self.classes).index(c) for c in self.estimator_.classes
+            ]
+            self.estimator_.set_params(
+                cost_matrix=np.asarray(self.cost_matrix)[
+                    np.ix_(class_indices, class_indices)
+                ]
+            )
         if has_fit_parameter(self.estimator, "sample_weight"):
             fit_kwargs["sample_weight"] = sample_weight_train
         self.estimator_.fit(X=X_train, y=y_train, **fit_kwargs)
@@ -2015,7 +2027,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if not hasattr(self, "y_train_"):
             self.y_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "sample_weight_train_"):
-            self.sample_weight_train_ = deque(maxlen=self.window_size)
+            self.sample_weight_train_ = None
         if self.only_labeled:
             is_lbld = is_labeled(y, self.missing_label)
             X = X[is_lbld]
@@ -2029,13 +2041,19 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if fit_func == "fit":
             self.X_train_ = deque(maxlen=self.window_size)
             self.y_train_ = deque(maxlen=self.window_size)
-            self.sample_weight_train_ = deque(maxlen=self.window_size)
+            self.sample_weight_train_ = None
+        if sample_weight is not None and self.sample_weight_train_ is None:
+            # Previously unweighted rows retain unit weight when weights are
+            # introduced. Fill before extending so eviction stays aligned.
+            self.sample_weight_train_ = deque(
+                np.ones(len(self.X_train_)), maxlen=self.window_size
+            )
         self.X_train_.extend(X)
         self.y_train_.extend(y)
-        if sample_weight is not None:
+        if self.sample_weight_train_ is not None:
+            if sample_weight is None:
+                sample_weight = np.ones(len(X))
             self.sample_weight_train_.extend(sample_weight)
-        else:
-            self.sample_weight_train_ = None
 
     def _validate_data(
         self,
@@ -2086,7 +2104,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         }
 
         # Check input parameters.
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         y = column_or_1d(y, warn=True)
         if len(y) == 0:
             check_X_dict["ensure_2d"] = False
@@ -3356,15 +3374,14 @@ if successful_river_import:
             ----------
             X : array-like of shape (n_samples, ...)
                 The feature matrix representing the samples.
-            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-                It contains the class labels of the training samples. Missing
-                labels are represented by the attribute `self.missing_label_`.
-                In case of multiple labels per sample (i.e., n_outputs > 1),
-                the samples are duplicated.
-            sample_weight : array-like of shape (n_samples,) or\
-                    (n_samples, n_outputs)
-                It contains the weights of the training samples' class labels.
-                It must have the same shape as `y`.
+            y : array-like of shape (n_samples,)
+                Class labels of the training samples, possibly including
+                missing labels indicated by `self.missing_label`. Only
+                single-output targets from one annotator are supported; see
+                :ref:`target-semantics`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                Weight of each training sample. It must have the same shape as
+                `y`.
 
             Returns
             -------
@@ -3386,15 +3403,14 @@ if successful_river_import:
             ----------
             X : array-like of shape (n_samples, ...)
                 The feature matrix representing the samples.
-            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-                It contains the class labels of the training samples. Missing
-                labels are represented the attribute `self.missing_label_`. In
-                case of multiple labels per sample (i.e., n_outputs > 1), the
-                samples are duplicated.
-            sample_weight : array-like of shape (n_samples,) or\
-                    (n_samples, n_outputs)
-                It contains the weights of the training samples' class labels.
-                It must have the same shape as `y`.
+            y : array-like of shape (n_samples,)
+                Class labels of the training samples, possibly including
+                missing labels indicated by `self.missing_label`. Only
+                single-output targets from one annotator are supported; see
+                :ref:`target-semantics`.
+            sample_weight : array-like of shape (n_samples,), default=None
+                Weight of each training sample. It must have the same shape as
+                `y`.
 
             Returns
             -------
@@ -3431,16 +3447,13 @@ if successful_river_import:
             check_n_features(self, X, reset=False)
             if self.is_fitted_:
                 P_list = []
-                est_classes = None
                 for x in X:
                     x_dict = self.transform_data_to_dict(x)
                     P_i_dict = self.estimator_.predict_proba_one(
                         x_dict, **predict_proba_kwargs
                     )
                     P_i = []
-                    if est_classes is None:
-                        est_classes = np.sort(list(P_i_dict.keys()))
-                    for c in self.classes_:
+                    for c in range(len(self.classes_)):
                         P_i.append(P_i_dict.get(c, 0.0))
                     P_list.append(P_i)
                 P = np.array(P_list)
@@ -3466,24 +3479,15 @@ if successful_river_import:
         def _fit(self, fit_function, X, y, sample_weight=None):
             """Fit or partially fit this wrapper as a single transaction.
 
-            This wrapper absorbs almost every estimator failure into its
-            prior-only fallback, which returns `self` and is therefore never
-            rolled back. The rejection of an `estimator` that is no river
-            classifier does raise, as does an unsupported `sample_weight`. The
-            transaction ensures that such a rejection leaves none of the
-            fitted attributes of the abandoned attempt behind, `n_features_in_`
-            among them, so that an already fitted wrapper keeps predicting on
-            the data it was trained on.
-
             Parameters
             ----------
             fit_function : "fit" or "partial_fit"
                 Whether the estimator is re-created or updated incrementally.
             X : array-like of shape (n_samples, ...)
                 The feature matrix representing the samples.
-            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-                It contains the class labels of the training samples. Missing
-                labels are represented by the attribute `self.missing_label_`.
+            y : array-like of shape (n_samples,)
+                Class labels of the training samples, possibly including
+                missing labels indicated by `self.missing_label`.
             sample_weight : array-like of shape (n_samples,), default=None
                 It contains the weights of the training samples' class labels.
 

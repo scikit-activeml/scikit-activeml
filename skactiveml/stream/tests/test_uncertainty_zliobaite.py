@@ -47,6 +47,7 @@ class TestFixedUncertainty(
         test_cases += [
             (None, TypeError),
             (FixedUncertainty, TypeError),
+            ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)
         self._test_param("init", "classes", [([0, 1], None)])

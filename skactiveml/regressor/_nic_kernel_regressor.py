@@ -1,17 +1,19 @@
 import numpy as np
-from scipy.stats import t
+
+from copy import deepcopy
+from scipy.stats import norm, t
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from skactiveml.base import ProbabilisticRegressor
 from skactiveml.utils import (
-    is_labeled,
     MISSING_LABEL,
     check_scalar,
     check_type,
     check_n_features,
 )
+from skactiveml.utils._label import _observed_numerical_labels
 
 
 class NICKernelRegressor(ProbabilisticRegressor):
@@ -25,7 +27,14 @@ class NICKernelRegressor(ProbabilisticRegressor):
     ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
+        `sklearn.metrics.pairwise.pairwise_kernels`, or `'precomputed'`.
+        Its values weight the training targets, so it must not be negative
+        for the given data.
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
+        so only for some data, and `'additive_chi2'` never does because it
+        is non-positive by construction. Prediction raises a `ValueError`
+        when the resulting kernel evidence is negative.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
     mu_0 : int or float, default=0
@@ -77,9 +86,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         Parameters
         ----------
-        X : matrix-like of shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features) or \
+                (n_samples, n_samples) if metric='precomputed'
             Training data set, usually complete, i.e., including the labeled
-            and unlabeled samples.
+            and unlabeled samples. If `metric='precomputed'`, `X` contains the
+            pairwise kernels between all training samples.
         y : array-like of shape (n_samples,) or (n_samples, n_targets)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
@@ -91,10 +102,15 @@ class NICKernelRegressor(ProbabilisticRegressor):
         self: SkactivemlRegressor,
             The SkactivemlRegressor is fitted on the training data.
         """
-        X, y, sample_weight = self._validate_data(
-            X, y, sample_weight, reset=self.metric != "precomputed"
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+        if self.metric == "precomputed" and X.shape[0] != X.shape[1]:
+            raise ValueError(
+                "For metric='precomputed', the training kernel matrix `X` "
+                "must have shape (n_train_samples, n_train_samples)."
+            )
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
         )
-        is_lbld = is_labeled(y, missing_label=self.missing_label_)
         for value, name in [
             (self.kappa_0, "self.kappa_0"),
             (self.nu_0, "self.nu_0"),
@@ -103,8 +119,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
             check_scalar(value, name, (int, float), min_val=0)
         check_scalar(self.mu_0, "self.mu_0", (int, float))
 
+        self._is_lbld = is_lbld
         self.X_ = X[is_lbld]
-        self.y_ = y[is_lbld]
+        self.y_ = y_observed
 
         self.prior_params_ = (
             self.kappa_0,
@@ -124,29 +141,89 @@ class NICKernelRegressor(ProbabilisticRegressor):
             self.weights_ = None
 
         check_type(self.metric, "self.metric", target_vals=self.METRICS)
-        self.metric_dict = {} if self.metric_dict is None else self.metric_dict
         check_type(
             self.metric_dict, "self.metric_dict", dict, target_vals=[None]
+        )
+        self.metric_dict_ = (
+            deepcopy(self.metric_dict) if self.metric_dict is not None else {}
         )
 
         return self
 
+    def _validate_prediction_data(self, X):
+        """Validate feature data or a precomputed test kernel.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features) or \
+                (n_samples, n_train_samples) if metric='precomputed'
+            Input samples or kernels against all samples from the latest fit.
+
+        Returns
+        -------
+        X : numpy.ndarray
+            Validated input data.
+        """
+        X = check_array(X)
+        if self.metric == "precomputed":
+            if X.shape[1] != self.n_features_in_:
+                raise ValueError(
+                    "For metric='precomputed', the kernel matrix `X` must "
+                    "have shape (n_test_samples, n_train_samples)."
+                )
+        else:
+            check_n_features(self, X, reset=False)
+        return X
+
     def _estimate_ml_params(self, X):
-        K = pairwise_kernels(
-            X, self.X_, metric=self.metric, **self.metric_dict
-        )
+        if self.metric == "precomputed":
+            K = X[:, self._is_lbld]
+        else:
+            K = pairwise_kernels(
+                X, self.X_, metric=self.metric, **self.metric_dict_
+            )
 
         if self.weights_ is not None:
             K = self.weights_.reshape(1, -1) * K
 
         N = np.sum(K, axis=1)
-        mu_ml = K @ self.y_ / N
+        mu_ml = np.divide(K @ self.y_, N, out=np.zeros_like(N), where=N != 0)
         scatter = np.sum(
             K * (self.y_[np.newaxis, :] - mu_ml[:, np.newaxis]) ** 2, axis=1
         )
-        var_ml = 1 / N * scatter
+        self._check_kernel_evidence(N, "kernel mass")
+        self._check_kernel_evidence(
+            scatter, "weighted sum of squared deviations (scatter)"
+        )
+        var_ml = np.divide(scatter, N, out=np.zeros_like(N), where=N != 0)
 
         return N, mu_ml, var_ml
+
+    def _check_kernel_evidence(self, values, name):
+        """Reject kernel evidence that cannot be a weighted count.
+
+        Parameters
+        ----------
+        values : numpy.ndarray of shape (n_samples,)
+            Kernel-weighted quantity to validate.
+        name : str
+            Name of the quantity reported in the error message.
+
+        Raises
+        ------
+        ValueError
+            If any value is negative.
+        """
+        if np.any(values < 0):
+            raise ValueError(
+                f"The {name} weighting the training targets is negative, the "
+                f"smallest being {np.min(values)}, so it cannot serve as a "
+                "pseudo-count. This happens when `sample_weight` contains "
+                f"negative values, or when `metric={self.metric!r}` produces "
+                "negative similarities on the given data. Use non-negative "
+                "sample weights and a non-negative kernel, e.g. 'rbf' or "
+                "'laplacian', or supply a non-negative 'precomputed' matrix."
+            )
 
     def _estimate_update_params(self, X):
         if len(self.X_) != 0:
@@ -163,8 +240,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         Parameters
         ----------
-        X :  array-like of shape (n_samples, n_features)
-            Input samples.
+        X : array-like of shape (n_samples, n_features) or \
+                (n_samples, n_train_samples) if metric='precomputed'
+            Input samples. If `metric='precomputed'`, `X` contains kernels
+            between the test samples and every sample passed to the latest
+            `fit` call.
 
         Returns
         -------
@@ -172,11 +252,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
             The distribution of the targets at the test samples.
         """
         check_is_fitted(self)
-        X = check_array(X)
-        check_n_features(self, X, reset=False)
+        X = self._validate_prediction_data(X)
 
         prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
+        self._check_posterior_evidence(prior_params[0] + update_params[0])
         post_params = _combine_params(prior_params, update_params)
 
         kappa_post, nu_post, mu_post, sigma_sq_post = post_params
@@ -185,6 +265,31 @@ class NICKernelRegressor(ProbabilisticRegressor):
         loc = mu_post
         scale = np.sqrt((1 + kappa_post) / kappa_post * sigma_sq_post)
         return t(df=df, loc=loc, scale=scale)
+
+    def _check_posterior_evidence(self, kappa_post):
+        """Reject test samples the posterior says nothing about.
+
+        Parameters
+        ----------
+        kappa_post : numpy.ndarray of shape (n_samples,)
+            Posterior weight on the target mean, per test sample.
+
+        Raises
+        ------
+        ValueError
+            If any test sample carries no posterior weight.
+        """
+        without_evidence = kappa_post <= 0
+        if np.any(without_evidence):
+            raise ValueError(
+                f"{np.sum(without_evidence)} of {len(kappa_post)} test "
+                "samples carry no evidence for the target mean, so it is "
+                "undefined for them. The kernel gives them zero mass and "
+                f"`kappa_0={self.kappa_0}` puts no weight on the prior mean "
+                "either. Widen the kernel, e.g. with a smaller 'gamma' in "
+                "`metric_dict`, or use a positive `kappa_0` so that such "
+                "samples fall back to the prior mean."
+            )
 
 
 def _combine_params(prior_params, update_params):
@@ -214,7 +319,14 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
+        `sklearn.metrics.pairwise.pairwise_kernels`, or `'precomputed'`.
+        Its values weight the training targets, so it must not be negative
+        for the given data.
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
+        so only for some data, and `'additive_chi2'` never does because it
+        is non-positive by construction. Prediction raises a `ValueError`
+        when the resulting kernel evidence is negative.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
     missing_label : scalar or string or np.nan or or None, default=np.nan
@@ -225,6 +337,12 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     target_type : "auto" or "single-output", default="auto"
         Declared target type. This estimator supports only single-output
         regression.
+
+    Notes
+    -----
+    Without observed targets, the Nadaraya-Watson estimate is undefined. This
+    estimator then returns a standard normal fallback distribution, with mean
+    zero and standard deviation one, until labeled data are fitted.
     """
 
     def __init__(
@@ -245,3 +363,12 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
             nu_0=3,
             sigma_sq_0=1,
         )
+
+    def predict_target_distribution(self, X):
+        """Return the estimated or fallback target distribution."""
+        check_is_fitted(self)
+        if len(self.X_) != 0:
+            return super().predict_target_distribution(X)
+
+        X = self._validate_prediction_data(X)
+        return norm(loc=np.zeros(len(X)), scale=np.ones(len(X)))

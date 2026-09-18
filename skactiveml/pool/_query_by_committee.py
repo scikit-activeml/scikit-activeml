@@ -566,7 +566,7 @@ def _check_ensemble(
                     "`sample_predictions_dict` must be `None`, if `ensemble` "
                     "is array-like."
                 )
-            est_arr = copy.deepcopy(ensemble)
+            est_arr = copy.deepcopy(list(ensemble))
             for i in range(len(est_arr)):
                 check_type(
                     est_arr[i], f"ensemble[{i}]", estimator_type

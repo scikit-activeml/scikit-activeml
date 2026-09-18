@@ -1,7 +1,10 @@
 import unittest
 from copy import deepcopy
+from unittest.mock import patch
 
 import numpy as np
+from scipy.interpolate import griddata
+from scipy.optimize import minimize_scalar
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 
@@ -97,6 +100,109 @@ class TestEpistemicUncertaintySampling(
             np.array([[0, 0], [1, 1]]), np.array([[0.5, 0.5]])
         )
         np.testing.assert_array_equal(interpolated, np.array([0.5]))
+
+    def test_precompute_reuse_growth_and_toggle(self):
+        X = np.zeros((6, 2))
+        y = np.array([0, 0, 1, 1, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            X, y, sample_weight=np.full(6, 0.7)
+        )
+        qs = EpistemicUncertaintySampling(precompute=True, random_state=0)
+        query_params = dict(
+            X=X, y=y, clf=clf, fit_clf=False, return_utilities=True
+        )
+        module = "skactiveml.pool._epistemic_uncertainty_sampling"
+        with patch(
+            f"{module}.minimize_scalar", wraps=minimize_scalar
+        ) as optimize:
+            first = qs.query(**query_params)
+            interpolator = qs._interpolation_cache["interpolator"]
+            table = qs._precompute_array.copy()
+            self.assertEqual(optimize.call_count, 2 * table.size)
+            optimize.reset_mock()
+            repeated = qs.query(**query_params)
+            self.assertEqual(optimize.call_count, 0)
+            self.assertIs(
+                qs._interpolation_cache["interpolator"], interpolator
+            )
+            for expected, actual in zip(first, repeated):
+                np.testing.assert_array_equal(expected, actual)
+
+            clf.fit(X, y, sample_weight=np.full(6, 1.7))
+            qs.query(**query_params)
+            self.assertIsNot(
+                qs._interpolation_cache["interpolator"], interpolator
+            )
+            self.assertEqual(
+                optimize.call_count,
+                2 * (qs._precompute_array.size - table.size),
+            )
+            np.testing.assert_array_equal(
+                qs._precompute_array[: table.shape[0], : table.shape[1]],
+                table,
+            )
+
+            optimize.reset_mock()
+            qs.set_params(precompute=False)
+            direct = qs.query(**query_params)
+            self.assertEqual(optimize.call_count, 4)
+            expected = EpistemicUncertaintySampling(random_state=0).query(
+                **query_params
+            )
+            for expected_part, actual in zip(expected, direct):
+                np.testing.assert_array_equal(expected_part, actual)
+
+            optimize.reset_mock()
+            qs.set_params(precompute=True)
+            qs.query(**query_params)
+            self.assertEqual(optimize.call_count, 0)
+
+    def test_interpolate_preserves_triangular_interpolation(self):
+        rng = np.random.RandomState(0)
+        for shape in [(2, 2), (3, 5), (6, 4)]:
+            table = rng.uniform(size=shape)
+            freq = rng.uniform(size=(20, 2)) * (np.array(shape) - 1)
+            points = np.indices(shape).reshape(2, -1).T
+            expected = griddata(points, table.ravel(), freq, method="linear")
+            np.testing.assert_array_equal(_interpolate(table, freq), expected)
+            cache = {}
+            _interpolate(table, freq[:1], cache)
+            np.testing.assert_array_equal(
+                _interpolate(table, freq, cache), expected
+            )
+
+    def test_precompute_candidate_subsets_match_fresh_queries(self):
+        X = np.array(
+            [[1, 0], [0, 1], [0.2, 0.7], [1.2, 1.7], [2.1, 2.1], [2, 0.5]]
+        )
+        y = np.array([0, 1, np.nan, np.nan, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1], metric="linear").fit(X, y)
+        qs = EpistemicUncertaintySampling(precompute=True, random_state=0)
+        for candidates, retained_shape in [
+            ([2, 3], (3, 3)),
+            ([5], (4, 3)),
+            (None, (4, 4)),
+            ([2, 3], (4, 4)),
+            ([2], (4, 4)),
+            ([4], (4, 4)),
+            (None, (4, 4)),
+        ]:
+            with self.subTest(candidates=candidates):
+                params = dict(
+                    X=X,
+                    y=y,
+                    clf=clf,
+                    fit_clf=False,
+                    candidates=candidates,
+                    return_utilities=True,
+                )
+                actual = qs.query(**params)
+                expected = EpistemicUncertaintySampling(
+                    precompute=True, random_state=0
+                ).query(**params)
+                for expected_part, actual_part in zip(expected, actual):
+                    np.testing.assert_array_equal(actual_part, expected_part)
+                self.assertEqual(qs._precompute_array.shape, retained_shape)
 
     def test_pwc_ml_1(self):
         self.assertEqual(1.0, -_pwc_ml_1(None, 0.0, 0.0))

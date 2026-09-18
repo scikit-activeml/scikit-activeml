@@ -89,6 +89,7 @@ class TestFixedUncertaintyBudgetManager(
             ("string", TypeError),
             (-1, TypeError),
             (0, TypeError),
+            ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)
 

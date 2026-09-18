@@ -82,8 +82,18 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             acq_left = (
                 self.budget_ * tmp_observed_samples_ - tmp_queried_samples_
             )
-            theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
-            sample = u >= theta_bal
+            if range_ranking == 0:
+                # Treat a one-ULP overshoot of an integer target as equality,
+                # so that an exactly reached budget does not buy another
+                # label. A positive fractional target still permits an
+                # immediate acquisition.
+                budget_target = np.nextafter(
+                    self.budget_ * tmp_observed_samples_, -np.inf
+                )
+                sample = tmp_queried_samples_ < budget_target
+            else:
+                theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
+                sample = u >= theta_bal
 
             if sample:
                 tmp_queried_samples_ += 1

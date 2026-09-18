@@ -312,9 +312,7 @@ Note that you might need to adjust this command for GPU support with
        # Since we train the classifier outside of `qs.query` in this example,
        # we use `fit_clf=False` to avoid unnecessary retraining during
        # querying.
-       query_idx = qs.query(
-           candidates=X_stream[[t]], y=y_stream[t], clf=clf, fit_clf=False
-       )
+       query_idx = qs.query(candidates=X_stream[[t]], clf=clf, fit_clf=False)
        qs.update(candidates=X_stream[[t]], queried_indices=query_idx)
        if len(query_idx) > 0:
            y_train[t] = y_stream[t]

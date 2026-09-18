@@ -136,9 +136,12 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         else:
             X_eval = check_array(X_eval)
             _check_n_features(self, X_eval, reset=False)
-        if self.integration_dict is None:
-            self.integration_dict = {"method": "assume_linear"}
-        check_type(self.integration_dict, "self.integration_dict", dict)
+        integration_dict = (
+            {"method": "assume_linear"}
+            if self.integration_dict is None
+            else self.integration_dict
+        )
+        check_type(integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -172,7 +175,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             new_model_variance,
             reg,
             random_state=self.random_state_,
-            **self.integration_dict,
+            **integration_dict,
         )
 
         utilities_cand = old_model_variance - ex_model_variance

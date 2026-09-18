@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+from scipy.sparse import csr_matrix, issparse, vstack
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 from sklearn.utils.validation import column_or_1d
@@ -28,6 +29,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     uncertainty. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation can handle class
     labels and multilabel targets represented by a two-dimensional `y`.
+    Regression is not supported, because the default radius `delta` depends
+    on a class count, which continuous labels do not provide.
 
     Multi-label support in this implementation is an extension and not part of
     the original proposal in [1]_. Coverage is computed in the embedding space
@@ -86,7 +89,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             {
                 ("classification", "single-output", "single-annotator"),
                 ("classification", "multi-label", "single-annotator"),
-                ("regression", "single-output", "single-annotator"),
             }
         )
 
@@ -193,14 +195,14 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         # Infer number of classes, which must have a minimum of 2.
         is_candidate = np.full(len(X), fill_value=False)
         is_candidate[mapping] = True
+        is_center = is_labeled(
+            y=y,
+            missing_label=self.missing_label_,
+            target_type=target_type,
+        )
         n_classes = self.n_classes
         if n_classes is None:
-            is_lbld = is_labeled(
-                y=y,
-                missing_label=self.missing_label_,
-                target_type=target_type,
-            )
-            y_labeled = y[is_lbld]
+            y_labeled = y[is_center]
             if target_type == "multi-label":
                 n_classes = len(
                     {tuple(np.asarray(row).tolist()) for row in y_labeled}
@@ -264,10 +266,17 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 cluster_algo_dict[self.n_cluster_param_name] = n_classes
                 cluster_obj = self.cluster_algo(**cluster_algo_dict)
                 y_cluster = cluster_obj.fit_predict(X)
-                is_impure = y_cluster[:, None] != y_cluster
                 for delta in deltas:
-                    edges = self.distances_ <= delta
-                    purity = 1 - (edges * is_impure).any(axis=1).mean()
+                    n_impure = 0
+                    chunk_size = max(1, 2**20 // len(X))
+                    for start in range(0, len(X), chunk_size):
+                        stop = start + chunk_size
+                        is_impure = y_cluster[start:stop, None] != y_cluster
+                        edges = self.distances_[start:stop] <= delta
+                        n_impure += np.count_nonzero(
+                            (edges & is_impure).any(axis=1)
+                        )
+                    purity = 1 - n_impure / len(X)
                     max_purity = max(max_purity, purity)
                     if purity < self.alpha:
                         break
@@ -283,22 +292,66 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 )
 
         # Compute edges of the graph with the samples as vertices.
-        edges = self.distances_ <= self.delta_max_
+        edges = _radius_graph(self.distances_, self.delta_max_)
+        incoming = edges.tocsc() if issparse(edges) else None
+        degrees = np.asarray(edges.sum(axis=1)).ravel()
+        covered = np.zeros(len(X), dtype=bool)
+
+        def cover(center):
+            if incoming is not None:
+                neighbors = edges.indices[
+                    edges.indptr[center] : edges.indptr[center + 1]
+                ]
+                newly_covered = neighbors[~covered[neighbors]]
+                covered[newly_covered] = True
+                for vertex in newly_covered:
+                    parents = incoming.indices[
+                        incoming.indptr[vertex] : incoming.indptr[vertex + 1]
+                    ]
+                    degrees[parents] -= 1
+            else:
+                newly_covered = np.flatnonzero(edges[center] & ~covered)
+                covered[newly_covered] = True
+                chunk_size = max(1, 2**20 // len(X))
+                for start in range(0, len(newly_covered), chunk_size):
+                    vertices = newly_covered[start : start + chunk_size]
+                    degrees[:] -= edges[:, vertices].sum(axis=1)
+
+        # A covered vertex decrements its predecessors' degrees only once.
+        for center in np.flatnonzero(is_center):
+            cover(center)
 
         # Perform sample-wise selection of the batch.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
         for b in range(batch_size):
-            # Step (ii) in [1]: Remove incoming edges for covered samples.
-            is_covered = edges[~is_candidate].any(axis=0)
-            edges[:, is_covered] = False
             # Step (i) in [1]: Query the sample with the highest out-degree.
-            utilities[b][is_candidate] = edges[is_candidate].sum(axis=1)
+            utilities[b, is_candidate] = degrees[is_candidate]
             idx = rand_argmax(utilities[b], random_state=self.random_state_)[0]
             is_candidate[idx] = False
             query_indices[b] = idx
+            if b + 1 < batch_size:
+                cover(idx)
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
+
+
+def _radius_graph(distances, radius):
+    """Build adjacency in bounded row chunks, retaining dense
+    graphs cheaply.
+    """
+    blocks = []
+    storage = 0
+    chunk_size = max(1, 2**20 // len(distances))
+    for start in range(0, len(distances), chunk_size):
+        block = csr_matrix(distances[start : start + chunk_size] <= radius)
+        storage += (
+            block.data.nbytes + block.indices.nbytes + block.indptr.nbytes
+        )
+        if 2 * storage >= distances.size:
+            return distances <= radius
+        blocks.append(block)
+    return vstack(blocks, format="csr")

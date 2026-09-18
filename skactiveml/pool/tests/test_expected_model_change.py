@@ -1,5 +1,6 @@
 import numpy as np
 import unittest
+import pickle
 
 from copy import deepcopy
 from scipy.stats import norm
@@ -33,6 +34,33 @@ class TestExpectedModelChangeMaximization(
             init_default_params={},
             query_default_params_reg=query_default_params_reg,
         )
+
+    def test_query_pickles_with_default_or_explicit_feature_map(self):
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        y = np.array([1.5, -1.2, np.nan, np.nan])
+        for feature_map in [None, np.copy]:
+            with self.subTest(feature_map=feature_map):
+                qs = ExpectedModelChangeMaximization(
+                    feature_map=feature_map, random_state=0
+                )
+                pickle.dumps(qs)
+                first = qs.query(
+                    X,
+                    y,
+                    SklearnRegressor(LinearRegression()),
+                    return_utilities=True,
+                )
+                restored = pickle.loads(pickle.dumps(qs))
+                self.assertIs(restored.feature_map, feature_map)
+                for strategy in [qs, restored]:
+                    repeated = strategy.query(
+                        X,
+                        y,
+                        SklearnRegressor(LinearRegression()),
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(first[0], repeated[0])
+                    np.testing.assert_allclose(first[1], repeated[1])
 
     def test_init_param_bootstrap_size(self):
         test_cases = [

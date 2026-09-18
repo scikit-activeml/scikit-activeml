@@ -18,12 +18,12 @@ from skactiveml.utils import (
     MISSING_LABEL,
     check_type,
     check_equal_missing_label,
-    is_labeled,
     simple_batch,
     rand_argmax,
     check_scalar,
     labeled_indices,
 )
+from skactiveml.utils._label import _observed_numerical_labels
 
 from ._target import _resolve_estimator_target_spec
 
@@ -414,11 +414,10 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
     n_samples_per_leaf : numpy.ndarray of shape (n_leafs)
         Number of samples per leaf.
     """
-    is_lbld = is_labeled(y, missing_label=missing_label)
+    is_lbld, y_labeled = _observed_numerical_labels(y, missing_label)
 
     # Compute the variance v_k on labeled samples in leaf k.
     leaf_labeled = reg.apply(X[is_lbld])
-    y_labeled = y[is_lbld]
     v_k = np.zeros(reg.tree_.node_count)
     for leaf in range(len(v_k)):
         y_labeled_leaf = y_labeled[leaf_labeled == leaf]

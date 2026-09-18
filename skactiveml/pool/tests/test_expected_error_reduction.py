@@ -11,8 +11,8 @@ from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
-    _cmp_object_dict,
 )
+from skactiveml.tests.utils import assert_state_unchanged
 from skactiveml.utils import MISSING_LABEL, is_labeled
 
 
@@ -107,10 +107,11 @@ class TemplateTestExpectedErrorReduction(
 
                 qs = self.qs_class(**self.init_default_params)
                 qs.query(**query_params)
-                self.assertTrue(
-                    _cmp_object_dict(
-                        query_params["clf"].__dict__, clf.__dict__
-                    ),
+                assert_state_unchanged(
+                    self,
+                    query_params["clf"],
+                    clf,
+                    name="clf",
                     msg=f"Classifier changed after calling query for "
                     f"`fit_clf={fit_clf}`.",
                 )
@@ -141,6 +142,35 @@ class TemplateTestExpectedErrorReduction(
 
 
 class TestExpectedErrorReduction(unittest.TestCase):
+    def test_query_mean_gamma_parzen_window_classifier(self):
+        X = np.linspace(0, 1, 8).reshape(-1, 1)
+        y = np.full(8, MISSING_LABEL)
+        y[:4] = [0, 1, 0, 1]
+
+        def query(metric_dict):
+            return MonteCarloEER(random_state=0).query(
+                X=X,
+                y=y,
+                clf=ParzenWindowClassifier(
+                    classes=[0, 1], metric_dict=metric_dict
+                ),
+                return_utilities=True,
+            )[1]
+
+        utilities = query({"gamma": "mean"})
+        self.assertTrue(np.all(np.isfinite(utilities[0, 4:])))
+
+        frozen = (
+            ParzenWindowClassifier(
+                classes=[0, 1], metric_dict={"gamma": "mean"}
+            )
+            .fit(X, y)
+            .metric_dict_["gamma"]
+        )
+        self.assertFalse(
+            np.allclose(utilities, query({"gamma": frozen}), equal_nan=True)
+        )
+
     def test__estimate_error_for_candidate(self):
         qs = ExpectedErrorReduction(enforce_mapping=False)
         self.assertRaises(
@@ -448,6 +478,57 @@ class TestExpectedErrorReduction(unittest.TestCase):
 class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
     def setUp(self):
         super().setUp(qs_class=MonteCarloEER)
+
+    def test_explicit_evaluation_with_training_weights(self):
+        X = np.array([[0.0], [1.0], [0.2], [0.8]])
+        y = np.array([0, 1, np.nan, np.nan])
+        X_eval = np.array([[0.3], [0.9]])
+        for method in ["misclassification_loss", "log_loss"]:
+            for subtract_current in [False, True]:
+                for candidates in [None, [2, 3], X[2:]]:
+                    weights_cases = [None, np.ones(2), np.array([1.0, 3.0])]
+                    for weights in weights_cases:
+                        with self.subTest(
+                            method=method,
+                            subtract_current=subtract_current,
+                            candidates=candidates,
+                            weights=weights,
+                        ):
+                            qs = MonteCarloEER(
+                                method=method,
+                                subtract_current=subtract_current,
+                                random_state=0,
+                            )
+                            kwargs = dict(
+                                X=X,
+                                y=y,
+                                clf=ParzenWindowClassifier(classes=[0, 1]),
+                                sample_weight=np.array([2.0, 1.0, 1.0, 1.0]),
+                                candidates=candidates,
+                                return_utilities=True,
+                            )
+                            indices, utilities = qs.query(
+                                **kwargs,
+                                X_eval=X_eval,
+                                sample_weight_eval=weights,
+                            )
+                            repeats = (
+                                np.ones(2, dtype=int)
+                                if weights is None
+                                else weights.astype(int)
+                            )
+                            repeated_eval = np.repeat(X_eval, repeats, axis=0)
+                            expected_indices, expected_utilities = qs.query(
+                                **kwargs,
+                                X_eval=repeated_eval,
+                                sample_weight_eval=np.ones(len(repeated_eval)),
+                            )
+                            np.testing.assert_array_equal(
+                                indices, expected_indices
+                            )
+                            np.testing.assert_allclose(
+                                utilities, expected_utilities
+                            )
 
     def test_init_param_method(self):
         test_cases = [(2, TypeError), ("string", ValueError)]

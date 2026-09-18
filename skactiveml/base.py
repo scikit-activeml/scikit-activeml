@@ -19,12 +19,14 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError, _ExhaustedCandidatePool
+from .utils._label_dtype import _as_label_array, _lossless_decode_dtype
 from .utils._target import (
     _check_target_capability,
     _has_no_class_evidence,
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
+from .utils._validation import _has_nested_classes
 from .utils import (
     MISSING_LABEL,
     is_labeled,
@@ -63,7 +65,7 @@ try:
     from collections.abc import Sequence
     from skorch import NeuralNet
     from skorch.utils import to_numpy
-    from .utils import _check_forward_outputs
+    from .utils._validation import _check_forward_outputs
 
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover
@@ -303,12 +305,15 @@ class PoolQueryStrategy(QueryStrategy):
 
         # Check labels
         y = check_array(
-            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
+            _as_label_array(y),
+            ensure_2d=False,
+            ensure_all_finite="allow-nan",
+            dtype=None,
         )
         check_consistent_length(X, y)
 
         # Check missing_label
-        check_missing_label(self.missing_label, target_type=y.dtype)
+        check_missing_label(self.missing_label, target_type=y.dtype, name="y")
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
@@ -982,7 +987,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        check_array(y, ensure_2d=True, ensure_all_finite="allow-nan")
+        check_array(
+            y, dtype=None, ensure_2d=True, ensure_all_finite="allow-nan"
+        )
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
@@ -1256,6 +1263,12 @@ class BudgetManager(ABC, BaseEstimator):
 class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies.
 
+    Stream query strategies have no `target_type` parameter, because they do
+    not resolve the labels `y` themselves. A strategy consuming a classifier
+    treats it as the target authority and supports single-output
+    classification only. Label-free strategies are task-agnostic and declare
+    the same capabilities as their pool-based counterparts.
+
     Parameters
     ----------
     budget : float
@@ -1268,6 +1281,64 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     def __init__(self, budget, random_state=None):
         super().__init__(random_state=random_state)
         self.budget = budget
+
+    @property
+    def _target_capabilities(self):
+        """Exact target semantics supported by a stream query strategy."""
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def _resolve_clf_target_spec(self, clf, y):
+        """Resolve the target specification `clf` is the authority for.
+
+        Parameters
+        ----------
+        clf : skactiveml.base.SkactivemlClassifier
+            The classifier passed to `query`.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
+                None
+            Labels of the training data set, if any.
+
+        Returns
+        -------
+        target_spec : skactiveml.utils.TargetSpec
+            The resolved target specification.
+
+        Raises
+        ------
+        ValueError
+            If the target specification is outside `_target_capabilities`,
+            or if an unfitted `clf` declares no `classes` and `y` provides
+            no class evidence.
+        """
+        target_spec = getattr(clf, "target_spec_", None)
+        if target_spec is None:
+            classes = clf.classes
+            if y is None:
+                # Only the declared vocabulary is evidence. Its nesting
+                # decides the number of label outputs of the empty labels.
+                n_outputs = (
+                    len(classes)
+                    if classes is not None and _has_nested_classes(classes)
+                    else None
+                )
+                y = np.full(
+                    (0,) if n_outputs is None else (0, n_outputs),
+                    clf.missing_label,
+                )
+            target_spec = resolve_target_spec(
+                y,
+                task="classification",
+                target_type=getattr(clf, "target_type", "auto"),
+                annotation_type="single-annotator",
+                classes=classes,
+                missing_label=clf.missing_label,
+            )
+        _check_target_spec_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
 
     @abstractmethod
     def query(self, candidates, *args, return_utilities=False, **kwargs):
@@ -1508,7 +1579,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         """Initialize resolved class metadata without fitting model state."""
         effective_classes = self.classes if classes is None else classes
         annotation_type = getattr(self, "_annotation_type", "single-annotator")
-        resolution_y = np.asarray(y)
+        resolution_y = _as_label_array(y)
         if annotation_type == "multi-annotator" and resolution_y.ndim == 1:
             resolution_y = resolution_y.reshape(-1, 1)
         target_spec = self._resolve_target_spec(
@@ -1552,19 +1623,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             The dtype of the declared class labels.
         """
         if self.target_spec_.target_type == "multi-label":
-            return np.result_type(*[c.dtype for c in self.classes_])
-        return self.classes_.dtype
+            return _lossless_decode_dtype(self.classes_)
+        return _lossless_decode_dtype([self.classes_])
 
     def _decode_class_labels(self, y_enc):
         """Decode encoded class labels into the declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, e.g., `float64` for integer classes and
-        `missing_label=np.nan`. Encoded predictions never carry
-        `missing_label`, so their decoded labels are narrowed back to the
-        dtype of the declared classes. Without this narrowing, predictions
-        are no longer the labels that were declared and cannot be used
-        where those labels are expected, e.g., as indices.
 
         Parameters
         ----------
@@ -1578,9 +1641,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 (n_samples, n_outputs)
             The decoded class labels in the declared class dtype.
         """
-        return self._le.inverse_transform(y_enc).astype(
-            self._class_label_dtype(), copy=False
-        )
+        return self._le._inverse_transform(y_enc, allow_missing=False)
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -1725,7 +1786,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         )
 
         # Check input parameters.
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         structured_target = (
             target_spec.target_type == "multi-label"
             or target_spec.annotation_type == "multi-annotator"
@@ -1870,9 +1931,43 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
                 (n_samples, n_outputs, 2)
             The class frequency estimates of the test samples `X`. For
             multi-label targets, the final axis follows each output's
-            canonical binary class vocabulary.
+            canonical binary class vocabulary. Implementations must return
+            non-negative frequencies, because `predict_proba` and
+            `sample_proba` reject negative ones.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _check_frequencies(F, name="predict_freq"):
+        """Reject class frequency estimates that are not counts.
+
+        Parameters
+        ----------
+        F : numpy.ndarray
+            Class frequency estimates to validate.
+        name : str, default="predict_freq"
+            Name of the quantity reported in the error message.
+
+        Returns
+        -------
+        F : numpy.ndarray
+            The validated estimates, unchanged.
+
+        Raises
+        ------
+        ValueError
+            If any estimate is negative.
+        """
+        if np.any(np.asarray(F) < 0):
+            raise ValueError(
+                f"`{name}` returned a negative class frequency, the smallest "
+                f"being {np.min(F)}. A frequency counts weighted evidence "
+                "for a class and can therefore never be negative. Check the "
+                "inputs and parameters this estimator derives its "
+                "frequencies from, whose documentation states which of them "
+                "must be non-negative."
+            )
+        return F
 
     def predict_proba(self, X, **kwargs):
         """Return probability estimates for the test data `X`.
@@ -1890,9 +1985,15 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             targets, each entry is the probability of the second class in the
             corresponding canonical binary class vocabulary. An output with
             zero estimated frequencies and zero prior has probability `0.5`.
+
+        Raises
+        ------
+        ValueError
+            If `predict_freq` returns a negative class frequency.
         """
         out = self.predict_freq(X, **kwargs)
         F = out[0] if isinstance(out, tuple) else out
+        self._check_frequencies(F)
         P = F + self.class_prior_
         target_type = getattr(
             getattr(self, "target_spec_", None),
@@ -1901,9 +2002,12 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         if target_type == "multi-label":
             normalizer = np.sum(P, axis=-1)
-            nonzero = normalizer > 0
-            P[nonzero] /= normalizer[nonzero, np.newaxis]
-            P[~nonzero] = 0.5
+            positive = normalizer > 0
+            P[positive] /= normalizer[positive, np.newaxis]
+            # Only a genuinely zero output can remain, because negative
+            # frequencies and priors are both rejected. Masking a negative
+            # one as `0.5` here would hide invalid evidence.
+            P[normalizer == 0] = 0.5
             return P[..., 1]
 
         normalizer = np.sum(P, axis=1)
@@ -1938,12 +2042,13 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Raises
         ------
         ValueError
-            If any class has zero frequency observations after adding the
-            prior. Set a positive `class_prior` to make every Dirichlet
-            parameter positive.
+            If `predict_freq` returns a negative class frequency, or if any
+            class has no frequency observations after adding the prior. Set a
+            positive `class_prior` to make every Dirichlet parameter positive.
         """
         random_state = check_random_state(random_state)
-        alphas = self.predict_freq(X) + self.class_prior_
+        alphas = self._check_frequencies(self.predict_freq(X))
+        alphas = alphas + self.class_prior_
         target_type = getattr(
             getattr(self, "target_spec_", None),
             "target_type",
@@ -1951,36 +2056,65 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         if target_type == "multi-label":
             alphas = np.repeat(alphas[np.newaxis], n_samples, axis=0)
-            if (alphas == 0).any():
+            if (alphas <= 0).any():
                 raise ValueError(
-                    "There are zero frequency observations. "
+                    "There are no frequency observations. "
                     "Set `class_prior > 0` to avoid this error."
                 )
             R = random_state.standard_gamma(alphas)
             R_flat = R.reshape(-1, R.shape[-1])
             is_zero = R_flat.sum(axis=-1) == 0.0
-            sampled_class_indices = random_state.choice(
-                np.array(R.shape[-1]), size=is_zero.sum()
+            alphas_flat = alphas.reshape(-1, alphas.shape[-1])
+            sampled_class_indices = self._sample_dirichlet_vertices(
+                alphas_flat[is_zero], random_state
             )
             R_flat[np.flatnonzero(is_zero), sampled_class_indices] = 1.0
             return R / R.sum(axis=-1, keepdims=True)
 
         alphas = alphas.repeat(repeats=n_samples, axis=0)
-        if (alphas == 0).any():
+        if (alphas <= 0).any():
             raise ValueError(
-                "There are zero frequency observations. "
+                "There are no frequency observations. "
                 "Set `class_prior > 0` to avoid this error."
             )
         R = random_state.standard_gamma(alphas)
         R_sums = R.sum(axis=-1)
         is_zero = (R_sums == 0.0).ravel()
-        sampled_class_indices = random_state.choice(
-            np.array(R.shape[-1]), size=is_zero.sum()
+        sampled_class_indices = self._sample_dirichlet_vertices(
+            alphas[is_zero], random_state
         )
         R[is_zero, sampled_class_indices] = 1.0
         P = R / R.sum(axis=-1, keepdims=True)
         P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
         return P
+
+    @staticmethod
+    def _sample_dirichlet_vertices(alphas, random_state):
+        """Draw one simplex vertex per row with probability given by `alphas`.
+
+        Parameters
+        ----------
+        alphas : numpy.ndarray of shape (n_rows, n_classes)
+            Strictly positive concentration parameters, one row per
+            degenerate Dirichlet sample.
+        random_state : numpy.random.RandomState
+            Random state used to draw one vertex per row.
+
+        Returns
+        -------
+        indices : numpy.ndarray of shape (n_rows,)
+            Index of the vertex drawn for each row.
+        """
+        if len(alphas) == 0:
+            return np.zeros(0, dtype=int)
+        # Scaling the uniform draws by the row total avoids dividing
+        # concentrations that small by each other.
+        cumulative = np.cumsum(alphas, axis=-1)
+        thresholds = (
+            random_state.random_sample(size=(len(alphas), 1))
+            * cumulative[:, -1:]
+        )
+        return np.argmax(cumulative > thresholds, axis=-1)
 
     def _validate_data(
         self,
@@ -2180,7 +2314,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
         else:

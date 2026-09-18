@@ -5,6 +5,7 @@ import numpy as np
 from ...base import BudgetManager
 from ...utils import check_random_state, check_scalar
 from skactiveml.utils import check_classes
+from skactiveml.utils._target import _check_class_vocabulary_structure
 
 
 class EstimatedBudgetZliobaite(BudgetManager):
@@ -211,6 +212,9 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
 
         check_classes(self.classes)
+        # The threshold below divides by the number of classes, so a nested
+        # vocabulary would silently make it the number of label outputs.
+        _check_class_vocabulary_structure("single-output", self.classes)
         return utilities
 
 
