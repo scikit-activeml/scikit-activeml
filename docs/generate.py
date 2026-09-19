@@ -81,22 +81,22 @@ OVERVIEW_HEADINGS = OrderedDict(
     [
         (
             "1-pool-classification",
-            ("\U0001F3CA Pool-based Active Learning", "Classification"),
+            ("Pool-based Active Learning", "Classification"),
         ),
         (
             "2-pool-regression",
-            ("\U0001F3CA Pool-based Active Learning", "Regression"),
+            ("Pool-based Active Learning", "Regression"),
         ),
         (
             "3-pool-multi-annotator",
             (
-                "\U0001F3CA Pool-based Active Learning",
+                "Pool-based Active Learning",
                 "Multi-annotator Learning",
             ),
         ),
         (
             "4-stream",
-            ("\U0001F30A Stream-based Active Learning", "Classification"),
+            ("Stream-based Active Learning", "Classification"),
         ),
     ]
 )

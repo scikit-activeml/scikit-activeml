@@ -20,8 +20,8 @@ labeled next. This page explains how these parts fit together and shows a
 complete, runnable cycle for each supported scenario.
 
 
-🔁 The Active Learning Cycle
-============================
+The Active Learning Cycle
+=========================
 
 The following terms are used throughout the documentation.
 
@@ -78,8 +78,8 @@ fitting an estimator or for querying, as this would leak labels that a real
 application does not have.
 
 
-🏷️ The Label Vector ``y``
-==========================
+The Label Vector ``y``
+======================
 
 ``scikit-activeml`` does not split the data into a labeled and an unlabeled
 set. Instead, ``X`` always contains *all* samples and ``y`` always has one
@@ -147,8 +147,8 @@ All objects taking part in one workflow must agree on the same
 by one object and unlabeled by another.
 
 
-🏊 Pool-based Classification
-============================
+Pool-based Classification
+=========================
 
 In pool-based active learning, ``X`` contains a fixed pool of samples and ``y``
 records which of them have been labeled so far. The example below uses two
@@ -258,16 +258,16 @@ documentation of a strategy for its exact inputs and the shape of its
 utilities.
 
 
-🔀 Workflow Variations
-======================
+Workflow Variations
+===================
 
 The cycle stays the same across prediction tasks, annotator setups, and
 active learning scenarios. The differences are the estimator, the shape and
 meaning of ``y``, and the arguments and return value of ``query()``.
 
 
-📈 Regression
--------------
+Regression
+----------
 
 Regression uses continuous labels and a regression query strategy.
 :class:`~skactiveml.pool.GreedySamplingTarget` selects the samples whose
@@ -296,8 +296,8 @@ This loop leaves the fit to the query strategy, which is why no ``fit_reg``
 argument is passed and ``reg`` is fitted only once at the end for scoring.
 
 
-📑 Multi-label Classification
------------------------------
+Multi-label Classification
+--------------------------
 
 In multi-label classification, every sample carries several binary labels, so
 ``y`` becomes a matrix with one column per label. Declare
@@ -341,8 +341,8 @@ rather than one per label. See
 vocabularies, label shapes, and the complete multi-label capability contract.
 
 
-👥 Multiple Annotators
-----------------------
+Multiple Annotators
+-------------------
 
 If several annotators are available and they do not agree, the sample alone no
 longer determines what a query costs or what it is worth. ``y`` therefore
@@ -395,8 +395,8 @@ The 20 acquired labels cover 10 samples, because each selected sample was
 labeled by both annotators.
 
 
-🌊 Stream-based Active Learning
--------------------------------
+Stream-based Active Learning
+----------------------------
 
 In stream-based active learning, samples arrive one after another and the
 decision whether to acquire a label has to be made immediately, without access
@@ -436,8 +436,8 @@ of 20%. Model-based stream strategies additionally receive the estimator and
 the labels observed so far.
 
 
-⚠️ Common Pitfalls
-===================
+Common Pitfalls
+===============
 
 The following mistakes are easy to make and typically show up as a workflow
 that runs without an error but does not behave as intended.
@@ -483,8 +483,8 @@ that runs without an error but does not behave as intended.
        acquired labels are written into ``y``.
 
 
-🧭 Where to Go Next
-===================
+Where to Go Next
+================
 
 .. list-table::
    :header-rows: 1

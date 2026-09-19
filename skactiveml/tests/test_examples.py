@@ -274,9 +274,8 @@ class TestExamples(unittest.TestCase):
             ("Informativeness", "^"),
         ]:
             with self.subTest(title=title):
-                # `docutils` measures an underline by its display width, so
-                # a title containing an emoji needs more characters than it
-                # has.
+                # Match `docutils`' display-width handling instead of
+                # assuming that every character occupies one column.
                 expected = "".ljust(column_width(title), underline)
                 self.assertIn(f"{title}\n{expected}\n", overview)
 

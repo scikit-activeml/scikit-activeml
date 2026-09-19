@@ -10,8 +10,8 @@ while the active learning scenario and prediction task are reflected by the
 subsections.
 
 
-🏊 Pool-based Active Learning
------------------------------
+Pool-based Active Learning
+--------------------------
 
 In pool-based active learning, a model has access to a large pool of unlabeled
 samples. In each iteration it selects one or several informative samples
@@ -112,8 +112,8 @@ Multi-annotator Learning
      - - Convolutional Neural Network
 
 
-🌊 Stream-based Active Learning
--------------------------------
+Stream-based Active Learning
+----------------------------
 
 In stream-based active learning, samples arrive sequentially as a data stream.
 For each incoming sample, the learner must immediately decide whether to query
