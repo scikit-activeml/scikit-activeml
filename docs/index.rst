@@ -32,7 +32,7 @@
    :start-after: citing_start
    :end-before: citing_end
 
-Indices and tables
+Indices and Tables
 ==================
 
 * :ref:`genindex`

@@ -238,7 +238,7 @@ This superclass inherits from ``sklearn.base.Estimator``. Its optional
 ``random_state`` parameter controls reproducibility, and the abstract ``query``
 method enforces the implementation of the sample-selection logic.
 
-Target semantics and compatibility
+Target Semantics and Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Target data has an explicit public contract. Read the
@@ -264,6 +264,11 @@ label helpers, or multi-annotator components. In particular:
   inputs, override ``_multilabel_custom_vocabulary_params`` and record the
   override in ``skactiveml/pool/tests/test_multilabel_contracts.py``
   instead of skipping the contract.
+
+When adding multi-label support to a pool strategy, update the inventory in
+``skactiveml/pool/tests/test_multilabel_contracts.py`` and the
+:ref:`multilabel-strategy-inventory`. The tests group strategies by their use of
+probabilities; the reference groups them by their use of multi-label data.
 
 Single-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -638,7 +643,7 @@ share the template
 template setup, then adjust the generated tests as needed.
 
 
-Multi-Annotator Pool-based Query Strategies
+Multi-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 All query strategies are stored in
@@ -876,7 +881,7 @@ Returns:
 
 .. _general-advice-7:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
@@ -913,7 +918,7 @@ Returns:
 
 .. _general-advice-8:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Check parameter ``X`` regarding its shape, i.e., use superclass method
@@ -947,7 +952,7 @@ Returns:
 
 .. _general-advice-9:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass through
@@ -986,7 +991,7 @@ Returns:
 
 .. _general-advice-10:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass. If the
@@ -1070,7 +1075,7 @@ Returns:
 
 .. _general-advice-11:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
@@ -1106,7 +1111,7 @@ Returns:
 
 .. _general-advice-12:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Check parameter ``X`` regarding its shape, i.e., use method
@@ -1144,7 +1149,7 @@ Returns:
 |                                   |  regarding ``y``.                 |
 +-----------------------------------+-----------------------------------+
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass. If the

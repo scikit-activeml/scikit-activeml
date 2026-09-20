@@ -6,7 +6,7 @@
     "method" : "Regression based Kullback Leibler Divergence Maximization",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "top-k-batch"],
-    "title" : "Regression based Kullback Leibler Divergence Maximization",
+    "title" : "Regression Based Kullback Leibler Divergence Maximization",
     "refs" : ["elreedy2019novel"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** Regression based Kullback Leibler Divergence Maximization selects those samples that maximize the expected Kullback-Leibler divergence from the new model to the old model, where the new model is the model that results from adding the samples to the training set and the expectation is performed over the model parameters.",

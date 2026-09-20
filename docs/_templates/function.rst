@@ -7,4 +7,4 @@
 .. _sphx_glr_backref_{{fullname}}:
 
 .. minigallery:: {{fullname}}
-   :add-heading:
+   :add-heading: Examples Using ``{{ fullname }}``
