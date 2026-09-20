@@ -10,7 +10,7 @@ from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
 
 from docs.generate import (
-    OVERVIEW_HEADINGS,
+    OVERVIEW_SCENARIOS,
     generate_examples,
     generate_strategy_overview_rst,
     get_skactiveml_methods,
@@ -199,89 +199,125 @@ class TestExamples(unittest.TestCase):
             for strategy, examples in examples_by_strategy.items()
             if any("multi-label" in example["tags"] for example in examples)
         }
-        # The tags are not rendered; they only decide which rows the
-        # `Multi-Label` filter of the strategy overview surfaces. What a user
-        # depends on is therefore that no multi-label capable strategy is
-        # missing from that filter, which is what this comparison states.
-        # Whether every single example of such a strategy is tagged is not
-        # checked, because a class declares its capabilities while an example
-        # describes one configuration of it, e.g.
-        # `UncertaintySampling(method="expected_average_precision")` is not
-        # multi-label capable although its class is.
+        # Each class supporting multi-label targets needs a tagged example.
+        # Individual configurations may be unsupported, such as
+        # `UncertaintySampling(method="expected_average_precision")`.
         self.assertEqual(expected_strategies, tagged_strategies)
 
     @staticmethod
-    def _overview_example(qs_name, method, category):
+    def _overview_example(
+        qs_name, method, category, package="pool", tags=None
+    ):
         return {
             "class": qs_name,
-            "package": "pool",
+            "package": package,
             "method": method,
             "category": category,
-            "tags": ["pool", "classification", "single-annotator"],
+            "tags": (
+                [package.split(".")[0], "classification", "single-annotator"]
+                if tags is None
+                else tags
+            ),
             "refs": [],
         }
 
-    def _generate_overview(self, json_data, sections=()):
-        """Render an overview and return it, with a stub for each section."""
+    def _generate_overview(self, json_data):
+        """Render an overview independently of gallery section headings."""
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         gen_path = path.join(tmp_dir, "generated")
         os.makedirs(gen_path)
-        for section in sections:
-            section_path = path.join(tmp_dir, "examples", section)
-            os.makedirs(section_path)
-            with open(path.join(section_path, "README.rst"), "w") as file:
-                file.write(f"{section}\n")
         generate_strategy_overview_rst(gen_path, json_data)
         with open(path.join(gen_path, "strategy_overview.rst")) as file:
             return file.read()
 
-    def test_strategy_overview_groups_tasks_under_their_scenario(self):
-        # Two sections of one scenario share its heading, and each task and
-        # category is one level below the previous one.
-        sections = list(OVERVIEW_HEADINGS)[:2]
-        scenario, first_task = OVERVIEW_HEADINGS[sections[0]]
-        _, second_task = OVERVIEW_HEADINGS[sections[1]]
+    def test_strategy_overview_has_one_table_per_scenario(self):
+        # Merge tasks and annotator settings while retaining every example
+        # and its original link, including methods that support both tasks.
         json_data = {
-            sections[0]: {
+            "1-pool-classification": {
                 "data": [
                     self._overview_example(
                         "RandomSampling", "Random Sampling", "Baseline"
                     )
                 ]
             },
-            sections[1]: {
+            "2-pool-regression": {
                 "data": [
                     self._overview_example(
-                        "GreedySamplingX", "Greedy Sampling", "Informativeness"
+                        "GreedySamplingX",
+                        "Greedy Sampling",
+                        "Representativeness",
+                        tags=[
+                            "pool",
+                            "classification",
+                            "regression",
+                            "single-annotator",
+                        ],
+                    )
+                ]
+            },
+            "3-pool-multi-annotator": {
+                "data": [
+                    self._overview_example(
+                        "SingleAnnotatorWrapper",
+                        "Random Sampling",
+                        "Baseline",
+                        package="pool.multiannotator",
+                        tags=["pool", "classification", "multi-annotator"],
+                    )
+                ]
+            },
+            "4-stream": {
+                "data": [
+                    self._overview_example(
+                        "StreamRandomSampling",
+                        "Stream Random Sampling",
+                        "Baseline",
+                        package="stream",
                     )
                 ]
             },
         }
 
-        overview = self._generate_overview(json_data, sections)
+        overview = self._generate_overview(json_data)
 
-        self.assertEqual(
-            overview.count(f"{scenario}\n"),
-            1,
-            msg="One scenario heading must cover all of its tasks.",
-        )
-        for title, underline in [
-            (scenario, "-"),
-            (first_task, "~"),
-            (second_task, "~"),
-            ("Baseline", "^"),
-            ("Informativeness", "^"),
-        ]:
+        self.assertEqual(overview.count(".. list-table::"), 2)
+        for title in OVERVIEW_SCENARIOS.values():
             with self.subTest(title=title):
-                # Match `docutils`' display-width handling instead of
-                # assuming that every character occupies one column.
-                expected = "".ljust(column_width(title), underline)
-                self.assertIn(f"{title}\n{expected}\n", overview)
+                self.assertEqual(overview.count(f"{title}\n"), 1)
+                self.assertIn(
+                    f"{title}\n{'-' * column_width(title)}\n", overview
+                )
+        pool_table, stream_table = overview.split(
+            OVERVIEW_SCENARIOS["pool"] + "\n", 1
+        )[1].split(OVERVIEW_SCENARIOS["stream"] + "\n", 1)
+        self.assertEqual(pool_table.count(".. list-table::"), 1)
+        self.assertEqual(stream_table.count(".. list-table::"), 1)
+        self.assertEqual(
+            pool_table.count("</generated/sphinx_gallery_examples/"), 3
+        )
+        self.assertEqual(
+            stream_table.count("</generated/sphinx_gallery_examples/"), 1
+        )
+        self.assertIn(
+            "3-pool-multi-annotator/plot-SingleAnnotatorWrapper-", pool_table
+        )
+        self.assertLess(
+            pool_table.index(":doc:`Greedy Sampling"),
+            pool_table.index(":doc:`Random Sampling"),
+        )
+        self.assertIn("| Classification, Regression", pool_table)
+        self.assertIn("| Multiple annotators", pool_table)
+        self.assertIn("| **Representativeness**", pool_table)
+        self.assertIn("API class", pool_table)
+        self.assertNotIn("Base Class", overview)
+        self.assertNotIn("\nClassification\n", overview)
+        self.assertNotIn("\nRegression\n", overview)
+        self.assertNotIn("\nBaseline\n", overview)
 
-    def test_strategy_overview_keeps_a_section_without_a_heading_path(self):
-        # A gallery section that nobody added to `OVERVIEW_HEADINGS` keeps
-        # its own title instead of silently losing its strategies.
+    def test_strategy_overview_keeps_methods_from_new_gallery_sections(self):
+        # A new gallery section needs no overview heading configuration.
         json_data = {
             "9-unmapped": {
                 "data": [
@@ -292,18 +328,17 @@ class TestExamples(unittest.TestCase):
             }
         }
 
-        with self.assertWarnsRegex(UserWarning, "OVERVIEW_HEADINGS"):
-            overview = self._generate_overview(json_data, ["9-unmapped"])
+        overview = self._generate_overview(json_data)
 
-        self.assertIn("9-unmapped\n", overview)
-        self.assertIn("RandomSampling", overview)
+        self.assertIn("Pool-based Active Learning\n", overview)
+        self.assertEqual(overview.count(".. list-table::"), 1)
+        self.assertIn(
+            "9-unmapped/plot-RandomSampling-Random_Sampling", overview
+        )
+        self.assertNotIn("\n9-unmapped\n", overview)
 
     def test_strategy_overview_offers_a_filter_per_tag(self):
-        # The tags themselves are never rendered; a strategy reaches a user
-        # only through these checkboxes, so every tag a row can carry needs
-        # one. The rows are real, because a filter over nothing filters
-        # nothing.
-        section = next(iter(OVERVIEW_HEADINGS))
+        section = "1-pool-classification"
         json_data = {
             section: {
                 "data": [
@@ -314,7 +349,7 @@ class TestExamples(unittest.TestCase):
             }
         }
 
-        overview = self._generate_overview(json_data, [section])
+        overview = self._generate_overview(json_data)
 
         for tag in [
             "classification",
@@ -327,7 +362,7 @@ class TestExamples(unittest.TestCase):
         ]:
             with self.subTest(tag=tag):
                 self.assertIn(f'value="{tag}"', overview)
-        self.assertIn("<label>Multi-Label</label>", overview)
+        self.assertIn("<span>Multi-label</span>", overview)
         # The filter reads the tags of a rendered row, so the row has to
         # carry them where the filter looks.
         self.assertIn("RandomSampling", overview)

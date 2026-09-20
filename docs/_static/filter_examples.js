@@ -1,9 +1,15 @@
 $(document).ready(function () {
+    var $filters = $('#strategy-filters');
+    if ($filters.length === 0) {
+        return;
+    }
+
     // Only apply filtering to tables that are NOT marked "no-tag-filter"
     var $tables = $('.table').not('.no-tag-filter');
 
     var $filterableRows = $tables.find('tbody>tr'),
-        $inputs = $('.input-tag');
+        $inputs = $filters.find('.input-tag'),
+        $status = $('#tag-filter-status');
 
     $tables.find('tr').each(function () {
         $(this).find('td').eq(2).hide();
@@ -13,47 +19,39 @@ $(document).ready(function () {
         $(this).find('col').eq(2).hide();
     });
 
-    $inputs.on('input', function () {
-        var selectedtags = [];
+    function updateFilters() {
+        var selectedTags = [];
         $inputs.each(function () {
             if (this.checked) {
-                selectedtags.push(this.value);
+                selectedTags.push(this.value);
             }
         });
 
         var $matched = $filterableRows.hide().filter(function () {
-            return $(this).find('td').eq(2).filter(function () {
-                var tdText = $(this).text().toLowerCase();
-                var matches = 0;
-                selectedtags.forEach(function (item) {
-                    if (tdText.indexOf(item) != -1) {
-                        matches += 1;
-                    }
-                });
-                return matches == selectedtags.length;
-            }).length == 1;
+            var tags = $(this).find('td').eq(2).text().toLowerCase().split(/\s+/);
+            return selectedTags.every(function (tag) {
+                return tags.indexOf(tag) !== -1;
+            });
         }).show();
 
-        // A strategy has to carry every selected tag, so combining tags that
-        // no strategy has in common empties the tables. Say so, because an
-        // empty page otherwise looks like a broken filter.
+        // Explain empty results when no strategy matches all selected properties.
         var count = $matched.length;
-        var $status = $('#tag-filter-status');
-        if (selectedtags.length === 0) {
-            $status.text('');
-            return;
-        }
+        var summary = 'Showing ' + count + ' of ' + $filterableRows.length
+            + ' strategies.';
         if (count === 0) {
             $status.text(
-                'No strategy has all of these properties: '
-                + selectedtags.join(', ')
-                + '. Try selecting fewer of them.'
+                summary + ' No strategy has all of these properties. '
+                + 'Try selecting fewer properties or clear all filters.'
             );
         } else {
-            $status.text(
-                count + (count === 1 ? ' strategy matches ' : ' strategies match ')
-                + selectedtags.join(' + ') + '.'
-            );
+            $status.text(summary);
         }
+    }
+
+    $inputs.on('change', updateFilters);
+    $('#clear-strategy-filters').on('click', function () {
+        $inputs.prop('checked', false);
+        updateFilters();
     });
+    updateFilters();
 });

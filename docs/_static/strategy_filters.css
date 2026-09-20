@@ -1,0 +1,158 @@
+.strategy-table {
+    width: 100%;
+    min-width: 45rem;
+    table-layout: fixed;
+}
+
+.strategy-table td {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.strategy-table .line-block {
+    margin: 0;
+}
+
+.strategy-filters {
+    margin: 1.5rem 0 2rem;
+    padding: 1.25rem 1.5rem 0;
+    border: 1px solid var(--pst-color-border);
+    border-radius: 0.625rem;
+    background: var(--pst-color-surface);
+}
+
+.strategy-filter-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+
+.strategy-filters .strategy-filter-title {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.strategy-filter-clear {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--pst-color-text-base);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.strategy-filter-clear:hover {
+    border-color: var(--pst-color-primary);
+    background: var(--pst-color-primary-bg);
+}
+
+.strategy-filters .strategy-filter-hint {
+    margin: 0.125rem 0 1.375rem;
+    color: var(--pst-color-text-muted);
+    font-size: inherit;
+}
+
+.strategy-filter-group {
+    min-width: 0;
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+}
+
+.strategy-filter-group legend {
+    float: left;
+    width: 8.75rem;
+    margin: 0;
+    padding: 0.625rem 1rem 0 0;
+    color: var(--pst-color-text-muted);
+    font-size: inherit;
+    font-weight: 600;
+}
+
+.strategy-filter-options {
+    /* Override the theme's clearing of the element after a legend. */
+    clear: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    margin-left: 8.75rem;
+}
+
+.strategy-filter-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 44px;
+    margin: 0;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--pst-color-text-muted);
+    border-radius: 0.4375rem;
+    background: var(--pst-color-background);
+    color: var(--pst-color-text-base);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.strategy-filter-option:hover {
+    border-color: var(--pst-color-primary);
+}
+
+.strategy-filter-option:has(input:checked) {
+    border-color: var(--pst-color-primary);
+    background: var(--pst-color-primary-bg);
+    box-shadow: inset 0 0 0 1px var(--pst-color-primary);
+}
+
+.strategy-filter-option input {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    accent-color: var(--pst-color-primary);
+    cursor: pointer;
+}
+
+.strategy-filter-clear:focus-visible,
+.strategy-filter-option:has(input:focus-visible) {
+    outline: 3px solid var(--pst-color-primary);
+    outline-offset: 3px;
+}
+
+.strategy-filters .strategy-filter-status {
+    margin: 1.375rem 0 0;
+    padding: 0.875rem 0;
+    border-top: 1px solid var(--pst-color-border);
+    color: var(--pst-color-text-muted);
+    font-size: inherit;
+}
+
+@media (max-width: 600px) {
+    .strategy-filters {
+        padding: 1rem 1rem 0;
+    }
+
+    .strategy-filter-group legend {
+        float: none;
+        width: auto;
+        margin-bottom: 0.5rem;
+        padding: 0;
+    }
+
+    .strategy-filter-options {
+        margin-left: 0;
+    }
+}
+
+@media (forced-colors: active) {
+    .strategy-filter-option:has(input:checked) {
+        outline: 2px solid Highlight;
+    }
+}

@@ -72,32 +72,12 @@ def get_skactiveml_methods():
     return methods_by_class
 
 
-# Heading path of each gallery section in the strategy overview, as
-# `(scenario, task)`. The wording matches `docs/tutorials.rst` verbatim, so
-# that both pages name the same things the same way. `sphinx-gallery` cannot
-# nest its sections, which is why the overview describes the hierarchy here
-# instead of reading it from the gallery directories.
-OVERVIEW_HEADINGS = OrderedDict(
+# Group strategies by their API scenario, independently of the example's
+# gallery directory or demonstrated prediction task.
+OVERVIEW_SCENARIOS = OrderedDict(
     [
-        (
-            "1-pool-classification",
-            ("Pool-based Active Learning", "Classification"),
-        ),
-        (
-            "2-pool-regression",
-            ("Pool-based Active Learning", "Regression"),
-        ),
-        (
-            "3-pool-multi-annotator",
-            (
-                "Pool-based Active Learning",
-                "Multi-annotator Learning",
-            ),
-        ),
-        (
-            "4-stream",
-            ("Stream-based Active Learning", "Classification"),
-        ),
+        ("pool", "Pool-based Active Learning"),
+        ("stream", "Stream-based Active Learning"),
     ]
 )
 
@@ -291,14 +271,14 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
         file.write(
             f"This is an overview of all implemented pool- and stream-based "
-            f"active learning strategies, which are often divided into three"
+            f"active learning strategies, which are often divided into three "
             f"main categories based on the utilities they compute for sample "
             "selection:\n\n"
             "1. **Informativeness-based** strategies mostly select samples "
             "for which the model is most uncertain (e.g., via "
             "information-theoretic measures).\n\n"
             "2. **Representativeness-based** strategies select samples that "
-            "capture the overall data distribution (e.g., via clustering or"
+            "capture the overall data distribution (e.g., via clustering or "
             "density estimation).\n\n"
             "3. **Hybrid** strategies combine both criteria to select "
             "samples that are informative and representative.\n\n"
@@ -313,83 +293,86 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "batch of samples by either including the samples with "
             "the **top-k** utilities or by including **diverse** samples "
             "with high utility scores.\n\n"
-            "You can use the checkboxes below to filter the query strategies "
-            "based on these distinctions.\n"
+            "Use the filters below to find query strategies "
+            "based on these distinctions. The tables group methods by "
+            "pool-based and stream-based scenarios and list their "
+            "properties alongside each method. Method names link to "
+            "visualizations; API class names link to the implementation "
+            "documentation.\n"
         )
         file.write("\n")
         file.write(
             ".. raw:: html\n"
             "\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="regression">\n'
-            "   <label>Regression</label>\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="classification">\n '
-            "   <label>Classification</label>\n\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="multi-label">\n '
-            "   <label>Multi-Label</label>\n\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="top-k-batch">\n '
-            "   <label>Top-k-Batch</label>\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="diverse-batch">\n '
-            "   <label>Diverse-Batch</label>\n\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="single-annotator">\n '
-            "   <label>Single-Annotator</label>\n"
-            '   <input type="checkbox" class="input-tag" '
-            'value="multi-annotator">\n '
-            "   <label>Multi-Annotator</label>\n\n"
-            '   <p id="tag-filter-status"></p>\n'
+            '   <section id="strategy-filters" class="strategy-filters" '
+            'aria-labelledby="strategy-filter-title" '
+            'aria-describedby="strategy-filter-hint">\n'
+            '     <div class="strategy-filter-header">\n'
+            '       <h2 id="strategy-filter-title" '
+            'class="strategy-filter-title">Filter Strategies</h2>\n'
+            '       <button type="button" id="clear-strategy-filters" '
+            'class="strategy-filter-clear">Clear all</button>\n'
+            "     </div>\n"
+            '     <p id="strategy-filter-hint" '
+            'class="strategy-filter-hint">Show strategies that match '
+            "every selected property.</p>\n"
+        )
+        filter_groups = [
+            (
+                "Task",
+                [
+                    ("classification", "Classification"),
+                    ("regression", "Regression"),
+                ],
+            ),
+            ("Targets", [("multi-label", "Multi-label")]),
+            (
+                "Batch Selection",
+                [("top-k-batch", "Top-k"), ("diverse-batch", "Diverse")],
+            ),
+            (
+                "Annotators",
+                [
+                    ("single-annotator", "Single annotator"),
+                    ("multi-annotator", "Multiple annotators"),
+                ],
+            ),
+        ]
+        for group_name, options in filter_groups:
+            file.write(
+                '     <fieldset class="strategy-filter-group">\n'
+                f"       <legend>{group_name}</legend>\n"
+                '       <div class="strategy-filter-options">\n'
+            )
+            for value, label in options:
+                file.write(
+                    '         <label class="strategy-filter-option" '
+                    f'for="strategy-filter-{value}">\n'
+                    '           <input type="checkbox" class="input-tag" '
+                    f'id="strategy-filter-{value}" value="{value}">\n'
+                    f"           <span>{label}</span>\n"
+                    "         </label>\n"
+                )
+            file.write("       </div>\n     </fieldset>\n")
+        file.write(
+            '     <p id="tag-filter-status" class="strategy-filter-status" '
+            'role="status" aria-atomic="true"></p>\n'
+            "   </section>\n"
         )
         file.write("\n")
 
-        # Iterate over the sections, ordered by their heading path so that
-        # one scenario heading covers all of its tasks.
-        known = [s for s in OVERVIEW_HEADINGS if s in strategy_table]
-        unknown = sorted(
-            s
-            for s in strategy_table
-            if len(s) > 0 and s not in OVERVIEW_HEADINGS
-        )
-        for section_name in unknown:
-            warnings.warn(
-                f'The gallery section "{section_name}" has no entry in '
-                f"`OVERVIEW_HEADINGS`, so it is described by its own "
-                f"`README.rst` instead of the shared heading vocabulary."
+        for scenario, table in strategy_table.items():
+            title = OVERVIEW_SCENARIOS[scenario]
+            file.write(f"{title}\n")
+            file.write("-" * column_width(title) + "\n\n")
+            file.write(
+                table_data_to_rst_table(
+                    table,
+                    widths="36 23 1 25 15",
+                    header_lines=1,
+                    classes="strategy-table",
+                )
             )
-
-        current_scenario = None
-        for section_name in known + unknown:
-            # The examples root is not a section of its own.
-            if len(section_name) == 0:
-                continue
-            cats = strategy_table[section_name]
-            if section_name in OVERVIEW_HEADINGS:
-                scenario, task = OVERVIEW_HEADINGS[section_name]
-            else:
-                with open(
-                    os.path.join(
-                        os.path.dirname(gen_path),
-                        f"examples/{section_name}/README.rst",
-                    ),
-                    "r",
-                ) as f:
-                    scenario, task = f.readline().strip(), None
-
-            if scenario != current_scenario:
-                file.write(f"{scenario}\n")
-                file.write("".ljust(column_width(scenario), "-") + "\n")
-                file.write("\n")
-                current_scenario = scenario
-            if task is not None:
-                file.write(f"{task}\n")
-                file.write("".ljust(column_width(task), "~") + "\n")
-                file.write("\n")
-
-            # Iterate over the examples.
-            file.write(format_sections(cats, underline="^"))
             file.write("\n")
 
         file.write("References\n")
@@ -399,24 +382,29 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
 
 def json_data_to_strategy_table(json_data, gen_path):
-    strategy_table = {}
-    head_line = ["Method", "Base Class", "Tags", "Reference"]
+    """Collect one table per scenario while preserving example links."""
+    rows_by_scenario = {scenario: [] for scenario in OVERVIEW_SCENARIOS}
+    # Keep the machine-readable tags in the third column for the filters.
+    head_line = ["Method", "API class", "Tags", "Properties", "Reference"]
     rel_api_path = os.path.join(os.path.basename(gen_path), "api").replace(
         "\\", "/"
     )
 
     for section_name, section_items in json_data.items():
-        table = np.ndarray(shape=(0, 5))
         for data in section_items["data"]:
-
             # Collect the data needed to generate the strategy overview.
             qs_name = data["class"]
             method = data["method"]
+            # Match the page title's capitalization without changing its URL.
+            title = data.get("title", method)
+            method_label = (
+                title if title.casefold() == method.casefold() else method
+            )
             package = skactiveml
             for subpackage in data["package"].split("."):
                 package = getattr(package, subpackage)
             methods_text = (
-                f":doc:`{method} </generated/sphinx_gallery_examples/"
+                f":doc:`{method_label} </generated/sphinx_gallery_examples/"
                 f"{section_name}/plot-{qs_name}-"
                 f'{method.replace(" ", "_")}>`'
             )
@@ -435,53 +423,48 @@ def json_data_to_strategy_table(json_data, gen_path):
                 else "Others"
             )
 
-            table = np.append(
-                table,
-                [[methods_text, strategy_text, tags, ref_text, category]],
-                axis=0,
+            properties = [f"**{category}**"]
+            for labels in [
+                {
+                    "classification": "Classification",
+                    "regression": "Regression",
+                },
+                {"multi-label": "Multi-label"},
+                {
+                    "single-annotator": "Single annotator",
+                    "multi-annotator": "Multiple annotators",
+                },
+            ]:
+                values = [
+                    label
+                    for tag, label in labels.items()
+                    if tag in data["tags"]
+                ]
+                if values:
+                    properties.append(", ".join(values))
+            properties_text = "\n".join(f"| {value}" for value in properties)
+            scenario = data["package"].split(".")[0]
+            rows_by_scenario[scenario].append(
+                [methods_text, strategy_text, tags, properties_text, ref_text]
             )
 
-        # Sort the table alphabetically.
-        table = sorted(table, key=lambda row: row[1])
-
-        # Build the strategy table.
-        strategy_table[section_name] = {}
-        for i, row in enumerate(table):
-            category = row[-1]
-            if category not in strategy_table[section_name].keys():
-                strategy_table[section_name][category] = np.array([head_line])
-            strategy_table[section_name][category] = np.append(
-                strategy_table[section_name][category], [row[:-1]], axis=0
-            )
-
-    return strategy_table
-
-
-def format_sections(cats, indent=0, underline="~"):
-    string = ""
-
-    # Iterate over the categories in the current paper.
-    for cat in sorted(cats):
-        if cat != "Others":
-            string += f"{cat}\n"
-            string += "".ljust(column_width(cat), underline) + "\n"
-            string += table_data_to_rst_table(
-                cats[cat], header_lines=1, indent=indent
-            )
-    if "Others" in cats.keys():
-        # 'Others' is the fallback, if no category is specified
-        # in the json file
-        string += "Others\n"
-        string += "".ljust(column_width("Others"), underline) + "\n"
-        string += table_data_to_rst_table(
-            cats["Others"], header_lines=1, indent=indent
+    # Sort by the displayed method, then the API class for duplicate names.
+    return {
+        scenario: [head_line]
+        + sorted(
+            rows,
+            key=lambda row: (
+                row[0].split(" <", 1)[0].casefold(),
+                row[1].casefold(),
+            ),
         )
-
-    return string
+        for scenario, rows in rows_by_scenario.items()
+        if rows
+    }
 
 
 def table_data_to_rst_table(
-    a, caption="", widths=None, header_lines=0, indent=0
+    a, caption="", widths=None, header_lines=0, indent=0, classes=None
 ):
     """Generates a rst-table and returns it as a string.
 
@@ -498,6 +481,8 @@ def table_data_to_rst_table(
         The number of rows to use in the table header.
     indent : int, optional (default=0)
         Number of spaces as indent in each line.
+    classes : str or None, default=None
+        Space-separated CSS classes for the table.
 
     Returns
     -------
@@ -509,6 +494,8 @@ def table_data_to_rst_table(
         f"{indents}.. list-table:: {caption}\n"
         f"{indents}   :header-rows: {header_lines}\n"
     )
+    if classes is not None:
+        table += f"{indents}   :class: {classes}\n"
     if widths is None:
         table += "\n"
     elif widths == "auto":
@@ -518,7 +505,8 @@ def table_data_to_rst_table(
     for row in a:
         table += f"{indents}   *"
         for column in row:
-            table += " - " + str(column) + f"\n{indents}    "
+            content = str(column).replace("\n", f"\n{indents}       ")
+            table += " - " + content + f"\n{indents}    "
         table = table[0 : -4 - indent]
     return table + "\n"
 

@@ -208,6 +208,8 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
+html_css_files = ["strategy_filters.css"]
+
 html_js_files = [
     "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js",
     "filter_examples.js",
@@ -321,3 +323,15 @@ generate_switcher(
 
 html_baseurl = f'https://scikit-activeml.github.io/{version}/'
 sitemap_url_scheme = "{link}"
+
+
+def capitalize_gallery_page_title(app, docname, source):
+    """Apply the heading style to Sphinx-Gallery's generated timing pages."""
+    if docname.rsplit("/", 1)[-1] == "sg_execution_times":
+        source[0] = source[0].replace(
+            "\nComputation times\n", "\nComputation Times\n", 1
+        )
+
+
+def setup(app):
+    app.connect("source-read", capitalize_gallery_page_title)
