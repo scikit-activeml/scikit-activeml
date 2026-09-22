@@ -7,6 +7,81 @@ from skactiveml.utils import ext_confusion_matrix
 
 
 class TestMultiAnnot(unittest.TestCase):
+    def test_ext_confusion_matrix_preserves_large_integer_labels(self):
+        expected = np.array(
+            [[[0, 1], [0, 0]], [[1, 0], [1, 0]], [[0, 0], [0, 0]]]
+        )
+        for labels in (
+            [2**53, 2**53 + 1],
+            [-(2**53) - 1, -(2**53)],
+            [2**63 - 2, 2**63 - 1],
+            [2**64 - 2, 2**64 - 1],
+        ):
+            for missing_label in (np.nan, None, -1):
+                predictions = [
+                    [labels[1], labels[0], missing_label],
+                    [missing_label, labels[0], missing_label],
+                ]
+                for container in (list, tuple, "object"):
+                    if container == "object":
+                        y_true = np.array(labels, dtype=object)
+                        y_pred = np.array(predictions, dtype=object)
+                    else:
+                        y_true = container(labels)
+                        y_pred = container(predictions)
+                    for classes in (None, labels, labels[::-1]):
+                        with self.subTest(
+                            labels=labels,
+                            missing_label=missing_label,
+                            container=container,
+                            classes=classes,
+                        ):
+                            actual = ext_confusion_matrix(
+                                y_true,
+                                y_pred,
+                                classes=classes,
+                                missing_label=missing_label,
+                            )
+                            np.testing.assert_array_equal(
+                                actual,
+                                (
+                                    expected[:, ::-1, ::-1]
+                                    if classes == labels[::-1]
+                                    else expected
+                                ),
+                            )
+
+    def test_ext_confusion_matrix_preserves_mixed_numeric_array_dtypes(self):
+        cases = [
+            (
+                np.array([2**63 - 1, 0], dtype=np.int64),
+                np.array([2**63, 0], dtype=np.uint64),
+                [0, 2**63 - 1, 2**63],
+                [[[1, 0, 0], [0, 0, 1], [0, 0, 0]]],
+            ),
+            (
+                np.array([2**53 + 1, 0], dtype=np.int64),
+                np.array([0.0, 0.0]),
+                [0, 2**53 + 1],
+                [[[1, 0], [1, 0]]],
+            ),
+            (
+                np.array([2**53, 2**53 + 1], dtype=np.int64),
+                np.array([np.nan, np.nan]),
+                [2**53, 2**53 + 1],
+                [[[0, 0], [0, 0]]],
+            ),
+        ]
+        for y_true, y_pred, labels, expected in cases:
+            for classes in (None, labels):
+                with self.subTest(
+                    y_true=y_true, y_pred=y_pred, classes=classes
+                ):
+                    actual = ext_confusion_matrix(
+                        y_true, y_pred, classes=classes
+                    )
+                    np.testing.assert_array_equal(actual, expected)
+
     def test_ext_confusion_matrix_preserves_requested_class_order(self):
         actual = ext_confusion_matrix([0, 0, 1], [0, 1, 1], classes=[1, 0])
 
@@ -66,6 +141,20 @@ class TestMultiAnnot(unittest.TestCase):
         )
 
     def test_ext_confusion_matrix(self):
+        for y_true, y_pred in (
+            ([0, 1], ["0", "1"]),
+            (["0", "1"], [0, 1]),
+            ([0, 1], [[0, "0"], [1, "1"]]),
+            ([0, "1"], [0, 1]),
+        ):
+            with self.subTest(y_true=y_true, y_pred=y_pred):
+                self.assertRaises(
+                    TypeError,
+                    ext_confusion_matrix,
+                    y_true=y_true,
+                    y_pred=y_pred,
+                    missing_label=None,
+                )
         y_true = ["4", "7", None]
         y_pred = ["3", None, "8"]
         self.assertRaises(
