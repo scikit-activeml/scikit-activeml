@@ -180,6 +180,91 @@ class TestRegressionTreeBasedAL(
         ]
         super().test_query_param_reg(test_cases=test_cases)
 
+    def test_query_param_candidates(self, test_cases=None):
+        super().test_query_param_candidates(test_cases=test_cases)
+        X = np.array([0, 1, 10, 11, 2, 2, 12, 13]).reshape(-1, 1)
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(
+                max_depth=1, min_samples_leaf=2, random_state=0
+            )
+        )
+        for targets in [[0, 1, 10, 11], [0, 0, 10, 10], [0, 100, 200, 201]]:
+            y = np.array(targets + [MISSING_LABEL] * 4)
+            for method in ["random", "diversity", "representativity"]:
+                for candidates, eligible in [
+                    (None, np.arange(4, 8)),
+                    ([4, 5], np.array([4, 5])),
+                    ([6, 7], np.array([6, 7])),
+                    ([4, 6, 7], np.array([4, 6, 7])),
+                    (X[[4, 5]], np.arange(2)),
+                    (np.array([[-2], [-1], [14]]), np.arange(3)),
+                    (np.array([[-2], [-2], [-2]]), np.arange(3)),
+                ]:
+                    for batch_size in sorted({1, 2, len(eligible)}):
+                        with self.subTest(
+                            targets=targets,
+                            method=method,
+                            candidates=candidates,
+                            batch_size=batch_size,
+                        ):
+                            qs = self.qs_class(method=method, random_state=0)
+                            indices, utilities = qs.query(
+                                X,
+                                y,
+                                reg,
+                                candidates=candidates,
+                                batch_size=batch_size,
+                                return_utilities=True,
+                            )
+                            self.assertIsInstance(indices, np.ndarray)
+                            self.assertEqual(indices.shape, (batch_size,))
+                            self.assertTrue(
+                                np.issubdtype(indices.dtype, np.integer)
+                            )
+                            self.assertEqual(
+                                len(np.unique(indices)), batch_size
+                            )
+                            self.assertTrue(np.isin(indices, eligible).all())
+                            n_utilities = (
+                                len(X)
+                                if candidates is None
+                                or np.ndim(candidates) == 1
+                                else len(candidates)
+                            )
+                            self.assertEqual(
+                                utilities.shape, (batch_size, n_utilities)
+                            )
+                            selected = utilities[
+                                np.arange(batch_size), indices
+                            ]
+                            self.assertTrue(np.isfinite(selected).all())
+                            np.testing.assert_array_equal(
+                                selected, np.nanmax(utilities, axis=1)
+                            )
+                            for i in range(batch_size):
+                                self.assertTrue(
+                                    np.isnan(utilities[i, indices[:i]]).all()
+                                )
+                            np.testing.assert_array_equal(
+                                indices,
+                                qs.query(
+                                    X,
+                                    y,
+                                    reg,
+                                    candidates=candidates,
+                                    batch_size=batch_size,
+                                ),
+                            )
+
+                indices = self.qs_class(method=method, random_state=0).query(
+                    X[:4],
+                    y[:4],
+                    reg,
+                    candidates=np.array([[-2], [-1], [14]]),
+                    batch_size=3,
+                )
+                np.testing.assert_array_equal(np.sort(indices), [0, 1, 2])
+
     def test__calc_acquisitions_per_leaf(self):
         reg = SklearnRegressor(_DummyRegressor())
         X = np.array([0, 2, 10, 12, 20, 22, 1, 11, 21]).reshape(-1, 1)
@@ -188,6 +273,33 @@ class TestRegressionTreeBasedAL(
             _calc_acquisitions_per_leaf(X, y, reg, MISSING_LABEL),
             np.full(3, 1 / 3),
         )
+
+        for targets, candidates, batch_size, expected in [
+            ([0, 2, 10, 12, 20, 22], [[1], [1]], 2, [2, 0, 0]),
+            ([0, 0, 10, 10, 20, 20], [[1], [1]], 2, [2, 0, 0]),
+            (
+                [0, 100, 10, 12, 20, 22],
+                [[1], [11], [21], [21]],
+                3,
+                [1, 2 / (1 + np.sqrt(2)), 2 * np.sqrt(2) / (1 + np.sqrt(2))],
+            ),
+            (
+                [0, 100, 10, 10, 20, 20],
+                [[1], [11], [21], [21]],
+                3,
+                [1, 1, 1],
+            ),
+        ]:
+            with self.subTest(targets=targets, candidates=candidates):
+                actual = _calc_acquisitions_per_leaf(
+                    X,
+                    np.array(targets + [MISSING_LABEL] * 3),
+                    reg,
+                    MISSING_LABEL,
+                    batch_size=batch_size,
+                    X_cand=np.array(candidates),
+                )
+                np.testing.assert_allclose(actual, expected)
 
     def test__discretize_acquisitions_per_leaf(self):
         n_k = np.array([2.5, 4.0, 3.9, 7.3, 9.6])

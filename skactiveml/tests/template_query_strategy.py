@@ -1311,7 +1311,10 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 query_params["return_utilities"] = True
                 query_ids, utils = qs.query(**query_params)
 
-                self.assertEqual(len(query_ids), batch_size)
+                self.assertIsInstance(query_ids, np.ndarray)
+                self.assertEqual(query_ids.shape, (batch_size,))
+                self.assertTrue(np.issubdtype(query_ids.dtype, np.integer))
+                self.assertEqual(len(np.unique(query_ids)), batch_size)
                 self.assertEqual(len(utils), batch_size)
                 self.assertEqual(len(utils[0]), len(query_params["X"]))
                 n_labeled = sum(is_labeled(query_params["y"], missing_label))
@@ -1324,7 +1327,10 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
                     ids, utilities = qs.query(**query_params)
-                    self.assertEqual(len(ids), max_batch_size)
+                    self.assertIsInstance(ids, np.ndarray)
+                    self.assertEqual(ids.shape, (max_batch_size,))
+                    self.assertTrue(np.issubdtype(ids.dtype, np.integer))
+                    self.assertEqual(len(np.unique(ids)), max_batch_size)
 
     def test_query_multilabel_batch_variation(self):
         if self.query_default_params_clf_multilabel is None:
