@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 from sklearn.datasets import load_breast_cancer
-from sklearn.mixture import BayesianGaussianMixture
+from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import (
@@ -111,3 +111,119 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
 
         self.assertIn(query_indices[0], range(1, len(X)))
         self.assertTrue(np.isfinite(utilities[0, 1:]).all())
+
+    def test_query_equal_density(self):
+        for X in (
+            np.ones((4, 1)),
+            np.array([[-1.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [1.0, 1.0]]),
+        ):
+            y = np.full(len(X), np.nan)
+            clf = MixtureModelClassifier(
+                mixture_model=GaussianMixture(n_components=1, random_state=0),
+                classes=[0, 1],
+            ).fit(X, y)
+            for lmbda in (None, 0, 0.2, 1):
+                for candidates in (None, [3, 1, 2], X[[3, 1, 2]]):
+                    with self.subTest(X=X, lmbda=lmbda, candidates=candidates):
+                        batch_size = (
+                            len(X) if candidates is None else len(candidates)
+                        )
+                        qs = FourDs(lmbda=lmbda, random_state=0)
+                        with np.errstate(divide="raise", invalid="raise"):
+                            indices, utilities = qs.query(
+                                X,
+                                y,
+                                clf,
+                                fit_clf=False,
+                                candidates=candidates,
+                                batch_size=batch_size,
+                                return_utilities=True,
+                            )
+                        self.assertEqual(indices.shape, (batch_size,))
+                        self.assertEqual(len(np.unique(indices)), batch_size)
+                        eligible = np.ones(utilities.shape[1], dtype=bool)
+                        if isinstance(candidates, list):
+                            eligible[:] = False
+                            eligible[candidates] = True
+                        for index, row in zip(indices, utilities):
+                            self.assertTrue(eligible[index])
+                            self.assertTrue(np.isfinite(row[eligible]).all())
+                            self.assertTrue(np.isnan(row[~eligible]).all())
+                            self.assertTrue((row[eligible] >= 0).all())
+                            self.assertTrue((row[eligible] <= 1).all())
+                            eligible[index] = False
+
+    def test_query_batch_prefix(self):
+        X = np.array([[-4.0], [-3.0], [0.0], [0.3], [2.0], [5.0]])
+        for y in (
+            np.full(len(X), np.nan),
+            np.array([0, 1, np.nan, np.nan, np.nan, np.nan]),
+        ):
+            clf = MixtureModelClassifier(
+                mixture_model=GaussianMixture(n_components=2, random_state=0),
+                classes=[0, 1],
+            ).fit(X, y)
+            for lmbda in (0, 0.2, 1):
+                params = dict(
+                    X=X, y=y, clf=clf, fit_clf=False, return_utilities=True
+                )
+                expected_indices, expected_utilities = FourDs(
+                    lmbda=lmbda, random_state=0
+                ).query(**params, batch_size=4)
+                for batch_size in (1, 2, 3):
+                    with self.subTest(y=y, lmbda=lmbda, batch_size=batch_size):
+                        indices, utilities = FourDs(
+                            lmbda=lmbda, random_state=0
+                        ).query(**params, batch_size=batch_size)
+                        np.testing.assert_array_equal(
+                            indices, expected_indices[:batch_size]
+                        )
+                        np.testing.assert_allclose(
+                            utilities, expected_utilities[:batch_size]
+                        )
+
+    def test_query_distribution_with_selected_samples(self):
+        X = np.array(
+            [[-12.0], [-11.0], [-10.0], [-9.0], [-8.0], [-7.0], [9.0], [11.0]]
+        )
+        for labeled_indices in ([], [6, 7]):
+            with self.subTest(labeled_indices=labeled_indices):
+                y = np.full(len(X), np.nan)
+                if labeled_indices:
+                    y[labeled_indices] = [0, 1]
+                clf = MixtureModelClassifier(
+                    mixture_model=GaussianMixture(
+                        n_components=2, random_state=0
+                    ),
+                    classes=[0, 1],
+                ).fit(X, y)
+                responsibilities = clf.mixture_model_.predict_proba(X)
+                weights = clf.mixture_model_.weights_
+                if labeled_indices:
+                    difference = np.abs(
+                        weights
+                        - responsibilities[labeled_indices].mean(axis=0)
+                    ).sum()
+                    self.assertGreaterEqual(difference, 1)
+                indices, utilities = FourDs(lmbda=0, random_state=0).query(
+                    X,
+                    y,
+                    clf,
+                    fit_clf=False,
+                    batch_size=4,
+                    return_utilities=True,
+                )
+                selected = []
+                for index, row in zip(indices, utilities):
+                    expected = np.full(len(X), np.nan)
+                    for candidate in range(len(X)):
+                        if (
+                            candidate in labeled_indices
+                            or candidate in selected
+                        ):
+                            continue
+                        prospective = labeled_indices + selected + [candidate]
+                        mean = responsibilities[prospective].mean(axis=0)
+                        expected[candidate] = np.minimum(weights, mean).sum()
+                    np.testing.assert_allclose(row, expected)
+                    selected.append(index)
