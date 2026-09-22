@@ -391,7 +391,7 @@ def average_kl_divergence(probas, eps=1e-7):
         target_type=(float, int),
         min_inclusive=False,
     )
-    probas = check_array(probas, allow_nd=True)
+    probas = check_array(probas, allow_nd=True, dtype=float, copy=True)
     if probas.ndim != 3:
         raise ValueError(
             f"Expected 3D array, got {probas.ndim}D array instead."

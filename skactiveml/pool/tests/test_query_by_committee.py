@@ -450,6 +450,23 @@ class TestAverageKlDivergence(unittest.TestCase):
         scores = average_kl_divergence(self.probas)
         np.testing.assert_almost_equal(scores, self.scores)
 
+    def test_probability_inputs_are_preserved(self):
+        values = np.array([[[1, 0], [0, 1]], [[0, 1], [0, 1]]])
+        eps = 0.01
+        p = 1 / (1 + eps)
+        q = eps / (1 + eps)
+        expected = [p * np.log(2 * p) + q * np.log(2 * q), 0]
+        for dtype in (np.float64, np.float32, np.int64):
+            for readonly in (False, True):
+                with self.subTest(dtype=dtype, readonly=readonly):
+                    probas = values.astype(dtype)
+                    original = probas.copy()
+                    if readonly:
+                        probas.setflags(write=False)
+                    scores = average_kl_divergence(probas, eps=eps)
+                    np.testing.assert_array_equal(probas, original)
+                    np.testing.assert_allclose(scores, expected, atol=1e-7)
+
 
 class TestVoteEntropy(unittest.TestCase):
     def setUp(self):
