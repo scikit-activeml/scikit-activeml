@@ -950,12 +950,14 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     ----------
     indices : array-like of shape (n_indices, n_dim) or (n_indices,)
         The considered indices, where for every `i = 0, ..., n_indices - 1`
-        `indices[i]` is interpreted as an index to the array `A`. An empty
-        selection is accepted, i.e., `n_indices` may be zero.
+        `indices[i]` is interpreted as an index to the array `A`. Values must
+        be nonnegative integers or integer-valued floats.
+        Boolean masks are not accepted. An empty selection is accepted,
+        i.e., `n_indices` may be zero.
     A : array-like
         The array that is indexed.
     dim : int or tuple of ints or 'adaptive', default='adaptive'
-        The dimensions of the array that are indexed.
+        The distinct, nonnegative dimensions of the array that are indexed.
         If `dim` equals `'adaptive'`, `dim` is set to first indices
         corresponding to the shape of `indices`. E.g., if `indices` is of
         shape (n_indices,), `dim` is set `0`.
@@ -968,74 +970,87 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     indices : tuple of np.ndarray or np.ndarray
         The validated indices.
     """
-    # An empty selection is valid, whereas a scalar stays a rejected input
-    # because it is no collection of indices at all.
+    indices = np.asarray(indices)
+    if indices.dtype.kind not in "iuf" or (
+        indices.dtype.kind == "f" and np.any(indices != np.floor(indices))
+    ):
+        raise ValueError("`indices` must contain integer values.")
     indices = check_array(
         indices,
-        dtype=int,
+        dtype=None,
         ensure_2d=False,
-        ensure_min_samples=0 if np.ndim(indices) > 0 else 1,
+        ensure_min_samples=0 if indices.ndim > 0 else 1,
     )
     A = check_array(
         A, allow_nd=True, ensure_all_finite=False, ensure_2d=False, dtype=None
     )
-    if unique == "check_unique":
-        if indices.ndim == 1:
-            n_unique_indices = len(np.unique(indices))
-        else:
-            n_unique_indices = len(np.unique(indices, axis=0))
-        if n_unique_indices < len(indices):
-            raise ValueError(
-                "`indices` contains two different indices of the "
-                "same value."
-            )
-    elif unique:
-        if indices.ndim == 1:
-            indices = np.unique(indices)
-        else:
-            indices = np.unique(indices, axis=0)
-    check_type(dim, "dim", int, tuple, target_vals=["adaptive"])
+    check_type(dim, "dim", int, np.integer, tuple, target_vals=["adaptive"])
     if dim == "adaptive":
         if indices.ndim == 1:
             dim = 0
         else:
             dim = tuple(range(indices.shape[1]))
 
+    dimensions = dim if isinstance(dim, tuple) else (dim,)
+    for axis in dimensions:
+        check_type(axis, "entry of `dim`", int, np.integer)
+        if isinstance(axis, (bool, np.bool_)) or not 0 <= axis < A.ndim:
+            raise ValueError(
+                f"Each dimension must be an integer in [0, {A.ndim})."
+            )
+    if not dimensions or len(set(dimensions)) != len(dimensions):
+        raise ValueError("`dim` must contain distinct dimensions.")
+    n_dimensions = 1 if indices.ndim == 1 else indices.shape[1]
+    if n_dimensions != len(dimensions):
+        raise ValueError(
+            f"`indices` has {n_dimensions} coordinate columns, but "
+            f"`dim` specifies {len(dimensions)} dimensions."
+        )
+    bounds = np.array(A.shape)[list(dimensions)]
+    if np.any(indices < 0) or np.any(indices >= bounds):
+        raise ValueError(
+            "`indices` must be nonnegative and smaller than the size of "
+            "each indexed dimension."
+        )
+    indices = indices.astype(int)
+    if unique == "check_unique":
+        if len(np.unique(indices, axis=0)) != len(indices):
+            raise ValueError("`indices` contains duplicate indices.")
+    elif unique:
+        indices = np.unique(indices, axis=0)
     if isinstance(dim, tuple):
-        for n in dim:
-            check_type(n, "entry of `dim`", int)
-        if A.ndim <= max(dim):
-            raise ValueError(
-                f"`dim` contains entry of value {max(dim)}, but all"
-                f"entries of dim must be smaller than {A.ndim}."
-            )
-        if len(dim) != indices.shape[1]:
-            raise ValueError(
-                f"shape of `indices` along dimension 1 is "
-                f"{indices.shape[0]}, but must be {len(dim)}"
-            )
-        indices = tuple(indices.T)
-        for i, n in enumerate(indices):
-            if np.any(indices[i] >= A.shape[dim[i]]):
+        return tuple(indices.reshape(-1, len(dimensions)).T)
+    return indices
+
+
+def _validate_budget_update(
+    candidates, queried_indices, budget_manager_param_dict=None
+):
+    """Validate acquisition indices and utilities before updating state."""
+    n_candidates = len(candidates)
+    indices = np.asarray(queried_indices)
+    if indices.ndim != 1:
+        raise IndexError("`queried_indices` must be one-dimensional.")
+    if indices.size and not np.issubdtype(indices.dtype, np.integer):
+        raise IndexError("`queried_indices` must contain integer indices.")
+    if np.any(indices < 0) or np.any(indices >= n_candidates):
+        raise IndexError(
+            "`queried_indices` must index the original candidates."
+        )
+    if budget_manager_param_dict is not None:
+        check_type(
+            budget_manager_param_dict, "budget_manager_param_dict", dict
+        )
+        if "utilities" in budget_manager_param_dict:
+            utilities = np.asarray(budget_manager_param_dict["utilities"])
+            if utilities.ndim != 1 or utilities.dtype.kind not in "biuf":
                 raise ValueError(
-                    f"`indices[{i}]` contains index of value "
-                    f"{np.max(indices[i])} but all indices must be"
-                    f" less than {A.shape[dim[i]]}."
+                    "`utilities` must be a one-dimensional numeric array."
                 )
-        return indices
-    else:
-        if A.ndim <= dim:
-            raise ValueError(
-                f"`dim` has value {dim}, but must be smaller than "
-                f"{A.ndim}."
-            )
-        if np.any(indices >= A.shape[dim]):
-            raise ValueError(
-                f"`indices` contains index of value "
-                f"{np.max(indices)} but all indices must be"
-                f" less than {A.shape[dim]}."
-            )
-        return indices
+            check_consistent_length(candidates, utilities)
+    queried = np.zeros(n_candidates, dtype=bool)
+    queried[indices.astype(int)] = True
+    return queried
 
 
 def check_type(

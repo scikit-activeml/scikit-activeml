@@ -16,6 +16,7 @@ from ..utils import (
     call_func,
     check_budget_manager,
 )
+from ..utils._validation import _validate_budget_update
 
 
 class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
@@ -211,15 +212,19 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`.
+            Optional kwargs for `budget_manager`. If supplied, `utilities`
+            must be a one-dimensional array with one value per candidate.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
             check_type(

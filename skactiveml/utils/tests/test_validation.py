@@ -601,6 +601,34 @@ class TestValidation(unittest.TestCase):
         indices_now_unique = check_indices(ind_not_unique, A, unique=True)
         self.assertEqual(len(indices_now_unique), 1)
 
+        for indices in [
+            [1.9],
+            [-1],
+            [-4],
+            [-1, 2],
+            [True],
+            ["1"],
+            [np.nan],
+            [np.inf],
+            np.array([2**64 - 1], dtype=np.uint64),
+        ]:
+            with self.subTest(indices=indices):
+                with self.assertRaises(ValueError):
+                    check_indices(indices, A)
+
+        np.testing.assert_array_equal(check_indices([0.0, 2.0], A), ind)
+        np.testing.assert_array_equal(
+            check_indices([2, 0, 2], A, unique=False), [2, 0, 2]
+        )
+        checked = check_indices(ind, A, dim=(0,))
+        self.assertIsInstance(checked, tuple)
+        np.testing.assert_array_equal(checked[0], ind)
+
+        for dim in [-1, (), (-1,), (2,), (0, 0), (0, 1)]:
+            with self.subTest(dim=dim):
+                with self.assertRaises(ValueError):
+                    check_indices(ind, A, dim=dim)
+
     def test_check_indices_empty_selection(self):
         # An empty selection is valid, e.g., an exhausted candidate pool.
         A = np.array([[4, 5], [6, 1], [3, 4]])
@@ -609,6 +637,12 @@ class TestValidation(unittest.TestCase):
 
         self.assertEqual(indices.shape, (0,))
         self.assertTrue(np.issubdtype(indices.dtype, np.integer))
+        checked = check_indices([], A, dim=(0,))
+        np.testing.assert_array_equal(checked[0], indices)
+        checked = check_indices(np.empty((0, 2), dtype=int), A)
+        self.assertEqual(len(checked), 2)
+        for column in checked:
+            np.testing.assert_array_equal(column, indices)
 
     def test_check_indices_n_dimensions(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])
@@ -626,6 +660,14 @@ class TestValidation(unittest.TestCase):
         self.assertEqual(2, len(indices_now_unique))
         for i in [0, 1]:
             self.assertEqual(1, len(indices_now_unique[i]))
+
+        for indices in [[[0.5, 1]], [[-1, 0]], [[0, -1]], [[3, 0]]]:
+            with self.subTest(indices=indices):
+                with self.assertRaises(ValueError):
+                    check_indices(indices, A)
+        checked = check_indices([[1, 2], [0, 0]], A, dim=(1, 0))
+        np.testing.assert_array_equal(checked[0], [0, 1])
+        np.testing.assert_array_equal(checked[1], [0, 2])
 
     def test_check_bound(self):
         self.assertRaises(ValueError, check_bound, X=7)

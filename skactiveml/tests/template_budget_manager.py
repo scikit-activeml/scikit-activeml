@@ -7,6 +7,7 @@ from numpy.random import RandomState
 from skactiveml.utils import call_func
 
 from skactiveml.tests.utils import (
+    assert_state_unchanged,
     check_positional_args,
     check_test_param_test_availability,
 )
@@ -33,6 +34,12 @@ class TemplateBudgetManager:
 
         self.query_by_utility_params = query_by_utility_params
         self.init_default_params.update(deepcopy(init_default_params))
+        self.update_params = {
+            "candidates": [[0], [1]],
+            "queried_indices": [0],
+        }
+        if "utilities" in inspect.signature(self.bm_class.update).parameters:
+            self.update_params["utilities"] = np.array([0.2, 0.8])
 
         check_positional_args(
             self.bm_class.__init__,
@@ -99,6 +106,9 @@ class TemplateBudgetManager:
         check_test_param_test_availability(
             self, self.bm_class.query_by_utility, "query_by_utility", not_test
         )
+        check_test_param_test_availability(
+            self, self.bm_class.update, "update", not_test, logic_test=False
+        )
 
     def test_query_by_utility_param_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -112,6 +122,36 @@ class TemplateBudgetManager:
             (["string"], TypeError),
         ]
         self._test_param("query_by_utility", "utilities", test_cases)
+
+    def test_update_param_candidates(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (Dummy, TypeError),
+            (None, TypeError),
+            (0, TypeError),
+            ([[0], [1]], None),
+        ]
+        self._test_param("update", "candidates", test_cases)
+
+    def test_update_param_queried_indices(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            ("string", IndexError),
+            (Dummy, IndexError),
+            (0, IndexError),
+            ([-1], IndexError),
+            ([2], IndexError),
+            ([0.5], IndexError),
+            ([0.0], IndexError),
+            ([True], IndexError),
+            ([[0]], IndexError),
+            ([np.nan], IndexError),
+            (np.array([2**64 - 1], dtype=np.uint64), IndexError),
+            ([], None),
+            ([1], None),
+            ([1, 0, 1], None),
+        ]
+        self._test_param("update", "queried_indices", test_cases)
 
     def _test_param(
         self,
@@ -137,12 +177,32 @@ class TemplateBudgetManager:
                 )
                 for key, val in replace_query_by_utility_params.items():
                     query_by_utility_params[key] = val
-                update_params = {}
+                update_params = deepcopy(self.update_params)
 
                 locals()[f"{test_func}_params"][test_param] = test_val
 
                 bm = self.bm_class(**init_params)
-                if err is None:
+                if test_func == "update":
+                    for initialized in [False, True]:
+                        with self.subTest(initialized=initialized):
+                            if initialized:
+                                bm.update(**deepcopy(self.update_params))
+                            before = deepcopy(bm)
+                            if err is not None:
+                                self.assertRaises(
+                                    err, bm.update, **update_params
+                                )
+                                assert_state_unchanged(self, bm, before)
+                            else:
+                                self.assertIs(bm.update(**update_params), bm)
+                                if test_param == "queried_indices":
+                                    reference_params = deepcopy(update_params)
+                                    reference_params["queried_indices"] = (
+                                        np.unique(test_val).astype(int)
+                                    )
+                                    before.update(**reference_params)
+                                    assert_state_unchanged(self, bm, before)
+                elif err is None:
                     bm.query_by_utility(**query_by_utility_params)
                 elif test_func in ["query_by_utility", "init"]:
                     self.assertRaises(
@@ -171,14 +231,12 @@ class TemplateBudgetManager:
             utilities = np.append(utilities, utilities_nan)
         bm = self.bm_class(**init_params)
         bm2 = self.bm_class(**init_params)
-        utilities_update = []
         bm1_outputs = []
 
         for u in utilities:
             output = bm.query_by_utility(np.array([u]))
             bm1_outputs.extend(output)
-            utilities_update.append(u)
-            budget_manager_param_dict1 = {"utilities": utilities_update}
+            budget_manager_param_dict1 = {"utilities": np.array([u])}
             call_func(
                 bm.update,
                 candidates=np.array([u]),
@@ -188,7 +246,7 @@ class TemplateBudgetManager:
         bm2_outputs = bm2.query_by_utility(np.array(utilities))
         budget_manager_param_dict2 = {"utilities": utilities}
         call_func(
-            bm.update,
+            bm2.update,
             candidates=np.array(utilities),
             queried_indices=bm2_outputs,
             **budget_manager_param_dict2,
@@ -211,14 +269,12 @@ class TemplateBudgetManager:
         bm = self.bm_class(**init_params)
         bm2 = self.bm_class(**init_params)
         bm2_outputs = []
-        utilities_update = []
         utilities = np.array([0.2, 0.6, 0.8, 0.9, 0.1])
         candidate = np.array([0.3])
         for u in utilities:
             output = bm2.query_by_utility(np.array([u]))
             bm2_outputs.extend(output)
-            utilities_update.append(u)
-            budget_manager_param_dict2 = {"utilities": utilities_update}
+            budget_manager_param_dict2 = {"utilities": np.array([u])}
             call_func(
                 bm2.update,
                 candidates=np.array([u]),

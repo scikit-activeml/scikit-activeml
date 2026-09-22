@@ -52,6 +52,20 @@ class TestBalancedIncrementalQuantileFilter(
         expected_output = [0, 1, 7, 8, 20]
         return super().test_query_by_utility(expected_output)
 
+    def test_update_param_utilities(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            ([], ValueError),
+            ([0.1], ValueError),
+            ([0.1, 0.2, 0.3], ValueError),
+            ([[0.1], [0.2]], ValueError),
+            (0.1, ValueError),
+            (None, ValueError),
+            ([0.1, 0.2], None),
+            (np.array([0.1, 0.2]), None),
+        ]
+        self._test_param("update", "utilities", test_cases)
+
     def test_tied_utilities_obey_budget(self):
         expected_output = np.arange(0, 1000, 10)
         candidates = np.zeros((1000, 1))

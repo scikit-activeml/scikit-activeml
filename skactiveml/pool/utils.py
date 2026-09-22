@@ -266,12 +266,12 @@ class IndexClassifierWrapper:
             'unlabeled'.
         """
         idx_fit = check_array(
-            idx_fit, ensure_2d=False, dtype=int, input_name="`idx_fit`"
+            idx_fit, ensure_2d=False, dtype=None, input_name="`idx_fit`"
         )
         idx_fit = check_indices(idx_fit, self.X, dim=0)
 
         idx_pred = check_array(
-            idx_pred, ensure_2d=False, dtype=int, input_name="`idx_pred`"
+            idx_pred, ensure_2d=False, dtype=None, input_name="`idx_pred`"
         )
         idx_pred = check_indices(idx_pred, self.X, dim=0)
 
@@ -344,7 +344,7 @@ class IndexClassifierWrapper:
             The fitted `IndexClassifierWrapper`.
         """
         # check idx
-        idx = check_array(idx, ensure_2d=False, dtype=int, input_name="`idx`")
+        idx = check_array(idx, ensure_2d=False, dtype=None, input_name="`idx`")
         idx = check_indices(
             idx, self.X, dim=0, unique=self.enforce_unique_samples
         )
@@ -438,7 +438,7 @@ class IndexClassifierWrapper:
 
         # check idx
         add_idx = check_array(
-            idx, ensure_2d=False, dtype=int, input_name="`add_idx`"
+            idx, ensure_2d=False, dtype=None, input_name="`add_idx`"
         )
         add_idx = check_indices(
             add_idx, self.X, dim=0, unique=self.enforce_unique_samples

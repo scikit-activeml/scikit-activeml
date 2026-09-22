@@ -247,11 +247,17 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         iclf = self.iclf()
         self.assertRaises((ValueError, TypeError), iclf.precompute, "str", [0])
         self.assertRaises((ValueError, TypeError), iclf.precompute, [10], [0])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.precompute, indices, [0])
 
     def test_precompute_param_idx_pred(self):
         iclf = self.iclf()
         self.assertRaises((ValueError, TypeError), iclf.precompute, [0], "str")
         self.assertRaises((ValueError, TypeError), iclf.precompute, [0], [10])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.precompute, [0], indices)
 
     def test_precompute_param_fit_params(self):
         iclf = self.iclf(use_speed_up=True)
@@ -306,6 +312,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises((ValueError, TypeError), iclf.fit, 0)
         self.assertRaises((ValueError, TypeError), iclf.fit, "wrong_str")
         self.assertRaises((ValueError, TypeError), iclf.fit, [10])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.fit, indices)
 
     def test_fit_param_y(self):
         iclf = self.iclf()
@@ -330,6 +339,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises((ValueError, TypeError), iclf.partial_fit, 0)
         self.assertRaises((ValueError, TypeError), iclf.partial_fit, "str")
         self.assertRaises((ValueError, TypeError), iclf.partial_fit, [10])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.partial_fit, indices)
 
     def test_partial_fit_param_y(self):
         iclf = self.iclf().fit([0])

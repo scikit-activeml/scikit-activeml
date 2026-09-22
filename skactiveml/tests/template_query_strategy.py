@@ -711,6 +711,11 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 cases = test_cases + [
                     (np.nan, ValueError),
                     (Dummy, TypeError),
+                    ([0.5], ValueError),
+                    ([-1], ValueError),
+                    ([-len(query_params["y"]) - 1], ValueError),
+                    ([len(query_params["y"])], ValueError),
+                    ([True], ValueError),
                     ([ulbd_idx[0]], None),
                 ]
                 self._test_param(
@@ -2292,10 +2297,36 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         test_cases += [
             ("string", IndexError),
             (Dummy, IndexError),
+            (0, IndexError),
+            ([-1], IndexError),
+            ([1], IndexError),
+            ([0.5], IndexError),
+            ([0.0], IndexError),
+            ([True], IndexError),
+            ([[0]], IndexError),
+            ([np.nan], IndexError),
+            (np.array([2**64 - 1], dtype=np.uint64), IndexError),
             ([], None),
             ([0], None),
+            ([0, 0], None),
         ]
         self._test_param("update", "queried_indices", test_cases)
+
+    def test_update_param_budget_manager_param_dict(self, test_cases=None):
+        if (
+            "budget_manager_param_dict"
+            not in inspect.signature(self.qs_class.update).parameters
+        ):
+            return
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            ({"utilities": []}, ValueError),
+            ({"utilities": [0.1, 0.2]}, ValueError),
+            ({"utilities": [[0.1]]}, ValueError),
+            ({"utilities": 0.1}, ValueError),
+            ({"utilities": [0.1]}, None),
+        ]
+        self._test_param("update", "budget_manager_param_dict", test_cases)
 
     def _test_param(
         self,
@@ -2338,7 +2369,18 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
                     qs = self.qs_class(**init_params)
                     if test_func == "update":
+                        check_state = err is not None and test_param in (
+                            "queried_indices",
+                            "budget_manager_param_dict",
+                        )
+                        before = deepcopy(qs) if check_state else None
                         self._check_update_param(qs, update_params, err)
+                        if check_state:
+                            assert_state_unchanged(self, qs, before)
+                            qs.update(**deepcopy(self.update_params))
+                            before = deepcopy(qs)
+                            self._check_update_param(qs, update_params, err)
+                            assert_state_unchanged(self, qs, before)
                     elif err is None:
                         qs.query(**query_params)
                     else:

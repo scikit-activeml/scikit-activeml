@@ -4,6 +4,7 @@ from copy import deepcopy
 from skactiveml.base import BudgetManager
 
 from skactiveml.utils import check_scalar, check_random_state
+from skactiveml.utils._validation import _validate_budget_update
 
 
 class DensityBasedSplitBudgetManager(BudgetManager):
@@ -120,17 +121,15 @@ class DensityBasedSplitBudgetManager(BudgetManager):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : RandomVariableUncertaintyBudgetManager
             The budget manager returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
         self.random_state_.random_sample(len(candidates))
         for s in queried:
             self.t_ += 1

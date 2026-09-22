@@ -6,6 +6,7 @@ from ...base import BudgetManager
 from ...utils import check_random_state, check_scalar
 from skactiveml.utils import check_classes
 from skactiveml.utils._target import _check_class_vocabulary_structure
+from skactiveml.utils._validation import _validate_budget_update
 
 
 class EstimatedBudgetZliobaite(BudgetManager):
@@ -55,15 +56,14 @@ class EstimatedBudgetZliobaite(BudgetManager):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : EstimatedBudgetZliobaite
             The `EstimatedBudgetZliobaite` returns itself, after it is updated.
         """
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
+        queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
         # update u_t for queried candidates
         for s in queried:
@@ -184,7 +184,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
@@ -313,17 +313,15 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : VariableUncertaintyBudgetManager
             The budget manager returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
         for i, s in enumerate(queried):
             if self.budget_ > self.u_t_ / self.w:
                 if s:
@@ -488,17 +486,15 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : RandomVariableUncertaintyBudgetManager
             The budget manager returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
         self.random_state_.random_sample(len(candidates))
         for s in queried:
             if self.budget_ > self.u_t_ / self.w:
@@ -675,17 +671,15 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : SplitBudgetManager
             The budget manager returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
         for x_t, q in zip(candidates, queried):
             if self.u_t_ / self.w < self.budget_:
                 if self.v > self.random_state_.random_sample():
@@ -838,13 +832,14 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : SplitBudgetManager
             The budget manager returns itself, after it is updated.
         """
+        _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
         self.random_state_.random_sample(len(candidates))
         super().update(candidates, queried_indices)

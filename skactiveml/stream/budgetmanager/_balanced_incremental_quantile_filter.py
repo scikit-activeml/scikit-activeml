@@ -5,6 +5,7 @@ import numpy as np
 
 from ...base import BudgetManager
 from ...utils import check_scalar
+from ...utils._validation import _validate_budget_update
 
 
 class BalancedIncrementalQuantileFilter(BudgetManager):
@@ -112,17 +113,19 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
+        utilities : array-like of shape (n_samples,)
+            One utility for each sample in `candidates`.
 
         Returns
         -------
         self : BalancedIncrementalQuantileFilter
             The budget manager returns itself, after it is updated.
         """
+        queried = _validate_budget_update(
+            candidates, queried_indices, {"utilities": utilities}
+        )
         self._validate_data(np.array([0]))
-
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
 
         self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)

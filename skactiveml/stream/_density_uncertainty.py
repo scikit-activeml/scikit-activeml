@@ -22,6 +22,7 @@ from skactiveml.utils import (
     call_func,
     check_budget_manager,
 )
+from skactiveml.utils._validation import _validate_budget_update
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
     DensityBasedSplitBudgetManager,
@@ -62,22 +63,6 @@ def _update_budget_manager(
         queried_indices=[0] if queried else [],
         **params,
     )
-
-
-def _validate_budget_update(candidates, queried_indices):
-    """Validate original-batch indices before any observation is committed."""
-    indices = np.asarray(queried_indices)
-    if indices.ndim != 1:
-        raise IndexError("`queried_indices` must be one-dimensional.")
-    if indices.size and not np.issubdtype(indices.dtype, np.integer):
-        raise IndexError("`queried_indices` must contain integer indices.")
-    if np.any(indices < 0) or np.any(indices >= len(candidates)):
-        raise IndexError(
-            "`queried_indices` must index the original candidates."
-        )
-    queried = np.zeros(len(candidates), dtype=bool)
-    queried[indices.astype(int)] = True
-    return queried
 
 
 class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
@@ -287,7 +272,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        queried = _validate_budget_update(candidates, queried_indices)
+        queried = _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
@@ -790,7 +777,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         self : CognitiveDualQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        queried = _validate_budget_update(candidates, queried_indices)
+        queried = _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
         self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
