@@ -1,6 +1,7 @@
 import inspect
 import warnings
 from copy import deepcopy
+from unittest.mock import patch
 
 import numpy as np
 from numpy.random import RandomState
@@ -508,6 +509,84 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         ml = self.init_default_params["missing_label"]
         test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param("init", "missing_label", test_cases)
+
+        if "reg" not in inspect.signature(self.qs_class.query).parameters:
+            return
+
+        reference = None
+        for fit_reg in [True, False]:
+            for missing_label in [np.nan, -1, None]:
+                with self.subTest(
+                    missing_label=missing_label, fit_reg=fit_reg
+                ):
+                    init_params = deepcopy(self.init_default_params)
+                    init_params["missing_label"] = missing_label
+                    query_params = deepcopy(self.query_default_params_reg)
+                    y = np.asarray(
+                        query_params["y"],
+                        dtype=object if missing_label is None else float,
+                    ).copy()
+                    y[is_unlabeled(y, ml)] = missing_label
+                    query_params["y"] = y
+                    query_params["reg"].set_params(missing_label=missing_label)
+                    if not fit_reg:
+                        query_params["reg"].fit(query_params["X"], y)
+                    query_params["fit_reg"] = fit_reg
+                    query_params["return_utilities"] = True
+
+                    qs = self.qs_class(**init_params)
+                    result = qs.query(**query_params)
+                    if reference is None:
+                        reference = result
+                    else:
+                        np.testing.assert_array_equal(result[0], reference[0])
+                        np.testing.assert_allclose(result[1], reference[1])
+
+    def test_query_param_reg(self, test_cases=None):
+        super().test_query_param_reg(test_cases=test_cases)
+        if "reg" not in inspect.signature(self.qs_class.query).parameters:
+            return
+
+        for fit_reg in [True, False]:
+            for missing_label in [-1, None]:
+                with self.subTest(
+                    missing_label=missing_label, fit_reg=fit_reg
+                ):
+                    query_params = deepcopy(self.query_default_params_reg)
+                    reg = query_params["reg"]
+                    if not fit_reg:
+                        reg.fit(query_params["X"], query_params["y"])
+                    y = np.asarray(query_params["y"], dtype=object).copy()
+                    y[is_unlabeled(y, reg.missing_label)] = missing_label
+                    query_params.update(y=y, fit_reg=fit_reg)
+                    init_params = deepcopy(self.init_default_params)
+                    init_params["missing_label"] = missing_label
+                    qs = self.qs_class(**init_params)
+
+                    with patch.object(
+                        type(reg),
+                        "fit",
+                        autospec=True,
+                        side_effect=type(reg).fit,
+                    ) as fit:
+                        with self.assertRaisesRegex(
+                            ValueError, "missing_label"
+                        ):
+                            qs.query(**query_params)
+                        fit.assert_not_called()
+                    assert_no_query_state(self, qs)
+
+        query_params = deepcopy(self.query_default_params_reg)
+        reg = query_params["reg"].fit(query_params["X"], query_params["y"])
+        query_params.update(
+            y=np.column_stack([query_params["y"], query_params["y"]]),
+            reg=reg,
+            fit_reg=False,
+        )
+        qs = self.qs_class(**deepcopy(self.init_default_params))
+        with self.assertRaisesRegex(ValueError, "Single-output regression"):
+            qs.query(**query_params)
+        assert_no_query_state(self, qs)
 
     def test_init_param_target_type(self):
         self.assertIn(

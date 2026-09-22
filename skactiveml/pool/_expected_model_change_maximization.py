@@ -8,6 +8,7 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 from skactiveml.utils import (
     check_type,
     simple_batch,
@@ -155,20 +156,29 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
               refers to the indexing in `candidates`.
         """
 
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(SkactivemlRegressor,),
+        )
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
-        check_type(reg, "reg", SkactivemlRegressor)
-        check_type(fit_reg, "fit_reg", bool)
         if self.feature_map is not None:
             _check_callable(self.feature_map, "self.feature_map")
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 

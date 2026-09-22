@@ -178,7 +178,7 @@ class TestRegressionTreeBasedAL(
             (SklearnRegressor(DecisionTreeRegressor()), None),
             (SklearnRegressor(ExtraTreeRegressor()), None),
         ]
-        self._test_param("query", "reg", test_cases)
+        super().test_query_param_reg(test_cases=test_cases)
 
     def test__calc_acquisitions_per_leaf(self):
         reg = SklearnRegressor(_DummyRegressor())

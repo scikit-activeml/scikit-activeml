@@ -1,11 +1,11 @@
 import numpy as np
-from sklearn import clone
 from sklearn.utils.validation import check_array, _check_n_features
 
 from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.utils import _update_reg, conditional_expect
 
@@ -125,12 +125,27 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(ProbabilisticRegressor,),
+        )
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
-        check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(fit_reg, "fit_reg", bool)
         if X_eval is None:
             X_eval = X
         else:
@@ -144,12 +159,6 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         check_type(integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         old_model_variance = np.average(
             reg.predict(X_eval, return_std=True)[1] ** 2
