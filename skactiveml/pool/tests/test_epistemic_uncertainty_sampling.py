@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.optimize import minimize_scalar
+from scipy.optimize import brentq, minimize_scalar
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 
@@ -80,6 +80,7 @@ class TestEpistemicUncertaintySampling(
                 SklearnClassifier(LogisticRegression(), classes=self.classes),
                 None,
             ),
+            (SklearnClassifier(LogisticRegression()), None),
             (ParzenWindowClassifier(), None),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
@@ -265,11 +266,53 @@ class TestEpistemicUncertaintySampling(
         query_params["clf"] = ParzenWindowClassifier(classes=[0, 1, 2])
         self.assertRaises(ValueError, qs.query, **query_params)
 
+    def test_pwc_large_frequencies(self):
+        freq = np.array(
+            [[0, 0], [1000, 1000], [1000, 800], [1000, 0], [0, 1000]]
+        )
+        expected_balanced = brentq(
+            lambda support: (1 - support**2) ** 1000 - support, 0, 1
+        )
+        with np.errstate(divide="raise", invalid="raise"):
+            utilities, _ = _epistemic_uncertainty_pwc(freq)
+            swapped, _ = _epistemic_uncertainty_pwc(freq[:, ::-1])
+        self.assertTrue(np.isfinite(utilities).all())
+        self.assertTrue(((0 <= utilities) & (utilities <= 1)).all())
+        self.assertEqual(utilities[0], 1)
+        self.assertAlmostEqual(utilities[1], expected_balanced, delta=2e-5)
+        np.testing.assert_allclose(utilities, swapped, atol=1e-10)
+
+        X = np.zeros((3, 1))
+        _, actual = EpistemicUncertaintySampling(random_state=0).query(
+            X,
+            [0, 1, np.nan],
+            ParzenWindowClassifier(),
+            sample_weight=[1000, 1000, 1],
+            return_utilities=True,
+        )
+        self.assertAlmostEqual(actual[0, 2], expected_balanced, delta=2e-5)
+
+    def test_precompute_large_frequencies(self):
+        freq = np.array([[1000, 1000]])
+        table = np.zeros((1001, 1001))
+        table[1000, 1000] = np.nan
+        expected = brentq(
+            lambda support: (1 - support**2) ** 1000 - support, 0, 1
+        )
+        module = "skactiveml.pool._epistemic_uncertainty_sampling"
+        # Check cache filling without building a million-point triangulation.
+        with (
+            patch(f"{module}._interpolate"),
+            np.errstate(divide="raise", invalid="raise"),
+        ):
+            _, actual = _epistemic_uncertainty_pwc(freq, table)
+        self.assertAlmostEqual(actual[1000, 1000], expected, delta=2e-5)
+
     # tests for epistemic logistic regression
     def test_loglike_logreg(self):
         w = np.array([0, 0])
         X = np.array([[0]])
-        y = np.array([0])
+        y = np.array([-1])
         self.assertEqual(0, _loglike_logreg(None, X=[], y=[]))
         self.assertEqual(2.0, np.exp(_loglike_logreg(w=w, X=X, y=y)))
 
@@ -301,7 +344,7 @@ class TestEpistemicUncertaintySampling(
             LogisticRegression(),
             classes=[0, 1, 2],
             random_state=42,
-        )
+        ).fit(self.X, self.y)
         self.assertRaises(
             ValueError,
             _epistemic_uncertainty_logreg,
@@ -334,15 +377,68 @@ class TestEpistemicUncertaintySampling(
             clf=self.clf,
         )
 
-        probas = np.array([[0.5, 0.5]])
-        X = np.array([[0]])
-        X_cand = np.array([[3]])
-        y = np.array([0])
-        # utils_expected = np.array()
-        clf = SklearnClassifier(LogisticRegression(), classes=[0, 1])
-        clf.fit(X, y)
-        utils = _epistemic_uncertainty_logreg(X_cand, X, y, clf, probas)
-        np.testing.assert_array_equal([0], utils)
+        for n_negative, n_positive in ((1, 1), (2, 1), (1, 2), (4, 1), (1, 4)):
+            with self.subTest(n_negative=n_negative, n_positive=n_positive):
+                X = np.zeros((n_negative + n_positive, 1))
+                y = np.array([-1] * n_negative + [1] * n_positive)
+                clf = SklearnClassifier(
+                    LogisticRegression(tol=1e-10), classes=[-1, 1]
+                ).fit(X, y)
+                alpha = np.linspace(0.01, 0.99, 99)
+                maximum = (n_negative / len(y)) ** n_negative * (
+                    n_positive / len(y)
+                ) ** n_positive
+                likelihood = (
+                    alpha**n_positive * (1 - alpha) ** n_negative / maximum
+                )
+                expected = min(
+                    np.max(np.minimum(likelihood, 2 * alpha - 1)),
+                    np.max(np.minimum(likelihood, 1 - 2 * alpha)),
+                )
+                actual = _epistemic_uncertainty_logreg(
+                    np.zeros((1, 1)), X, y, clf
+                )
+                np.testing.assert_allclose(actual, expected, atol=1e-7)
+
+    def test_logreg_label_encoding(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0], [0.0], [0.8]])
+        sample_weight = np.array([1, 0.5, 1.5, 1, 7, 9])
+        qs = EpistemicUncertaintySampling(missing_label=None, random_state=0)
+        query_params = dict(
+            X=X, sample_weight=sample_weight, return_utilities=True
+        )
+        expected_indices, expected_utilities = qs.query(
+            **query_params,
+            y=[-1, -1, 1, 1, None, None],
+            clf=SklearnClassifier(
+                LogisticRegression(tol=1e-10),
+                classes=[-1, 1],
+                missing_label=None,
+            ),
+        )
+        for labels in ([0, 1], [2, 5], [5, 2], ["cat", "dog"], ["dog", "cat"]):
+            y = [labels[0], labels[0], labels[1], labels[1], None, None]
+            for classes in (None, labels[::-1]):
+                for fit_clf in (True, False):
+                    with self.subTest(
+                        labels=labels, classes=classes, fit_clf=fit_clf
+                    ):
+                        clf = SklearnClassifier(
+                            LogisticRegression(tol=1e-10),
+                            classes=classes,
+                            missing_label=None,
+                        )
+                        if not fit_clf:
+                            clf.fit(X, y, sample_weight=sample_weight)
+                        indices, utilities = qs.query(
+                            **query_params, y=y, clf=clf, fit_clf=fit_clf
+                        )
+                        np.testing.assert_array_equal(
+                            indices, expected_indices
+                        )
+                        np.testing.assert_allclose(
+                            utilities, expected_utilities, atol=1e-6
+                        )
 
     def test_query(self):
         query_params = deepcopy(self.query_default_params_clf)
