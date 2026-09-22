@@ -8,6 +8,7 @@ import warnings
 import inspect
 
 from copy import deepcopy
+from itertools import product
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
@@ -889,6 +890,54 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         self.assertFalse(clf.is_fitted_)
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
+
+    def test_fallback_predictions_minimize_explicit_costs(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        X_test = np.zeros((32, 1))
+        for classes, observed in product(
+            ([0, 1], [1, 0], ["z", "a"]), (False, True)
+        ):
+            with self.subTest(classes=classes, observed=observed):
+                y = [classes[0] if observed else None] * len(X)
+                # A nonzero diagonal makes the cheaper prediction differ
+                # from the sole observed class in the one-class fallback.
+                costs = [[2 if observed else 0, 1], [100, 0]]
+                clf = SklearnClassifier(
+                    LogisticRegression(),
+                    classes=classes,
+                    missing_label=None,
+                    cost_matrix=costs,
+                    random_state=0,
+                ).fit(X, y)
+
+                self.assertFalse(clf.is_fitted_)
+                prediction = clf.predict(X_test)
+                np.testing.assert_array_equal(
+                    prediction, [classes[1]] * len(X_test)
+                )
+                assert_predicts_class_dtype(self, prediction, clf.classes_)
+
+    def test_fallback_cost_ties_are_reproducible(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        X_test = np.zeros((64, 1))
+        for observed in (False, True):
+            with self.subTest(observed=observed):
+                predictions = []
+                for _ in range(2):
+                    clf = SklearnClassifier(
+                        LogisticRegression(),
+                        classes=["a", "b", "c"],
+                        missing_label=None,
+                        cost_matrix=[[0, 0, 4], [0, 0, 4], [1, 1, 0]],
+                        random_state=0,
+                    ).fit(X, ["a" if observed else None] * len(X))
+                    self.assertFalse(clf.is_fitted_)
+                    prediction = clf.predict(X_test)
+                    np.testing.assert_array_equal(
+                        np.unique(prediction), ["a", "b"]
+                    )
+                    predictions.append(prediction)
+                np.testing.assert_array_equal(*predictions)
 
     def test_multilabel_predict_proba(self):
         X = self.X_ml
@@ -3627,6 +3676,93 @@ class TestSlidingWindowClassifier(
                         clf.estimator_.cost_matrix_, canonical_costs
                     )
                     self.assertIsNone(member.cost_matrix)
+
+    def test_costs_agree_across_inner_and_outer_class_orders(self):
+        X = np.array([[-1.0], [0.0], [1.0]])
+        query = np.array([[-0.5], [0.5]])
+        canonical_costs = np.array([[0, 1, 2], [100, 0, 2], [100, 1, 0]])
+        outer_order = [2, 0, 1]
+        inner_order = [1, 2, 0]
+        outer_costs = canonical_costs[np.ix_(outer_order, outer_order)]
+        inner_costs = canonical_costs[np.ix_(inner_order, inner_order)]
+        for classes, method, source in product(
+            ([0, 1, 2], ["a", "b", "c"]),
+            ("fit", "partial_fit"),
+            ("outer", "inner", "both"),
+        ):
+            with self.subTest(classes=classes, method=method, source=source):
+                member = ParzenWindowClassifier(
+                    classes=[classes[i] for i in inner_order],
+                    cost_matrix=None if source == "outer" else inner_costs,
+                    missing_label=None,
+                )
+                clf = SlidingWindowClassifier(
+                    member,
+                    classes=[classes[i] for i in outer_order],
+                    cost_matrix=None if source == "inner" else outer_costs,
+                    missing_label=None,
+                )
+                getattr(clf, method)(X, [None] * len(X))
+                np.testing.assert_array_equal(
+                    clf.predict(query), [classes[1]] * len(query)
+                )
+                np.testing.assert_array_equal(
+                    clf.cost_matrix_, canonical_costs
+                )
+
+                clf.partial_fit(X, classes)
+                expected = np.asarray(classes)[
+                    np.argmin(
+                        clf.predict_proba(query) @ canonical_costs, axis=1
+                    )
+                ]
+                np.testing.assert_array_equal(clf.predict(query), expected)
+                if source == "outer":
+                    self.assertIsNone(member.cost_matrix)
+                else:
+                    np.testing.assert_array_equal(
+                        member.cost_matrix, inner_costs
+                    )
+                np.testing.assert_array_equal(
+                    outer_costs,
+                    canonical_costs[np.ix_(outer_order, outer_order)],
+                )
+                np.testing.assert_array_equal(
+                    inner_costs,
+                    canonical_costs[np.ix_(inner_order, inner_order)],
+                )
+
+    def test_equal_arrays_with_conflicting_class_costs_are_rejected(self):
+        X = np.array([[-1.0], [1.0]])
+        for classes, method in product(
+            ([0, 1], ["a", "b"]), ("fit", "partial_fit")
+        ):
+            with self.subTest(classes=classes, method=method):
+                member = ParzenWindowClassifier(
+                    classes=classes[::-1], missing_label=None
+                )
+                clf = SlidingWindowClassifier(
+                    member,
+                    classes=classes,
+                    cost_matrix=[[0, 1], [100, 0]],
+                    missing_label=None,
+                ).fit(X, [None, None])
+                window_before = np.asarray(clf.X_train_).copy()
+                predictions_before = clf.predict(X)
+                member.cost_matrix = [[0, 1], [100, 0]]
+
+                assert_fit_failure_is_transactional(
+                    self,
+                    clf,
+                    lambda: getattr(clf, method)(X + 1, classes),
+                    ValueError,
+                    "cost_matrix",
+                )
+
+                np.testing.assert_array_equal(clf.X_train_, window_before)
+                np.testing.assert_array_equal(
+                    clf.predict(X), predictions_before
+                )
 
 
 if successful_skorch_torch_import:

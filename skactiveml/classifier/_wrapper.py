@@ -561,7 +561,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     empty labeled training subset, and an `estimator` rejecting a labeled
     training subset that carries fewer than two distinct classes in at least
     one output. Both set `is_fitted_` to `False` and emit a warning. Every
-    other `estimator` failure is raised.
+    other `estimator` failure is raised. With an explicit `cost_matrix`,
+    `predict` minimizes expected costs under this fallback distribution.
 
     References
     ----------
@@ -748,23 +749,22 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        if self.is_fitted_:
-            if self.cost_matrix is None:
-                y_pred = self.estimator_.predict(X, **predict_kwargs)
-                if self._is_multilabel_target():
-                    y_pred = self._check_multilabel_predictions(
-                        y_pred, n_samples=len(X)
-                    )
-                y_pred = np.asarray(y_pred).astype(
-                    self._class_label_dtype(), copy=False
+        if self.cost_matrix is not None:
+            P = self.predict_proba(X)
+            costs = np.dot(P, self.cost_matrix_)
+            y_pred = rand_argmin(
+                costs, random_state=self.random_state_, axis=1
+            )
+            y_pred = self._decode_class_labels(y_pred)
+        elif self.is_fitted_:
+            y_pred = self.estimator_.predict(X, **predict_kwargs)
+            if self._is_multilabel_target():
+                y_pred = self._check_multilabel_predictions(
+                    y_pred, n_samples=len(X)
                 )
-            else:
-                P = self.predict_proba(X)
-                costs = np.dot(P, self.cost_matrix_)
-                y_pred = rand_argmin(
-                    costs, random_state=self.random_state_, axis=1
-                )
-                y_pred = self._decode_class_labels(y_pred)
+            y_pred = np.asarray(y_pred).astype(
+                self._class_label_dtype(), copy=False
+            )
         else:
             p = self.predict_proba([X[0]])
             if self._is_multilabel_target():
@@ -1726,7 +1726,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
+        `classes` is not none. If both the wrapper and `estimator` specify a
+        cost matrix, their costs must agree for each pair of class labels,
+        even if their declared class orders differ.
     window_size : int, default=None,
         Value to represent the estimator sliding window size for X, y and
         sample weight. If `None` the window is unrestricted in its size.
@@ -2128,16 +2130,21 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if (
             self.cost_matrix is not None
             and self.estimator.cost_matrix is not None
-            and not np.array_equiv(
-                self.cost_matrix, self.estimator.cost_matrix
-            )
         ):
-            raise ValueError(
-                "'cost_matrix' and estimator.cost_matrix must be equal. "
-                "Got {} is not equal to {}.".format(
-                    self.cost_matrix, self.estimator.cost_matrix
+            class_indices = [
+                list(self.classes).index(c) for c in inner_classes
+            ]
+            aligned_costs = np.asarray(self.cost_matrix, dtype=float)[
+                np.ix_(class_indices, class_indices)
+            ]
+            if not np.array_equal(
+                aligned_costs,
+                np.asarray(self.estimator.cost_matrix, dtype=float),
+            ):
+                raise ValueError(
+                    "'cost_matrix' and estimator.cost_matrix must be equal "
+                    "after aligning their class labels."
                 )
-            )
         # self.missing_label is not testet completly and
         # needs to be checked for the general test.
         # if general test is removed, remove this check.
