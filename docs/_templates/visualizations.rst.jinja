@@ -1,0 +1,104 @@
+{% macro gallery(setup) -%}
+.. minigallery::
+
+{% for example in examples[setup] %}
+   {{ example }}
+{%- endfor %}
+{%- endmacro %}
+{{ intro }}
+
+Pool-based Active Learning
+--------------------------
+
+The strategy chooses which samples to label from an available pool.
+The groups below show different prediction tasks and annotation settings.
+
+.. _pool-based-active-learning-classification:
+
+Single-output Classification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each sample has one class label. The animations show the classifier's
+decision boundary, labeled samples, and the query strategy's utility scores.
+
+.. image:: /examples/pool_classification_legend.png
+   :alt: Legend for class labels, decision boundaries, labeled samples, and utility scores.
+
+{{ gallery("pool-classification") }}
+
+Multi-label Classification
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A sample can have several labels. Each animation shows one panel per label.
+Querying a sample reveals its complete label vector. The panels share the
+same acquisition utility, while each has its own decision boundary.
+The legend below applies separately to each panel: class 0 and class 1 mean
+that the panel's label is absent or present, respectively. Gray markers
+identify samples whose label vectors have been acquired.
+
+.. image:: /examples/pool_classification_legend.png
+   :alt: Legend applied per label: binary label values, decision boundaries, acquired samples, and utility scores.
+
+{{ gallery("pool-multilabel") }}
+
+.. _pool-based-active-learning-regression:
+
+Regression
+~~~~~~~~~~
+
+Each sample has a continuous target value. The animations show the fitted
+regression curve, labeled samples, and acquisition utilities. Some examples
+select several samples per cycle.
+
+.. image:: /examples/pool_regression_legend.png
+   :alt: Legend for the regression curve, utility scores, and labeled and unlabeled samples.
+
+{{ gallery("pool-regression") }}
+
+.. _pool-based-active-learning-multi-annotator-learning:
+
+Classification with Multiple Annotators
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Several annotators can provide a class label for a sample. These examples
+show how a strategy selects sample–annotator pairs when annotator reliability
+varies.
+
+.. image:: /examples/pool_multi_annotator_legend.png
+   :alt: Legend for class labels, annotator correctness, decision boundaries, and utility scores.
+
+{{ gallery("pool-multi-annotator") }}
+
+.. _stream-based-active-learning-classification:
+
+Stream-based Active Learning
+----------------------------
+
+Samples arrive in sequence, and the strategy decides which ones to label
+within its budget. The current animations demonstrate single-output
+classification, showing arriving samples and the evolving decision boundary.
+
+.. image:: /examples/stream_classification_legend.png
+   :alt: Legend for class labels, unlabeled and current samples, and the decision boundary.
+
+{{ gallery("stream-classification") }}
+
+.. toctree::
+   :hidden:
+   :includehidden:
+
+{% for section in sections %}
+   {{ section }}/index
+{%- endfor %}
+
+.. only:: html
+
+   .. container:: sphx-glr-footer sphx-glr-footer-gallery
+
+      .. container:: sphx-glr-download sphx-glr-download-python
+
+         :download:`Download all Python examples </generated/sphinx_gallery_examples/sphinx_gallery_examples_python.zip>`
+
+      .. container:: sphx-glr-download sphx-glr-download-jupyter
+
+         :download:`Download all example notebooks </generated/sphinx_gallery_examples/sphinx_gallery_examples_jupyter.zip>`

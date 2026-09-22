@@ -18,11 +18,13 @@ import sys
 sys.path.append(os.path.abspath("./_ext"))
 sys.path.insert(0, os.path.abspath(".."))
 import skactiveml
+from sphinx_gallery.sorting import ExampleTitleSortKey
 
 from docs.generate import (
     generate_strategy_overview_rst,
     generate_api_reference_rst,
     generate_examples,
+    generate_visualizations_rst,
     generate_tutorials,
     generate_switcher,
     get_skactiveml_methods,
@@ -155,6 +157,10 @@ sphinx_gallery_conf = {
     "examples_dirs": os.path.normpath("generated/examples"),
     # the path where to save gallery generated output
     "gallery_dirs": os.path.normpath("generated/sphinx_gallery_examples"),
+    # Keep example URLs while arranging the landing page by demonstrated setup.
+    "copyfile_regex": r"index\.rst$",
+    "within_subsection_order": "ExampleTitleSortKey",
+    "minigallery_sort_order": ExampleTitleSortKey(""),
     "matplotlib_animations": True,
     # directory where function/class granular galleries are stored
     "backreferences_dir": os.path.normpath(
@@ -309,6 +315,12 @@ json_data = generate_examples(
     version=version,
 )
 
+generate_visualizations_rst(
+    gen_path=sphinx_gallery_conf["examples_dirs"],
+    json_data=json_data,
+    examples_path=sphinx_gallery_conf["examples_dirs"],
+)
+
 generate_strategy_overview_rst(
     gen_path=os.path.abspath("generated/"), json_data=json_data
 )
@@ -339,5 +351,14 @@ def capitalize_gallery_page_title(app, docname, source):
         )
 
 
+def expand_visualization_contents(
+    app, pagename, templatename, context, doctree
+):
+    """Keep all example setups reachable from the gallery's contents panel."""
+    if pagename == "generated/sphinx_gallery_examples/index":
+        context["theme_show_toc_level"] = 2
+
+
 def setup(app):
     app.connect("source-read", capitalize_gallery_page_title)
+    app.connect("html-page-context", expand_visualization_contents)

@@ -1,11 +1,11 @@
-:orphan:
-
 Visualizations
 ==============
 
-On this page, we illustrate how different query strategies behave across
-various active learning scenarios. To this end, we generate synthetic,
-low-dimensional toy datasets that allow us to visualize the distribution of
-samples selected for labeling in feature space. Each example consists of an
-animation and accompanying code that plot the results across individual
-active learning cycles.
+Explore how query strategies select samples across active learning cycles.
+Each animation uses a small synthetic dataset. Open its card to see the
+accompanying explanation and code.
+Examples are grouped by the setup shown in the animation. A strategy may
+support additional tasks or target types: use the
+:doc:`Strategy Overview </generated/strategy_overview>` to filter methods by
+their supported setups. Cards within each group are ordered alphabetically
+by example title.

@@ -1261,6 +1261,15 @@ explains qualifications such as random selection within tree leaves.
 The overview marks generic pool wrappers' target support as dependent on the
 wrapped strategy. The sub-sampling wrapper also inherits its batching rule.
 
+The visualization landing page groups examples by the setup demonstrated by
+their ``template``, independently of the capabilities listed in ``tags``.
+For example, an entry using ``template_pool.py`` belongs to single-output
+classification even if its strategy also supports regression or multi-label
+targets. ``template_pool_multilabel.py`` places an example in the multi-label
+group. The layout lives in ``docs/_templates/visualizations.rst.jinja``. Its
+mini-galleries use the existing generated scripts and keep example URLs
+stable. Sphinx-Gallery sorts cards by their displayed example titles.
+
 Testing and Code Coverage
 -------------------------
 

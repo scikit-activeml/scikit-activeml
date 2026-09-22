@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 from joblib import Parallel, delayed
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 import git
 
 import skactiveml
@@ -211,6 +212,49 @@ def _example_setup(data):
     else:
         setup = "classification"
     return f"{scenario}-{setup}"
+
+
+def generate_visualizations_rst(gen_path, json_data, examples_path):
+    """Write a gallery landing page grouped by the demonstrated setup.
+
+    ``gen_path`` is the generated examples directory. Sphinx-Gallery copies
+    its ``index.rst`` into the gallery via ``copyfile_regex``. Mini-galleries
+    reference the scripts below ``examples_path`` (relative to the Sphinx
+    source directory), retaining existing example URLs and thumbnails.
+    """
+    examples = {setup: [] for setup in EXAMPLE_SETUP_LABELS}
+    sections = []
+    for section, contents in json_data.items():
+        if not contents["data"]:
+            continue
+        sections.append(section)
+        for data in contents["data"]:
+            setup = _example_setup(data)
+            if setup not in examples:
+                raise ValueError(
+                    f"No visualization group for {data['method']!r}: {setup!r}."
+                )
+            filename = (
+                f"plot-{data['class']}-{data['method'].replace(' ', '_')}.py"
+            )
+            examples[setup].append(
+                (Path(examples_path) / section / filename).as_posix()
+            )
+
+    docs_path = Path(__file__).parent
+    environment = Environment(
+        loader=FileSystemLoader(docs_path / "_templates"),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    rendered = environment.get_template("visualizations.rst.jinja").render(
+        intro=(docs_path / "examples" / "README.rst").read_text(),
+        examples=examples,
+        sections=sorted(sections),
+    )
+    destination = Path(gen_path) / "index.rst"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(rendered)
 
 
 def _format_generated_python_script(file_path, line_length=79):
@@ -759,7 +803,7 @@ def generate_examples(
 def _generate_single_example(
     filename, root, local_dir_path, dst, notebook_directory, version="latest"
 ):
-    """_summary_
+    """Generate examples or copy a gallery support file.
 
     Parameters
     ----------

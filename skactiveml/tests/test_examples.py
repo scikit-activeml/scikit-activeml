@@ -1,6 +1,7 @@
 import inspect
 import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from docs.generate import (
     OVERVIEW_SCENARIOS,
     generate_examples,
     generate_strategy_overview_rst,
+    generate_visualizations_rst,
     get_strategy_metadata,
     get_skactiveml_methods,
 )
@@ -486,6 +488,86 @@ class TestExamples(unittest.TestCase):
         data["tags"].append("single-sample")
         with self.assertRaisesRegex(ValueError, "pool batching"):
             get_strategy_metadata(data)
+
+    def test_visualizations_group_by_demonstrated_setup(self):
+        json_data = {}
+        for root, _, files in os.walk(self.json_path):
+            records = []
+            for filename in sorted(files):
+                if filename.endswith(".json"):
+                    with open(path.join(root, filename)) as file:
+                        records.extend(json.load(file))
+            if records:
+                json_data[path.relpath(root, self.json_path)] = {
+                    "data": records
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            generate_visualizations_rst(
+                directory, json_data, examples_path="generated/examples"
+            )
+            with open(path.join(directory, "index.rst")) as file:
+                index = file.read()
+
+        groups = [
+            re.findall(
+                r"^   (generated/examples/.*\.py)$", block, re.MULTILINE
+            )
+            for block in index.split(".. minigallery::")[1:]
+        ]
+        self.assertEqual(len(groups), 5)
+        all_examples = [example for group in groups for example in group]
+        expected_count = sum(
+            len(section["data"]) for section in json_data.values()
+        )
+        self.assertEqual(len(all_examples), expected_count)
+        self.assertEqual(len(set(all_examples)), expected_count)
+
+        classification, multilabel, regression, multiannotator, stream = groups
+        # Broad capabilities must not duplicate a classification animation
+        # under regression or multilabel. Keep the existing example URL.
+        random = (
+            "generated/examples/1-pool-classification/"
+            "plot-RandomSampling-Random_Sampling.py"
+        )
+        self.assertIn(random, classification)
+        self.assertNotIn(random, multilabel + regression)
+        for cls in [
+            "LabelCardinalityInconsistency",
+            "MaxLossReductionMaxConfidence",
+        ]:
+            self.assertTrue(
+                any(f"/plot-{cls}-" in item for item in multilabel)
+            )
+            self.assertFalse(
+                any(f"/plot-{cls}-" in item for item in classification)
+            )
+        self.assertTrue(
+            all("/2-pool-regression/" in item for item in regression)
+        )
+        self.assertTrue(
+            all("/3-pool-multi-annotator/" in item for item in multiannotator)
+        )
+        self.assertTrue(all("/4-stream/" in item for item in stream))
+        self.assertIn(
+            "Strategy Overview </generated/strategy_overview>", index
+        )
+        # Existing subgallery pages stay in the documentation navigation.
+        for section in json_data:
+            self.assertIn(f"   {section}/index", index)
+
+    def test_visualizations_reject_unhandled_setups(self):
+        data = self._overview_example(
+            "StreamRandomSampling", "Random", "Baseline", package="stream"
+        )
+        data["template"] = "examples/template_stream_regression.py"
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "No visualization group"):
+                generate_visualizations_rst(
+                    directory,
+                    {"4-stream": {"data": [data]}},
+                    examples_path="generated/examples",
+                )
 
 
 class Dummy:
