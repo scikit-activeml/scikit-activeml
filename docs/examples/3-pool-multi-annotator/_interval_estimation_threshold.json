@@ -5,7 +5,7 @@
     "method" : "Interval Estimation Threshold",
     "category" : "Baseline",
     "template" : "examples/template_pool_multi_annotator.py",
-    "tags" : ["pool", "classification", "multi-annotator"],
+    "tags" : ["pool", "classification", "multi-annotator", "top-k-batch"],
     "title" : "Interval Estimation Threshold",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],

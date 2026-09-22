@@ -5,7 +5,7 @@
     "method" : "Query-by-Committee (QBC) with Empirical Variance",
     "category" : "Informativeness",
     "template" : "examples/template_pool_regression.py",
-    "tags" : ["pool",  "regression", "single-annotator"],
+    "tags" : ["pool", "regression", "single-annotator", "top-k-batch"],
     "title" : "Query-by-Committee (QBC) with Empirical Variance",
     "refs" : ["seung1992query","burbidge2007active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

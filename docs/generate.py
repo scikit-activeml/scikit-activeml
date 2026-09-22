@@ -81,6 +81,137 @@ OVERVIEW_SCENARIOS = OrderedDict(
     ]
 )
 
+OVERVIEW_FILTERS = [
+    (
+        "task",
+        "Task",
+        [("classification", "Classification"), ("regression", "Regression")],
+    ),
+    (
+        "target",
+        "Targets",
+        [("single-output", "Single-output"), ("multi-label", "Multi-label")],
+    ),
+    (
+        "annotators",
+        "Annotators",
+        [
+            ("single-annotator", "Single annotator"),
+            ("multi-annotator", "Multiple annotators"),
+        ],
+    ),
+    (
+        "batch",
+        "Pool Batching",
+        [
+            ("batch", "Batch-capable"),
+            ("top-k-batch", "Top-k"),
+            ("diverse-batch", "Diverse"),
+            ("random-batch", "Random"),
+            ("single-sample", "Single-sample only"),
+        ],
+    ),
+]
+
+OVERVIEW_BATCH_LABELS = {
+    "top-k-batch": "Top-k batch",
+    "diverse-batch": "Diverse batch",
+    "random-batch": "Random batch",
+    "single-sample": "Single-sample only",
+}
+
+
+def get_strategy_metadata(data):
+    """Resolve a documented method's supported setups and pool batching.
+
+    The API declares complete (task, target type, annotator type) tuples.
+    Example tags restrict these to the documented method variant; they do
+    not define additional combinations. Constructor parameters that change
+    capabilities belong in ``capability_params``, independently of the code
+    used to demonstrate the method in ``init_qs``.
+    """
+    package = importlib.import_module(f"skactiveml.{data['package']}")
+    cls = getattr(package, data["class"])
+    params = {
+        name: None
+        for name, parameter in inspect.signature(cls).parameters.items()
+        if parameter.default is inspect.Parameter.empty
+    }
+    conditional = cls in (
+        skactiveml.pool.SubSamplingWrapper,
+        skactiveml.pool.ParallelUtilityEstimationWrapper,
+    )
+    if conditional:
+        # These wrappers preserve the wrapped strategy's target semantics.
+        # A task-agnostic strategy exposes the target kinds they can preserve;
+        # the overview explicitly notes the dependency on the wrapped method.
+        params["query_strategy"] = skactiveml.pool.RandomSampling()
+    params.update(data.get("capability_params", {}))
+    declared = cls(**params)._target_capabilities
+    tags = set(data["tags"])
+    capabilities = sorted(
+        capability
+        for capability in declared
+        if capability[0] in tags
+        and capability[2] in tags
+        and (capability[1] != "multi-label" or "multi-label" in tags)
+    )
+    capability_tags = {
+        "classification",
+        "regression",
+        "multi-label",
+        "single-annotator",
+        "multi-annotator",
+    }
+    supported_tags = {value for setup in capabilities for value in setup}
+    if not capabilities or not (tags & capability_tags) <= supported_tags:
+        raise ValueError(
+            f"Unsupported capability tags for {data['method']!r}."
+        )
+
+    batch = sorted(tags & OVERVIEW_BATCH_LABELS.keys())
+    scenario = data["package"].split(".")[0]
+    if scenario == "stream" and batch:
+        raise ValueError(
+            f"Stream method {data['method']!r} has pool batch tags."
+        )
+    if scenario == "pool" and (
+        not batch or ("single-sample" in batch and len(batch) != 1)
+    ):
+        raise ValueError(f"Specify pool batching for {data['method']!r}.")
+    return {
+        "api_class": f"{package.__name__}.{cls.__name__}",
+        "capabilities": capabilities,
+        "batch": batch,
+        "conditional": conditional,
+    }
+
+
+EXAMPLE_SETUP_LABELS = {
+    "pool-classification": "single-output classification",
+    "pool-multilabel": "multi-label classification",
+    "pool-regression": "regression",
+    "pool-multi-annotator": "classification with multiple annotators",
+    "stream-classification": "single-output classification",
+}
+
+
+def _example_setup(data):
+    """Identify the demonstrated setup, independently of supported tasks."""
+    template = Path(data.get("template", "")).stem
+    if not template:
+        return None
+    scenario = data["package"].split(".")[0]
+    if "regression" in template:
+        setup = "regression"
+    elif "multilabel" in template:
+        setup = "multilabel"
+    elif "multi_annotator" in template:
+        setup = "multi-annotator"
+    else:
+        setup = "classification"
+    return f"{scenario}-{setup}"
+
 
 def _format_generated_python_script(file_path, line_length=79):
     """Formats a generated Python example script with Black."""
@@ -262,7 +393,6 @@ def generate_strategy_overview_rst(gen_path, json_data):
         file.write("\n")
 
         file.write("|\n\n")
-        # TODO: Replace image path.
         file.write(
             ".. image:: ../logos/scikit-activeml-query-strategy-overview.svg\n"
         )
@@ -291,15 +421,15 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "**classification** as supervised learning tasks. Classification "
             "targets may be **multi-label**, and labels can be provided by a "
             "**single annotator** or "
-            "**multiple annotators**. Finally, a strategy builds a "
-            "batch of samples by either including the samples with "
-            "the **top-k** utilities or by including **diverse** samples "
-            "with high utility scores.\n\n"
-            "Use the filters below to find query strategies "
-            "based on these distinctions. The tables group methods by "
-            "pool-based and stream-based scenarios and list their "
-            "properties alongside each method. Method names link to "
-            "visualizations; API class names link to the implementation "
+            "**multiple annotators**. Pool strategies can select batches "
+            "using **top-k** utility scores, **diversity**, or **random "
+            "selection**. Some methods select only one sample at a time. "
+            "Stream strategies decide which arriving samples to label "
+            "within a **budget**.\n\n"
+            "Each table entry is a method, variant, or wrapped configuration. "
+            "Filters describe the setups that entry supports. The linked "
+            "visualization illustrates the example setup noted below its "
+            "method name. API class names link to the implementation "
             "documentation.\n"
         )
         file.write("\n")
@@ -308,7 +438,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "\n"
             '   <section id="strategy-filters" class="strategy-filters" '
             'aria-labelledby="strategy-filter-title" '
-            'aria-describedby="strategy-filter-hint">\n'
+            'aria-describedby="strategy-filter-hint" hidden>\n'
             '     <div class="strategy-filter-header">\n'
             '       <h2 id="strategy-filter-title" '
             'class="strategy-filter-title">Filter Strategies</h2>\n'
@@ -316,42 +446,27 @@ def generate_strategy_overview_rst(gen_path, json_data):
             'class="strategy-filter-clear">Clear all</button>\n'
             "     </div>\n"
             '     <p id="strategy-filter-hint" '
-            'class="strategy-filter-hint">Show strategies that match '
-            "every selected property.</p>\n"
+            'class="strategy-filter-hint">Choose your intended setup, or '
+            "leave a group on Any. Pool batching options apply to pool "
+            "strategies. With multiple annotators, a batch contains "
+            "sample–annotator pairs.</p>\n"
         )
-        filter_groups = [
-            (
-                "Task",
-                [
-                    ("classification", "Classification"),
-                    ("regression", "Regression"),
-                ],
-            ),
-            ("Targets", [("multi-label", "Multi-label")]),
-            (
-                "Batch Selection",
-                [("top-k-batch", "Top-k"), ("diverse-batch", "Diverse")],
-            ),
-            (
-                "Annotators",
-                [
-                    ("single-annotator", "Single annotator"),
-                    ("multi-annotator", "Multiple annotators"),
-                ],
-            ),
-        ]
-        for group_name, options in filter_groups:
+        for key, group_name, options in OVERVIEW_FILTERS:
             file.write(
-                '     <fieldset class="strategy-filter-group">\n'
+                '     <fieldset class="strategy-filter-group" '
+                f'data-filter="{key}">\n'
                 f"       <legend>{group_name}</legend>\n"
                 '       <div class="strategy-filter-options">\n'
             )
-            for value, label in options:
+            for value, label in [("", "Any")] + options:
+                option_id = f"strategy-filter-{key}-{value or 'any'}"
+                checked = " checked" if not value else ""
                 file.write(
                     '         <label class="strategy-filter-option" '
-                    f'for="strategy-filter-{value}">\n'
-                    '           <input type="checkbox" class="input-tag" '
-                    f'id="strategy-filter-{value}" value="{value}">\n'
+                    f'for="{option_id}">\n'
+                    '           <input type="radio" '
+                    f'name="strategy-{key}" id="{option_id}" '
+                    f'value="{value}"{checked}>\n'
                     f"           <span>{label}</span>\n"
                     "         </label>\n"
                 )
@@ -386,14 +501,21 @@ def generate_strategy_overview_rst(gen_path, json_data):
 def json_data_to_strategy_table(json_data, gen_path):
     """Collect one table per scenario while preserving example links."""
     rows_by_scenario = {scenario: [] for scenario in OVERVIEW_SCENARIOS}
-    # Keep the machine-readable tags in the third column for the filters.
-    head_line = ["Method", "API class", "Tags", "Properties", "Reference"]
+    # The hidden third column carries complete setups for browser filtering.
+    head_line = [
+        "Method",
+        "API class",
+        "Filter data",
+        "Properties",
+        "Reference",
+    ]
     rel_api_path = os.path.join(os.path.basename(gen_path), "api").replace(
         "\\", "/"
     )
 
     for section_name, section_items in json_data.items():
         for data in section_items["data"]:
+            metadata = get_strategy_metadata(data)
             # Collect the data needed to generate the strategy overview.
             qs_name = data["class"]
             method = data["method"]
@@ -410,11 +532,14 @@ def json_data_to_strategy_table(json_data, gen_path):
                 f"{section_name}/plot-{qs_name}-"
                 f'{method.replace(" ", "_")}>`'
             )
+            example_label = EXAMPLE_SETUP_LABELS.get(_example_setup(data), "")
+            if example_label:
+                methods_text += f"\n\n*Example: {example_label}.*"
             strategy_text = (
                 f":doc:`{qs_name} </{rel_api_path}/"
                 f"{package.__name__}.{qs_name}>`"
             )
-            tags = " ".join(data["tags"])
+            filter_data = f"``{json.dumps(metadata)}``"
             ref_text = ""
             for ref in data["refs"]:
                 ref_text += f":footcite:t:`{ref}`, "
@@ -426,28 +551,51 @@ def json_data_to_strategy_table(json_data, gen_path):
             )
 
             properties = [f"**{category}**"]
-            for labels in [
-                {
-                    "classification": "Classification",
-                    "regression": "Regression",
-                },
-                {"multi-label": "Multi-label"},
-                {
-                    "single-annotator": "Single annotator",
-                    "multi-annotator": "Multiple annotators",
-                },
-            ]:
-                values = [
-                    label
-                    for tag, label in labels.items()
-                    if tag in data["tags"]
+            setups = metadata["capabilities"]
+            target_labels = {
+                (
+                    "classification",
+                    "single-output",
+                ): "Single-output classification",
+                (
+                    "classification",
+                    "multi-label",
+                ): "Multi-label classification",
+                ("regression", "single-output"): "Regression",
+            }
+            for setup, label in target_labels.items():
+                if any(capability[:2] == setup for capability in setups):
+                    properties.append(label)
+            properties.extend(
+                label
+                for value, label in [
+                    ("single-annotator", "Single annotator"),
+                    ("multi-annotator", "Multiple annotators"),
                 ]
-                if values:
-                    properties.append(", ".join(values))
+                if any(capability[2] == value for capability in setups)
+            )
+            if data["class"] == "SubSamplingWrapper":
+                properties.append("Batch rule depends on wrapped strategy")
+            elif metadata["batch"]:
+                properties.extend(
+                    OVERVIEW_BATCH_LABELS[value] for value in metadata["batch"]
+                )
+            else:
+                properties.append("Stream budget")
+            if metadata["conditional"]:
+                properties.append("Target support depends on wrapped strategy")
+            if data.get("batch_note"):
+                properties.append(data["batch_note"])
             properties_text = "\n".join(f"| {value}" for value in properties)
             scenario = data["package"].split(".")[0]
             rows_by_scenario[scenario].append(
-                [methods_text, strategy_text, tags, properties_text, ref_text]
+                [
+                    methods_text,
+                    strategy_text,
+                    filter_data,
+                    properties_text,
+                    ref_text,
+                ]
             )
 
     # Sort by the displayed method, then the API class for duplicate names.

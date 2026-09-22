@@ -1191,10 +1191,9 @@ Each JSON file contains a list of example entries with the following fields:
 +------------------+----------------------------------------------------------+
 | ``method``       | Query strategy's official name.                          |
 +------------------+----------------------------------------------------------+
-| ``category``     | The methodological category of this query strategy, e.g.,|
-|                  | Expected Error Reduction, Model Change,                  |
-|                  | Query-by-Committee, Random Sampling,                     |
-|                  | Uncertainty Sampling, or Others.                         |
+| ``category``     | The strategy's methodological category. Examples are     |
+|                  | Informativeness, Representativeness, Hybrid, Baseline,   |
+|                  | and Wrapper.                                             |
 +------------------+----------------------------------------------------------+
 | ``template``     | Defines the general setup/setting of the example.        |
 |                  | Supported templates include:                             |
@@ -1204,7 +1203,8 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | ``examples/template_stream.py``, and                     |
 |                  | ``examples/template_pool_batch.py``.                     |
 +------------------+----------------------------------------------------------+
-| ``tags``         | Search categories. Supported tags include ``pool``,      |
+| ``tags``         | Supported setups and batching behavior for the           |
+|                  | documented method variant. Tags include ``pool``,        |
 |                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
 |                  | ``classification``, ``multi-label``, and ``regression``. |
 +------------------+----------------------------------------------------------+
@@ -1243,6 +1243,23 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | ``NICKernelRegressor()``. (Only supported for the        |
 |                  | regression template.)                                    |
 +------------------+----------------------------------------------------------+
+
+The strategy overview obtains complete task, target, and annotator combinations
+from the class's ``_target_capabilities``. The ``tags`` restrict these to the
+documented method variant. They describe supported use cases. The ``template``
+field describes the setup illustrated by the linked example. For variants whose
+constructor parameters change their capabilities, add ``capability_params``
+with those parameters as a JSON object, for example
+``{"method": "expected_average_precision"}``. These parameters are used for
+capability inspection, independently of the example code in ``init_qs``.
+
+Pool entries must specify their batching behavior using ``top-k-batch``,
+``diverse-batch``, or ``random-batch``. Use ``single-sample`` for an entry
+restricted to one sample per cycle. It cannot be combined with batch tags.
+Stream entries do not carry pool batching tags. An optional ``batch_note``
+explains qualifications such as random selection within tree leaves.
+The overview marks generic pool wrappers' target support as dependent on the
+wrapped strategy. The sub-sampling wrapper also inherits its batching rule.
 
 Testing and Code Coverage
 -------------------------

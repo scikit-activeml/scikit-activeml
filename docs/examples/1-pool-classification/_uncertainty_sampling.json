@@ -51,7 +51,8 @@
     "method" : "Uncertainty Sampling with Expected Average Precision (USAP)",
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "tags" : ["pool", "classification", "single-annotator", "top-k-batch"],
+    "capability_params" : {"method": "expected_average_precision"},
     "title": "Uncertainty Sampling with Expected Average Precision (USAP)",
     "refs": [
       "wang2018uncertainty"
@@ -93,7 +94,8 @@
     "method" : "Dual Strategy for Active Learning (DUAL)",
     "category" : "Hybrid",
     "template" : "examples/1-pool-classification/template_DUAL.py",
-    "tags" : ["pool",  "classification", "single-annotator", "multi-label"],
+    "tags" : ["pool", "classification", "single-annotator", "multi-label", "single-sample"],
+    "batch_note" : "The DUAL recipe selects one sample per cycle",
     "title" : "Dual Strategy for Active Learning",
     "refs" : ["donmez2007dual"],
     "sequence" : ["title", "text_0", "plot", "refs"],

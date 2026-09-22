@@ -5,7 +5,7 @@
     "method" : "Probabilistic Active Learning in Datastreams",
     "category" : "Hybrid",
     "template" : "examples/template_stream.py",
-    "tags" : ["stream",  "classification", "single-annotator", "top-k-batch"],
+    "tags" : ["stream", "classification", "single-annotator"],
     "title" : "Probabilistic Active Learning in Datastreams",
     "refs" : ["kottke2015probalistic"],
     "sequence" : ["title", "text_0", "plot", "refs"],

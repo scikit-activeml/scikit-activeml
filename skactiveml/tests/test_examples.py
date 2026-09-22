@@ -13,6 +13,7 @@ from docs.generate import (
     OVERVIEW_SCENARIOS,
     generate_examples,
     generate_strategy_overview_rst,
+    get_strategy_metadata,
     get_skactiveml_methods,
 )
 from skactiveml import pool, stream
@@ -215,6 +216,7 @@ class TestExamples(unittest.TestCase):
             "category": category,
             "tags": (
                 [package.split(".")[0], "classification", "single-annotator"]
+                + (["random-batch"] if package != "stream" else [])
                 if tags is None
                 else tags
             ),
@@ -253,6 +255,7 @@ class TestExamples(unittest.TestCase):
                             "classification",
                             "regression",
                             "single-annotator",
+                            "diverse-batch",
                         ],
                     )
                 ]
@@ -264,7 +267,12 @@ class TestExamples(unittest.TestCase):
                         "Random Sampling",
                         "Baseline",
                         package="pool.multiannotator",
-                        tags=["pool", "classification", "multi-annotator"],
+                        tags=[
+                            "pool",
+                            "classification",
+                            "multi-annotator",
+                            "random-batch",
+                        ],
                     )
                 ]
             },
@@ -307,7 +315,8 @@ class TestExamples(unittest.TestCase):
             pool_table.index(":doc:`Greedy Sampling"),
             pool_table.index(":doc:`Random Sampling"),
         )
-        self.assertIn("| Classification, Regression", pool_table)
+        self.assertIn("| Single-output classification", pool_table)
+        self.assertIn("| Regression", pool_table)
         self.assertIn("| Multiple annotators", pool_table)
         self.assertIn("| **Representativeness**", pool_table)
         self.assertIn("API class", pool_table)
@@ -337,7 +346,7 @@ class TestExamples(unittest.TestCase):
         )
         self.assertNotIn("\n9-unmapped\n", overview)
 
-    def test_strategy_overview_offers_a_filter_per_tag(self):
+    def test_strategy_overview_offers_one_choice_per_setup_property(self):
         section = "1-pool-classification"
         json_data = {
             section: {
@@ -354,19 +363,129 @@ class TestExamples(unittest.TestCase):
         for tag in [
             "classification",
             "regression",
+            "single-output",
             "multi-label",
             "single-annotator",
             "multi-annotator",
             "top-k-batch",
             "diverse-batch",
+            "random-batch",
+            "single-sample",
+            "batch",
         ]:
             with self.subTest(tag=tag):
                 self.assertIn(f'value="{tag}"', overview)
         self.assertIn("<span>Multi-label</span>", overview)
-        # The filter reads the tags of a rendered row, so the row has to
-        # carry them where the filter looks.
+        self.assertEqual(overview.count('value="" checked'), 4)
+        self.assertNotIn('type="checkbox"', overview)
+        for name in ["task", "target", "annotators", "batch"]:
+            self.assertIn(f'name="strategy-{name}"', overview)
         self.assertIn("RandomSampling", overview)
-        self.assertIn("single-annotator", overview)
+        self.assertIn(
+            '"capabilities": [["classification", "single-output", '
+            '"single-annotator"]]',
+            overview,
+        )
+
+    def test_strategy_overview_metadata_for_documented_variants(self):
+        records = {}
+        for root, _, files in os.walk(self.json_path):
+            for filename in files:
+                if filename.endswith(".json"):
+                    with open(path.join(root, filename)) as file:
+                        for data in json.load(file):
+                            records[(data["class"], data["method"])] = (
+                                get_strategy_metadata(data)
+                            )
+
+        def metadata(cls, method=None):
+            matches = [
+                value
+                for (name, label), value in records.items()
+                if name == cls and (method is None or label == method)
+            ]
+            self.assertEqual(len(matches), 1)
+            return matches[0]
+
+        # Combining supported properties must not invent multilabel regression.
+        core_set = metadata("CoreSet")
+        self.assertIn(
+            ("regression", "single-output", "single-annotator"),
+            core_set["capabilities"],
+        )
+        self.assertIn(
+            ("classification", "multi-label", "single-annotator"),
+            core_set["capabilities"],
+        )
+        for record in records.values():
+            self.assertNotIn(
+                ("regression", "multi-label", "single-annotator"),
+                record["capabilities"],
+            )
+
+        # Native multilabel methods cannot be offered for single-output use.
+        for name in [
+            "LabelCardinalityInconsistency",
+            "MaxLossReductionMaxConfidence",
+        ]:
+            self.assertEqual(
+                metadata(name)["capabilities"],
+                [("classification", "multi-label", "single-annotator")],
+            )
+        usap = metadata(
+            "UncertaintySampling",
+            "Uncertainty Sampling with Expected Average Precision (USAP)",
+        )
+        self.assertEqual(
+            usap["capabilities"],
+            [("classification", "single-output", "single-annotator")],
+        )
+
+        # Pool batches, single-only wrappers, and stream budgets differ.
+        qbc = metadata(
+            "QueryByCommittee",
+            "Query-by-Committee (QBC) with Empirical Variance",
+        )
+        self.assertEqual(qbc["batch"], ["top-k-batch"])
+        self.assertEqual(
+            qbc["capabilities"],
+            [("regression", "single-output", "single-annotator")],
+        )
+        self.assertEqual(
+            metadata("ParallelUtilityEstimationWrapper")["batch"],
+            ["single-sample"],
+        )
+        self.assertEqual(metadata("RandomSampling")["batch"], ["random-batch"])
+        self.assertEqual(metadata("StreamRandomSampling")["batch"], [])
+        self.assertEqual(metadata("PeriodicSampling")["batch"], [])
+        self.assertEqual(
+            metadata("IntervalEstimationThreshold")["batch"], ["top-k-batch"]
+        )
+        self.assertEqual(
+            metadata("SingleAnnotatorWrapper", "Core Set + Greedy Selection")[
+                "batch"
+            ],
+            ["diverse-batch"],
+        )
+        for name in ["SubSamplingWrapper", "ParallelUtilityEstimationWrapper"]:
+            self.assertTrue(metadata(name)["conditional"])
+
+    def test_strategy_overview_rejects_invalid_metadata(self):
+        data = self._overview_example(
+            "LabelCardinalityInconsistency", "LCI", "Informativeness"
+        )
+        with self.assertRaisesRegex(ValueError, "capability tags"):
+            get_strategy_metadata(data)
+        data = self._overview_example(
+            "StreamRandomSampling", "Random", "Baseline", package="stream"
+        )
+        data["tags"].append("top-k-batch")
+        with self.assertRaisesRegex(ValueError, "pool batch tags"):
+            get_strategy_metadata(data)
+        data = self._overview_example("RandomSampling", "Random", "Baseline")
+        data["tags"].append("single-sample")
+        with self.assertRaisesRegex(ValueError, "pool batching"):
+            get_strategy_metadata(data)
 
 
 class Dummy:

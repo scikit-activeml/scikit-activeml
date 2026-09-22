@@ -13,6 +13,19 @@
     margin: 0;
 }
 
+.strategy-table tr > :nth-child(3),
+.strategy-table col:nth-child(3),
+.strategy-table tr[hidden],
+.bd-toc-nav li[hidden] {
+    display: none;
+}
+
+.strategy-table td:first-child p + p {
+    margin-top: 0.5rem;
+    color: var(--pst-color-text-muted);
+    font-size: 0.875rem;
+}
+
 .strategy-filters {
     margin: 1.5rem 0 2rem;
     padding: 1.25rem 1.5rem 0;
