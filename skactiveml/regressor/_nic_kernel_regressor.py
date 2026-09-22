@@ -132,7 +132,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         if sample_weight is not None:
             self.weights_ = sample_weight[is_lbld]
-            if np.sum(self.weights_) == 0:
+            if len(self.weights_) > 0 and np.sum(self.weights_) == 0:
                 raise ValueError(
                     "The sample weights of the labeled samples "
                     "must not be all zero."
@@ -140,7 +140,12 @@ class NICKernelRegressor(ProbabilisticRegressor):
         else:
             self.weights_ = None
 
-        check_type(self.metric, "self.metric", target_vals=self.METRICS)
+        check_type(
+            self.metric,
+            "self.metric",
+            target_vals=self.METRICS,
+            indicator_funcs=[callable],
+        )
         check_type(
             self.metric_dict, "self.metric_dict", dict, target_vals=[None]
         )
@@ -183,6 +188,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
                 X, self.X_, metric=self.metric, **self.metric_dict_
             )
 
+        K = np.asarray(K, dtype=float)
         if self.weights_ is not None:
             K = self.weights_.reshape(1, -1) * K
 
