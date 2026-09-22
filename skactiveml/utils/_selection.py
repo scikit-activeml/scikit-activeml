@@ -1,8 +1,6 @@
 """Utilities for selection."""
 
-import operator
 import warnings
-from functools import reduce
 
 import numpy as np
 from scipy.stats import rankdata
@@ -177,80 +175,77 @@ def simple_batch(
 
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
-    """Combine different rankings hierarchically to one ranking assignment.
-    A ranking index `i` is ranked higher than index `j` iff
-    `ranking[i] > ranking[j]`. For the combined ranking it will hold that the
-    first ranking of `iter_ranking` always determines the ranking position at
-    an index, and only when two ranking assignments are equal the second
-    ranking will determine the ranking position and so forth.
+    """Combine rankings in order of priority.
+
+    Earlier rankings take precedence over later rankings. Later rankings
+    break ties in earlier rankings.
 
     Parameters
     ----------
     iter_ranking : iterable of array-like
-        The different rankings. They must share a common shape in the sense
-        that they have the same number of dimensions and are broadcastable by
-        numpy.
-    rank_method : string, default=None
-        The method by which the utilities are ranked. See `scipy.rankdata`s
-        argument `method` for details.
+        One or more numerical rankings with the same number of dimensions
+        and shapes that can be broadcast together. An entry containing
+        `np.nan` in any ranking is excluded and receives `np.nan` in the
+        result. Infinite values are valid ranking values.
+    rank_method : {'average', 'min', 'max', 'dense', 'ordinal'}, default=None
+        How to assign ranks to entries tied in every input ranking, following
+        the `method` argument of `scipy.stats.rankdata`. `None` uses 'dense'.
+        With 'ordinal', ties follow the flattened input order.
     rank_per_batch : bool, default=False
-        Whether the first index determines the batch and is not used for
-        ranking.
+        If `True`, the first axis identifies independent batches and the
+        remaining axes are flattened within each batch. Otherwise, all
+        entries are ranked together.
 
     Returns
     -------
-    combined_ranking : np.ndarray
-        The combined ranking.
+    combined_ranking : np.ndarray, dtype=float64
+        The combined ranks in the broadcast shape, with larger values
+        indicating higher priority. A single input ranking is converted to
+        float and returned without reranking.
     """
 
     if rank_method is None:
         rank_method = "dense"
     check_type(rank_method, "rank_method", str)
+    if rank_method not in ("average", "min", "max", "dense", "ordinal"):
+        raise ValueError(f"Unknown rank method '{rank_method}'.")
     check_type(rank_per_batch, "rank_per_batch", bool)
 
-    iter_ranking = list(iter_ranking)
-    for idx, ranking in enumerate(iter_ranking):
-        iter_ranking[idx] = check_array(
+    rankings = [
+        check_array(
             ranking, allow_nd=True, ensure_2d=False, ensure_all_finite=False
-        ).astype(float)
-        if idx != 0 and iter_ranking[idx - 1].ndim != ranking.ndim:
-            raise ValueError(
-                f"The number of dimensions of the `ranking` in "
-                f"`iter_ranking` must be the same, but "
-                f"`iter_ranking[{idx}].ndim == {ranking.ndim}"
-                f" and `iter_ranking[{idx - 1}].ndim == "
-                f"{iter_ranking[idx - 1].ndim}`."
-            )
-    np.broadcast_shapes(*(u.shape for u in iter_ranking))
-
-    combined_ranking = iter_ranking[0]
-
-    for idx in range(1, len(iter_ranking)):
-        next_ranking = iter_ranking[idx]
-        cr_shape = combined_ranking.shape
-        if rank_per_batch:
-            rank_shape = (
-                cr_shape[0],
-                max(reduce(operator.mul, cr_shape[1:], 1), 1),
-            )
-            rank_dict = {"method": rank_method, "axis": 1}
-        else:
-            rank_shape = reduce(operator.mul, cr_shape, 1)
-            rank_dict = {"method": rank_method}
-
-        combined_ranking = combined_ranking.reshape(rank_shape)
-
-        # exchange nan values to make rankdata work.
-        nan_values = np.isnan(combined_ranking)
-        combined_ranking[nan_values] = -np.inf
-        combined_ranking = rankdata(combined_ranking, **rank_dict).astype(
-            float
         )
-        combined_ranking[nan_values] = np.nan
-        combined_ranking = combined_ranking.reshape(cr_shape)
+        for ranking in iter_ranking
+    ]
+    if not rankings:
+        raise ValueError("At least one ranking is required.")
+    if any(ranking.ndim != rankings[0].ndim for ranking in rankings[1:]):
+        raise ValueError(
+            "All rankings must have the same number of dimensions."
+        )
+    if len(rankings) == 1:
+        return rankings[0].astype(float)
 
-        combined_ranking = combined_ranking + 1 / (
-            1 + np.exp(-next_ranking)
-        )  # sigmoid
+    rankings = np.broadcast_arrays(*rankings)
+    shape = rankings[0].shape
+    n_batches = shape[0] if rank_per_batch else 1
+    rankings = [ranking.reshape(n_batches, -1) for ranking in rankings]
+    is_valid = ~np.logical_or.reduce(
+        [np.isnan(ranking) for ranking in rankings]
+    )
+    combined_ranking = np.full(rankings[0].shape, np.nan)
 
-    return combined_ranking
+    # Putting invalid entries last keeps them out of valid tie counts.
+    order = np.lexsort([*reversed(rankings), ~is_valid], axis=1)
+    new_group = np.ones(order.shape, dtype=bool)
+    new_group[:, 1:] = False
+    for ranking in rankings:
+        values = np.take_along_axis(ranking, order, axis=1)
+        new_group[:, 1:] |= values[:, 1:] != values[:, :-1]
+    ranks = np.cumsum(new_group, axis=1)
+    if rank_method != "dense":
+        ranks = rankdata(ranks, method=rank_method, axis=1)
+    np.put_along_axis(combined_ranking, order, ranks, axis=1)
+    combined_ranking[~is_valid] = np.nan
+
+    return combined_ranking.reshape(shape)
