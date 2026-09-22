@@ -13,6 +13,7 @@ from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
 from sklearn.datasets import make_blobs
 
+from skactiveml.base import SkactivemlRegressor
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
@@ -1258,6 +1259,60 @@ class TestFunctions(unittest.TestCase):
             bootstrap_size=5,
             n_train=1.9,
         )
+
+    def test_bootstrap_training_size(self):
+        class RecordingRegressor(SkactivemlRegressor):
+            def fit(self, X, y, sample_weight=None):
+                self.X_fit_ = X
+                self.y_fit_ = y
+                self.sample_weight_fit_ = sample_weight
+                return self
+
+            def predict(self, X):
+                return np.zeros(len(X))
+
+        X = np.arange(10).reshape(-1, 1)
+        y = np.arange(10, dtype=float)
+        y[-2:] = np.nan
+        test_cases = [
+            (0.5, 5),
+            (0.25, 3),
+            (0.01, 1),
+            (1.0, 10),
+            (1, 1),
+            (2, 2),
+            (10, 10),
+            (12, 12),
+        ]
+        for n_train, expected_size in test_cases:
+            for sample_weight in [None, np.arange(1, 11)]:
+                with self.subTest(
+                    n_train=n_train,
+                    weighted=sample_weight is not None,
+                ):
+                    regressors = _bootstrap_estimators(
+                        RecordingRegressor(),
+                        X,
+                        y,
+                        bootstrap_size=3,
+                        n_train=n_train,
+                        sample_weight=sample_weight,
+                        random_state=0,
+                    )
+                    self.assertEqual(len(regressors), 3)
+                    for reg in regressors:
+                        self.assertEqual(reg.X_fit_.shape, (expected_size, 1))
+                        sampled_indices = reg.X_fit_[:, 0]
+                        np.testing.assert_array_equal(
+                            reg.y_fit_, y[sampled_indices]
+                        )
+                        if sample_weight is None:
+                            self.assertIsNone(reg.sample_weight_fit_)
+                        else:
+                            np.testing.assert_array_equal(
+                                reg.sample_weight_fit_,
+                                sample_weight[sampled_indices],
+                            )
 
     def test_cross_entropy(self):
         X_1 = np.arange(3 * 2).reshape(3, 2)
