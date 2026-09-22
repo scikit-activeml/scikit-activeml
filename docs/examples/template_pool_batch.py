@@ -53,8 +53,10 @@ clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], class_prior=1e-3, metric
 qs = "$init_qs"
 "$preproc"
 # Preparation for plotting: create a 2x2 grid of subplots.
-fig, axs = plt.subplots(2, 2, figsize=(1.5*6.4, 1.5*4.8))
-fig.subplots_adjust(top=0.875, hspace=0.3, left=0.075, right=0.975, bottom=0.075)
+fig, axs = plt.subplots(2, 2, figsize=(1.5 * 6.4, 1.5 * 4.8))
+fig.subplots_adjust(
+    top=0.875, hspace=0.3, left=0.075, right=0.975, bottom=0.075
+)
 feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = [[] for j in range("$n_cycles|5")]
 
@@ -65,16 +67,18 @@ for c in range(n_cycles):
     clf.fit(X, y)
 
     # Query the next batch of samples; retrieve both indices and utility values.
-    query_idx, utilities = qs.query("$query_params", batch_size=4, return_utilities=True)
+    query_idx, utilities = qs.query(
+        "$query_params", batch_size=4, return_utilities=True
+    )
 
     title = fig.text(
         0.5,
         0.98,
         f"Decision boundary and utilities after acquiring {c} labels\n"
         f"Test Accuracy: {clf.score(X_test, y_test):.4f}",
-        ha='center',
-        va='top',
-        fontsize=14
+        ha="center",
+        va="top",
+        fontsize=14,
     )
     artists[c].append(title)
     # Plot results on each subplot.
@@ -92,7 +96,9 @@ for c in range(n_cycles):
             ax=ax,
         )
         # Scatter all samples with true labels.
-        ax.scatter(X[:, 0], X[:, 1], c=y_pool, cmap="coolwarm", marker=".", zorder=2)
+        ax.scatter(
+            X[:, 0], X[:, 1], c=y_pool, cmap="coolwarm", marker=".", zorder=2
+        )
         # Highlight the labeled samples.
         X_labeled = X[labeled_indices(y)]
         ax.scatter(
@@ -103,8 +109,8 @@ for c in range(n_cycles):
             marker=".",
             s=300,
         )
-        ax.set_xlabel('Feature 1')
-        ax.set_ylabel('Feature 2')
+        ax.set_xlabel("Feature 1")
+        ax.set_ylabel("Feature 2")
         # Overlay the decision boundary.
         ax = plot_decision_boundary(clf, feature_bound, ax=ax)
         # Set the title indicating the current batch and subplot index.

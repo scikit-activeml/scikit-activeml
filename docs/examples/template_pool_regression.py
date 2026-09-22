@@ -73,27 +73,32 @@ for c in range(n_cycles):
     # Record current plot elements.
     coll_old = list(ax_1.collections) + list(ax_2.collections)
     title = ax_1.text(
-        0.5, 1.05,
+        0.5,
+        1.05,
         f"Prediction after acquiring {c} labels\n"
         f"Test R-squared score: {reg.score(X_test, y_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
         ha="center",
         transform=ax_1.transAxes,
     )
-    ax_1.set_xlabel('Sample')
-    ax_1.set_ylabel('Target Value')
-    ax_2.set_xlabel('Sample')
-    ax_2.set_ylabel('Utility')
+    ax_1.set_xlabel("Sample")
+    ax_1.set_ylabel("Target Value")
+    ax_2.set_xlabel("Sample")
+    ax_2.set_ylabel("Utility")
 
     # Compute utility values for the test candidates.
-    _, utilities_test = qs.query("$query_params", candidates=X_test, return_utilities=True)
+    _, utilities_test = qs.query(
+        "$query_params", candidates=X_test, return_utilities=True
+    )
     utilities_test = (utilities_test - utilities_test.min()).flatten()
     if np.any(utilities_test != utilities_test[0]):
         utilities_test /= utilities_test.max()
 
     # Plot utility information on the second axis.
     (utility_line,) = ax_2.plot(X_test, utilities_test, c="green")
-    utility_fill = plt.fill_between(X_test.flatten(), utilities_test, color="green", alpha=0.3)
+    utility_fill = plt.fill_between(
+        X_test.flatten(), utilities_test, color="green", alpha=0.3
+    )
 
     # Plot the samples and their labels.
     is_lbld = is_labeled(y)

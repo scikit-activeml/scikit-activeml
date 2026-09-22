@@ -14,6 +14,7 @@
 #
 import os
 import sys
+
 sys.path.append(os.path.abspath("./_ext"))
 sys.path.insert(0, os.path.abspath(".."))
 import skactiveml
@@ -31,23 +32,25 @@ from docs.generate import (
 
 project = "scikit-activeml"
 copyright = "2025"
-author = "Marek Herde, " \
-         "Minh Tuan Pham, " \
-         "Daniel Kottke, " \
-         "Alexander Benz, " \
-         "Lukas Lührs, " \
-         "Pascal Mergard, " \
-         "Christoph Sandrock, " \
-         "Jiaying Cheng, "\
-         "Atal Roghman," \
-         "Mehmet Mjüde, " \
-         "Lukas Rauch, " \
-         "Bernhard Sick "
+author = (
+    "Marek Herde, "
+    "Minh Tuan Pham, "
+    "Daniel Kottke, "
+    "Alexander Benz, "
+    "Lukas Lührs, "
+    "Pascal Mergard, "
+    "Christoph Sandrock, "
+    "Jiaying Cheng, "
+    "Atal Roghman,"
+    "Mehmet Mjüde, "
+    "Lukas Rauch, "
+    "Bernhard Sick "
+)
 
 # The short X.Y version
 version = skactiveml.__version__
-if '.' in version:
-    version = '.'.join(version.split('.')[:-1])
+if "." in version:
+    version = ".".join(version.split(".")[:-1])
 # The full version, including alpha/beta/rc tags
 release = skactiveml.__version__
 
@@ -84,11 +87,14 @@ nitpicky = True
 nitpick_ignore = [
     ("py:class", "skactiveml.pool._bald._GeneralBALD"),
     ("py:class", "skactiveml.pool._wrapper._TargetPreservingWrapper"),
-    ("py:class", "skactiveml.classifier.multiannotator._utils._SkorchMultiAnnotatorClassifier"),
+    (
+        "py:class",
+        "skactiveml.classifier.multiannotator._utils._SkorchMultiAnnotatorClassifier",
+    ),
 ]
 
 # nbsphinx_execute = 'always'
-nbsphinx_execute = 'never'
+nbsphinx_execute = "never"
 
 # Napoleon settings
 napoleon_numpy_docstring = True
@@ -104,7 +110,7 @@ templates_path = ["_templates"]
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = {'.rst': 'restructuredtext'}
+source_suffix = {".rst": "restructuredtext"}
 
 # The master toctree document.
 master_doc = "index"
@@ -126,13 +132,13 @@ exclude_patterns = [
     "**.ipynb_checkpoints",
     # ignore sphinx gallery example ipynb as they might interfere with
     # including the generated .rst files
-    'generated/sphinx_gallery_examples/**/*.ipynb',
-    'examples/*',
-    'generated/examples/*',
+    "generated/sphinx_gallery_examples/**/*.ipynb",
+    "examples/*",
+    "generated/examples/*",
     # Executing a tutorial downloads third-party sources next to it. They
     # are not documents of this project, so they are neither rendered nor
     # reported as missing from a toctree.
-    'generated/**/.cache/**',
+    "generated/**/.cache/**",
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.
@@ -160,7 +166,7 @@ sphinx_gallery_conf = {
         # The module you locally document uses None
         "skactiveml": None
     },
-    'parallel': num_cpus
+    "parallel": num_cpus,
 }
 os.makedirs(
     os.path.abspath(sphinx_gallery_conf["gallery_dirs"]), exist_ok=True
@@ -224,9 +230,9 @@ html_js_files = [
 # 'searchbox.html']``.
 #
 html_sidebars = {
-    "tutorials": [], # no primary sidebar for this page
-    "contributing": [], # no primary sidebar for this page
-    "generated/strategy_overview": [], # no primary sidebar for this page
+    "tutorials": [],  # no primary sidebar for this page
+    "contributing": [],  # no primary sidebar for this page
+    "generated/strategy_overview": [],  # no primary sidebar for this page
     "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
 }
 
@@ -262,7 +268,7 @@ bibtex_bibfiles = ["refs.bib"]
 intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "python": ("https://docs.python.org/3/", None),
-    'sklearn': ('https://scikit-learn.org/stable/', None),
+    "sklearn": ("https://scikit-learn.org/stable/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "joblib": ("https://joblib.readthedocs.io/en/latest/", None),
@@ -291,8 +297,8 @@ autoclass_content = "class"
 
 
 # -- Options for copy_sphinx_gallery_notebooks extension ---------------------
-copy_gallery_notebooks_src_path = 'generated/sphinx_gallery_examples/'
-copy_gallery_notebooks_dst_path = 'generated/sphinx_gallery_notebooks/'
+copy_gallery_notebooks_src_path = "generated/sphinx_gallery_examples/"
+copy_gallery_notebooks_dst_path = "generated/sphinx_gallery_notebooks/"
 
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
@@ -300,7 +306,7 @@ json_data = generate_examples(
     gen_path="generated/examples/",
     json_path="examples/",
     example_notebook_directory=copy_gallery_notebooks_dst_path,
-    version=version
+    version=version,
 )
 
 generate_strategy_overview_rst(
@@ -311,17 +317,17 @@ generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
     dst_path="generated/tutorials/",
     dst_path_colab="generated/tutorials_colab/",
-    version=version
+    version=version,
 )
 
-blacklisted_versions = ['0.0.0', '0.1.0', '0.1.1', '0.1.2']
+blacklisted_versions = ["0.0.0", "0.1.0", "0.1.1", "0.1.2"]
 generate_switcher(
     repo_path="..",
     switcher_location="_static/switcher.json",
-    blacklisted_versions=blacklisted_versions
+    blacklisted_versions=blacklisted_versions,
 )
 
-html_baseurl = f'https://scikit-activeml.github.io/{version}/'
+html_baseurl = f"https://scikit-activeml.github.io/{version}/"
 sitemap_url_scheme = "{link}"
 
 

@@ -83,7 +83,6 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
 
     # get prediction of current sample
 
-
     # Fit the classifier with current training data.
     clf.fit(X, y)
 
@@ -130,8 +129,8 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             ha="center",
             transform=ax.transAxes,
         )
-        ax.set_xlabel('Number of Observed Samples')
-        ax.set_ylabel('Feature')
+        ax.set_xlabel("Number of Observed Samples")
+        ax.set_ylabel("Feature")
         coll_new = list(ax.collections)
         coll_new.append(title)
 

@@ -12,7 +12,6 @@ from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import AutoImageProcessor, Dinov2Model
 
-
 # Define the device depending on its availability.
 device = "cuda" if torch.cuda.is_available() else "cpu"
 

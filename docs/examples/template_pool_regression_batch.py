@@ -74,17 +74,18 @@ for c in range(n_cycles):
     # Capture the current plot state.
     coll_old = list(ax_1.collections) + list(ax_2.collections)
     title = ax_1.text(
-        0.5, 1.05,
+        0.5,
+        1.05,
         f"Prediction after acquiring {c} labels\n"
         f"Test R-squared score: {reg.score(X_test, y_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
         ha="center",
         transform=ax_1.transAxes,
     )
-    ax_1.set_xlabel('Sample')
-    ax_1.set_ylabel('Target Value')
-    ax_2.set_xlabel('Sample')
-    ax_2.set_ylabel('Utility')
+    ax_1.set_xlabel("Sample")
+    ax_1.set_ylabel("Target Value")
+    ax_2.set_xlabel("Sample")
+    ax_2.set_ylabel("Utility")
 
     # Sort X values for smooth plotting of the utility curve.
     sort_mask = np.argsort(X.flatten())
@@ -93,7 +94,9 @@ for c in range(n_cycles):
 
     # Plot the utility curve on the second axis.
     (utility_line,) = ax_2.plot(X_plot, utilities_plot, c="green")
-    utility_fill = plt.fill_between(X_plot, utilities_plot, color="green", alpha=0.3)
+    utility_fill = plt.fill_between(
+        X_plot, utilities_plot, color="green", alpha=0.3
+    )
 
     # Plot the data: unlabeled points in light blue, labeled points in orange.
     is_lbld = is_labeled(y)

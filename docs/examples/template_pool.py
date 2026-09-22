@@ -51,10 +51,7 @@ qs = "$init_qs"
 "$preproc"
 # Preparation for plotting.
 fig, ax = plt.subplots()
-feature_bound = [
-    [min(X[:, 0]), min(X[:, 1])],
-    [max(X[:, 0]), max(X[:, 1])]
-]
+feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # Active learning cycle:
@@ -69,11 +66,13 @@ for c in range(n_cycles):
     # Capture the current plot state.
     coll_old = list(ax.collections)
     title = ax.text(
-        0.5, 1.05,
+        0.5,
+        1.05,
         f"Decision boundary after acquiring {c} labels\n"
         f"Test Accuracy: {clf.score(X_test, y_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
-        ha="center", transform=ax.transAxes,
+        ha="center",
+        transform=ax.transAxes,
     )
 
     # Update plot with utility values, samples, and decision boundary.
@@ -87,12 +86,7 @@ for c in range(n_cycles):
         ax=ax,
     )
     ax.scatter(
-        X[:, 0],
-        X[:, 1],
-        c=y_pool,
-        cmap="coolwarm",
-        marker=".",
-        zorder=2
+        X[:, 0], X[:, 1], c=y_pool, cmap="coolwarm", marker=".", zorder=2
     )
     ax.scatter(
         X_labeled[:, 0],
@@ -103,8 +97,8 @@ for c in range(n_cycles):
         s=300,
     )
     ax = plot_decision_boundary(clf, feature_bound, ax=ax)
-    ax.set_xlabel('Feature 1')
-    ax.set_ylabel('Feature 2')
+    ax.set_xlabel("Feature 1")
+    ax.set_ylabel("Feature 2")
 
     coll_new = list(ax.collections)
     coll_new.append(title)

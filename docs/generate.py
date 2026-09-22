@@ -263,7 +263,9 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
         file.write("|\n\n")
         # TODO: Replace image path.
-        file.write(".. image:: ../logos/scikit-activeml-query-strategy-overview.svg\n")
+        file.write(
+            ".. image:: ../logos/scikit-activeml-query-strategy-overview.svg\n"
+        )
         file.write("   :class: dark-light\n")
         file.write("   :align: center\n")
         file.write("   :width: 100%\n\n")
@@ -516,7 +518,7 @@ def generate_examples(
     json_path,
     example_notebook_directory,
     recursive=True,
-    version="latest"
+    version="latest",
 ):
     """
     Creates all example scripts for the specified package and returns the data
@@ -572,7 +574,7 @@ def generate_examples(
                         local_dir_path=sub_dir_str,
                         dst=dst,
                         notebook_directory=example_notebook_directory,
-                        version=version
+                        version=version,
                     )
                     for filename in files
                 )
@@ -587,7 +589,7 @@ def generate_examples(
                         local_dir_path=sub_dir_str,
                         dst=dst,
                         notebook_directory=example_notebook_directory,
-                        version=version
+                        version=version,
                     )
                 )
         for json_data_list in json_data_lists:
@@ -651,7 +653,7 @@ def _generate_single_example(
                     package=current_package,
                     template_path=os.path.abspath(data["template"]),
                     notebook_directory=notebook_directory,
-                    version=version
+                    version=version,
                 )
     elif not filename.startswith("template"):
         if filename.endswith(".py") or filename.endswith(".ipynb"):
@@ -678,7 +680,7 @@ def generate_example_script(
     template_path,
     notebook_directory,
     google_colab_link=None,
-    version="latest"
+    version="latest",
 ):
     """
     Generates a python example file needed, for the 'sphinx-gallery' extension.
@@ -1010,13 +1012,13 @@ def generate_tutorials(src_path, dst_path, dst_path_colab, version="latest"):
         dst_path,
         colab_notebook_path=dst_path_colab,
         show_installation_code=False,
-        version=version
+        version=version,
     )
     post_process_tutorials(
         dst_path_colab,
         colab_notebook_path=dst_path_colab,
         show_installation_code=True,
-        version=version
+        version=version,
     )
 
 
@@ -1025,7 +1027,7 @@ def post_process_tutorials(
     colab_notebook_path,
     show_installation_code=False,
     google_colab_link=None,
-    version="latest"
+    version="latest",
 ):
     """This function allows to post-process the tutorial notebooks. In
     particular, the placeholder (<colab_link>) within notebooks are replaced
@@ -1069,7 +1071,7 @@ def post_process_tutorials(
                 processed_file_content,
                 file_path_colab,
                 google_colab_link,
-                version
+                version,
             )
             if show_installation_code:
                 processed_file_content = uncomment_installation_code(
@@ -1108,11 +1110,8 @@ def add_orphan_metadata(file_content):
 
 
 def replace_colab_link(
-        file_content,
-        colab_path,
-        google_colab_link=None,
-        version="latest"
-    ):
+    file_content, colab_path, google_colab_link=None, version="latest"
+):
     """This function replaces the placeholder (<colab_link>) within
     `file_content` with the link that matches the location once the notebook is
     included into the deployed documentation.
@@ -1145,7 +1144,7 @@ def replace_colab_link(
     return output
 
 
-def check_google_colab_link(google_colab_link, version='latest'):
+def check_google_colab_link(google_colab_link, version="latest"):
     """This function checks if `google_colab_link` is a string. If it is, it is
     returned as is. If it is `None`, a valid string that points to the official
     scikit-activeml documentation is returned.
