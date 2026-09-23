@@ -12,7 +12,7 @@ from sklearn import clone
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ConstantKernel
+from sklearn.gaussian_process.kernels import ConstantKernel, RBF
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -890,6 +890,107 @@ class TestSklearnNormalRegressor(
 
         reg = SklearnNormalRegressor(estimator=LinearRegression())
         self.assertRaises(ValueError, reg.fit, self.X, self.y)
+
+    def test_predict_target_distribution_propagates_type_errors(self):
+        class FailingGPR(GaussianProcessRegressor):
+            def __init__(self, message="backend calculation failed"):
+                super().__init__()
+                self.message = message
+
+            def predict(self, X, return_std=False, return_cov=False):
+                if return_std:
+                    raise TypeError(self.message)
+                return super().predict(X)
+
+        class KwargsLinearRegression(LinearRegression):
+            def predict(self, X, **predict_kwargs):
+                return super().predict(X, **predict_kwargs)
+
+        for message in [
+            "backend calculation failed",
+            "return_std is not supported",
+        ]:
+            reg = SklearnNormalRegressor(FailingGPR(message)).fit(
+                self.X, self.y
+            )
+            for method in [reg.predict_target_distribution, reg.predict]:
+                with self.subTest(message=message, method=method.__name__):
+                    with self.assertRaisesRegex(TypeError, message):
+                        method(self.X_cand)
+
+        # The recognized rejection of `return_std` keeps its message.
+        reg = SklearnNormalRegressor(KwargsLinearRegression()).fit(
+            self.X, self.y
+        )
+        with self.assertRaisesRegex(ValueError, "accept `return_std`"):
+            reg.predict_target_distribution(self.X_cand)
+
+    def test_predict_zero_standard_deviation(self):
+        X = np.array([[0.0], [1.0]])
+        y = np.array([2.0, 3.0])
+        X_pred = np.array([[0.0], [0.5], [1.0]])
+        gpr = GaussianProcessRegressor(kernel=RBF(), alpha=0, optimizer=None)
+        mean_exp, std_exp = (
+            clone(gpr).fit(X, y).predict(X_pred, return_std=True)
+        )
+        self.assertEqual(std_exp[0], 0)
+        self.assertEqual(std_exp[2], 0)
+        self.assertGreater(std_exp[1], 0)
+
+        reg = SklearnNormalRegressor(gpr).fit(X, y)
+        mean, std, entropy = reg.predict(
+            X_pred, return_std=True, return_entropy=True
+        )
+        np.testing.assert_array_equal(mean, mean_exp)
+        np.testing.assert_array_equal(std, std_exp)
+        self.assertTrue(np.isfinite(entropy).all())
+        self.assertLess(entropy[0], entropy[1])
+
+        dist = reg.predict_target_distribution(X_pred)
+        zero = std_exp == 0
+        quantiles = dist.ppf(np.array([[0.01], [0.5], [0.99]]))
+        np.testing.assert_allclose(
+            quantiles[:, zero], np.tile(mean_exp[zero], (3, 1))
+        )
+        y_samples = reg.sample_y(X_pred, n_samples=5, random_state=0)
+        np.testing.assert_allclose(
+            y_samples[zero], np.tile(mean_exp[zero, np.newaxis], (1, 5))
+        )
+
+        # Constant labels give a zero standard deviation as fallback.
+        class UnfittableRegressor(GaussianProcessRegressor):
+            def fit(self, X, y, sample_weight=None):
+                raise ValueError()
+
+        reg = SklearnNormalRegressor(UnfittableRegressor())
+        with self.assertWarns(Warning):
+            reg.fit(X, [1.5, 1.5])
+        with self.assertWarns(Warning):
+            mean, std = reg.predict(X_pred, return_std=True)
+        np.testing.assert_array_equal(mean, np.full(len(X_pred), 1.5))
+        np.testing.assert_array_equal(std, np.zeros(len(X_pred)))
+
+    def test_predict_target_distribution_rejects_invalid_std(self):
+        class InvalidStdGPR(GaussianProcessRegressor):
+            def __init__(self, std=-1.0):
+                super().__init__()
+                self.std = std
+
+            def predict(self, X, return_std=False, return_cov=False):
+                mean = super().predict(X)
+                if return_std:
+                    return mean, np.full(len(mean), self.std)
+                return mean
+
+        for std in [-1.0, np.nan, np.inf]:
+            reg = SklearnNormalRegressor(InvalidStdGPR(std)).fit(
+                self.X, self.y
+            )
+            with self.subTest(std=std):
+                with self.assertRaisesRegex(
+                    ValueError, "finite and nonnegative"
+                ):
+                    reg.predict(self.X_cand)
 
     def test_fit(self):
         class DummyRegressor(SkactivemlRegressor):

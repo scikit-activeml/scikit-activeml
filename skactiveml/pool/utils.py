@@ -956,7 +956,8 @@ def expected_target_val(X, target_func, reg, **kwargs):
         - 'dynamic_quad' uses `scipy's` function `expect` on the
           `rv_continuous` random variable of `reg`, which in turn uses a
           dynamic gaussian quadrature routine for calculating the integral.
-          Performance is worse using a vector function.
+          A random variable with zero standard deviation is evaluated at its
+          mean instead. Performance is worse using a vector function.
     quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
@@ -1046,8 +1047,9 @@ def conditional_expect(
           by `n_integration_samples`.
         -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
           random variable of `reg`, which in turn uses a dynamic gaussian
-          quadrature routine for calculating the integral. Performance is worse
-          using a vector function.
+          quadrature routine for calculating the integral. A random variable
+          with zero standard deviation is evaluated at its mean instead.
+          Performance is worse using a vector function.
     quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
@@ -1250,9 +1252,12 @@ def conditional_expect(
                 func_out = func(np.arange(len(X)), X, np.full((len(X), 1), y))
                 return float(to_scalar_if_singleton(func_out[idx]))
 
-            expectation[idx] = cond_dist.expect(
-                quad_function_wrapper,
-                **quad_dict,
-            )
+            if cond_dist.std() == 0:
+                expectation[idx] = quad_function_wrapper(cond_dist.mean())
+            else:
+                expectation[idx] = cond_dist.expect(
+                    quad_function_wrapper,
+                    **quad_dict,
+                )
 
     return expectation

@@ -8,6 +8,7 @@ from scipy.stats import norm
 from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
@@ -978,6 +979,38 @@ class TestApproximation(unittest.TestCase):
                     vector_func=True,
                 )
                 np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_conditional_expectation_handles_zero_standard_deviations(self):
+        reg = SklearnNormalRegressor(
+            GaussianProcessRegressor(kernel=RBF(), alpha=0, optimizer=None)
+        ).fit(np.array([[0.0], [1.0]]), np.array([2.0, 3.0]))
+        X = np.array([[0.0], [0.5], [1.0]])
+        mean, std = reg.predict(X, return_std=True)
+        zero = std == 0
+        np.testing.assert_array_equal(zero, [True, False, True])
+
+        for parameters, vector_func in itertools.product(
+            [
+                {"method": "assume_linear"},
+                {"method": "monte_carlo"},
+                {"method": "quantile", "quantile_method": "trapezoid"},
+                {"method": "quantile", "quantile_method": "quadrature"},
+                {"method": "gauss_hermite"},
+                {"method": "dynamic_quad"},
+            ],
+            [True, False],
+        ):
+            with self.subTest(**parameters, vector_func=vector_func):
+                result = conditional_expect(
+                    X=X,
+                    func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,
+                    reg=reg,
+                    random_state=0,
+                    vector_func=vector_func,
+                    **parameters,
+                )
+                self.assertTrue(np.isfinite(result).all())
+                np.testing.assert_allclose(result[zero], mean[zero] ** 2)
 
     def test_conditional_expectation_handles_degenerate_quantile_grids(self):
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())

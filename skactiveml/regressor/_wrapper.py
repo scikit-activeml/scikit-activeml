@@ -716,23 +716,36 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
         Returns
         -------
         dist : scipy.stats._distn_infrastructure.rv_frozen
-            The distribution of the targets at the test samples.
+            The distribution of the targets at the test samples. Its means and
+            standard deviations are those predicted by `estimator`. As
+            `scipy` requires positive scales, a predicted standard deviation
+            of zero is represented by the smallest positive normal float as
+            scale. The mean of such a distribution is the predicted one, its
+            standard deviation is zero, and its quantiles and samples equal
+            the predicted mean up to floating-point resolution.
 
         """
         check_is_fitted(self)
 
         try:
             loc, scale = SklearnRegressor.predict(self, X, return_std=True)
-            return norm(loc=loc, scale=scale)
         except TypeError as e:
             if (
                 "predict() got an unexpected keyword argument 'return_std'"
                 in str(e)
             ):
                 raise ValueError(
-                    "SklearnNormalRegressors require the Regressor from"
+                    "SklearnNormalRegressors require the Regressor from "
                     "`sklearn` to accept `return_std`."
                 ) from e
+            raise
+        scale = np.asarray(scale, dtype=float)
+        if not np.all(np.isfinite(scale) & (scale >= 0)):
+            raise ValueError(
+                "The standard deviations predicted by `estimator` must be "
+                "finite and nonnegative."
+            )
+        return norm(loc=loc, scale=np.maximum(scale, np.finfo(float).tiny))
 
 
 if successful_skorch_torch_import:
