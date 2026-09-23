@@ -39,11 +39,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
         Any further parameters are passed directly to the kernel function.
     mu_0 : int or float, default=0
         The prior mean.
-    kappa_0 : int or float, default=0.1
+    kappa_0 : int or float >= 0, default=0.1
         The weight of the prior mean.
-    sigma_sq_0: int or float, default=1.0
+    sigma_sq_0 : int or float >= 0, default=1.0
         The prior variance.
-    nu_0 : int or float, default=2.5
+    nu_0 : int or float >= 0, default=2.5
         The weight of the prior variance.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -111,13 +111,15 @@ class NICKernelRegressor(ProbabilisticRegressor):
         is_lbld, y_observed = _observed_numerical_labels(
             y, self.missing_label_
         )
-        for value, name in [
-            (self.kappa_0, "self.kappa_0"),
-            (self.nu_0, "self.nu_0"),
-            (self.sigma_sq_0, "self.sigma_sq_0"),
+        for value, name, min_val in [
+            (self.kappa_0, "self.kappa_0", 0),
+            (self.nu_0, "self.nu_0", 0),
+            (self.sigma_sq_0, "self.sigma_sq_0", 0),
+            (self.mu_0, "self.mu_0", None),
         ]:
-            check_scalar(value, name, (int, float), min_val=0)
-        check_scalar(self.mu_0, "self.mu_0", (int, float))
+            check_scalar(value, name, (int, float), min_val=min_val)
+            if not np.isfinite(value):
+                raise ValueError(f"`{name}` must be finite, got {value}.")
 
         self._is_lbld = is_lbld
         self.X_ = X[is_lbld]
@@ -255,14 +257,18 @@ class NICKernelRegressor(ProbabilisticRegressor):
         Returns
         -------
         dist : scipy.stats._distn_infrastructure.rv_frozen
-            The distribution of the targets at the test samples.
+            The distribution of the targets at the test samples. A posterior
+            scale of zero yields a point mass at the posterior mean.
         """
         check_is_fitted(self)
         X = self._validate_prediction_data(X)
 
         prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
-        self._check_posterior_evidence(prior_params[0] + update_params[0])
+        self._check_posterior_evidence(
+            prior_params[0] + update_params[0],
+            prior_params[1] + update_params[1],
+        )
         post_params = _combine_params(prior_params, update_params)
 
         kappa_post, nu_post, mu_post, sigma_sq_post = post_params
@@ -270,32 +276,41 @@ class NICKernelRegressor(ProbabilisticRegressor):
         df = nu_post
         loc = mu_post
         scale = np.sqrt((1 + kappa_post) / kappa_post * sigma_sq_post)
+        scale = np.maximum(scale, np.finfo(float).tiny)
         return t(df=df, loc=loc, scale=scale)
 
-    def _check_posterior_evidence(self, kappa_post):
+    def _check_posterior_evidence(self, kappa_post, nu_post):
         """Reject test samples the posterior says nothing about.
 
         Parameters
         ----------
         kappa_post : numpy.ndarray of shape (n_samples,)
             Posterior weight on the target mean, per test sample.
+        nu_post : numpy.ndarray of shape (n_samples,)
+            Posterior weight on the target variance, per test sample.
 
         Raises
         ------
         ValueError
-            If any test sample carries no posterior weight.
+            If any test sample carries no posterior weight on the target
+            mean or variance.
         """
-        without_evidence = kappa_post <= 0
-        if np.any(without_evidence):
-            raise ValueError(
-                f"{np.sum(without_evidence)} of {len(kappa_post)} test "
-                "samples carry no evidence for the target mean, so it is "
-                "undefined for them. The kernel gives them zero mass and "
-                f"`kappa_0={self.kappa_0}` puts no weight on the prior mean "
-                "either. Widen the kernel, e.g. with a smaller 'gamma' in "
-                "`metric_dict`, or use a positive `kappa_0` so that such "
-                "samples fall back to the prior mean."
-            )
+        for weight_post, name, prior_weight, quantity in [
+            (kappa_post, "kappa_0", self.kappa_0, "mean"),
+            (nu_post, "nu_0", self.nu_0, "variance"),
+        ]:
+            without_evidence = weight_post <= 0
+            if np.any(without_evidence):
+                raise ValueError(
+                    f"{np.sum(without_evidence)} of {len(weight_post)} test "
+                    f"samples carry no evidence for the target {quantity}, "
+                    "so it is undefined for them. The kernel gives them zero "
+                    f"mass and `{name}={prior_weight}` puts no weight on the "
+                    f"prior {quantity} either. Widen the kernel, e.g. with a "
+                    "smaller 'gamma' in `metric_dict`, or use a positive "
+                    f"`{name}` so that such samples fall back to the prior "
+                    f"{quantity}."
+                )
 
 
 def _combine_params(prior_params, update_params):

@@ -725,6 +725,82 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         y_pred = reg.predict(X)
         np.testing.assert_array_equal(np.zeros_like(y_pred), y_pred)
 
+    def test_pretrained_estimator(self):
+        random_state = np.random.RandomState(0)
+        X_full, y_full = make_regression(150, random_state=0)
+        X_train = X_full[:100]
+        y_train = y_full[:100]
+        X_test = X_full[100:]
+        missing_label = np.nan
+
+        sgd_regressor_instance = SGDRegressor(
+            loss="huber",
+            random_state=0,
+        )
+        gp_regressor_instance = GaussianProcessRegressor(random_state=0)
+        lr_regressor_instance = LinearRegression()
+        # TODO: Is there a scikit-learn regressor that supports .sample(..)?
+        # GaussianProcessRegressor does not seem to throw a NotFittedError
+        cases = [
+            (sgd_regressor_instance, NotFittedError),
+            (gp_regressor_instance, None),
+            (lr_regressor_instance, NotFittedError),
+        ]
+
+        for estimator, fit_exception in cases:
+            # check that non-pretrained regressors fail without fitting
+            reg_no_pretrain = SklearnRegressor(
+                estimator=deepcopy(estimator),
+                missing_label=missing_label,
+                random_state=0,
+            )
+            if fit_exception is not None:
+                self.assertRaises(
+                    fit_exception, reg_no_pretrain.predict, X_test
+                )
+
+            for use_partial_fit in [False, True]:
+                # pretrain regressor and test consistency of results after
+                # wrapping
+                pretrained_estimator = deepcopy(estimator)
+                pretrained_estimator.fit(X_train, y_train)
+
+                has_sample = hasattr(pretrained_estimator, "sample")
+                has_sample_y = hasattr(pretrained_estimator, "sample_y")
+                has_partial_fit = hasattr(pretrained_estimator, "partial_fit")
+
+                reg = SklearnRegressor(
+                    estimator=deepcopy(pretrained_estimator),
+                    missing_label=missing_label,
+                    random_state=0,
+                )
+
+                if use_partial_fit and has_partial_fit:
+                    # update classifier and check results for consistency
+                    # afterwards
+                    y_train_random = random_state.permutation(y_train)
+
+                    pretrained_estimator.partial_fit(X_train, y_train_random)
+                    reg.partial_fit(X_train, y_train_random)
+
+                if has_sample:
+                    sample_orig_0 = pretrained_estimator.sample(X_test)
+                    sample_wrapped_0 = reg.sample_y(X_test)
+                    np.testing.assert_array_equal(
+                        sample_orig_0, sample_wrapped_0
+                    )
+
+                if has_sample_y:
+                    sample_y_orig_0 = pretrained_estimator.sample_y(X_test)
+                    sample_y_wrapped_0 = reg.sample_y(X_test)
+                    np.testing.assert_array_equal(
+                        sample_y_orig_0, sample_y_wrapped_0
+                    )
+
+                pred_orig_0 = pretrained_estimator.predict(X_test)
+                pred_wrapped_0 = reg.predict(X_test)
+                np.testing.assert_array_equal(pred_orig_0, pred_wrapped_0)
+
     def test_unlabeled_partial_fit_preserves_predictions_and_fallback(self):
         X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
         for loss in ("squared_error", "invalid"):
@@ -1042,80 +1118,41 @@ class TestSklearnNormalRegressor(
         self.assertRaises(ValueError, reg.partial_fit, X_new, y_new)
 
     def test_pretrained_estimator(self):
-        random_state = np.random.RandomState(0)
-        X_full, y_full = make_regression(150, random_state=0)
+        X_full, y_full = make_regression(150, n_features=3, random_state=0)
         X_train = X_full[:100]
         y_train = y_full[:100]
         X_test = X_full[100:]
-        missing_label = np.nan
+        y_train_random = np.random.RandomState(0).permutation(y_train)
 
-        sgd_regressor_instance = SGDRegressor(
-            loss="huber",
-            random_state=0,
-        )
-        gp_regressor_instance = GaussianProcessRegressor(random_state=0)
-        lr_regressor_instance = LinearRegression()
-        # TODO: Is there a scikit-learn regressor that supports .sample(..)?
-        # GaussianProcessRegressor does not seem to throw a NotFittedError
-        cases = [
-            (sgd_regressor_instance, NotFittedError),
-            (gp_regressor_instance, None),
-            (lr_regressor_instance, NotFittedError),
-        ]
-
-        for estimator, fit_exception in cases:
-            # check that non-pretrained regressors fail without fitting
-            reg_no_pretrain = SklearnRegressor(
-                estimator=deepcopy(estimator),
-                missing_label=missing_label,
-                random_state=0,
-            )
-            if fit_exception is not None:
-                self.assertRaises(
-                    fit_exception, reg_no_pretrain.predict, X_test
-                )
-
-            for use_partial_fit in [False, True]:
-                # pretrain regressor and test consistency of results after
-                # wrapping
-                pretrained_estimator = deepcopy(estimator)
+        for use_partial_fit in [False, True]:
+            with self.subTest(use_partial_fit=use_partial_fit):
+                pretrained_estimator = clone(self.prob_reg_partial_fit)
                 pretrained_estimator.fit(X_train, y_train)
-
-                has_sample = hasattr(pretrained_estimator, "sample")
-                has_sample_y = hasattr(pretrained_estimator, "sample_y")
-                has_partial_fit = hasattr(pretrained_estimator, "partial_fit")
-
-                reg = SklearnRegressor(
+                reg = SklearnNormalRegressor(
                     estimator=deepcopy(pretrained_estimator),
-                    missing_label=missing_label,
+                    missing_label=np.nan,
                     random_state=0,
                 )
-
-                if use_partial_fit and has_partial_fit:
-                    # update classifier and check results for consistency
-                    # afterwards
-                    y_train_random = random_state.permutation(y_train)
-
+                if use_partial_fit:
                     pretrained_estimator.partial_fit(X_train, y_train_random)
                     reg.partial_fit(X_train, y_train_random)
 
-                if has_sample:
-                    sample_orig_0 = pretrained_estimator.sample(X_test)
-                    sample_wrapped_0 = reg.sample_y(X_test)
-                    np.testing.assert_array_equal(
-                        sample_orig_0, sample_wrapped_0
-                    )
+                mean_exp, std_exp = pretrained_estimator.predict(
+                    X_test, return_std=True
+                )
+                mean, std = reg.predict(X_test, return_std=True)
+                np.testing.assert_array_equal(mean, mean_exp)
+                np.testing.assert_array_equal(std, std_exp)
 
-                if has_sample_y:
-                    sample_y_orig_0 = pretrained_estimator.sample_y(X_test)
-                    sample_y_wrapped_0 = reg.sample_y(X_test)
-                    np.testing.assert_array_equal(
-                        sample_y_orig_0, sample_y_wrapped_0
-                    )
-
-                pred_orig_0 = pretrained_estimator.predict(X_test)
-                pred_wrapped_0 = reg.predict(X_test)
-                np.testing.assert_array_equal(pred_orig_0, pred_wrapped_0)
+        # Pre-fitted estimators without `return_std` cannot be wrapped.
+        for estimator in [SGDRegressor(random_state=0), LinearRegression()]:
+            reg = SklearnNormalRegressor(
+                estimator=clone(estimator).fit(X_train, y_train),
+                missing_label=np.nan,
+            )
+            with self.subTest(estimator=type(estimator).__name__):
+                with self.assertRaisesRegex(ValueError, "accept `return_std`"):
+                    reg.predict(X_test)
 
     def test_pipeline(self):
         X = np.linspace(-3, 3, 100)
@@ -1134,16 +1171,23 @@ class TestSklearnNormalRegressor(
         reg.fit(X, y_true)
 
         self.assertRaises(ValueError, reg.predict, X)
-        pipline = Pipeline(
+        pipeline = Pipeline(
             (
                 ("scaler", StandardScaler()),
-                ("lr", GaussianProcessRegressor()),
+                ("gpr", GaussianProcessRegressor()),
             )
         )
-        reg = SklearnRegressor(pipline, missing_label=np.nan, random_state=0)
+        reg = SklearnNormalRegressor(
+            pipeline, missing_label=np.nan, random_state=0
+        )
         reg = reg.fit(X, y_true)
         check_is_fitted(reg)
-        reg.predict(X)
+        mean_exp, std_exp = (
+            clone(pipeline).fit(X, y_true).predict(X, return_std=True)
+        )
+        mean, std = reg.predict(X, return_std=True)
+        np.testing.assert_array_equal(mean, mean_exp)
+        np.testing.assert_array_equal(std, std_exp)
 
 
 if successful_skorch_torch_import:

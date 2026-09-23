@@ -981,15 +981,16 @@ class TestApproximation(unittest.TestCase):
                 np.testing.assert_allclose(result, expected, atol=1e-10)
 
     def test_conditional_expectation_handles_zero_standard_deviations(self):
-        reg = SklearnNormalRegressor(
+        normal_reg = SklearnNormalRegressor(
             GaussianProcessRegressor(kernel=RBF(), alpha=0, optimizer=None)
         ).fit(np.array([[0.0], [1.0]]), np.array([2.0, 3.0]))
+        nic_reg = NICKernelRegressor(
+            mu_0=2.0, sigma_sq_0=0, metric_dict={"gamma": 5000.0}
+        ).fit(np.array([[0.0], [0.5]]), np.array([2.0, 3.0]))
         X = np.array([[0.0], [0.5], [1.0]])
-        mean, std = reg.predict(X, return_std=True)
-        zero = std == 0
-        np.testing.assert_array_equal(zero, [True, False, True])
 
-        for parameters, vector_func in itertools.product(
+        for reg, parameters, vector_func in itertools.product(
+            [normal_reg, nic_reg],
             [
                 {"method": "assume_linear"},
                 {"method": "monte_carlo"},
@@ -1000,7 +1001,12 @@ class TestApproximation(unittest.TestCase):
             ],
             [True, False],
         ):
-            with self.subTest(**parameters, vector_func=vector_func):
+            mean, std = reg.predict(X, return_std=True)
+            zero = std == 0
+            np.testing.assert_array_equal(zero, [True, False, True])
+            with self.subTest(
+                reg=type(reg).__name__, **parameters, vector_func=vector_func
+            ):
                 result = conditional_expect(
                     X=X,
                     func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,

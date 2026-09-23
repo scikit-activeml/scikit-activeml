@@ -50,45 +50,6 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
         ]
         self._test_param("init", "metric_dict", test_cases)
 
-    def test_init_param_mu_0(self):
-        if hasattr(self.estimator_class, "mu_0"):
-            test_cases = []
-            test_cases += [(0, None), (0.2, None), ("Test", TypeError)]
-            self._test_param("init", "mu_0", test_cases)
-
-    def test_init_param_kappa_0(self):
-        if hasattr(self.estimator_class, "kappa_0"):
-            test_cases = []
-            test_cases += [
-                (0.1, None),
-                (1, None),
-                (-1.0, None),
-                ("Test", TypeError),
-            ]
-            self._test_param("init", "kappa_0", test_cases)
-
-    def test_init_param_sigma_sq_0(self):
-        if hasattr(self.estimator_class, "sigma_sq_0"):
-            test_cases = []
-            test_cases += [
-                (1.0, None),
-                (1, None),
-                (-1.0, None),
-                ("Test", TypeError),
-            ]
-            self._test_param("init", "sigma_sq_0", test_cases)
-
-    def test_init_param_nu_0(self):
-        if hasattr(self.estimator_class, "nu_0"):
-            test_cases = []
-            test_cases += [
-                (2.5, None),
-                (1, None),
-                (-1.0, None),
-                ("Test", TypeError),
-            ]
-            self._test_param("init", "nu_0", test_cases)
-
     def test_predict(self):
         reg = self.estimator_class(**self.start_parameter)
         X = np.array([[0, 0], [1, 1], [2, 2]])
@@ -359,6 +320,37 @@ class TestNICKernelEstimator(
         self.y = np.array([1, 2, 3])
         self.X_cand = np.array([[2, 1], [3, 5]])
 
+    def test_init_param_mu_0(self):
+        test_cases = [
+            (0, None),
+            (0.2, None),
+            (-1.5, None),
+            ("Test", TypeError),
+            (np.nan, ValueError),
+            (np.inf, ValueError),
+            (-np.inf, ValueError),
+        ]
+        self._test_param("init", "mu_0", test_cases)
+
+    def test_init_param_kappa_0(self):
+        self._test_nonnegative_prior_param("kappa_0", [0.1, 1])
+
+    def test_init_param_sigma_sq_0(self):
+        self._test_nonnegative_prior_param("sigma_sq_0", [1.0, 1])
+
+    def test_init_param_nu_0(self):
+        self._test_nonnegative_prior_param("nu_0", [2.5, 1])
+
+    def _test_nonnegative_prior_param(self, name, valid_values):
+        test_cases = [(value, None) for value in [0, *valid_values]]
+        test_cases += [
+            (-1.0, ValueError),
+            ("Test", TypeError),
+            (np.nan, ValueError),
+            (np.inf, ValueError),
+        ]
+        self._test_param("init", name, test_cases)
+
     def test_fit(self):
         reg = NICKernelRegressor(**self.start_parameter)
         X = 5
@@ -431,6 +423,64 @@ class TestNICKernelEstimator(
             reg.predict([[0.0]])
         with self.assertRaisesRegex(ValueError, "no evidence"):
             reg.predict_target_distribution([[0.0]])
+
+    def test_predict_rejects_zero_posterior_degrees_of_freedom(self):
+        unlabeled = NICKernelRegressor(nu_0=0).fit([[0.0]], [np.nan])
+        labeled = NICKernelRegressor(nu_0=0, metric_dict={"gamma": 500.0}).fit(
+            [[0.0], [0.0], [0.0]], [0.0, 1.0, 2.0]
+        )
+
+        for reg, X in [(unlabeled, [[0.0]]), (labeled, [[0.0], [50.0]])]:
+            for method in [reg.predict, reg.predict_target_distribution]:
+                with self.subTest(
+                    n_labels=len(reg.y_), method=method.__name__
+                ):
+                    with self.assertRaisesRegex(
+                        ValueError, "no evidence for the target variance"
+                    ):
+                        method(X)
+
+        mean, std = labeled.predict([[0.0]], return_std=True)
+        self.assertTrue(np.isfinite(mean).all())
+        self.assertTrue(np.isfinite(std).all())
+
+    def test_zero_posterior_scale_is_a_point_mass(self):
+        # Test samples near the constant labels at zero and without kernel
+        # evidence have a zero posterior scale, the one near ten does not.
+        reg = NICKernelRegressor(
+            mu_0=1.0, sigma_sq_0=0, metric_dict={"gamma": 1000.0}
+        ).fit([[0.0], [0.0], [10.0]], [1.0, 1.0, 3.0])
+        X = np.array([[0.0], [10.0], [5.0]])
+        zero = np.array([True, False, True])
+
+        mean, std, entropy = reg.predict(
+            X, return_std=True, return_entropy=True
+        )
+        np.testing.assert_array_equal(mean[zero], [1.0, 1.0])
+        np.testing.assert_array_equal(std[zero], [0.0, 0.0])
+        self.assertGreater(std[1], 0)
+        self.assertTrue(np.isfinite(entropy).all())
+        self.assertLess(np.max(entropy[zero]), entropy[1])
+        for part, part_alone in zip(
+            (mean, std, entropy),
+            reg.predict(X[[1]], return_std=True, return_entropy=True),
+        ):
+            np.testing.assert_array_equal(part[[1]], part_alone)
+
+        dist = reg.predict_target_distribution(X)
+        quantiles = dist.ppf(np.array([[0.01], [0.5], [0.99]]))
+        np.testing.assert_allclose(quantiles[:, zero], np.ones((3, 2)))
+        y_samples = reg.sample_y(X, n_samples=5, random_state=0)
+        np.testing.assert_allclose(y_samples[zero], np.ones((2, 5)))
+
+        # Constant labels without prior variance and prior mean weight give
+        # the maximum-likelihood variance of zero.
+        reg = NICKernelRegressor(kappa_0=0, sigma_sq_0=0).fit(
+            [[0.0], [1.0]], [1.0, 1.0]
+        )
+        mean, std = reg.predict([[0.0], [0.5]], return_std=True)
+        np.testing.assert_array_equal(mean, [1.0, 1.0])
+        np.testing.assert_array_equal(std, [0.0, 0.0])
 
     def test_predict_rejects_a_negative_kernel_mass(self):
         reg = NICKernelRegressor(metric="linear").fit(
