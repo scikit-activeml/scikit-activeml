@@ -9,7 +9,6 @@ import copy
 import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import check_array, check_is_fitted
-from itertools import chain
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -273,9 +272,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             # Compute utilities.
             if self.method == "KL_divergence":
                 if sample_func is None:
-                    probas = self._aggregate_predict_probas(
-                        X_cand, ensemble, est_arr
-                    )
+                    probas = self._aggregate_predict_probas(X_cand, est_arr)
                 else:
                     probas = sample_func(X_cand, **sample_dict)
                 utilities_cand = average_kl_divergence(probas, self.eps)
@@ -288,7 +285,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                     probas = sample_func(X_cand, **sample_dict)
                     votes = probas.argmax(axis=-1).T
                 if self.method == "vote_entropy":
-                    utilities_cand = vote_entropy(votes, classes)
+                    utilities_cand = vote_entropy(votes, np.unique(votes))
                 else:
                     utilities_cand = variation_ratios(votes)
         else:
@@ -313,50 +310,28 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             return_utilities=return_utilities,
         )
 
-    def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
-        """Aggregate the predicted probabilities across all ensemble members
-        and ensure that all classes are mapped correctly.
+    def _aggregate_predict_probas(self, X_cand, est_arr):
+        """Aggregate the predicted probabilities across all ensemble members.
 
         Parameters
         ----------
         X_cand : array-like of shape (n_samples, n_features)
             Samples whose probabilities are to be predicted.
-        ensemble : SkactivemlClassifier or list or tuple of \
-                SkactivemlClassifier
-            - If `ensemble` is a `SkactivemlClassifier`, it must have
-              `n_estimators` and `estimators_` after fitting as attribute.
-              Then, its estimators will be used as committee.
-            - If `ensemble` is array-like, each element of this list must be
-              `SkactivemlClassifier` and will be used as committee member.
         est_arr : list or tuple of SkactivemlClassifier
-            List of ensemble members contained in `ensemble`.
+            List of ensemble members.
 
         Returns
         -------
-        probas : np.ndarray of shape (n_samples, n_classes)
-            The mapped predicted probabilities.
+        probas : np.ndarray of shape (n_members, n_samples, n_classes)
+            The aligned predicted probabilities, where `n_classes` is the
+            number of distinct classes across all members.
         """
-        if hasattr(ensemble, "classes_"):
-            ensemble_classes = ensemble.classes_
-        else:
-            ensemble_classes = np.unique(
-                list(chain.from_iterable([est.classes_ for est in est_arr]))
-            )
-        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble_classes)))
-        for i, est in enumerate(est_arr):
-            est_proba = est.predict_proba(X_cand)
-            est_classes = est.classes_
-
-            if len(est_classes) == len(ensemble_classes):
-                indices_ensemble = np.arange(len(ensemble_classes))
-            else:
-                indices_est = np.where(np.isin(est_classes, ensemble_classes))[
-                    0
-                ]
-                indices_ensemble = np.searchsorted(
-                    ensemble_classes, est_classes[indices_est]
-                )
-            probas[i, :, indices_ensemble] = est_proba.T
+        member_classes = [np.asarray(est.classes_) for est in est_arr]
+        classes = np.unique(np.concatenate(member_classes))
+        probas = np.zeros((len(est_arr), len(X_cand), len(classes)))
+        for i, (est, est_classes) in enumerate(zip(est_arr, member_classes)):
+            columns = np.searchsorted(classes, est_classes)
+            probas[i][:, columns] = est.predict_proba(X_cand)
         return probas
 
 
@@ -435,7 +410,7 @@ def vote_entropy(votes, classes):
        Linguist., pages 319–326, 1996.
     """
     # Check `votes` array.
-    votes = check_array(votes)
+    votes = check_array(votes, dtype=None)
     n_estimators = votes.shape[1]
 
     # Count the votes.
@@ -472,7 +447,7 @@ def variation_ratios(votes):
        IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages 9368–9377, 2018.
     """
     # Check `votes` array.
-    votes = check_array(votes)
+    votes = check_array(votes, dtype=None)
     n_estimators = votes.shape[1]
 
     # Count the votes.

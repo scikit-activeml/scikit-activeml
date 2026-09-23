@@ -227,7 +227,7 @@ class _GeneralBALD(QueryByCommittee):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if sample_func is None:
-            probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
+            probas = self._aggregate_predict_probas(X_cand, est_arr)
         else:
             probas = sample_func(X_cand, **sample_dict)
 

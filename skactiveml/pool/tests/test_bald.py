@@ -199,6 +199,51 @@ class TestGeneralBALD(
                     ),
                 )
 
+    def test_query_is_invariant_to_class_labels(self):
+        # Only the first and the last class are observed, so the members of
+        # wrapped scikit-learn ensembles know fewer classes than the wrapper.
+        X = np.array(
+            [[1, 2], [5, 8], [8, 4], [5, 4], [2, 2], [7, 7], [3, 6], [6, 1]],
+            dtype=float,
+        )
+        codes = np.array([0, 2, 0, -1, -1, -1, 2, -1])
+        estimators = [
+            RandomForestClassifier(n_estimators=7, random_state=0),
+            BaggingClassifier(
+                ParzenWindowClassifier(), n_estimators=5, random_state=0
+            ),
+        ]
+        for strategy_class, estimator in product(
+            (BatchBALD, GreedyBALD), estimators
+        ):
+            results = []
+            for classes in ([0, 1, 2], [0, 2, 5], ["a", "b", "c"]):
+                ml = None if isinstance(classes[0], str) else np.nan
+                y = np.full(
+                    len(codes), ml, dtype=object if ml is None else float
+                )
+                y[codes >= 0] = np.asarray(classes)[codes[codes >= 0]]
+                ensemble = SklearnClassifier(
+                    clone(estimator),
+                    classes=classes,
+                    missing_label=ml,
+                    random_state=0,
+                )
+                strategy = strategy_class(missing_label=ml, random_state=0)
+                results.append(
+                    strategy.query(
+                        X, y, ensemble, batch_size=2, return_utilities=True
+                    )
+                )
+            with self.subTest(
+                strategy_class=strategy_class, estimator=estimator
+            ):
+                indices, utilities = results[0]
+                self.assertGreater(np.nanmax(utilities), 0)
+                for other_indices, other_utilities in results[1:]:
+                    np.testing.assert_array_equal(other_indices, indices)
+                    np.testing.assert_allclose(other_utilities, utilities)
+
     def test_init_param_greedy_selection(self):
         test_cases = [
             (0, TypeError),
