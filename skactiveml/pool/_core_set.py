@@ -22,12 +22,13 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     This class implements the core-set based query strategy, i.e., the
     standard greedy algorithm for the k-center problem [1]_. CoreSet
     applies a k-center (farthest-first) selection in a feature space,
-    seeded by the labeled set, to minimize the maximum distance of unlabeled
-    samples to the labeled/selected samples. It is a pure diversity criterion
-    without explicit consideration of prediction uncertainty. Originally,
-    this query strategy was only proposed for classification. Nevertheless, it
-    is task-agnostic such that it can handle class labels, numerical targets,
-    and multilabel targets represented by a two-dimensional `y`.
+    seeded by labeled samples outside the candidate set, to minimize the
+    maximum distance of candidates to the selected samples. It is a pure
+    diversity criterion without explicit consideration of prediction
+    uncertainty. Originally, this query strategy was only proposed for
+    classification. Nevertheless, it is task-agnostic such that it can handle
+    class labels, numerical targets, and multilabel targets represented by a
+    two-dimensional `y`.
 
     Parameters
     ----------
@@ -104,7 +105,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Labeled candidates remain eligible and are
+              excluded from the initial centers.
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
@@ -130,7 +132,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
+            Utilities for samples outside the candidate set and samples
+            already selected in the batch are set to `np.nan`.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in
@@ -220,8 +223,8 @@ def k_greedy_center(
     metric_dict=None,
     target_type="single-output",
 ):
-    """An active learning method that greedily forms a batch to minimize the
-    maximum distance to a cluster center among all unlabeled datapoints.
+    """Greedily select candidates to minimize their maximum distance to a
+    cluster center.
 
     Parameters
     ----------
@@ -241,6 +244,8 @@ def k_greedy_center(
         Value to represent a missing label.
     mapping : None or np.ndarray of shape (n_candidates,), default=None
         Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
+        If `None`, the unlabeled samples are candidates. Labeled samples in
+        `mapping` remain eligible and are excluded from the initial centers.
     n_new_cand : int or None, default=None
         The number of new candidates that are additionally added to `X`.
         Only used for the case, that in the query function with the shape of
@@ -271,7 +276,8 @@ def k_greedy_center(
         The utilities of samples after each selected sample of the batch,
         e.g., `utilities[0]` indicates the utilities used for selecting
         the first sample (with index `query_indices[0]`) of the batch.
-        Utilities for labeled samples will be set to np.nan.
+        Utilities for samples outside the candidate set and samples already
+        selected in the batch are set to `np.nan`.
 
         - If `candidates` is `None` or of shape
           `(n_candidates,)`, the indexing refers to the samples in
@@ -327,6 +333,7 @@ def k_greedy_center(
         missing_label=missing_label,
         target_type=target_type,
     )
+    selected_samples = np.setdiff1d(selected_samples, mapping)
     query_indices = np.zeros(batch_size, dtype=int)
     for i in range(batch_size):
         if i == 0:
