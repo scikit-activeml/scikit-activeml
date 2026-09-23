@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import numpy as np
+from sklearn import clone
 
 from .utils import IndexClassifierWrapper
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
@@ -166,6 +167,8 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label)
         check_type(fit_clf, "fit_clf", bool)
+        if fit_clf:
+            clf = clone(clf)
         target_spec = _resolve_estimator_target_spec(self, clf, y)
 
         (
@@ -226,11 +229,6 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             set_base_clf=not fit_clf,
             ignore_partial_fit=ignore_partial_fit,
             enforce_unique_samples=True,
-            # Precomputing the kernel requires memory quadratic in the number
-            # of samples and fixes the kernel parameters for all hypothetical
-            # refits, which is incorrect for a data-dependent bandwidth such
-            # as `metric_dict={'gamma': 'mean'}`. It only pays off for
-            # high-dimensional samples and is slower otherwise.
             use_speed_up=False,
             missing_label=self.missing_label_,
         )
@@ -832,11 +830,30 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
     ):
         id_clf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
+        return self._estimate_risk(
+            id_clf, idx_train, idx_eval, w_eval, idx_cx=idx_cx, cy=cy
+        )
 
-        # Handle problem that if only one candidate is remaining, this should
-        # be the one to be selected although the error cannot be estimated
-        # as there are no samples left for estimating
+    def _estimate_current_error(
+        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
+    ):
+        if self.subtract_current:
+            return self._estimate_risk(id_clf, idx_train, idx_eval, w_eval)
+        else:
+            return super()._estimate_current_error(
+                id_clf, idx_train, idx_cand, idx_eval, w_eval
+            )
 
+    def _estimate_risk(
+        self, id_clf, idx_train, idx_eval, w_eval, idx_cx=None, cy=None
+    ):
+        """Estimate the risk of `id_clf` on the labeled and unlabeled samples.
+
+        If `idx_cx` and `cy` are given, they describe a candidate with its
+        simulated label, which is added to the labeled samples if
+        `candidate_to_labeled` is `True`. A normalized risk without any
+        considered sample is zero.
+        """
         le = id_clf._le
         y_eval = id_clf.y[idx_eval]
         idx_labeled = idx_train[
@@ -847,7 +864,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             is_unlabeled(y_eval, missing_label=self.missing_label_)
         ]
 
-        if self.candidate_to_labeled:
+        if idx_cx is not None and self.candidate_to_labeled:
             idx_labeled = np.concatenate([idx_labeled, idx_cx], axis=0)
             y_labeled = np.concatenate([y_labeled, cy], axis=0)
             idx_unlabeled = np.setdiff1d(
@@ -881,50 +898,6 @@ class ValueOfInformationEER(ExpectedErrorReduction):
                 return err / norm
         else:
             return err
-
-    def _estimate_current_error(
-        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
-    ):
-        # estimate current utility score if required
-        # TODO: maybe use function for code below to reduce redundancies
-        if self.subtract_current:
-            le = id_clf._le
-            y_eval = id_clf.y[idx_eval]
-            idx_labeled = idx_train[is_labeled(y_eval)]
-            y_labeled = id_clf.y[idx_labeled]
-            idx_unlabeled = idx_train[is_unlabeled(y_eval)]
-
-            y_labeled_c_id = None
-            if len(idx_labeled) > 0:
-                y_labeled_c_id = le.transform(y_labeled)
-
-            err = 0
-            norm = 0
-            if self.consider_labeled and len(idx_labeled) > 0:
-                norm += len(idx_labeled)
-                probs = id_clf.predict_proba(idx_labeled)
-                err += self._risk_estimation(
-                    y_labeled_c_id,
-                    probs,
-                    self.cost_matrix_,
-                    w_eval[idx_labeled],
-                )
-
-            if self.consider_unlabeled and len(idx_unlabeled) > 0:
-                norm += len(idx_unlabeled)
-                probs = id_clf.predict_proba(idx_unlabeled)
-                err += self._risk_estimation(
-                    probs, probs, self.cost_matrix_, w_eval[idx_unlabeled]
-                )
-
-            if self.normalize:
-                return err / norm
-            else:
-                return err
-        else:
-            return super()._estimate_current_error(
-                id_clf, idx_train, idx_cand, idx_eval, w_eval
-            )
 
     def _precompute_and_fit_clf(
         self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf

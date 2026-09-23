@@ -1,5 +1,6 @@
 import unittest
 from copy import deepcopy
+from itertools import product
 
 import numpy as np
 from sklearn.naive_bayes import GaussianNB
@@ -12,8 +13,11 @@ from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_state_unchanged
-from skactiveml.utils import MISSING_LABEL, is_labeled
+from skactiveml.tests.utils import (
+    assert_no_query_state,
+    assert_state_unchanged,
+)
+from skactiveml.utils import MISSING_LABEL, is_labeled, unlabeled_indices
 
 
 class TemplateTestExpectedErrorReduction(
@@ -115,6 +119,44 @@ class TemplateTestExpectedErrorReduction(
                     msg=f"Classifier changed after calling query for "
                     f"`fit_clf={fit_clf}`.",
                 )
+
+    def test_query_refit_resolves_classes_from_constructor(self):
+        X = np.arange(6.0).reshape(-1, 1)
+        y_two = np.array([0, 1, np.nan, np.nan, np.nan, np.nan])
+        y_three = np.array([0, 1, 2, np.nan, np.nan, np.nan])
+
+        for y_fit, y_query, msg in [
+            (y_two, y_three, "new class"),
+            (y_three, y_two, "disappearing class"),
+        ]:
+            with self.subTest(msg=msg):
+                qs = self.qs_class(random_state=0)
+                _, expected = qs.query(
+                    X,
+                    y_query,
+                    ParzenWindowClassifier(random_state=0),
+                    return_utilities=True,
+                )
+                clf = ParzenWindowClassifier(random_state=0).fit(X, y_fit)
+                clf_before = deepcopy(clf)
+                _, utilities = self.qs_class(random_state=0).query(
+                    X, y_query, clf, fit_clf=True, return_utilities=True
+                )
+                np.testing.assert_allclose(utilities, expected)
+                self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+                assert_state_unchanged(self, clf, clf_before, name="clf")
+
+        # The fitted vocabulary remains authoritative without refitting, and
+        # explicit classes remain authoritative with refitting.
+        for clf, fit_clf in [
+            (ParzenWindowClassifier().fit(X, y_two), False),
+            (ParzenWindowClassifier(classes=[0, 1]).fit(X, y_two), True),
+        ]:
+            with self.subTest(fit_clf=fit_clf):
+                qs = self.qs_class(random_state=0)
+                with self.assertRaisesRegex(ValueError, "outside `classes`"):
+                    qs.query(X, y_three, clf, fit_clf=fit_clf)
+                assert_no_query_state(self, qs)
 
     def test_init_param_subtract_current(self):
         test_cases = [(2, TypeError), ("string", TypeError)]
@@ -769,6 +811,93 @@ class TestValueOfInformationEER(
     def test_init_param_normalize(self):
         test_cases = [(2, TypeError), ("string", TypeError)]
         self._test_param("query", "normalize", test_cases)
+
+    def test_query_current_risk_respects_missing_label(self):
+        X = np.arange(6.0).reshape(-1, 1)
+        label_sets = [
+            ([0, 1], [0, 1, 0], np.nan),
+            ([0, 1], [0, 1, 0], -1),
+            ([0, 1], [0, 1, 0], None),
+            (["a", "b"], ["a", "b", "a"], "?"),
+        ]
+        for flags in product([False, True], repeat=4):
+            (
+                consider_labeled,
+                consider_unlabeled,
+                candidate_to_labeled,
+                normalize,
+            ) = flags
+            expected = None
+            for classes, labels, missing_label in label_sets:
+                with self.subTest(
+                    flags=flags, missing_label=repr(missing_label)
+                ):
+                    y = np.array(
+                        labels + [missing_label] * 3,
+                        dtype=(
+                            object
+                            if missing_label is None
+                            or isinstance(missing_label, str)
+                            else float
+                        ),
+                    )
+                    qs = ValueOfInformationEER(
+                        consider_labeled=consider_labeled,
+                        consider_unlabeled=consider_unlabeled,
+                        candidate_to_labeled=candidate_to_labeled,
+                        subtract_current=True,
+                        normalize=normalize,
+                        missing_label=missing_label,
+                        random_state=0,
+                    )
+                    clf = ParzenWindowClassifier(
+                        classes=classes, missing_label=missing_label
+                    )
+                    _, utilities = qs.query(X, y, clf, return_utilities=True)
+                    self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+                    if expected is None:
+                        expected = utilities
+                    else:
+                        np.testing.assert_allclose(utilities, expected)
+
+    def test_query_normalized_risk_without_considered_samples(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        nan = MISSING_LABEL
+        test_cases = [
+            (False, False, True, [0, 1, nan, nan], None),
+            (True, False, False, [nan, nan, nan, nan], None),
+            (False, True, True, [0.0, 1.0, 0.0, 1.0], [0, 1]),
+        ]
+        for (
+            consider_labeled,
+            consider_unlabeled,
+            candidate_to_labeled,
+            y,
+            candidates,
+        ) in test_cases:
+            with self.subTest(
+                consider_labeled=consider_labeled,
+                consider_unlabeled=consider_unlabeled,
+            ):
+                qs = ValueOfInformationEER(
+                    consider_labeled=consider_labeled,
+                    consider_unlabeled=consider_unlabeled,
+                    candidate_to_labeled=candidate_to_labeled,
+                    subtract_current=True,
+                    normalize=True,
+                    random_state=0,
+                )
+                _, utilities = qs.query(
+                    X,
+                    y,
+                    ParzenWindowClassifier(classes=[0, 1]),
+                    candidates=candidates,
+                    return_utilities=True,
+                )
+                cand = (
+                    unlabeled_indices(y) if candidates is None else candidates
+                )
+                np.testing.assert_array_equal(utilities[0, cand], 0.0)
 
     def test_query(self):
         super().test_query()
