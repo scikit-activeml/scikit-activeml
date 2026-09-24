@@ -1504,7 +1504,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             _check_probas_are_valid(complete_rows, is_multilabel=False)
 
     def _normalize_single_output_proba(self, P, n_samples):
-        """Align a single-output probability array to `classes_`.
+        """Align single-output probabilities to `classes_` and validate them.
 
         The wrapped estimator's probability columns follow its own learned
         class vocabulary, which may be ordered differently from `classes_` and
@@ -1530,7 +1530,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ------
         ValueError
             If the probabilities can be reconciled with neither the learned
-            nor the declared class vocabulary.
+            nor the declared class vocabulary, or are not valid class
+            probabilities.
         """
         P = np.asarray(P, dtype=float)
         if P.ndim != 2 or P.shape[0] != n_samples:
@@ -1551,9 +1552,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     f"classes, declare `classes` matching the estimator, or "
                     f"return probabilities for all declared classes."
                 )
-            return P
-
-        return _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+        else:
+            P = _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+        self._check_estimator_probas_are_valid(P, is_multilabel=False)
+        return P
 
     def _normalize_multilabel_proba_list(self, P, n_samples):
         """Align a list of per-output probability matrices to `classes_`.
@@ -2393,8 +2395,9 @@ if successful_skorch_torch_import:
             values of a multi-label target must lie within `[0, 1]`.
 
             - If `True`, invalid probabilities raise a `ValueError`.
-            - If `False`, the first forward output is passed on unchecked,
-              e.g., to interpret scores that are not probabilities. The
+            - If `False`, the values of the first forward output are passed
+              on unchecked, e.g., to interpret scores that are not
+              probabilities. Their shape is checked in either case. The
               caller is then responsible for the consumers of these values.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
@@ -2658,23 +2661,30 @@ if successful_skorch_torch_import:
             P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
             check_scalar(self.validate_proba, "validate_proba", bool)
             is_multilabel = self._uses_multilabel_target()
-            if is_multilabel:
-                target_spec = getattr(self, "target_spec_", None)
-                classes = (
-                    target_spec.classes
-                    if target_spec is not None
-                    else self.classes
-                )
-                n_outputs = len(classes)
-                expected_shape = (len(X), n_outputs)
-                if np.shape(P) != expected_shape:
+            target_spec = getattr(self, "target_spec_", None)
+            classes = (
+                target_spec.classes
+                if target_spec is not None
+                else self.classes
+            )
+            expected_shape = (len(X), len(classes))
+            if np.shape(P) != expected_shape:
+                if is_multilabel:
                     raise ValueError(
                         "Expected `predict_proba` of the Skorch module to "
                         "return positive-class probabilities of shape "
-                        f"`(n_samples, {n_outputs})`, exactly "
+                        f"`(n_samples, {len(classes)})`, exactly "
                         f"`{expected_shape}`, for multi-label "
                         f"classification, got {np.shape(P)}."
                     )
+                raise ValueError(
+                    "Expected `predict_proba` of the Skorch module to "
+                    "return class probabilities of shape "
+                    f"`(n_samples, {len(classes)})`, exactly "
+                    f"`{expected_shape}`, for the classes "
+                    f"{_format_classes(classes)}, got {np.shape(P)}. The "
+                    "module needs one output unit per class."
+                )
             if self.validate_proba:
                 _check_probas_are_valid(
                     P,

@@ -2130,6 +2130,40 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                     ValueError, message, clf.predict_proba, self.X_ml
                 )
 
+    def test_invalid_single_output_probabilities_are_rejected(self):
+        invalid_rows = [[np.inf, 0.0], [-0.1, 1.1], [0.4, 0.4], [np.nan, 1.1]]
+        for classes_, invalid_row in product(
+            [np.array([0, 1]), None], invalid_rows
+        ):
+            with self.subTest(classes_=classes_, invalid_row=invalid_row):
+                proba = np.full((len(self.X_ml), 2), 0.5)
+                proba[0] = invalid_row
+                clf = self._prefit_single_output_clf(
+                    proba=proba, classes_=classes_
+                )
+
+                self.assertRaisesRegex(
+                    ValueError,
+                    "'probas' are invalid",
+                    clf.predict_proba,
+                    self.X_ml,
+                )
+
+    def test_single_output_nan_probabilities_keep_prior_fallback(self):
+        for classes_ in [np.array([0, 1]), None]:
+            with self.subTest(classes_=classes_):
+                proba = np.full((len(self.X_ml), 2), 0.5)
+                proba[0] = [np.nan, 0.5]
+                clf = self._prefit_single_output_clf(
+                    proba=proba, classes_=classes_
+                )
+
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    P = clf.predict_proba(self.X_ml)
+
+                np.testing.assert_allclose(P, np.full_like(P, 0.5))
+
     def test_unlearned_probability_column_class_is_rejected(self):
         clf = self._prefit_single_output_clf(
             proba=np.full((len(self.X_ml), 1), 1.0), classes_=np.array([5])
@@ -3957,6 +3991,50 @@ assert np.isfinite(estimator.predict_proba(X)).all()
 
             self.assertFalse(hasattr(clf, "target_spec_"))
             self.assertFalse(hasattr(clf, "_le"))
+
+        def test_predict_proba_rejects_class_count_mismatch(self):
+            X = self.X[:4]
+            y = np.array([0, 1, 0, 1])
+            for n_units, validate_proba, fitted in product(
+                [3, 1], [True, False], [False, True]
+            ):
+                if fitted and n_units == 1:
+                    # Fewer output units than classes already fail in `fit`.
+                    continue
+                with self.subTest(
+                    n_units=n_units,
+                    validate_proba=validate_proba,
+                    fitted=fitted,
+                ):
+                    init_params = deepcopy(self.init_default_params)
+                    init_params.update(
+                        {
+                            "module": nn.Linear(1, n_units),
+                            "classes": [0, 1],
+                            "validate_proba": validate_proba,
+                            "forward_outputs": {
+                                "proba": (0, nn.Softmax(dim=-1)),
+                                "logits": (0, None),
+                            },
+                        }
+                    )
+                    clf = SkorchClassifier(**init_params)
+                    if fitted:
+                        clf.fit(X, y)
+                    for method, kwargs in [
+                        (clf.predict_proba, {}),
+                        (clf.predict_proba, {"extra_outputs": "logits"}),
+                        (clf.predict, {}),
+                    ]:
+                        with self.assertRaisesRegex(
+                            ValueError,
+                            rf"shape `\(n_samples, 2\)`.+got \(4, {n_units}\)"
+                            ".+one output unit per class",
+                        ):
+                            method(X, **kwargs)
+                    if not fitted:
+                        self.assertFalse(hasattr(clf, "target_spec_"))
+                        self.assertFalse(hasattr(clf, "_le"))
 
         def test_prefit_multilabel_rejects_cost_matrix(self):
             init_params = deepcopy(self.init_default_params)
