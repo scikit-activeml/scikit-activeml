@@ -345,7 +345,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         """
         ldf = 0
         if len(self.window_) >= 1:
-            distances = self.dist_func_(self.window_, candidates).ravel()
+            distances = self.dist_func_(
+                self.window_, candidates, **self.dist_func_dict_
+            ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
             for i in np.where(is_new_nn)[0]:
@@ -876,7 +878,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         theta = 0
         if len(self.cognition_window_) >= 1:
             distances = self.dist_func_(
-                self.cognition_window_, candidates
+                self.cognition_window_, candidates, **self.dist_func_dict_
             ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
@@ -891,7 +893,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             self.f_[t] = 1 / (self.theta_[t] + 1)
             tmp = -self.f_[t] * (t_x - self.t_x_[t])
             self.s_[t] = np.exp(tmp)
-        if len(self.cognition_window_) > self.cognition_window_size:
+        if len(self.cognition_window_) >= self.cognition_window_size:
             # remove element with the smallest memory strength
             remove_index = np.argmin(self.s_)
             self.cognition_window_.pop(remove_index)
