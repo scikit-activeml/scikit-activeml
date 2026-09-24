@@ -70,7 +70,7 @@ for c in range(n_cycles):
     title = fig.text(
         0.5,
         0.98,
-        f"Decision boundary and utilities after acquiring {c} labels\n"
+        f"Decision boundary and utilities after acquiring {len(labeled_indices(y, missing_label=MISSING_LABEL))} labels\n"
         f"Test Accuracy: {clf.score(X_test, y_test):.4f}",
         ha='center',
         va='top',
@@ -94,7 +94,7 @@ for c in range(n_cycles):
         # Scatter all samples with true labels.
         ax.scatter(X[:, 0], X[:, 1], c=y_pool, cmap="coolwarm", marker=".", zorder=2)
         # Highlight the labeled samples.
-        X_labeled = X[labeled_indices(y)]
+        X_labeled = X[labeled_indices(y, missing_label=MISSING_LABEL)]
         ax.scatter(
             X_labeled[:, 0],
             X_labeled[:, 1],
