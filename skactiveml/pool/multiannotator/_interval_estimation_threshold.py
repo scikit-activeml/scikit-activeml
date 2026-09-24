@@ -473,6 +473,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             missing_label=clf.missing_label,
             alpha=self.alpha,
             mode="upper",
+            random_state=self.random_state_,
             target_type=self.target_type,
         )
 
