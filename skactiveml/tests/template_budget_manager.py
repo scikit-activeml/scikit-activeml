@@ -233,9 +233,9 @@ class TemplateBudgetManager:
         bm2 = self.bm_class(**init_params)
         bm1_outputs = []
 
-        for u in utilities:
+        for i, u in enumerate(utilities):
             output = bm.query_by_utility(np.array([u]))
-            bm1_outputs.extend(output)
+            bm1_outputs.extend(i + idx for idx in output)
             budget_manager_param_dict1 = {"utilities": np.array([u])}
             call_func(
                 bm.update,
@@ -251,7 +251,8 @@ class TemplateBudgetManager:
             queried_indices=bm2_outputs,
             **budget_manager_param_dict2,
         )
-        self.assertEqual(len(bm1_outputs), len(bm2_outputs))
+        self.assertEqual(bm1_outputs, list(bm2_outputs))
+        assert_state_unchanged(self, bm, bm2)
         if len(expected_output) == 0:
             self.assertEqual(len(expected_output), len(bm2_outputs))
         else:
@@ -271,9 +272,9 @@ class TemplateBudgetManager:
         bm2_outputs = []
         utilities = np.array([0.2, 0.6, 0.8, 0.9, 0.1])
         candidate = np.array([0.3])
-        for u in utilities:
+        for i, u in enumerate(utilities):
             output = bm2.query_by_utility(np.array([u]))
-            bm2_outputs.extend(output)
+            bm2_outputs.extend(i + idx for idx in output)
             budget_manager_param_dict2 = {"utilities": np.array([u])}
             call_func(
                 bm2.update,
@@ -288,6 +289,7 @@ class TemplateBudgetManager:
             queried_indices=bm2_outputs,
             **budget_manager_param_dict1,
         )
+        assert_state_unchanged(self, bm, bm2)
         output1 = bm.query_by_utility(candidate)
         output2 = bm2.query_by_utility(candidate)
-        self.assertEqual(len(output1), len(output2))
+        self.assertEqual(output1, output2)

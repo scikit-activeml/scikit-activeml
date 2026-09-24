@@ -130,10 +130,11 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         """
         queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-        self.random_state_.random_sample(len(candidates))
         for s in queried:
             self.t_ += 1
             if self.budget_ > self.u_ / self.t_:
+                # Replay the draw of `query_by_utility` for this sample.
+                self.random_state_.normal(1, self.delta)
                 if s:
                     self.theta_ *= 1 - self.s
                 else:

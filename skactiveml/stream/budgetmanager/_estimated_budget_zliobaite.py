@@ -322,13 +322,14 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         """
         queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-        for i, s in enumerate(queried):
+        for s in queried:
             if self.budget_ > self.u_t_ / self.w:
                 if s:
                     self.theta_ *= 1 - self.s
                 else:
                     self.theta_ *= 1 + self.s
-        super().update(candidates, queried_indices)
+            # u_t = u_t-1 * (w-1)/w + labeling_t
+            self.u_t_ = self.u_t_ * ((self.w - 1) / self.w) + s
         return self
 
     def _validate_data(self, utilities):
@@ -495,14 +496,16 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         """
         queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-        self.random_state_.random_sample(len(candidates))
         for s in queried:
             if self.budget_ > self.u_t_ / self.w:
+                # Replay the draw of `query_by_utility` for this sample.
+                self.random_state_.normal(1, self.delta)
                 if s:
                     self.theta_ *= 1 - self.s
                 else:
                     self.theta_ *= 1 + self.s
-        super().update(candidates, queried_indices)
+            # u_t = u_t-1 * (w-1)/w + labeling_t
+            self.u_t_ = self.u_t_ * ((self.w - 1) / self.w) + s
         return self
 
     def _validate_data(self, utilities):

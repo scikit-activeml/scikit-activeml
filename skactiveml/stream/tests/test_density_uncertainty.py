@@ -489,7 +489,7 @@ class TestCognitiveDualQueryStrategy(
                     )
 
     def test_query(self):
-        expected_output = [1, 4, 5, 6, 10, 15]
+        expected_output = [4, 5, 6, 7, 11, 15]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,
@@ -579,7 +579,7 @@ class TestCognitiveDualQueryStrategyRanVarUn(
         )
 
     def test_query(self):
-        expected_output = [1, 4, 5, 6, 10, 15]
+        expected_output = [4, 5, 6, 7, 11, 15]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,

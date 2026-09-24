@@ -2212,7 +2212,14 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             init_params["random_state"] = np.random.RandomState(0)
             qs = self.qs_class(**init_params)
             qs2 = self.qs_class(**init_params)
-            X = [[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75], [0.5, 0.5]]
+            X = [
+                [0.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.75, 0.75],
+                [0.5, 0.5],
+            ]
             y_true = [0, 0, 1, 1, 1, 0]
             query_default_params1 = deepcopy(self.query_default_params_clf)
             query_params = inspect.signature(self.qs_class.query).parameters
@@ -2236,7 +2243,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 query_default_params1["return_utilities"] = True
                 qs_output, u = qs.query(**query_default_params1)
                 budget_manager_param_dict1 = {"utilities": u}
-                qs_outputs.extend(qs_output)
+                qs_outputs.extend(i + idx for idx in qs_output)
                 call_func(
                     qs.update,
                     candidates=np.array(x).reshape([1, -1]),
@@ -2253,9 +2260,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 budget_manager_param_dict=budget_manager_param_dict1,
             )
             query_default_params1["candidates"] = X
-            _, expected_utilities = qs.query(**query_default_params1)
-            _, utilities = qs2.query(**query_default_params1)
+            expected_output, expected_utilities = qs.query(
+                **query_default_params1
+            )
+            output, utilities = qs2.query(**query_default_params1)
+            np.testing.assert_array_equal(output, expected_output)
             np.testing.assert_almost_equal(expected_utilities, utilities)
+            assert_state_unchanged(self, qs2, qs)
 
     def test_query_param_return_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
