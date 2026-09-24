@@ -196,6 +196,8 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
+        elif self.budget_manager is None:
+            self.budget_manager_.set_params(budget=self.budget)
 
         budget_manager_param_dict = (
             {}
@@ -300,6 +302,8 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
+        elif self.budget_manager is None:
+            self.budget_manager_.set_params(budget=self.budget)
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
 

@@ -1,6 +1,7 @@
 import inspect
 import warnings
 from copy import deepcopy
+from itertools import product
 from unittest.mock import patch
 
 import numpy as np
@@ -2267,6 +2268,66 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             np.testing.assert_array_equal(output, expected_output)
             np.testing.assert_almost_equal(expected_utilities, utilities)
             assert_state_unchanged(self, qs2, qs)
+
+    def test_set_params_budget(self):
+        query_params = deepcopy(self.query_default_params_clf)
+        if query_params is None:
+            return
+        query_params["return_utilities"] = True
+        n_features = np.shape(query_params["candidates"])[1]
+        candidates = RandomState(0).uniform(0, 10, size=(40, n_features))
+        init_params = deepcopy(self.init_default_params)
+        init_params.update(budget=0.3, random_state=0)
+
+        def query_and_update(qs, chunk):
+            query_params["candidates"] = chunk
+            queried_indices, utilities = qs.query(**query_params)
+            call_func(
+                qs.update,
+                candidates=chunk,
+                queried_indices=queried_indices,
+                budget_manager_param_dict={"utilities": utilities},
+            )
+
+        for budget, update_first in product([0.05, 1.0], [False, True]):
+            qs = self.qs_class(**init_params)
+            query_and_update(qs, candidates[:20])
+            qs.set_params(budget=budget)
+            expected = deepcopy(qs)
+            if hasattr(expected, "budget_manager_"):
+                expected.budget_manager_.set_params(budget=budget)
+            query_params["candidates"] = candidates[20:]
+            if update_first:
+                queried_indices, utilities = deepcopy(expected).query(
+                    **query_params
+                )
+                for strategy in [qs, expected]:
+                    call_func(
+                        strategy.update,
+                        candidates=candidates[20:],
+                        queried_indices=queried_indices,
+                        budget_manager_param_dict={"utilities": utilities},
+                    )
+            else:
+                output, utilities = qs.query(**query_params)
+                expected_output, expected_utilities = expected.query(
+                    **query_params
+                )
+                np.testing.assert_array_equal(output, expected_output)
+                np.testing.assert_allclose(utilities, expected_utilities)
+            assert_state_unchanged(self, qs, expected)
+
+        init_signature = inspect.signature(self.qs_class.__init__)
+        if "budget_manager" in init_signature.parameters:
+            qs = self.qs_class(**init_params)
+            query_and_update(qs, candidates[:20])
+            qs = self.qs_class(
+                **init_params, budget_manager=clone(qs.budget_manager_)
+            )
+            query_and_update(qs, candidates[:20])
+            qs.set_params(budget=1.0)
+            query_and_update(qs, candidates[20:])
+            self.assertEqual(qs.budget_manager_.budget, 0.3)
 
     def test_query_param_return_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

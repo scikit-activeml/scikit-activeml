@@ -291,6 +291,8 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
+        elif self.budget_manager is None:
+            self.budget_manager_.set_params(budget=self.budget)
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -438,6 +440,8 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
+        elif self.budget_manager is None:
+            self.budget_manager_.set_params(budget=self.budget)
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -801,6 +805,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
+        elif self.budget_manager is None:
+            self.budget_manager_.set_params(budget=self.budget)
         # _init_members
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -1001,6 +1007,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
+        elif self.budget_manager is None:
+            self.budget_manager_.set_params(budget=self.budget)
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
