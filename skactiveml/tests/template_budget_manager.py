@@ -260,6 +260,55 @@ class TemplateBudgetManager:
         output = bm.query_by_utility(utilities_nan)
         self.assertEqual(0, len(output))
 
+    def test_query_by_utility_preserves_state(self):
+        random_states = (
+            [0, np.random.RandomState(0), None]
+            if "random_state" in self.init_default_params
+            else [None]
+        )
+        original_global_state = np.random.get_state()
+        try:
+            for random_state in random_states:
+                for initialize_with in ("query", "update"):
+                    with self.subTest(
+                        random_state=random_state,
+                        initialize_with=initialize_with,
+                    ):
+                        init_params = deepcopy(self.init_default_params)
+                        init_params["budget"] = 0.5
+                        if "random_state" in init_params:
+                            init_params["random_state"] = deepcopy(
+                                random_state
+                            )
+                        bm = self.bm_class(**init_params)
+                        if initialize_with == "query":
+                            bm.query_by_utility(
+                                **deepcopy(self.query_by_utility_params)
+                            )
+                        else:
+                            bm.update(**deepcopy(self.update_params))
+                        before = deepcopy(bm)
+                        global_before = np.random.get_state()
+                        for utilities in (
+                            np.array([0.8]),
+                            np.array([0.2, 0.6, 0.8, 0.9, 0.1, np.nan]),
+                        ):
+                            params = deepcopy(self.query_by_utility_params)
+                            params["utilities"] = utilities
+                            first = bm.query_by_utility(**params)
+                            assert_state_unchanged(self, bm, before)
+                            repeated = bm.query_by_utility(**params)
+                            np.testing.assert_array_equal(first, repeated)
+                            assert_state_unchanged(self, bm, before)
+                            assert_state_unchanged(
+                                self,
+                                np.random.get_state(),
+                                global_before,
+                                name="global_random_state",
+                            )
+        finally:
+            np.random.set_state(original_global_state)
+
     def test_update_before_query_by_utility(
         self,
     ):

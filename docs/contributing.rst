@@ -562,6 +562,14 @@ following methods:
 |                                   | according to the queried labels   |
 +-----------------------------------+-----------------------------------+
 
+Once initialized, ``query_by_utility`` must leave the budget manager's
+acquisition state unchanged, including counters, thresholds, histories, and
+random state. Repeated queries with the same utilities and parameters must
+return the same indices until ``update`` advances that state. Both
+``query_by_utility`` and ``update`` must initialize the state needed for
+querying when called first. The shared budget-manager test template checks
+this contract for both initialization paths.
+
 .. _update-2:
 
 ``update``

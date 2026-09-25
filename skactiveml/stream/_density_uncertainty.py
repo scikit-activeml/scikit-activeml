@@ -11,7 +11,6 @@ from sklearn.utils import (
 )
 from sklearn.base import clone
 from sklearn.metrics.pairwise import pairwise_distances
-from sklearn.utils.extmath import row_norms
 
 from skactiveml.base import (
     BudgetManager,
@@ -62,25 +61,6 @@ def _update_budget_manager(
         queried_indices=[0] if queried else [],
         **params,
     )
-
-
-def _window_distances(dist_func, window, candidates, dist_func_dict):
-    """Compute the distances between window samples and candidates."""
-    if dist_func is pairwise_distances and not dist_func_dict:
-        X, Y = np.asarray(window), np.asarray(candidates)
-        if (
-            X.dtype == Y.dtype == np.float64
-            and X.ndim == Y.ndim == 2
-            and X.shape[1] == Y.shape[1]
-            and np.isfinite(X).all()
-            and np.isfinite(Y).all()
-        ):
-            distances = -2 * (X @ Y.T)
-            distances += row_norms(X, squared=True)[:, np.newaxis]
-            distances += row_norms(Y, squared=True)[np.newaxis, :]
-            np.maximum(distances, 0, out=distances)
-            return np.sqrt(distances, out=distances)
-    return dist_func(window, candidates, **dist_func_dict)
 
 
 class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
@@ -374,8 +354,8 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         """
         ldf = 0
         if len(self.window_) >= 1:
-            distances = _window_distances(
-                self.dist_func_, self.window_, candidates, self.dist_func_dict_
+            distances = self.dist_func_(
+                self.window_, candidates, **self.dist_func_dict_
             ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
@@ -919,11 +899,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         s = 1
         theta = 0
         if len(self.cognition_window_) >= 1:
-            distances = _window_distances(
-                self.dist_func_,
-                self.cognition_window_,
-                candidates,
-                self.dist_func_dict_,
+            distances = self.dist_func_(
+                self.cognition_window_, candidates, **self.dist_func_dict_
             ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)

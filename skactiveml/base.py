@@ -1183,6 +1183,12 @@ class BudgetManager(ABC, BaseEstimator):
         """Ask the budget manager which `utilities` are sufficient to query the
         corresponding labels.
 
+        The first call may initialize the manager. Once initialized, querying
+        must leave its acquisition state unchanged, including counters,
+        thresholds, histories, and random state. Repeated calls with the same
+        utilities and parameters must return the same indices until `update`
+        advances that state.
+
         Parameters
         ----------
         utilities : array-like of shape (n_samples,)
@@ -1201,6 +1207,9 @@ class BudgetManager(ABC, BaseEstimator):
     @abstractmethod
     def update(self, candidates, queried_indices, *args, **kwargs):
         """Updates the budget manager.
+
+        If called before `query_by_utility`, this method must also initialize
+        all state required for subsequent queries.
 
         Parameters
         ----------
