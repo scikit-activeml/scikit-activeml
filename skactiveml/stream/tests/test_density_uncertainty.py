@@ -311,6 +311,7 @@ def _assert_dist_func_dict_is_forwarded(test_case, strategy_type):
         {"dist_func": distance, "dist_func_dict": {"metric": "manhattan"}},
         {"dist_func": manhattan_distances},
         {},
+        {"dist_func": distance, "dist_func_dict": {"metric": "euclidean"}},
     ):
         strategy = strategy_type(**kwargs, **dist_params)
         selected = []
@@ -325,6 +326,8 @@ def _assert_dist_func_dict_is_forwarded(test_case, strategy_type):
     test_case.assertFalse(
         np.allclose(results[0][1].min_dist_, results[2][1].min_dist_)
     )
+    test_case.assertEqual(results[2][0], results[3][0])
+    _assert_acquisition_state_equal(test_case, results[2][1], results[3][1])
 
 
 class TemplateCognitiveDualQueryStrategy(
