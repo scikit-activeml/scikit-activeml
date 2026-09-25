@@ -364,13 +364,14 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
                 Mu /= np.sum(Mu, axis=1, keepdims=True)
             else:
                 # Use current model parameters to estimate ground truth labels.
-                U = np.ones((n_samples, n_classes))
-                for c in range(n_classes):
-                    for k in range(n_classes):
-                        y_is_k = y == k
-                        U[:, c] *= np.prod(
-                            self.Alpha_[:, c, k] ** y_is_k, axis=1
-                        )
+                # Multiply the likelihoods of each sample's labels per class;
+                # every remaining sample has at least one label.
+                sample_idx, annot_idx = np.nonzero(is_lbld)
+                U = np.multiply.reduceat(
+                    self.Alpha_[annot_idx, :, y[sample_idx, annot_idx]],
+                    np.flatnonzero(np.diff(sample_idx, prepend=-1)),
+                    axis=0,
+                )
                 Mu = P * U
                 Mu_sum = Mu.sum(axis=1, keepdims=True)
                 Mu = np.divide(
