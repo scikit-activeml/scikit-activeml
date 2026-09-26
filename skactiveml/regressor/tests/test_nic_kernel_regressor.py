@@ -447,31 +447,36 @@ class TestNICKernelEstimator(
     def test_zero_posterior_scale_is_a_point_mass(self):
         # Test samples near the constant labels at zero and without kernel
         # evidence have a zero posterior scale, the one near ten does not.
-        reg = NICKernelRegressor(
-            mu_0=1.0, sigma_sq_0=0, metric_dict={"gamma": 1000.0}
-        ).fit([[0.0], [0.0], [10.0]], [1.0, 1.0, 3.0])
         X = np.array([[0.0], [10.0], [5.0]])
         zero = np.array([True, False, True])
+        for nu_0 in [0.5, 1.5, 2.5]:
+            with self.subTest(nu_0=nu_0):
+                reg = NICKernelRegressor(
+                    mu_0=1.0,
+                    sigma_sq_0=0,
+                    nu_0=nu_0,
+                    metric_dict={"gamma": 1000.0},
+                ).fit([[0.0], [0.0], [10.0]], [1.0, 1.0, 3.0])
 
-        mean, std, entropy = reg.predict(
-            X, return_std=True, return_entropy=True
-        )
-        np.testing.assert_array_equal(mean[zero], [1.0, 1.0])
-        np.testing.assert_array_equal(std[zero], [0.0, 0.0])
-        self.assertGreater(std[1], 0)
-        self.assertTrue(np.isfinite(entropy).all())
-        self.assertLess(np.max(entropy[zero]), entropy[1])
-        for part, part_alone in zip(
-            (mean, std, entropy),
-            reg.predict(X[[1]], return_std=True, return_entropy=True),
-        ):
-            np.testing.assert_array_equal(part[[1]], part_alone)
+                mean, std, entropy = reg.predict(
+                    X, return_std=True, return_entropy=True
+                )
+                np.testing.assert_array_equal(mean[zero], [1.0, 1.0])
+                np.testing.assert_array_equal(std[zero], [0.0, 0.0])
+                self.assertGreater(std[1], 0)
+                self.assertTrue(np.isfinite(entropy).all())
+                self.assertLess(np.max(entropy[zero]), entropy[1])
+                for part, part_alone in zip(
+                    (mean, std, entropy),
+                    reg.predict(X[[1]], return_std=True, return_entropy=True),
+                ):
+                    np.testing.assert_array_equal(part[[1]], part_alone)
 
-        dist = reg.predict_target_distribution(X)
-        quantiles = dist.ppf(np.array([[0.01], [0.5], [0.99]]))
-        np.testing.assert_allclose(quantiles[:, zero], np.ones((3, 2)))
-        y_samples = reg.sample_y(X, n_samples=5, random_state=0)
-        np.testing.assert_allclose(y_samples[zero], np.ones((2, 5)))
+                dist = reg.predict_target_distribution(X)
+                quantiles = dist.ppf(np.array([[0.01], [0.5], [0.99]]))
+                np.testing.assert_allclose(quantiles[:, zero], np.ones((3, 2)))
+                y_samples = reg.sample_y(X, n_samples=5, random_state=0)
+                np.testing.assert_allclose(y_samples[zero], np.ones((2, 5)))
 
         # Constant labels without prior variance and prior mean weight give
         # the maximum-likelihood variance of zero.

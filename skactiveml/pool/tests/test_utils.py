@@ -987,10 +987,17 @@ class TestApproximation(unittest.TestCase):
         nic_reg = NICKernelRegressor(
             mu_0=2.0, sigma_sq_0=0, metric_dict={"gamma": 5000.0}
         ).fit(np.array([[0.0], [0.5]]), np.array([2.0, 3.0]))
+        heavy_tailed_nic_reg = NICKernelRegressor(
+            mu_0=2.0, sigma_sq_0=0, nu_0=0.5, metric_dict={"gamma": 5000.0}
+        ).fit(np.array([[0.0], [0.5], [0.5]]), np.array([2.0, 3.0, 1.0]))
         X = np.array([[0.0], [0.5], [1.0]])
 
-        for reg, parameters, vector_func in itertools.product(
-            [normal_reg, nic_reg],
+        for (name, reg), parameters, vector_func in itertools.product(
+            [
+                ("normal", normal_reg),
+                ("nic", nic_reg),
+                ("heavy_tailed_nic", heavy_tailed_nic_reg),
+            ],
             [
                 {"method": "assume_linear"},
                 {"method": "monte_carlo"},
@@ -1004,9 +1011,7 @@ class TestApproximation(unittest.TestCase):
             mean, std = reg.predict(X, return_std=True)
             zero = std == 0
             np.testing.assert_array_equal(zero, [True, False, True])
-            with self.subTest(
-                reg=type(reg).__name__, **parameters, vector_func=vector_func
-            ):
+            with self.subTest(reg=name, **parameters, vector_func=vector_func):
                 result = conditional_expect(
                     X=X,
                     func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,

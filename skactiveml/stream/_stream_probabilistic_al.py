@@ -238,11 +238,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 self.budget_manager,
                 BalancedIncrementalQuantileFilter,
             )
-        elif (
-            self.budget_manager is None
-            and self.budget_manager_.budget is not self.budget
-        ):
-            self.budget_manager_.set_params(budget=self.budget)
+        self._sync_default_budget_manager()
         budget_manager_param_dict = (
             {}
             if budget_manager_param_dict is None
@@ -348,11 +344,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 self.budget_manager,
                 BalancedIncrementalQuantileFilter,
             )
-        elif (
-            self.budget_manager is None
-            and self.budget_manager_.budget is not self.budget
-        ):
-            self.budget_manager_.set_params(budget=self.budget)
+        self._sync_default_budget_manager()
 
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates

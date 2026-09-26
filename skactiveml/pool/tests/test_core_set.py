@@ -234,18 +234,22 @@ class TestKGreedyCenter(unittest.TestCase):
         self.assertRaises(
             ValueError, k_greedy_center, X=self.X, y=self.y, mapping="string"
         )
-        indices, utilities = k_greedy_center(
-            X=np.arange(4).reshape(-1, 1),
-            y=[0, 1, 0, 1],
-            mapping=[0, 1],
-            batch_size=2,
-            random_state=0,
-        )
-        np.testing.assert_array_equal(indices, [0, 1])
-        np.testing.assert_allclose(
-            utilities,
-            [[2, 1, np.nan, np.nan], [np.nan, 1, np.nan, np.nan]],
-        )
+        X, y = np.arange(4).reshape(-1, 1), [0, 1, 0, 1]
+        for mapping in [[0.5, 1], [-1, 1], [True, False], [0, 4]]:
+            with self.subTest(mapping=mapping):
+                self.assertRaises(
+                    ValueError, k_greedy_center, X=X, y=y, mapping=mapping
+                )
+        for mapping in [[0, 1], [0.0, 1.0]]:
+            with self.subTest(mapping=mapping):
+                indices, utilities = k_greedy_center(
+                    X=X, y=y, mapping=mapping, batch_size=2, random_state=0
+                )
+                np.testing.assert_array_equal(indices, [0, 1])
+                np.testing.assert_allclose(
+                    utilities,
+                    [[2, 1, np.nan, np.nan], [np.nan, 1, np.nan, np.nan]],
+                )
 
     def test_param_n_new_cand(self):
         self.assertRaises(

@@ -80,6 +80,8 @@ _TARGET_SPEC_NOT_PROVIDED = object()
 # solve an auxiliary problem and are therefore no semantic authority for `y`.
 _TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
 
+_DEFAULT_BUDGET = 0.1
+
 
 def _maps_to_samples(candidates):
     """Check whether an acquisition result is indexed w.r.t. `X`.
@@ -193,6 +195,17 @@ def _reuse_established_target_spec(resolved_spec, established_spec=None):
             f"{resolved_spec!r}."
         )
     return established_spec
+
+
+def _check_budget(budget):
+    """Return `budget`, or `_DEFAULT_BUDGET` if it is `None`, after checking
+    that it is a float in `(0, 1]`.
+    """
+    budget = _DEFAULT_BUDGET if budget is None else budget
+    check_scalar(
+        budget, "budget", float, min_val=0.0, max_val=1.0, min_inclusive=False
+    )
+    return budget
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -1229,21 +1242,10 @@ class BudgetManager(ABC, BaseEstimator):
         raise NotImplementedError
 
     def _validate_budget(self):
-        """check the assigned `budget` and set the default value 0.1 if
-        `budget` is set to `None`.
+        """Validate `budget` and store it as `budget_`, which is
+        `_DEFAULT_BUDGET` if `budget` is `None`.
         """
-        if self.budget is not None:
-            self.budget_ = self.budget
-        else:
-            self.budget_ = 0.1
-        check_scalar(
-            self.budget_,
-            "budget",
-            float,
-            min_val=0.0,
-            max_val=1.0,
-            min_inclusive=False,
-        )
+        self.budget_ = _check_budget(self.budget)
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.
@@ -1422,21 +1424,19 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget(self):
-        """Creates a copy "budget_" if budget is a float between 0 and 1. If it
-        is `None`, `budget_` is set to 0.1.
+        """Validate `budget` and store it as `budget_`, which is
+        `_DEFAULT_BUDGET` if `budget` is `None`.
         """
-        if self.budget is not None:
-            self.budget_ = self.budget
-        else:
-            self.budget_ = 0.1
-        check_scalar(
-            self.budget_,
-            "budget",
-            float,
-            min_val=0.0,
-            max_val=1.0,
-            min_inclusive=False,
-        )
+        self.budget_ = _check_budget(self.budget)
+
+    def _sync_default_budget_manager(self):
+        """Apply `budget` to `budget_manager_` if it is the default one. Its
+        other parameters keep the values it was created with.
+        """
+        if self.budget_manager is None:
+            self._validate_budget()
+            if self.budget_manager_.budget != self.budget:
+                self.budget_manager_.set_params(budget=self.budget)
 
     def _validate_data(
         self,

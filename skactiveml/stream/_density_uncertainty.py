@@ -297,11 +297,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
-        elif (
-            self.budget_manager is None
-            and self.budget_manager_.budget is not self.budget
-        ):
-            self.budget_manager_.set_params(budget=self.budget)
+        self._sync_default_budget_manager()
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -451,11 +447,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
-        elif (
-            self.budget_manager is None
-            and self.budget_manager_.budget is not self.budget
-        ):
-            self.budget_manager_.set_params(budget=self.budget)
+        self._sync_default_budget_manager()
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -826,11 +818,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
-        elif (
-            self.budget_manager is None
-            and self.budget_manager_.budget is not self.budget
-        ):
-            self.budget_manager_.set_params(budget=self.budget)
+        self._sync_default_budget_manager()
         # _init_members
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -1031,11 +1019,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
-        elif (
-            self.budget_manager is None
-            and self.budget_manager_.budget is not self.budget
-        ):
-            self.budget_manager_.set_params(budget=self.budget)
+        self._sync_default_budget_manager()
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances

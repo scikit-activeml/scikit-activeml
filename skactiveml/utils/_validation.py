@@ -970,11 +970,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     indices : tuple of np.ndarray or np.ndarray
         The validated indices.
     """
-    indices = np.asarray(indices)
-    if indices.dtype.kind not in "iuf" or (
-        indices.dtype.kind == "f" and np.any(indices != np.floor(indices))
-    ):
-        raise ValueError("`indices` must contain integer values.")
+    indices = _check_integer_indices(indices, "indices")
     indices = check_array(
         indices,
         dtype=None,
@@ -1007,12 +1003,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
             f"`dim` specifies {len(dimensions)} dimensions."
         )
     bounds = np.array(A.shape)[list(dimensions)]
-    if np.any(indices < 0) or np.any(indices >= bounds):
-        raise ValueError(
-            "`indices` must be nonnegative and smaller than the size of "
-            "each indexed dimension."
-        )
-    indices = indices.astype(int)
+    indices = _check_index_bounds(indices, bounds, "indices")
     if unique == "check_unique":
         if len(np.unique(indices, axis=0)) != len(indices):
             raise ValueError("`indices` contains duplicate indices.")
@@ -1023,6 +1014,31 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     return indices
 
 
+def _check_integer_indices(indices, name, error=ValueError):
+    """Return `indices` as an array if they are integers or integer-valued
+    floats, and raise `error` otherwise.
+    """
+    indices = np.asarray(indices)
+    if indices.dtype.kind not in "iuf" or (
+        indices.dtype.kind == "f" and np.any(indices != np.floor(indices))
+    ):
+        raise error(f"`{name}` must contain integer values.")
+    return indices
+
+
+def _check_index_bounds(indices, bounds, name, error=ValueError):
+    """Return `indices` as integers if they lie in `[0, bounds)`, and raise
+    `error` otherwise.
+    """
+    bounds = np.asarray(bounds)
+    if np.any(indices < 0) or np.any(indices >= bounds):
+        raise error(
+            f"`{name}` must be nonnegative and smaller than the size of "
+            "each indexed dimension."
+        )
+    return indices.astype(int)
+
+
 def _validate_budget_update(
     candidates, queried_indices, budget_manager_param_dict=None
 ):
@@ -1031,12 +1047,10 @@ def _validate_budget_update(
     indices = np.asarray(queried_indices)
     if indices.ndim != 1:
         raise IndexError("`queried_indices` must be one-dimensional.")
-    if indices.size and not np.issubdtype(indices.dtype, np.integer):
-        raise IndexError("`queried_indices` must contain integer indices.")
-    if np.any(indices < 0) or np.any(indices >= n_candidates):
-        raise IndexError(
-            "`queried_indices` must index the original candidates."
-        )
+    indices = _check_integer_indices(indices, "queried_indices", IndexError)
+    indices = _check_index_bounds(
+        indices, n_candidates, "queried_indices", IndexError
+    )
     if budget_manager_param_dict is not None:
         check_type(
             budget_manager_param_dict, "budget_manager_param_dict", dict
@@ -1049,7 +1063,7 @@ def _validate_budget_update(
                 )
             check_consistent_length(candidates, utilities)
     queried = np.zeros(n_candidates, dtype=bool)
-    queried[indices.astype(int)] = True
+    queried[indices] = True
     return queried
 
 

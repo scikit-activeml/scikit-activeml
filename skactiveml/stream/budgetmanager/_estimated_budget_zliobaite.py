@@ -683,7 +683,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         """
         queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-        for x_t, q in zip(candidates, queried):
+        for q in queried:
             if self.u_t_ / self.w < self.budget_:
                 if self.v > self.random_state_.random_sample():
                     _ = self.random_state_.random_sample()
@@ -692,8 +692,8 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
                         self.theta_ *= 1 - self.s
                     else:
                         self.theta_ *= 1 + self.s
-            new_queried_indices = [0] if q else []
-            super().update([x_t], new_queried_indices)
+            # u_t = u_t-1 * (w-1)/w + labeling_t
+            self.u_t_ = self.u_t_ * ((self.w - 1) / self.w) + q
         return self
 
     def _validate_data(self, utilities):
@@ -839,13 +839,11 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        self : SplitBudgetManager
+        self : RandomBudgetManager
             The budget manager returns itself, after it is updated.
         """
-        _validate_budget_update(candidates, queried_indices)
-        self._validate_data(np.array([]))
-        self.random_state_.random_sample(len(candidates))
         super().update(candidates, queried_indices)
+        self.random_state_.random_sample(len(candidates))
         return self
 
     def _validate_data(self, utilities):

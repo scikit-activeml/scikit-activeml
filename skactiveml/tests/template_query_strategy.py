@@ -2329,6 +2329,29 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             query_and_update(qs, candidates[20:])
             self.assertEqual(qs.budget_manager_.budget, 0.3)
 
+    def test_set_params_budget_rejects_invalid_budgets(self):
+        init_params = deepcopy(self.init_default_params)
+        init_params["budget"] = 1.0
+        update_params = deepcopy(self.update_params)
+        update_params["candidates"] = [[0.0]]
+        for budget, err in [
+            (1, TypeError),
+            (True, TypeError),
+            (np.float32(1.0), TypeError),
+            (np.array(1.0), TypeError),
+            (1.5, ValueError),
+            (0.0, ValueError),
+            (-0.1, ValueError),
+        ]:
+            with self.subTest(budget=budget):
+                qs = self.qs_class(**init_params)
+                qs.update(**deepcopy(update_params))
+                qs.set_params(budget=budget)
+                before = deepcopy(qs)
+                with self.assertRaises(err):
+                    qs.update(**deepcopy(update_params))
+                assert_state_unchanged(self, qs, before)
+
     def test_query_param_return_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [("string", TypeError), (Dummy, TypeError), (True, None)]
@@ -2379,7 +2402,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             ([-1], IndexError),
             ([1], IndexError),
             ([0.5], IndexError),
-            ([0.0], IndexError),
+            ([0.0], None),
             ([True], IndexError),
             ([[0]], IndexError),
             ([np.nan], IndexError),

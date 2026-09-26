@@ -3,6 +3,7 @@ import numpy as np
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
+    check_indices,
     labeled_indices,
     unlabeled_indices,
     rand_argmax,
@@ -310,7 +311,9 @@ def k_greedy_center(
             target_type=target_type,
         )
     else:
-        mapping = column_or_1d(mapping, dtype=int, warn=True)
+        mapping = check_indices(
+            column_or_1d(mapping, warn=True), X, dim=0, unique=False
+        )
 
     if not isinstance(batch_size, int):
         raise TypeError("`batch_size` must be an `integer`.")

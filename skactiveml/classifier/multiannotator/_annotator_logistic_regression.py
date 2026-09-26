@@ -341,6 +341,11 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             self.Alpha_ = A_norm
             return self
 
+        # Group the observed labels by sample for the E-step.
+        sample_idx, annot_idx = np.nonzero(is_lbld)
+        y_observed = y[sample_idx, annot_idx]
+        sample_starts = np.flatnonzero(np.diff(sample_idx, prepend=-1))
+
         # Initialize first expectation to infinity such that
         # |current - new| < tol is False.
         current_expectation = -np.inf
@@ -364,12 +369,10 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
                 Mu /= np.sum(Mu, axis=1, keepdims=True)
             else:
                 # Use current model parameters to estimate ground truth labels.
-                # Multiply the likelihoods of each sample's labels per class;
-                # every remaining sample has at least one label.
-                sample_idx, annot_idx = np.nonzero(is_lbld)
+                # Multiply the likelihoods of each sample's labels per class.
                 U = np.multiply.reduceat(
-                    self.Alpha_[annot_idx, :, y[sample_idx, annot_idx]],
-                    np.flatnonzero(np.diff(sample_idx, prepend=-1)),
+                    self.Alpha_[annot_idx, :, y_observed],
+                    sample_starts,
                     axis=0,
                 )
                 Mu = P * U

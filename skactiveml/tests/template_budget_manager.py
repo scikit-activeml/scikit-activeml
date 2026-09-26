@@ -76,6 +76,30 @@ class TemplateBudgetManager:
         ]
         self._test_param("init", "budget", test_cases)
 
+    def test_set_params_budget_rejects_invalid_budgets(self):
+        for budget, err in [
+            (1, TypeError),
+            (True, TypeError),
+            (np.float32(1.0), TypeError),
+            (np.array(1.0), TypeError),
+            (1.5, ValueError),
+            (0.0, ValueError),
+            (-0.1, ValueError),
+        ]:
+            with self.subTest(budget=budget):
+                bm = self.bm_class(**deepcopy(self.init_default_params))
+                bm.update(**deepcopy(self.update_params))
+                bm.set_params(budget=budget)
+                before = deepcopy(bm)
+                with self.assertRaises(err):
+                    bm.query_by_utility(
+                        **deepcopy(self.query_by_utility_params)
+                    )
+                assert_state_unchanged(self, bm, before)
+                with self.assertRaises(err):
+                    bm.update(**deepcopy(self.update_params))
+                assert_state_unchanged(self, bm, before)
+
     def test_init_param_test_assignments(self):
         for param in inspect.signature(self.bm_class.__init__).parameters:
             if param != "self":
@@ -142,7 +166,7 @@ class TemplateBudgetManager:
             ([-1], IndexError),
             ([2], IndexError),
             ([0.5], IndexError),
-            ([0.0], IndexError),
+            ([0.0], None),
             ([True], IndexError),
             ([[0]], IndexError),
             ([np.nan], IndexError),
@@ -152,6 +176,26 @@ class TemplateBudgetManager:
             ([1, 0, 1], None),
         ]
         self._test_param("update", "queried_indices", test_cases)
+
+    def test_update_integer_valued_float_indices(self):
+        candidates = np.zeros((2049, 1))
+        utilities = np.zeros(len(candidates))
+        indices = np.array([0, len(candidates) - 1])
+        for dtype in [np.float16, np.float32, np.float64]:
+            with self.subTest(dtype=dtype):
+                bm = self.bm_class(**deepcopy(self.init_default_params))
+                expected = deepcopy(bm)
+                for manager, queried_indices in [
+                    (bm, indices.astype(dtype)),
+                    (expected, indices),
+                ]:
+                    call_func(
+                        manager.update,
+                        candidates=candidates,
+                        queried_indices=queried_indices,
+                        utilities=utilities,
+                    )
+                assert_state_unchanged(self, bm, expected)
 
     def _test_param(
         self,

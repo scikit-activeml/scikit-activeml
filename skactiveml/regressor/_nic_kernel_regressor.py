@@ -273,9 +273,13 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         kappa_post, nu_post, mu_post, sigma_sq_post = post_params
 
-        df = nu_post
         loc = mu_post
         scale = np.sqrt((1 + kappa_post) / kappa_post * sigma_sq_post)
+        # Approximate a point mass with a tiny positive scale and df > 2
+        # so the Student's t distribution has finite mean and variance.
+        # The zero-scale limit is independent of df.
+        is_point_mass = scale < np.finfo(float).tiny
+        df = np.where(is_point_mass, np.maximum(nu_post, 3), nu_post)
         scale = np.maximum(scale, np.finfo(float).tiny)
         return t(df=df, loc=loc, scale=scale)
 
