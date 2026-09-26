@@ -150,41 +150,6 @@ def _guard_exhausted_candidate_pool(query):
     return guarded_query
 
 
-def _guard_own_query(cls):
-    """Guard the `query` a pool query strategy defines itself.
-
-    A `query` published through a descriptor, i.e. the one `match_signature`
-    creates, is guarded through the function that descriptor binds, so that
-    the descriptor keeps owning how `query` is exposed. Any other publication
-    is rejected at class definition time rather than silently left unguarded.
-
-    Parameters
-    ----------
-    cls : type
-        The pool query strategy whose own `query` is to be guarded.
-
-    Raises
-    ------
-    TypeError
-        If `cls` publishes `query` in a way this guard does not cover.
-    """
-    query = cls.__dict__.get("query")
-    if query is None:
-        return
-    if inspect.isfunction(query):
-        cls.query = _guard_exhausted_candidate_pool(query)
-        return
-    published_query = getattr(query, "fn", None)
-    if inspect.isfunction(published_query):
-        query.fn = _guard_exhausted_candidate_pool(published_query)
-        return
-    raise TypeError(
-        f"'{cls.__name__}' publishes `query` as {type(query).__name__}, which "
-        "the exhausted candidate pool guard does not cover. Extend "
-        "`_guard_own_query` for that publication."
-    )
-
-
 def _reuse_established_target_spec(resolved_spec, established_spec=None):
     if established_spec is None:
         return resolved_spec
@@ -241,10 +206,37 @@ class PoolQueryStrategy(QueryStrategy):
     """
 
     def __init_subclass__(cls, **kwargs):
-        # Every `query` is guarded, so that the shared validation can answer an
-        # exhausted candidate pool for all pool strategies at once.
+        """Guard the `query` a pool query strategy defines itself.
+
+        Every `query` is guarded, so that the shared validation can answer an
+        exhausted candidate pool for all pool strategies at once. A `query`
+        published through a descriptor, i.e. the one `match_signature`
+        creates, is guarded through the function that descriptor binds, so
+        that the descriptor keeps owning how `query` is exposed. Any other
+        publication is rejected at class definition time rather than silently
+        left unguarded.
+
+        Raises
+        ------
+        TypeError
+            If `cls` publishes `query` in a way this guard does not cover.
+        """
         super().__init_subclass__(**kwargs)
-        _guard_own_query(cls)
+        query = cls.__dict__.get("query")
+        if query is None:
+            return
+        if inspect.isfunction(query):
+            cls.query = _guard_exhausted_candidate_pool(query)
+            return
+        published_query = getattr(query, "fn", None)
+        if inspect.isfunction(published_query):
+            query.fn = _guard_exhausted_candidate_pool(published_query)
+            return
+        raise TypeError(
+            f"'{cls.__name__}' publishes `query` as {type(query).__name__}, "
+            "which the exhausted candidate pool guard does not cover. Extend "
+            "`PoolQueryStrategy.__init_subclass__` for that publication."
+        )
 
     def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
