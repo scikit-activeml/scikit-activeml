@@ -994,7 +994,6 @@ class TestSklearnNormalRegressor(
                     with self.assertRaisesRegex(TypeError, message):
                         method(self.X_cand)
 
-        # The recognized rejection of `return_std` keeps its message.
         reg = SklearnNormalRegressor(KwargsLinearRegression()).fit(
             self.X, self.y
         )
@@ -1033,7 +1032,6 @@ class TestSklearnNormalRegressor(
             y_samples[zero], np.tile(mean_exp[zero, np.newaxis], (1, 5))
         )
 
-        # Constant labels give a zero standard deviation as fallback.
         class UnfittableRegressor(GaussianProcessRegressor):
             def fit(self, X, y, sample_weight=None):
                 raise ValueError()
@@ -1144,7 +1142,6 @@ class TestSklearnNormalRegressor(
                 np.testing.assert_array_equal(mean, mean_exp)
                 np.testing.assert_array_equal(std, std_exp)
 
-        # Pre-fitted estimators without `return_std` cannot be wrapped.
         for estimator in [SGDRegressor(random_state=0), LinearRegression()]:
             reg = SklearnNormalRegressor(
                 estimator=clone(estimator).fit(X_train, y_train),

@@ -429,8 +429,6 @@ class TestQueryByCommittee(
                 self.assertEqual(len(u), 1)
 
     def test_query_is_invariant_to_class_labels(self):
-        # Only the first and the last class are observed, so the members of
-        # wrapped scikit-learn ensembles know fewer classes than the wrapper.
         X = np.array(
             [[1, 2], [5, 8], [8, 4], [5, 4], [2, 2], [7, 7], [3, 6], [6, 1]],
             dtype=float,
@@ -454,7 +452,6 @@ class TestQueryByCommittee(
                 qs_params = {"method": method, "missing_label": ml}
                 fit_ensemble = True
                 if form == "members":
-                    # Members fitted on different labels disagree in votes.
                     ensemble = []
                     for subset in ([0, 1], [2, 6], [0, 6]):
                         y_subset = np.full_like(y, ml)

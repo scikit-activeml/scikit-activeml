@@ -146,8 +146,6 @@ class TemplateTestExpectedErrorReduction(
                 self.assertTrue(np.isfinite(utilities[0, 3:]).all())
                 assert_state_unchanged(self, clf, clf_before, name="clf")
 
-        # The fitted vocabulary remains authoritative without refitting, and
-        # explicit classes remain authoritative with refitting.
         for clf, fit_clf in [
             (ParzenWindowClassifier().fit(X, y_two), False),
             (ParzenWindowClassifier(classes=[0, 1]).fit(X, y_two), True),

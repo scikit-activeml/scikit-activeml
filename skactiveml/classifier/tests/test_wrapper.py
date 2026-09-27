@@ -899,8 +899,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         ):
             with self.subTest(classes=classes, observed=observed):
                 y = [classes[0] if observed else None] * len(X)
-                # A nonzero diagonal makes the cheaper prediction differ
-                # from the sole observed class in the one-class fallback.
                 costs = [[2 if observed else 0, 1], [100, 0]]
                 clf = SklearnClassifier(
                     LogisticRegression(),
@@ -3999,7 +3997,6 @@ assert np.isfinite(estimator.predict_proba(X)).all()
                 [3, 1], [True, False], [False, True]
             ):
                 if fitted and n_units == 1:
-                    # Fewer output units than classes already fail in `fit`.
                     continue
                 with self.subTest(
                     n_units=n_units,

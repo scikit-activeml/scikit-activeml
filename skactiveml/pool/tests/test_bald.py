@@ -200,8 +200,6 @@ class TestGeneralBALD(
                 )
 
     def test_query_is_invariant_to_class_labels(self):
-        # Only the first and the last class are observed, so the members of
-        # wrapped scikit-learn ensembles know fewer classes than the wrapper.
         X = np.array(
             [[1, 2], [5, 8], [8, 4], [5, 4], [2, 2], [7, 7], [3, 6], [6, 1]],
             dtype=float,

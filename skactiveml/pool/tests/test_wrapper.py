@@ -796,14 +796,10 @@ class TestSubSamplingWrapper(
         )
 
     def test_query_param_aligned_kwargs_of_subset_length(self):
-        # An argument of the length of the subset must still be rejected,
-        # although the wrapped strategy would accept the subset.
         X, y, clf = _aligned_kwargs_setting()
         n_labeled = int((~np.isnan(y)).sum())
         max_candidates = 3
         candidates = X[unlabeled_indices(y, MISSING_LABEL)]
-        # The candidate subsample and, if unlabeled samples are excluded, the
-        # retained samples of `X` determine the length of the subset.
         test_cases = [
             (
                 UncertaintySampling,
@@ -1463,8 +1459,6 @@ class TestParallelUtilityEstimationWrapper(
         self.assertEqual(int((~np.isnan(utilities[0])).sum()), len(candidates))
 
     def test_query_param_weights_match_direct_query(self):
-        # Chunking the candidates must neither invalidate weights aligned to
-        # `X` nor misalign weights aligned to the candidate samples.
         X, y, clf = _aligned_kwargs_setting()
         candidate_indices = unlabeled_indices(y, MISSING_LABEL)
         candidate_samples = X[candidate_indices]
@@ -1513,9 +1507,6 @@ class TestParallelUtilityEstimationWrapper(
                     np.testing.assert_allclose(utilities, expected_utilities)
 
     def test_query_index_candidates_match_direct_query(self):
-        # Index candidates reach the wrapped strategy as indices, so that
-        # strategies requiring them can be wrapped and labeled candidates are
-        # scored as in a direct query.
         X, y, clf = _aligned_kwargs_setting()
         test_cases = [
             (ValueOfInformationEER, None),
@@ -1552,7 +1543,6 @@ class TestParallelUtilityEstimationWrapper(
     def test_query_param_weights_of_wrong_length(self):
         X, y, clf = _aligned_kwargs_setting()
         candidates = X[unlabeled_indices(y, MISSING_LABEL)]
-        # A weight vector of the length of a chunk must still be rejected.
         for n_weights in [len(X), len(candidates) // 2]:
             for qs_class, name in [
                 (UncertaintySampling, "utility_weight"),

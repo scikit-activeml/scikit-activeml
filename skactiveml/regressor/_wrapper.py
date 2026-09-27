@@ -716,13 +716,9 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
         Returns
         -------
         dist : scipy.stats._distn_infrastructure.rv_frozen
-            The distribution of the targets at the test samples. Its means and
-            standard deviations are those predicted by `estimator`. As
-            `scipy` requires positive scales, a predicted standard deviation
-            of zero is represented by the smallest positive normal float as
-            scale. The mean of such a distribution is the predicted one, its
-            standard deviation is zero, and its quantiles and samples equal
-            the predicted mean up to floating-point resolution.
+            The distribution of the targets at the test samples. A predicted
+            standard deviation of zero yields a point mass at the predicted
+            mean.
 
         """
         check_is_fitted(self)

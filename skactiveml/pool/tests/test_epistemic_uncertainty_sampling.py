@@ -300,7 +300,6 @@ class TestEpistemicUncertaintySampling(
             lambda support: (1 - support**2) ** 1000 - support, 0, 1
         )
         module = "skactiveml.pool._epistemic_uncertainty_sampling"
-        # Check cache filling without building a million-point triangulation.
         with (
             patch(f"{module}._interpolate"),
             np.errstate(divide="raise", invalid="raise"),

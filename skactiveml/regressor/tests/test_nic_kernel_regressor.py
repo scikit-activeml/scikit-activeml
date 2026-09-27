@@ -445,8 +445,6 @@ class TestNICKernelEstimator(
         self.assertTrue(np.isfinite(std).all())
 
     def test_zero_posterior_scale_is_a_point_mass(self):
-        # Test samples near the constant labels at zero and without kernel
-        # evidence have a zero posterior scale, the one near ten does not.
         X = np.array([[0.0], [10.0], [5.0]])
         zero = np.array([True, False, True])
         for nu_0 in [0.5, 1.5, 2.5]:
@@ -478,8 +476,6 @@ class TestNICKernelEstimator(
                 y_samples = reg.sample_y(X, n_samples=5, random_state=0)
                 np.testing.assert_allclose(y_samples[zero], np.ones((2, 5)))
 
-        # Constant labels without prior variance and prior mean weight give
-        # the maximum-likelihood variance of zero.
         reg = NICKernelRegressor(kappa_0=0, sigma_sq_0=0).fit(
             [[0.0], [1.0]], [1.0, 1.0]
         )
