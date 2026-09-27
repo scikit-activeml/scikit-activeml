@@ -576,17 +576,9 @@ class _ExactJointEntropy:
 
     def compute_batch(self, log_probs_B_K_C):
         B, K, C = log_probs_B_K_C.shape
-        M = self.joint_probs_M_K.shape[0]
 
         probs_b_K_C = np.exp(log_probs_B_K_C)
-        b = probs_b_K_C.shape[0]
-        probs_b_M_C = np.empty((b, M, C))
-        for i in range(b):
-            np.matmul(
-                self.joint_probs_M_K,
-                probs_b_K_C[i],
-                out=probs_b_M_C[i],
-            )
+        probs_b_M_C = np.matmul(self.joint_probs_M_K, probs_b_K_C)
         probs_b_M_C /= K
 
         output_entropies_B = np.sum(
@@ -604,17 +596,19 @@ def _batch_multi_choices(probs_b_C, M, random_state):
         choices: Ni... x M
     """
     probs_B_C = probs_b_C.reshape((-1, probs_b_C.shape[-1]))
-    B = probs_B_C.shape[0]
-    C = probs_B_C.shape[1]
 
-    # samples: Ni... x draw_per_xx
-    choices = [
-        random_state.choice(
-            C, size=M, p=probs_B_C[b] / np.sum(probs_B_C[b]), replace=True
-        )
-        for b in range(B)
-    ]
-    choices = np.array(choices, dtype=int)
+    cdf_B_C = np.cumsum(
+        probs_B_C / probs_B_C.sum(axis=1, keepdims=True), axis=1
+    )
+    cdf_B_C /= cdf_B_C[:, -1:]
+    uniform_B_M = random_state.random_sample((len(cdf_B_C), M))
+    choices = np.array(
+        [
+            np.searchsorted(cdf_C, uniform_M, side="right")
+            for cdf_C, uniform_M in zip(cdf_B_C, uniform_B_M)
+        ],
+        dtype=int,
+    )
 
     choices_b_M = choices.reshape(list(probs_b_C.shape[:-1]) + [M])
     return choices_b_M
@@ -675,17 +669,9 @@ class _SampledJointEntropy:
         B, K, C = log_probs_B_K_C.shape
         M = self.sampled_joint_probs_M_K.shape[0]
 
-        b = log_probs_B_K_C.shape[0]
-
-        probs_b_M_C = np.empty(
-            (b, M, C),
+        probs_b_M_C = np.matmul(
+            self.sampled_joint_probs_M_K, np.exp(log_probs_B_K_C)
         )
-        for i in range(b):
-            np.matmul(
-                self.sampled_joint_probs_M_K,
-                np.exp(log_probs_B_K_C[i]),
-                out=probs_b_M_C[i],
-            )
         probs_b_M_C /= K
 
         q_1_M_1 = self.sampled_joint_probs_M_K.mean(axis=1, keepdims=True)[
