@@ -47,17 +47,24 @@ def _copy_budget_manager(budget_manager):
 
 
 def _update_budget_manager(
-    budget_manager, candidate, queried, budget_manager_param_dict, index
+    budget_manager,
+    candidate,
+    queried,
+    budget_manager_param_dict,
+    index,
+    eligible,
 ):
-    """Advance one observation with local indices and aligned utilities."""
+    """Mask ineligible utilities and advance one observation."""
     params = budget_manager_param_dict.copy()
     if "utilities" in params:
-        params["utilities"] = np.asarray(params["utilities"])[
-            index : index + 1
-        ]
+        params["utilities"] = (
+            np.asarray(params["utilities"])[index : index + 1]
+            if eligible
+            else np.array([np.nan])
+        )
     call_func(
         budget_manager.update,
-        candidates=[candidate],
+        candidates=[candidate if eligible else np.nan],
         queried_indices=[0] if queried else [],
         **params,
     )
@@ -235,10 +242,11 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                     budget_manager = _copy_budget_manager(budget_manager)
                 _update_budget_manager(
                     budget_manager,
-                    x_cand if eligible else np.nan,
+                    x_cand,
                     queried,
                     {"utilities": utilities},
                     t,
+                    eligible=eligible,
                 )
                 self.window_.append(x_cand)
         finally:
@@ -270,8 +278,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Optional kwargs for each single-observation budget-manager
             update. If provided, `utilities` must align with the original
             candidates; it is sliced into one-element arrays for the observed
-            samples. Other kwargs are forwarded unchanged. Supply `utilities`
-            when the budget manager requires them for updating.
+            samples. Utilities of candidates rejected by the density filter
+            are passed as NaN. Other kwargs are forwarded unchanged. Supply
+            `utilities` when the budget manager requires them for updating.
 
         Returns
         -------
@@ -325,10 +334,11 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             local_density_factor = self._calculate_ldf([x_cand])
             _update_budget_manager(
                 self.budget_manager_,
-                x_cand if local_density_factor > 0 else np.nan,
+                x_cand,
                 queried[i],
                 budget_manager_param_dict,
                 i,
+                eligible=local_density_factor > 0,
             )
             self.window_.append(x_cand)
         return self
@@ -752,10 +762,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                             )
                         _update_budget_manager(
                             budget_manager,
-                            x_cand if eligible else np.nan,
+                            x_cand,
                             queried,
                             {"utilities": utilities},
                             i,
+                            eligible=eligible,
                         )
                 self.t_ += 1
         finally:
@@ -786,8 +797,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Optional kwargs for each single-observation budget-manager
             update. If provided, `utilities` must align with the original
             candidates; it is sliced into one-element arrays for the observed
-            samples. Other kwargs are forwarded unchanged. Supply `utilities`
-            when the budget manager requires them for updating.
+            samples. With `force_full_budget=True`, utilities of candidates
+            rejected by the density filter are passed as NaN. Otherwise,
+            these candidates are skipped. Other kwargs are forwarded
+            unchanged. Supply `utilities` when the budget manager requires
+            them for updating.
 
         Returns
         -------
@@ -858,10 +872,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             if eligible or self.force_full_budget:
                 _update_budget_manager(
                     self.budget_manager_,
-                    x_cand if eligible else np.nan,
+                    x_cand,
                     queried[i],
                     budget_manager_param_dict,
                     i,
+                    eligible=eligible,
                 )
             self.t_ += 1
         return self

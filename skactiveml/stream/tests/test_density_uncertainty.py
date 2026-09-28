@@ -7,6 +7,7 @@ from sklearn.metrics.pairwise import manhattan_distances, pairwise_distances
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.stream.budgetmanager import (
+    BalancedIncrementalQuantileFilter,
     DensityBasedSplitBudgetManager,
     FixedUncertaintyBudgetManager,
 )
@@ -292,6 +293,43 @@ def _assert_partition_invariance(test_case, strategy_type):
         np.random.set_state(original_global_state)
 
 
+def _assert_biqf_excludes_ineligible_utilities(test_case, strategy_type):
+    candidates = np.array([[0.0], [1.0], [0.5], [10.0], [0.75], [20.0]])
+    eligible = np.array([False, True, True, False, True, False])
+    classifier = ParzenWindowClassifier(
+        classes=[0, 1], metric_dict={"gamma": 1.0}
+    ).fit([[-1.0], [1.0]], [0, 1])
+    kwargs = (
+        {}
+        if strategy_type is StreamDensityBasedAL
+        else {"force_full_budget": True}
+    )
+    results = []
+    for boundaries in (list(range(1, 7)), [6]):
+        strategy = strategy_type(
+            budget_manager=BalancedIncrementalQuantileFilter(budget=0.2),
+            random_state=0,
+            **kwargs,
+        )
+        selected, utilities, start = [], [], 0
+        for stop in boundaries:
+            batch = candidates[start:stop]
+            queried, batch_utilities = strategy.query(
+                batch, classifier, return_utilities=True
+            )
+            strategy.update(batch, queried, {"utilities": batch_utilities})
+            selected.extend(start + i for i in queried)
+            utilities.extend(batch_utilities)
+            start = stop
+        np.testing.assert_array_equal(
+            strategy.budget_manager_.history_sorted_,
+            np.where(eligible, utilities, np.nan),
+        )
+        results.append((selected, strategy))
+    test_case.assertEqual(results[1][0], results[0][0])
+    _assert_acquisition_state_equal(test_case, results[1][1], results[0][1])
+
+
 def _assert_dist_func_dict_is_forwarded(test_case, strategy_type):
     candidates = np.random.RandomState(0).uniform(size=(30, 2))
     classifier = ParzenWindowClassifier(classes=[0, 1]).fit(
@@ -462,6 +500,9 @@ class TestCognitiveDualQueryStrategy(
             query_default_params_clf=query_default_params_clf,
         )
 
+    def test_biqf_excludes_ineligible_utilities(self):
+        _assert_biqf_excludes_ineligible_utilities(self, self.qs_class)
+
     def test_batch_accounts_for_earlier_acquisitions(self):
         _assert_batch_accounts_for_earlier_acquisitions(self, self.qs_class)
 
@@ -515,8 +556,13 @@ class TestCognitiveDualQueryStrategy(
                 strategy.update(candidates, [acquired], params)
                 history = strategy.budget_manager_.history_
                 expected_indices = list(range(8)) if full else [1, 2, 5]
-                self.assertEqual(
-                    [entry[2] for entry in history], expected_indices
+                expected_utilities = (
+                    [np.nan, 1, 2, np.nan, np.nan, 5, np.nan, np.nan]
+                    if full
+                    else [1, 2, 5]
+                )
+                np.testing.assert_array_equal(
+                    [entry[2] for entry in history], expected_utilities
                 )
                 self.assertEqual(
                     [entry[1] for entry in history],
@@ -808,6 +854,9 @@ class TestStreamDensityBasedAL(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_biqf_excludes_ineligible_utilities(self):
+        _assert_biqf_excludes_ineligible_utilities(self, self.qs_class)
 
     def test_batch_accounts_for_earlier_acquisitions(self):
         _assert_batch_accounts_for_earlier_acquisitions(self, self.qs_class)
