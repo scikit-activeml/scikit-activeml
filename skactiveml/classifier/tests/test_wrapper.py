@@ -9,6 +9,7 @@ import inspect
 
 from copy import deepcopy
 from itertools import product
+from unittest.mock import patch
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
@@ -5670,6 +5671,21 @@ if successful_capymoa_import:
                         self.assertEqual(pred_proba[:, 0].sum(), len(X))
                         self.assertFalse(clf.is_fitted_)
 
+        def test_predict_proba_pads_short_estimator_probabilities(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["classes"] = [0, 1, 2]
+            clf = CapyMOAClassifier(**init_params)
+            clf.fit(**self.fit_default_params)
+            with patch.object(
+                clf.estimator_,
+                "predict_proba",
+                return_value=np.array([0.25, 0.75]),
+            ):
+                P = clf.predict_proba(self.X[:3])
+            np.testing.assert_array_equal(
+                P, np.tile([0.25, 0.75, 0.0], (3, 1))
+            )
+
         def test_is_fitted(self):
             init_params = deepcopy(self.init_default_params)
             init_params["classes"] = [0, 1]
@@ -5731,7 +5747,7 @@ if successful_capymoa_import:
             # fit a capymoa classifier and returns its predict_proba results of
             # from capymoa classifiers
             from capymoa.stream import Schema
-            from capymoa.instance import LabeledInstance, Instance
+            from capymoa.core import LabeledInstance, Instance
 
             column_list = [f"f{i}" for i in range(X_train.shape[1])]
             column_list += ["label"]

@@ -3093,7 +3093,7 @@ if successful_capymoa_import:
                 ordered according to the attribute `self.classes_`.
             """
             import capymoa
-            import capymoa.instance
+            import capymoa.core
 
             check_is_fitted(self)
             predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
@@ -3103,7 +3103,7 @@ if successful_capymoa_import:
             if self.is_fitted_:
                 p_list = []
                 for x in X:
-                    x_instance = capymoa.instance.Instance(
+                    x_instance = capymoa.core.Instance(
                         schema=self.schema_, instance=x
                     )
                     p_i = self.estimator_.predict_proba(x_instance)
@@ -3186,7 +3186,7 @@ if successful_capymoa_import:
             """
             import capymoa
             import capymoa.base
-            import capymoa.instance
+            import capymoa.core
 
             had_established_target_spec = (
                 fit_function == "partial_fit"
@@ -3252,7 +3252,7 @@ if successful_capymoa_import:
                 for i in range(len(y_train)):
                     x_inst = X_train[i]
                     y_inst = y_train[i].item()
-                    instance = capymoa.instance.LabeledInstance.from_array(
+                    instance = capymoa.core.LabeledInstance.from_array(
                         self.schema_,
                         x=x_inst,
                         y_index=y_inst,
