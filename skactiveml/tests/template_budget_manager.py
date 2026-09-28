@@ -304,6 +304,36 @@ class TemplateBudgetManager:
         output = bm.query_by_utility(utilities_nan)
         self.assertEqual(0, len(output))
 
+    def test_query_by_utility_never_queries_nan(self):
+        utilities = RandomState(0).rand(60)
+        utilities[RandomState(1).rand(60) < 0.5] = np.nan
+        for budget in [0.1, 1.0]:
+            with self.subTest(budget=budget):
+                init_params = deepcopy(self.init_default_params)
+                init_params["budget"] = budget
+                bm = self.bm_class(**init_params)
+                bm2 = self.bm_class(**init_params)
+                bm1_outputs = []
+                for i, u in enumerate(utilities):
+                    output = bm.query_by_utility(np.array([u]))
+                    bm1_outputs.extend(i + idx for idx in output)
+                    call_func(
+                        bm.update,
+                        candidates=np.array([u]),
+                        queried_indices=output,
+                        utilities=np.array([u]),
+                    )
+                bm2_outputs = bm2.query_by_utility(utilities)
+                call_func(
+                    bm2.update,
+                    candidates=utilities,
+                    queried_indices=bm2_outputs,
+                    utilities=utilities,
+                )
+                self.assertEqual(bm1_outputs, list(bm2_outputs))
+                assert_state_unchanged(self, bm, bm2)
+                self.assertFalse(np.isnan(utilities[bm2_outputs]).any())
+
     def test_query_by_utility_preserves_state(self):
         random_states = (
             [0, np.random.RandomState(0), None]

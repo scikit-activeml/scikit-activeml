@@ -74,10 +74,14 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         for i, u in enumerate(utilities):
             tmp_observed_samples_ += 1
             tmp_history_sorted_.append(u)
-            theta = np.quantile(tmp_history_sorted_, (1 - self.budget_))
+            if np.isnan(u):
+                continue
+            history = np.asarray(tmp_history_sorted_)
+            history = history[~np.isnan(history)]
+            theta = np.quantile(history, (1 - self.budget_))
 
-            min_ranking = np.min(tmp_history_sorted_)
-            max_ranking = np.max(tmp_history_sorted_)
+            min_ranking = np.min(history)
+            max_ranking = np.max(history)
             range_ranking = max_ranking - min_ranking
 
             acq_left = (

@@ -644,7 +644,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
                 random_val = self.random_state_.random_sample()
                 if self.v > random_val:
                     new_u = self.random_state_.random_sample()
-                    sample = new_u <= self.budget_
+                    sample = new_u <= self.budget_ and not np.isnan(u)
                 else:
                     sample = u < tmp_theta
                     # get the indices samples that should be queried

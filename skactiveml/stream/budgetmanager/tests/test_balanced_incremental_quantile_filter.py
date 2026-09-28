@@ -126,3 +126,22 @@ class TestBalancedIncrementalQuantileFilter(
         np.testing.assert_array_equal(
             bm.query_by_utility(utilities), np.arange(100)
         )
+
+    def test_nan_utilities_do_not_block_later_queries(self):
+        utilities = np.array([np.nan, np.nan, 1, 1, 1, 1])
+        for budget, expected_output in [(1.0, [2, 3, 4, 5]), (0.5, [2, 3, 4])]:
+            with self.subTest(budget=budget):
+                bm = BalancedIncrementalQuantileFilter(w=5, budget=budget)
+                self.assertEqual(
+                    bm.query_by_utility(utilities), expected_output
+                )
+        bm = BalancedIncrementalQuantileFilter(w=5, budget=1.0)
+        bm.update(np.zeros((3, 1)), [], np.full(3, np.nan))
+        self.assertEqual(bm.observed_samples_, 3)
+        np.testing.assert_array_equal(bm.history_sorted_, np.full(3, np.nan))
+        self.assertEqual(bm.query_by_utility(np.ones(4)), [0, 1, 2, 3])
+
+    def test_nan_utilities_occupy_window_slots(self):
+        bm = BalancedIncrementalQuantileFilter(w=3, w_tol=1, budget=0.5)
+        utilities = np.array([0.2, np.nan, 0.8, 0.4, 0.7])
+        self.assertEqual(bm.query_by_utility(utilities), [0, 2, 4])
