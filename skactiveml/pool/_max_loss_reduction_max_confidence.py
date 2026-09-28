@@ -201,11 +201,16 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         )
 
         # Canonicalize both public multi-label probability formats before any
-        # masking or arithmetic is applied.
+        # arithmetic is applied.
         n_outputs = y.shape[1]
-        probas = _canonicalize_multilabel_probas(
-            clf.predict_proba(X), n_samples=len(X), n_outputs=n_outputs
-        )
+        lbld_probas = np.empty((0, n_outputs))
+        if lbld_mask.any():
+            X_lbld = X[lbld_mask]
+            lbld_probas = _canonicalize_multilabel_probas(
+                clf.predict_proba(X_lbld),
+                n_samples=len(X_lbld),
+                n_outputs=n_outputs,
+            )
         cand_probas = _canonicalize_multilabel_probas(
             clf.predict_proba(X_cand),
             n_samples=len(X_cand),
@@ -222,7 +227,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         )
         y_discriminator = label_encoder.fit_transform(y[lbld_mask]).sum(axis=1)
         discriminator.fit(
-            _label_cardinality_features(probas[lbld_mask]), y_discriminator
+            _label_cardinality_features(lbld_probas), y_discriminator
         )
         n_positive_labels = discriminator.predict(
             _label_cardinality_features(cand_probas)

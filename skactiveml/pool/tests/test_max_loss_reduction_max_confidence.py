@@ -307,30 +307,34 @@ class TestMaxLossReductionMaxConfidence(
         )
 
     def test_query_rejects_malformed_multilabel_probas(self):
+        n_labeled = len(self.X) - len(self.unld_idx)
         cases = [
             (
                 "output count",
-                [np.full((len(self.X), 2), 0.5) for _ in range(3)],
+                [np.full((n_labeled, 2), 0.5) for _ in range(3)],
                 "contains 3 outputs, expected 2",
             ),
             (
                 "sample count",
-                [np.full((len(self.X) + 1, 2), 0.5) for _ in range(2)],
-                r"`probas\[0\]` has 9 samples, expected 8",
+                [np.full((n_labeled + 1, 2), 0.5) for _ in range(2)],
+                (
+                    rf"`probas\[0\]` has {n_labeled + 1} samples, "
+                    rf"expected {n_labeled}"
+                ),
             ),
             (
                 "binary width",
-                [np.full((len(self.X), 3), 1 / 3) for _ in range(2)],
+                [np.full((n_labeled, 3), 1 / 3) for _ in range(2)],
                 r"`probas\[0\]` must have shape `\(n_samples, 2\)`",
             ),
             (
                 "per-output dimension",
-                np.full(len(self.X), 0.5),
+                np.full(n_labeled, 0.5),
                 r"`probas` must have shape `\(n_samples, n_outputs\)`",
             ),
             (
                 "array output count",
-                np.full((len(self.X), 3), 0.5),
+                np.full((n_labeled, 3), 0.5),
                 "has 3 outputs, expected 2",
             ),
         ]
