@@ -44,7 +44,6 @@ from .utils import (
     check_indices,
     check_n_features,
     check_type,
-    compute_vote_vectors,
 )
 
 __all__ = [
@@ -2169,19 +2168,20 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     def _compute_class_frequency_vectors(self, y, sample_weight):
         """Convert encoded targets to per-sample class-frequency vectors."""
-        if self.target_spec_.target_type == "single-output":
-            return compute_vote_vectors(
-                y=y,
-                w=sample_weight,
-                classes=np.arange(len(self.classes_)),
-                missing_label=-1,
-            )
-
         weights = (
             np.ones_like(y, dtype=float)
             if sample_weight is None
             else np.asarray(sample_weight, dtype=float).copy()
         )
+        if self.target_spec_.target_type == "single-output":
+            is_lbld = y != -1
+            weights = weights[is_lbld]
+            V = np.zeros((len(y), len(self.classes_)))
+            V[np.flatnonzero(is_lbld), y[is_lbld].astype(int)] += np.where(
+                np.isnan(weights), 0, weights
+            )
+            return V
+
         if weights.ndim == 1:
             weights = np.repeat(weights[:, np.newaxis], y.shape[1], axis=1)
         is_missing = y == -1
