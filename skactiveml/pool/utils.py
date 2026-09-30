@@ -1121,16 +1121,32 @@ def conditional_expect(
             * np.sum(weights[np.newaxis, :] * output, axis=1)
         )
     else:  # method equals "dynamic_quad"
+
+        def to_scalar_if_one_element(a):
+            # Since NumPy 2.4 arrays with one element are not anymore
+            # implicitly transformed to scalars.
+            a = np.asarray(a)
+            return a.item() if a.size == 1 else a
+
+        def handle_one_element_arrays_in_dist(my_dist):
+            # Handle arryas with one element in the distribution
+            # returned by the regressor.
+            new_args = tuple(to_scalar_if_one_element(v) for v in my_dist.args)
+            new_kwds = {
+                k: to_scalar_if_one_element(v) for k, v in my_dist.kwds.items()
+            }
+            return my_dist.dist(*new_args, **new_kwds)
+
         for idx, x in enumerate(X):
             cond_dist = reg.predict_target_distribution([x])
+            cond_dist = handle_one_element_arrays_in_dist(cond_dist)
 
             def quad_function_wrapper(y):
+                y = to_scalar_if_one_element(y)
                 if is_optional or not vector_func:
-                    return func(idx, x, y)
-                else:
-                    return func(np.arange(len(X)), X, np.full((len(X), 1), y))[
-                        idx
-                    ]
+                    return float(to_scalar_if_one_element(func(idx, x, y)))
+                func_out = func(np.arange(len(X)), X, np.full((len(X), 1), y))
+                return float(to_scalar_if_one_element(func_out[idx]))
 
             expectation[idx] = cond_dist.expect(
                 quad_function_wrapper,
