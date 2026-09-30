@@ -8,7 +8,7 @@
 |
 
 ==========================================================================
-A Comprehensive and User-friendly Active Learning Library
+A Comprehensive and User-Friendly Active Learning Library
 ==========================================================================
 |Doc| |Codecov| |PythonVersion| |PyPi| |Black| |Downloads| |Paper|
 
@@ -24,8 +24,8 @@ A Comprehensive and User-friendly Active Learning Library
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
    :target: https://pypi.org/project/scikit-activeml/
 
-.. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202507.0252.v1-blue.svg
-   :target: https://www.preprints.org/manuscript/202507.0252/v1
+.. |Paper| image:: https://img.shields.io/badge/paper-JMLR-blue.svg
+   :target: https://jmlr.org/papers/v27/25-1999.html
 
 .. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
    :target: https://github.com/psf/black
@@ -463,13 +463,45 @@ following work and consider starring the repository to help others discover it:
 
 .. code-block:: bibtex
 
-    @article{skactiveml2025,
-        title={{scikit-activeml: A Comprehensive and User-friendly Active Learning Library}},
-        author={Herde, Marek and Pham, Minh Tuan and Kottke, Daniel and Benz, Alexander and L{\"u}hrs, Lukas and Mergard, Pascal and Sandrock, Christoph and Cheng, Jiaying and Roghman, Atal and M{\"u}jde, Mehmet and Rauch, Lukas and Sick, Bernahrd},
-        journal={Preprints},
-        doi={10.20944/preprints202507.0252.v1},
-        year={2025},
-        url={https://github.com/scikit-activeml/scikit-activeml}
+    @article{JMLR:v27:25-1999,
+        author={Herde, Marek and Pham, Minh Tuan and Kottke, Daniel and Benz, Alexander and L{\"u}hrs, Lukas and Mergard, Pascal and Sandrock, Christoph and Cheng, Jiaying and Roghman, Atal and M{\"u}jde, Mehmet and Rauch, Lukas and Sick, Bernhard},
+        title={{scikit-activeml: A Comprehensive and User-Friendly Active Learning Library}},
+        journal={Journal of Machine Learning Research},
+        year={2026},
+        volume={27},
+        number={184},
+        pages={1--20},
+        url={https://jmlr.org/papers/v27/25-1999.html}
     }
 
+Where available, please also cite the original research articles for any
+query strategies, classifiers, regressors, or other methods you use from
+``skactiveml``. The relevant references are listed in the corresponding API
+documentation.
+
 .. citing_end
+
+.. license_start
+
+⚖️ License
+----------
+``scikit-activeml`` is primarily licensed under the `BSD 3-Clause License
+<https://github.com/scikit-activeml/scikit-activeml/blob/master/LICENSE.txt>`__.
+Incorporated third-party code retains its respective licenses:
+
+- Parts of ``BatchBALD``, ``GreedyBALD``, and ``batch_bald`` are modifications
+  of `batchbald_redux <https://github.com/BlackHC/batchbald_redux>`__
+  (Apache-2.0).
+- Parts of ``CostEmbeddingAL`` are modifications of
+  `libact <https://github.com/ntucllab/libact>`__ (BSD-2-Clause) and
+  `scikit-learn <https://github.com/scikit-learn/scikit-learn>`__
+  (BSD-3-Clause).
+- Parts of ``EpistemicUncertaintySampling`` are modifications of
+  `scikit-learn <https://github.com/scikit-learn/scikit-learn>`__
+  (BSD-3-Clause).
+
+The full license texts and notices can be found in the `LICENSES directory
+<https://github.com/scikit-activeml/scikit-activeml/tree/master/LICENSES>`__
+and are distributed with the source package and wheel. 
+
+.. license_end

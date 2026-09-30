@@ -8,6 +8,7 @@
    generated/sphinx_gallery_examples/index
    generated/api/skactiveml
    contributing
+   licenses
    Changelog <https://github.com/scikit-activeml/scikit-activeml/releases>
 
 .. include:: ../README.rst
@@ -30,10 +31,13 @@
    :start-after: citing_start
    :end-before: citing_end
 
+.. include:: ../README.rst
+   :start-after: license_start
+   :end-before: license_end
+
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
