@@ -1,6 +1,28 @@
 """
-Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
-the Apache-2.0 license and the associated query strategy is presented:
+This module's computations, i.e., `batch_bald` and its entropy
+helpers, are a modification of batchbald_redux
+(https://github.com/BlackHC/batchbald_redux), distributed under the Apache-2.0
+license.
+
+Copyright 2020- Andreas Kirsch
+
+The full Apache-2.0 text and the NOTICE file are distributed with
+scikit-activeml in ``LICENSES/batchbald_redux/``.
+
+Central changes made by the scikit-activeml developers:
+
+- NumPy replaces PyTorch.
+- Chunking or progress bars are removed.
+- The inputs are probabilities of shape `(n_estimators, n_samples, n_classes)`
+  instead of log probabilities. They are checked for dimensionality and
+  finite values, then clipped to `[eps, 1]` before taking logarithms.
+- Sampling uses NumPy's `RandomState`. Ties inside `batch_bald` are broken
+  with `rand_argmax` using the fixed seed 0.
+- The utilities of every batch step are returned, where candidates
+  selected earlier in the batch are marked as NaN.
+- Only the parts needed for `BatchBALD` are kept.
+
+The associated query strategy is presented in:
 
 A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and Diverse
 Batch Acquisition for Deep Bayesian Active Learning. In Adv. Neural Inf.
@@ -25,7 +47,7 @@ from ..utils import (
 class _GeneralBALD(QueryByCommittee):
     """General Bayesian Active Learning by Disagreement (_GeneralBALD)
 
-    The Bayesian Active Learning by Disagreement (BatchBALD) [1]_ strategy
+    The Bayesian Active Learning by Disagreement (BALD) [1]_ strategy
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
@@ -389,7 +411,7 @@ def batch_bald(
     """BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian
     Active Learning
 
-    BatchBALD [1]_ is an extension of BALD  [2]_ (Bayesian Active Learning by
+    BatchBALD [2]_ is an extension of BALD [1]_ (Bayesian Active Learning by
     Disagreement) whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.

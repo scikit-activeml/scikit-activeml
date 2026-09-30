@@ -1,9 +1,11 @@
 """
-Implementation of Active Learning with Cost Embedding (CostEmbeddingAL), which
-is modified of:
+This module implementing Active Learning with Cost Embedding
+(`CostEmbeddingAL`) is a modification of:
 
 https://github.com/ntucllab/libact/blob/master/libact.
 Copyright (c) 2014, National Taiwan University All rights reserved.
+BSD-2-Clause license. The full text is distributed with scikit-activeml
+in `LICENSES/libact/LICENSE`.
 """
 
 import warnings
@@ -359,14 +361,17 @@ Implementation of Multi-dimensional Scaling Partial (MDSP), which
 is a modification of:
 
 https://github.com/ntucllab/libact/blob/master/libact/query_strategies/multiclass/mdsp.py
-written by Kuan-Hao Huang (BSD license. Copyright (c) 2014, National Taiwan
-University All rights reserved.)
+written by Kuan-Hao Huang (BSD-2-Clause license. Copyright (c) 2014,
+National Taiwan University All rights reserved.)
 
 and
 
 https://github.com/scikit-learn/scikit-learn/blob/14031f6/sklearn/manifold/mds.py.
-written by Nelle Varoquaux <nelle.varoquaux@gmail.com> (BSD license.
+written by Nelle Varoquaux <nelle.varoquaux@gmail.com> (BSD-3-Clause license.
 Copyright (c) 2007–2016 The scikit-learn developers. All rights reserved.).
+
+The full license texts are distributed with scikit-activeml in
+`LICENSES/libact/LICENSE` and `LICENSES/scikit-learn/COPYING-14031f6`.
 """
 
 
@@ -591,7 +596,7 @@ def smacof_p(
     References
     ----------
     .. [1] "Modern Multidimensional Scaling - Theory and Applications" Borg,
-       I.; Groenen P. Springer Series in Statistics (1997)
+       I., Groenen P. Springer Series in Statistics (1997)
     .. [2] "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
        Psychometrika, 29 (1964)
     .. [3] "Multidimensional scaling by optimizing goodness of fit to a
@@ -709,7 +714,7 @@ class MDSP(BaseEstimator):
     References
     ----------
     .. [1] "Modern Multidimensional Scaling - Theory and Applications" Borg,
-       I.; Groenen P. Springer Series in Statistics (1997)
+       I., Groenen P. Springer Series in Statistics (1997)
     .. [2] "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
        Psychometrika, 29 (1964)
     .. [3] "Multidimensional scaling by optimizing goodness of fit to a
