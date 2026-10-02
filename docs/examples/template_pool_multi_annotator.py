@@ -60,7 +60,7 @@ for i, p in enumerate(annotator_error_prob):
 y = np.full(shape=y_annot.shape, fill_value=MISSING_LABEL)
 y_mv = majority_vote(y, missing_label=MISSING_LABEL, random_state=random_state)
 # Initialise the classifier.
-clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], random_state=random_state)"
+clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], class_prior=1e-3, metric_dict={'gamma': 3}, random_state=random_state)"
 
 # Initialise the query strategy.
 qs = "$init_qs"

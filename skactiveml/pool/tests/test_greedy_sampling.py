@@ -8,6 +8,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL, is_labeled
 from sklearn.gaussian_process import GaussianProcessRegressor
 
@@ -24,11 +25,23 @@ class TestGreedySamplingX(
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
         }
+        params_clf_multilabel = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]], dtype=float),
+            "y": np.array(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                ]
+            ),
+        }
         super().setUp(
             qs_class=GreedySamplingX,
             init_default_params={},
             query_default_params_reg=query_default_params_reg,
             query_default_params_clf=query_default_params_clf,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_metric(self):
@@ -74,6 +87,37 @@ class TestGreedySamplingTarget(
             init_default_params={},
             query_default_params_reg=query_default_params_reg,
         )
+
+    def test_target_contract(self):
+        strategy = GreedySamplingTarget()
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset({("regression", "single-output", "single-annotator")}),
+        )
+
+    def test_multi_output_capability_failure_precedes_acquisition_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 2.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        reg = SklearnRegressor(
+            GaussianProcessRegressor(), target_type="multi-output"
+        )
+        strategy = GreedySamplingTarget()
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            strategy.query(X, y, reg, fit_reg=False)
+
+        assert_no_query_state(self, strategy)
 
     def test_init_param_x_metric(self):
         test_cases = [

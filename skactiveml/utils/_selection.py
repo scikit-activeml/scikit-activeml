@@ -123,6 +123,7 @@ def simple_batch(
         dtype=float,
         ensure_all_finite="allow-nan",
         allow_nd=True,
+        copy=True,
     )
     check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
     max_batch_size = np.sum(~np.isnan(utilities), dtype=int)

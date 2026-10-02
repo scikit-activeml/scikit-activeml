@@ -5,6 +5,8 @@ import inspect
 
 import numpy as np
 from sklearn.datasets import load_breast_cancer
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -12,12 +14,18 @@ from skactiveml.regressor import SklearnRegressor
 from skactiveml.pool import (
     SubSamplingWrapper,
     ParallelUtilityEstimationWrapper,
+    DiscriminativeAL,
     QueryByCommittee,
     UncertaintySampling,
+    RandomSampling,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
+)
+from skactiveml.tests.utils import (
+    assert_no_query_state,
+    assert_attributes_unchanged,
 )
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -75,12 +83,510 @@ class TestSubSamplingWrapper(
             "random_state": 0,
             "missing_label": MISSING_LABEL,
         }
+        # The wrapped strategy is estimator-backed, so that the multi-label
+        # fixture carries a class vocabulary the wrapper must preserve.
+        init_default_params_multilabel = {
+            "query_strategy": UncertaintySampling(random_state=0),
+            "max_candidates": 20,
+        }
+        params_clf_multilabel = {
+            "X": X[:20],
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(18)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                random_state=0,
+            ),
+        }
 
         super().setUp(
             qs_class=SubSamplingWrapper,
             init_default_params=init_default_params,
+            init_default_params_multilabel=init_default_params_multilabel,
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel=params_clf_multilabel,
+        )
+
+    def test_refitting_respects_declared_and_inferred_vocabularies(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0, 1, 2, MISSING_LABEL])
+        strategies = [
+            UncertaintySampling(),
+            SubSamplingWrapper(UncertaintySampling(), max_candidates=4),
+            ParallelUtilityEstimationWrapper(UncertaintySampling(), n_jobs=1),
+            SingleAnnotatorWrapper(UncertaintySampling()),
+            SingleAnnotatorWrapper(
+                SubSamplingWrapper(UncertaintySampling(), max_candidates=4)
+            ),
+        ]
+        for strategy in strategies:
+            for classes in [None, [0, 1]]:
+                for fit_clf in [None, True, False]:
+                    with self.subTest(
+                        strategy=type(strategy).__name__,
+                        classes=classes,
+                        fit_clf=fit_clf,
+                    ):
+                        qs = deepcopy(strategy)
+                        clf = ParzenWindowClassifier(classes=classes).fit(
+                            X[:2], [0, 1]
+                        )
+                        attributes_before = dict(clf.__dict__)
+                        probabilities_before = clf.predict_proba(X)
+                        kwargs = (
+                            {} if fit_clf is None else {"fit_clf": fit_clf}
+                        )
+                        is_multiannotator = isinstance(
+                            qs, SingleAnnotatorWrapper
+                        )
+                        query_y = (
+                            np.column_stack([y, y]) if is_multiannotator else y
+                        )
+
+                        if classes is not None or fit_clf is False:
+                            with self.assertRaisesRegex(
+                                ValueError, "outside `classes`"
+                            ):
+                                qs.query(X, query_y, clf=clf, **kwargs)
+                            assert_no_query_state(self, qs)
+                        else:
+                            indices = qs.query(X, query_y, clf=clf, **kwargs)
+                            samples = (
+                                indices[:, 0] if is_multiannotator else indices
+                            )
+                            np.testing.assert_array_equal(samples, [3])
+
+                        assert_attributes_unchanged(
+                            self, clf, attributes_before
+                        )
+                        np.testing.assert_array_equal(
+                            clf.predict_proba(X), probabilities_before
+                        )
+
+    def test_target_contract_preserves_wrapped_strategy(self):
+        wrapped = UncertaintySampling(method="entropy")
+        wrapper = SubSamplingWrapper(query_strategy=wrapped)
+
+        self.assertEqual(wrapper.target_type, "auto")
+        self.assertEqual(
+            wrapper._target_capabilities, wrapped._target_capabilities
+        )
+        restricted = UncertaintySampling(method="expected_average_precision")
+        restricted_wrapper = SubSamplingWrapper(query_strategy=restricted)
+        self.assertEqual(
+            restricted_wrapper._target_capabilities,
+            restricted._target_capabilities,
+        )
+        self.assertNotIn(
+            ("classification", "multi-label", "single-annotator"),
+            restricted_wrapper._target_capabilities,
+        )
+
+    def test_ambiguous_targets_fail_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=RandomSampling(), max_candidates=2
+        )
+
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            wrapper.query(X, y)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_fitted_estimator_semantics_reach_wrapped_strategy(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
+        ).fit(X, y_fit)
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=UncertaintySampling(),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        query_idx, utilities = wrapper.query(
+            X,
+            y_query,
+            clf=clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertEqual(utilities.shape, (1, len(X)))
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+
+        conflicting = SubSamplingWrapper(
+            query_strategy=UncertaintySampling(),
+            max_candidates=4,
+            target_type="single-output",
+        )
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            conflicting.query(X, y_query, clf=clf, fit_clf=False)
+        assert_no_query_state(self, conflicting)
+
+    def test_fitted_estimator_vocabulary_fails_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
+        ).fit(X, y_fit)
+        y_query = y_fit.copy()
+        y_query[0, 0] = 2.0
+        wrapper = SubSamplingWrapper(
+            query_strategy=UncertaintySampling(),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "outside `classes\\[0\\]`"):
+            wrapper.query(X, y_query, clf=clf, fit_clf=False)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_conflicting_fitted_estimators_fail_before_wrapper_state(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        clf_01 = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
+            X, [0, 1, 0, 1]
+        )
+        clf_02 = SklearnClassifier(GaussianNB(), classes=[0, 2]).fit(
+            X, [0, 2, 0, 2]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(), max_candidates=2
+        )
+
+        with self.assertRaisesRegex(ValueError, "conflicting target"):
+            wrapper.query(
+                X,
+                np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+                ensemble=[clf_01, clf_02],
+                fit_ensemble=False,
+            )
+
+        assert_no_query_state(self, wrapper)
+
+    def test_explicit_estimator_target_types_conflict_before_query(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array(
+            [
+                [0, 1],
+                [1, 0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(),
+            max_candidates=2,
+            target_type="multi-label",
+        )
+        clf = SklearnClassifier(
+            GaussianNB(), classes=[0, 1], target_type="single-output"
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "target declaration conflicts"
+        ):
+            wrapper.query(X, y, ensemble=clf, fit_ensemble=False)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_classifier_and_regressor_estimators_conflict_before_query(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(), max_candidates=2
+        )
+        estimators = [
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+            SklearnRegressor(RandomForestRegressor(random_state=0)),
+        ]
+
+        with self.assertRaisesRegex(
+            ValueError, "conflicting classification and regression"
+        ):
+            wrapper.query(X, y, ensemble=estimators, fit_ensemble=False)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_reordered_estimator_class_vocabularies_are_equivalent(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        # The same class vocabulary declared in a different order describes the
+        # same targets, so wrapping must not change the selected candidates.
+        estimators = [
+            SklearnClassifier(GaussianNB(), classes=[1, 0]),
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+        ]
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(random_state=0),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        np.testing.assert_array_equal(
+            wrapper.query(X, y, ensemble=estimators),
+            QueryByCommittee(random_state=0).query(X, y, ensemble=estimators),
+        )
+
+    def test_wrapper_rejects_unsupported_explicit_target_type(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array(
+            [
+                [0, 1],
+                [1, 0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(),
+            target_type="multi-label",
+            max_candidates=2,
+        )
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            wrapper.query(X, y, ensemble=None)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_resolved_target_type_reaches_auto_and_nested_strategies(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapped = RandomSampling(random_state=0)
+        direct = SubSamplingWrapper(
+            query_strategy=wrapped,
+            max_candidates=4,
+            target_type="multi-label",
+            random_state=0,
+        )
+
+        direct_idx, direct_utilities = direct.query(
+            X, y, return_utilities=True
+        )
+
+        self.assertIn(direct_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(direct_utilities[0, :2]).all())
+        self.assertEqual(wrapped.target_type, "auto")
+
+        nested = SubSamplingWrapper(
+            query_strategy=SubSamplingWrapper(
+                query_strategy=RandomSampling(
+                    target_type="multi-label", random_state=0
+                ),
+                max_candidates=4,
+                random_state=0,
+            ),
+            max_candidates=4,
+            random_state=0,
+        )
+        nested_idx, nested_utilities = nested.query(
+            X, y, return_utilities=True
+        )
+
+        self.assertIn(nested_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(nested_utilities[0, :2]).all())
+
+    def test_target_type_declarations_conflict_before_query(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=RandomSampling(target_type="single-output"),
+            max_candidates=4,
+            target_type="multi-label",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "target declaration conflicts"
+        ):
+            wrapper.query(X, y)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_wrapper_without_estimator_argument_resolves_declarations(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=RandomSampling(target_type="multi-label"),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        target_type = wrapper._resolve_wrapped_target_type(y, {})
+
+        self.assertEqual(target_type, "multi-label")
+        self.assertEqual(wrapper.query(X, y).shape, (1,))
+
+    def test_estimator_like_argument_is_no_target_authority(self):
+        X = np.arange(24, dtype=float).reshape(12, 2)
+        y_discriminator = np.array([0.0, 1.0] + [MISSING_LABEL] * 10)
+        # The discriminator separates labeled from unlabeled samples such that
+        # its target semantics do not describe `y`.
+        discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
+            X, y_discriminator
+        )
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0]]
+            + [[MISSING_LABEL, MISSING_LABEL] for _ in range(10)]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=DiscriminativeAL(random_state=0),
+            max_candidates=4,
+            target_type="multi-label",
+            random_state=0,
+        )
+
+        self.assertEqual(
+            wrapper._collect_target_authorities(
+                {"discriminator": discriminator}
+            ),
+            [],
+        )
+        query_indices = wrapper.query(X, y, discriminator=discriminator)
+
+        self.assertNotIn(query_indices[0], [0, 1])
+
+    def test_estimator_authorities_are_collected_deterministically(self):
+        clf_0 = SklearnClassifier(GaussianNB(), classes=[0, 1])
+        clf_1 = SklearnClassifier(GaussianNB(), classes=[0, 1])
+        clf_2 = SklearnClassifier(GaussianNB(), classes=[0, 1])
+        wrapper = SubSamplingWrapper(query_strategy=QueryByCommittee())
+
+        authorities = wrapper._collect_target_authorities(
+            {
+                "ensemble": [clf_1, clf_2, clf_1],
+                "clf": clf_0,
+                "discriminator": SklearnClassifier(
+                    GaussianNB(), classes=[0, 1]
+                ),
+                "fit_clf": False,
+                "fit_ensemble": False,
+                "sample_weight": None,
+            }
+        )
+
+        self.assertEqual(
+            [id(a) for a in authorities],
+            [id(clf_0), id(clf_1), id(clf_2)],
+        )
+
+    def test_authority_params_delegate_to_wrapped_strategy(self):
+        wrapped = DiscriminativeAL()
+        nested = SubSamplingWrapper(
+            query_strategy=SubSamplingWrapper(query_strategy=wrapped)
+        )
+
+        self.assertEqual(
+            nested._target_authority_params, wrapped._target_authority_params
+        )
+        self.assertNotIn("discriminator", wrapped._target_authority_params)
+        self.assertEqual(SubSamplingWrapper()._target_authority_params, ())
+
+    def test_conflicting_estimator_vocabularies_fail_before_query(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([0.0, 1.0, MISSING_LABEL, MISSING_LABEL])
+        wrapper = SubSamplingWrapper(
+            query_strategy=QueryByCommittee(random_state=0),
+            max_candidates=2,
+            random_state=0,
+        )
+        conflicting = [
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+            SklearnClassifier(GaussianNB(), classes=[0, 2]),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "class vocabularies"):
+            wrapper.query(X, y, ensemble=conflicting, fit_ensemble=True)
+        assert_no_query_state(self, wrapper)
+
+        agreeing = [
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+            SklearnClassifier(GaussianNB(), classes=[0, 1]),
+        ]
+        query_indices = wrapper.query(
+            X, y, ensemble=agreeing, fit_ensemble=True
+        )
+
+        self.assertIn(query_indices[0], [2, 3])
+
+    def test_cyclic_wrapper_chain_terminates(self):
+        inner = SubSamplingWrapper(query_strategy=RandomSampling())
+        outer = SubSamplingWrapper(
+            query_strategy=inner, target_type="multi-label"
+        )
+        inner.query_strategy = outer
+
+        declarations = outer._collect_target_declarations()
+
+        self.assertEqual(
+            declarations,
+            [
+                ("multi-label", "SubSamplingWrapper"),
+                ("auto", "SubSamplingWrapper"),
+            ],
         )
 
     def test_init_param_max_candidates(self, test_cases=None):
@@ -266,6 +772,12 @@ class TestSubSamplingWrapper(
 class TestParallelUtilityEstimationWrapper(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
+    supports_multilabel_batch_variation = False
+    # This wrapper parallelizes one-sample utility estimates and deliberately
+    # rejects larger batches; its wrapped strategies retain their own batch
+    # reproducibility coverage.
+    reproducibility_batch_size = 1
+
     def setUp(self):
         X, y = load_breast_cancer(return_X_y=True)
         X = StandardScaler().fit_transform(X)
@@ -305,9 +817,112 @@ class TestParallelUtilityEstimationWrapper(
                 "query_strategy": QueryByCommittee(random_state=0),
                 "n_jobs": 2,
             },
+            # The wrapped strategy is estimator-backed, so that the multi-label
+            # fixture carries a class vocabulary the wrapper must preserve.
+            init_default_params_multilabel={
+                "query_strategy": UncertaintySampling(random_state=0),
+                "n_jobs": 2,
+            },
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel={
+                "X": X[:20],
+                "y": np.vstack(
+                    [
+                        [0.0, 1.0],
+                        [1.0, 0.0],
+                        *[
+                            np.full(2, MISSING_LABEL, dtype=float)
+                            for _ in range(18)
+                        ],
+                    ]
+                ),
+                "clf": SklearnClassifier(
+                    MultiOutputClassifier(GaussianNB()),
+                    classes=[[0, 1], [0, 1]],
+                    missing_label=MISSING_LABEL,
+                    random_state=0,
+                ),
+            },
         )
+
+    def test_target_contract_preserves_wrapped_strategy(self):
+        wrapped = RandomSampling(target_type="multi-label")
+        wrapper = ParallelUtilityEstimationWrapper(query_strategy=wrapped)
+
+        self.assertEqual(wrapper.target_type, "auto")
+        self.assertEqual(
+            wrapper._target_capabilities, wrapped._target_capabilities
+        )
+
+    def test_ambiguous_targets_fail_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = ParallelUtilityEstimationWrapper(
+            query_strategy=RandomSampling(), n_jobs=1
+        )
+
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            wrapper.query(X, y)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_fitted_estimator_vocabulary_fails_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
+        ).fit(X, y_fit)
+        y_query = y_fit.copy()
+        y_query[0, 0] = 2.0
+        wrapper = ParallelUtilityEstimationWrapper(
+            query_strategy=UncertaintySampling(),
+            n_jobs=1,
+            random_state=0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "outside `classes\\[0\\]`"):
+            wrapper.query(X, y_query, clf=clf, fit_clf=False)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_resolved_target_type_reaches_auto_strategy(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapped = RandomSampling(random_state=0)
+        wrapper = ParallelUtilityEstimationWrapper(
+            query_strategy=wrapped,
+            n_jobs=1,
+            target_type="multi-label",
+            random_state=0,
+        )
+
+        query_idx, utilities = wrapper.query(X, y, return_utilities=True)
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+        self.assertEqual(wrapped.target_type, "auto")
 
     def test_init_param_query_strategy(self):
         test_cases = [
@@ -374,6 +989,29 @@ class TestParallelUtilityEstimationWrapper(
             query_params["return_utilities"] = False
             q_sub = qs_sub.query(**query_params)
             self.assertEqual(len(q_sub), 1)
+
+    def test_query_fewer_candidates_than_jobs(self):
+        # With `n_jobs=-1`, the candidates are split across all available
+        # CPUs. Fewer candidates than CPUs must not produce an empty chunk,
+        # which would ask the wrapped strategy to select from an exhausted
+        # candidate pool and contribute no utilities.
+        query_params = deepcopy(self.query_default_params_clf)
+        candidates = unlabeled_indices(
+            query_params["y"], self.init_default_params["missing_label"]
+        )[:2]
+        query_params["candidates"] = candidates
+        query_params["return_utilities"] = True
+
+        init_params = deepcopy(self.init_default_params)
+        init_params["n_jobs"] = -1
+        query_indices, utilities = self.qs_class(**init_params).query(
+            **query_params
+        )
+
+        self.assertEqual(query_indices.shape, (1,))
+        self.assertIn(query_indices[0], candidates)
+        self.assertEqual(utilities.shape, (1, len(query_params["X"])))
+        self.assertEqual(int((~np.isnan(utilities[0])).sum()), len(candidates))
 
     def test_query_batch_variation(self):
         # The strategy does not support `batch_size > 1` (see documentation)

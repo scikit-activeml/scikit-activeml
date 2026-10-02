@@ -27,7 +27,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
     points the discriminator rates most unlabeled-like, thus covering
     underrepresented regions. It does not use predictive uncertainty
     such that effectiveness hinges on the representation and discriminator
-    calibration.
+    calibration. This implementation is task-agnostic such that it can handle
+    class labels, numerical targets, and multilabel targets represented by a
+    two-dimensional `y`.
 
     Parameters
     ----------
@@ -41,6 +43,10 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -48,14 +54,27 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
        arXiv:1907.06347, 2019.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
+
     def __init__(
         self,
         greedy_selection=False,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.greedy_selection = greedy_selection
 
@@ -75,9 +94,11 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         discriminator : skactiveml.base.SkactivemlClassifier
             Classification model implementing the methods `fit` and
             `predict_proba`. It will be used to solve the binary classification
@@ -92,7 +113,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
               samples in `(X,y)`.
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
-              necessarily contained in `X`).
+              necessarily contained in `X`). Direct candidate samples are not
+              supported because DAL requires a mapping to samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -123,9 +145,17 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_query_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            target_type=target_type,
         )
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
@@ -133,7 +163,11 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         # Retransform candidates and create a potential mapping to the samples
         # in `X`.
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates=candidates,
+            X=X,
+            y=y,
+            enforce_mapping=True,
+            target_type=target_type,
         )
 
         # Re-define discriminator to fit the setting of classifying
@@ -145,7 +179,11 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         if self.greedy_selection:
             # Return the top samples with the highest probabilities of
             # being unlabeled, which correspond to their utilities.
-            y_discriminator = is_unlabeled(y, missing_label=self.missing_label)
+            y_discriminator = is_unlabeled(
+                y=y,
+                missing_label=self.missing_label,
+                target_type=target_type,
+            )
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
             utilities_cand = discriminator.predict_proba(X_cand)[:, 1]
@@ -170,7 +208,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             for i in range(batch_size):
                 # Determine unlabeled vs. labeled samples.
                 y_discriminator = is_unlabeled(
-                    y, missing_label=self.missing_label
+                    y=y,
+                    missing_label=self.missing_label,
+                    target_type=target_type,
                 )
                 y_discriminator = y_discriminator.astype(int)
 

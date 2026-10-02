@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, simple_batch
+from ..utils import simple_batch
 
 
 class RandomSampling(SingleAnnotatorPoolQueryStrategy):
@@ -17,11 +17,20 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Random state for candidate selection.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
     """
 
-    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
         )
 
     def query(
@@ -34,9 +43,11 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -78,11 +89,26 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_query_target_type(y)
+
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            target_type=target_type,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        # Determine candidate samples for selection.
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates,
+            X=X,
+            y=y,
+            target_type=target_type,
+        )
 
         if mapping is None:
             utilities = np.ones(len(X_cand))

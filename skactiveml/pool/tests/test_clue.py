@@ -4,14 +4,17 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.cluster import SpectralClustering, KMeans, MiniBatchKMeans
 from sklearn.exceptions import NotFittedError
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.pool import Clue
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.regressor import NadarayaWatsonRegressor
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
-    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplateMultilabelAggregationQueryStrategy,
 )
 from skactiveml.tests.utils import (
     ParzenWindowClassifierEmbedding,
@@ -21,7 +24,42 @@ from skactiveml.tests.utils import (
 )
 
 
-class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class ExactMultilabelClassifier(SkactivemlClassifier):
+    def __init__(
+        self,
+        probas=(0.0, 1.0),
+        classes=((0, 1), (0, 1)),
+        missing_label=MISSING_LABEL,
+    ):
+        super().__init__(
+            classes=classes,
+            missing_label=missing_label,
+            target_type="multi-label",
+        )
+        self.probas = probas
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
+
+    def fit(self, X, y, sample_weight=None):
+        target_spec = self._resolve_fitting_target_spec(y)
+        self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            target_spec=target_spec,
+        )
+        self.target_spec_ = target_spec
+        return self
+
+    def predict_proba(self, X):
+        return np.tile(self.probas, (len(X), 1))
+
+
+class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
     def setUp(self):
         X = np.linspace(0, 1, 20).reshape(10, 2)
         y = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
@@ -40,6 +78,26 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 classes=self.classes,
             ),
         }
+        self.qs_params_clf_multilabel = {
+            "X": X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "estimator": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=42,
+            ),
+        }
         self.query_default_params_reg = {
             "X": X,
             "y": y,
@@ -51,6 +109,24 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             init_default_params={"cluster_algo_dict": cluster_dict},
             query_default_params_clf=self.query_default_params_clf,
             query_default_params_reg=self.query_default_params_reg,
+            query_default_params_clf_multilabel=self.qs_params_clf_multilabel,
+        )
+
+    def test_target_contract(self):
+        self._test_classification_target_contract(
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                    ("regression", "single-output", "single-annotator"),
+                }
+            ),
+            estimator_param="estimator",
+            fit_param="fit_estimator",
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):
@@ -255,6 +331,129 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                         prev_clf_utilities = utilities
 
                     prev_utilities = utilities
+
+    def test_query_random_state_controls_clustering(self):
+        X, y_true = make_blobs(n_samples=100, centers=4, random_state=0)
+        y = np.full(len(X), MISSING_LABEL)
+        estimator = ParzenWindowClassifier(classes=np.unique(y_true))
+
+        repeated = [
+            Clue(random_state=7).query(X, y, estimator=estimator, batch_size=5)
+            for _ in range(4)
+        ]
+        for query_indices in repeated[1:]:
+            np.testing.assert_array_equal(query_indices, repeated[0])
+
+        different_seed = Clue(random_state=8).query(
+            X, y, estimator=estimator, batch_size=5
+        )
+        self.assertFalse(np.array_equal(repeated[0], different_seed))
+
+        propagated_seed = Clue(random_state=0).query(
+            X, y, estimator=estimator, batch_size=5
+        )
+        explicit_seed = Clue(
+            random_state=7, cluster_algo_dict={"random_state": 0}
+        ).query(X, y, estimator=estimator, batch_size=5)
+        np.testing.assert_array_equal(explicit_seed, propagated_seed)
+
+        # A one-centroid clustering problem was deterministic before seed
+        # propagation and remains unchanged for integer and absent seeds.
+        np.testing.assert_array_equal(
+            Clue(random_state=7).query(
+                X, y, estimator=estimator, batch_size=1
+            ),
+            [76],
+        )
+        np.testing.assert_array_equal(
+            Clue(random_state=None).query(
+                X, y, estimator=estimator, batch_size=1
+            ),
+            [76],
+        )
+
+        class FirstPointsClustering:
+            def __init__(self, n_clusters):
+                self.n_clusters = n_clusters
+
+            def fit_transform(self, X, y=None, sample_weight=None):
+                return np.linalg.norm(
+                    X[:, np.newaxis] - X[: self.n_clusters], axis=2
+                )
+
+        query_indices = Clue(
+            cluster_algo=FirstPointsClustering, random_state=7
+        ).query(X, y, estimator=estimator, batch_size=5)
+        self.assertEqual(query_indices.shape, (5,))
+
+    def test_query_multilabel_with_list_probas(self):
+        X = self.query_default_params_clf_multilabel["X"]
+        y = self.query_default_params_clf_multilabel["y"]
+        estimator = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=42,
+        )
+        qs = Clue(
+            random_state=0, cluster_algo_dict={"random_state": 0, "n_init": 1}
+        )
+        query_idx, utilities = qs.query(
+            X,
+            y,
+            estimator=estimator,
+            batch_size=2,
+            return_utilities=True,
+        )
+        self.assertEqual(query_idx.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(X)))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_multilabel_entropy_falls_back_for_certain_predictions(self):
+        X = np.array([[0, 0], [0, 1], [10, 0], [10, 1]])
+        y = np.full((len(X), 2), MISSING_LABEL)
+        query_indices = Clue(
+            method="entropy",
+            random_state=0,
+            cluster_algo_dict={"random_state": 0, "n_init": 1},
+        ).query(
+            X,
+            y,
+            estimator=ExactMultilabelClassifier(),
+            batch_size=2,
+        )
+        np.testing.assert_array_equal(query_indices, [3, 0])
+
+    def test_query_multilabel_with_multiclass_list_probas_raises(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [2.0, 0.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        estimator = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1, 2], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=42,
+        )
+        qs = Clue(
+            random_state=0, cluster_algo_dict={"random_state": 0, "n_init": 1}
+        )
+        self.assertRaises(
+            ValueError,
+            qs.query,
+            X,
+            y,
+            estimator=estimator,
+        )
 
 
 class NadarayaWatsonRegressorUncertainty(NadarayaWatsonRegressor):

@@ -22,9 +22,21 @@ class TestDiscriminativeAL(
         self.discriminator = ParzenWindowClassifier(
             random_state=self.random_state
         )
+        self.y_ml = np.vstack(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[np.full(2, MISSING_LABEL, dtype=float) for _ in range(8)],
+            ]
+        )
         query_default_params_clf = {
             "X": self.X,
             "y": self.y,
+            "discriminator": self.discriminator,
+        }
+        params_clf_multilabel = {
+            "X": self.X,
+            "y": self.y_ml,
             "discriminator": self.discriminator,
         }
         query_default_params_reg = {
@@ -37,6 +49,7 @@ class TestDiscriminativeAL(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_greedy_selection(self):

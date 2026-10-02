@@ -321,12 +321,11 @@ try:
         # `_validate_data_kwargs`
         # ------------------------------------------------------------------
 
-        def test_validate_data_kwargs_sets_y_ensure_1d_false(self):
+        def test_validate_data_kwargs_use_resolved_target_spec(self):
             clf = _DummySkorchMultiAnnotator(**self.base_init_params)
             vd_kwargs = clf._validate_data_kwargs()
             self.assertIsInstance(vd_kwargs, dict)
-            self.assertIn("y_ensure_1d", vd_kwargs)
-            self.assertFalse(vd_kwargs["y_ensure_1d"])
+            self.assertEqual(set(vd_kwargs), {"check_X_dict"})
 
     class TestMultiAnnotatorClassificationModule(unittest.TestCase):
         def setUp(self):

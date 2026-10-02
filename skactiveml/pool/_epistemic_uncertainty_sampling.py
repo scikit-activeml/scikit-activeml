@@ -9,7 +9,6 @@ import warnings
 import numpy as np
 from scipy.interpolate import griddata
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
-from sklearn import clone
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils.extmath import safe_sparse_dot
 
@@ -19,10 +18,9 @@ from ..utils import (
     is_labeled,
     simple_batch,
     check_scalar,
-    check_type,
     MISSING_LABEL,
-    check_equal_missing_label,
 )
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
@@ -49,6 +47,9 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This strategy supports only single-output
+        classification.
 
     References
     ----------
@@ -57,10 +58,16 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-        self, precompute=False, missing_label=MISSING_LABEL, random_state=None
+        self,
+        precompute=False,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.precompute = precompute
 
@@ -132,23 +139,30 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
+
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        # Validate classifier type.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-
-        # Validate classifier type.
-        check_type(fit_clf, "fit_clf", bool)
-
-        # Fit the classifier.
-        if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
 
         # Chose the correct method for the given classifier.
         if isinstance(clf, ParzenWindowClassifier):

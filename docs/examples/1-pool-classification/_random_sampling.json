@@ -5,7 +5,7 @@
     "method" : "Random Sampling",
     "category" : "Baseline",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool", "regression", "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Random Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],

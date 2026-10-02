@@ -1,16 +1,8 @@
-"""
-Module implementing `ProbCover`, which is a deep active learning strategy
-suited for low budgets.
-"""
-
-import numpy as np
 import warnings
 
-
-from copy import deepcopy
-from inspect import signature
-from sklearn.metrics import pairwise_distances
+import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances
 from sklearn.utils.validation import column_or_1d
 
 from ..base import SingleAnnotatorPoolQueryStrategy
@@ -18,7 +10,9 @@ from ..utils import (
     MISSING_LABEL,
     rand_argmax,
     check_scalar,
+    is_labeled,
 )
+from ._clustering import _set_random_state_if_supported
 
 
 class ProbCover(SingleAnnotatorPoolQueryStrategy):
@@ -31,15 +25,27 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     greedily adding the candidate samples that covers the most new samples at
     each step. It chooses `delta` via a purity criterion estimated from
     unlabeled data, prioritizes dense regions, and does not use predictive
-    uncertainty.
+    uncertainty. Originally, this query strategy was only proposed for
+    classification tasks. Nevertheless, this implementation can handle class
+    labels and multilabel targets represented by a two-dimensional `y`.
+
+    Multi-label support in this implementation is an extension and not part of
+    the original proposal in [1]_. Coverage is computed in the embedding space
+    and is therefore independent of the target structure, but the `delta`
+    default depends on a class count. For resolved multi-label targets with
+    `n_classes=None`, that count is the number of distinct observed label
+    rows, i.e., the number of distinct multi-label combinations.
 
     Parameters
     ----------
     n_classes : None or int, default=None
         This parameter is used to determine the delta value. If
         `n_classes=None`, the number of classes is extracted from the
-        given labels. If this extracted number of classes is below 2,
-        `n_classes=2` is used as a fallback.
+        given labels. For one-dimensional `y`, this is the number of unique
+        observed labels. For two-dimensional `y`, this is the number of unique
+        observed label rows, i.e., distinct multilabel combinations. If this
+        extracted number of classes is below 2, `n_classes=2` is used as a
+        fallback.
     deltas : None or array-like of shape (n_deltas,), default=None
         List of deltas (ball radii) to be tested for finding the maximum
         value satisfying a sample coverage >= `alpha`. If no value in
@@ -63,12 +69,26 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
     .. [1] O. Yehuda, A. Dekel, G. Hacohen, and D. Weinshall. Active Learning
        Through a Covering Lens. In Adv. Neural Inf. Process. Syst., 2022.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def __init__(
         self,
@@ -81,9 +101,12 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         distance_func=pairwise_distances,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.deltas = deltas
         self.alpha = alpha
@@ -109,9 +132,11 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -119,6 +144,9 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
+            - Candidate samples passed directly with shape
+              `(n_candidates, n_features)` are not supported because
+              ProbCover requires a mapping to samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -135,21 +163,51 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan. The indexing
-            refers to the samples in `X`.
+            Utilities for labeled samples will be set to np.nan.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to the samples in `X`.
         """
-        # Check parameters.
+        target_type = self._resolve_query_target_type(y)
+
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            target_type=target_type,
         )
+
+        # Determine candidate samples for selection.
         _, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates=candidates,
+            X=X,
+            y=y,
+            enforce_mapping=True,
+            target_type=target_type,
         )
+
+        # Infer number of classes, which must have a minimum of 2.
         is_candidate = np.full(len(X), fill_value=False)
         is_candidate[mapping] = True
         n_classes = self.n_classes
         if n_classes is None:
-            n_classes = max(len(np.unique(y[~is_candidate])), 2)
+            is_lbld = is_labeled(
+                y=y,
+                missing_label=self.missing_label_,
+                target_type=target_type,
+            )
+            y_labeled = y[is_lbld]
+            if target_type == "multi-label":
+                n_classes = len(
+                    {tuple(np.asarray(row).tolist()) for row in y_labeled}
+                )
+            else:
+                n_classes = len(np.unique(y_labeled))
+            n_classes = max(n_classes, 2)
         check_scalar(
             n_classes,
             "n_classes",
@@ -157,6 +215,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             min_inclusive=True,
             target_type=int,
         )
+
+        # Check parameters for determining the ball radius delta.
         if self.deltas is None:
             deltas = np.arange(0.2, 2.2, 0.2)
         else:
@@ -182,18 +242,16 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 "values according to the `init` function of `cluster_algo`."
             )
         check_scalar(update, name="update", target_type=bool)
+
+        # Set up clustering algorithm.
         cluster_algo_dict = (
             {}
             if self.cluster_algo_dict is None
             else self.cluster_algo_dict.copy()
         )
-
-        # Optionally, set random state.
-        cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
-        algo_has_seed = "random_state" in cluster_algo_sig
-        dict_lacks_seed = "random_state" not in cluster_algo_dict
-        if self.random_state is not None and algo_has_seed and dict_lacks_seed:
-            cluster_algo_dict["random_state"] = deepcopy(self.random_state)
+        _set_random_state_if_supported(
+            self.cluster_algo, cluster_algo_dict, self.random_state
+        )
 
         if update or not hasattr(self, "delta_max_"):
             # Compute distances between each pair of observed samples.

@@ -63,7 +63,8 @@ class TestSelection(unittest.TestCase):
         np.testing.assert_array_equal([1], rand_argmax(self.e))
 
     def test_simple_batch(self):
-        utils = [4, 2, 5, 3, 1, 0]
+        utils = np.array([4, 2, 5, 3, 1, 0], dtype=float)
+        utils_copy = utils.copy()
         expected_indices = np.array([2, 0, 3, 1, 4, 5])
         expected_batches = np.array(
             [
@@ -93,12 +94,14 @@ class TestSelection(unittest.TestCase):
         )
         np.testing.assert_array_equal(indices, expected_indices)
         np.testing.assert_array_equal(batches, expected_batches)
+        np.testing.assert_array_equal(utils, utils_copy)
 
         indices, batches = simple_batch(
             utils, random_state=42, batch_size=3, return_utilities=True
         )
         np.testing.assert_array_equal(indices[0:3], expected_indices[0:3])
         np.testing.assert_array_equal(batches[0:3], expected_batches[0:3])
+        np.testing.assert_array_equal(utils, utils_copy)
 
         indices, batches = simple_batch(
             [[np.nan, np.nan], [np.nan, np.nan]],

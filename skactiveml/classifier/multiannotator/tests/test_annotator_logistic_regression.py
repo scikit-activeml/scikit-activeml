@@ -6,11 +6,16 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.datasets import make_blobs
 from sklearn.linear_model import LogisticRegression
 
-from skactiveml.tests.template_estimator import TemplateEstimator
+from skactiveml.tests.template_estimator import (
+    TemplateEstimator,
+    TemplateMultiAnnotatorClassifier,
+)
 from skactiveml.classifier.multiannotator import AnnotatorLogisticRegression
 
 
-class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
+class TestAnnotatorLogisticRegression(
+    TemplateMultiAnnotatorClassifier, TemplateEstimator, unittest.TestCase
+):
     def setUp(self):
         self.X = np.zeros((2, 1))
         self.y_nan = [["nan", "nan", "nan"], ["nan", "nan", "nan"]]
@@ -41,6 +46,14 @@ class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
             fit_default_params=fit_default_params,
             predict_default_params=predict_default_params,
         )
+        self.target_contract_estimator_factory = lambda: (
+            AnnotatorLogisticRegression(
+                classes=self.classes,
+                missing_label="nan",
+                random_state=0,
+            )
+        )
+        self.target_contract_fit_params = fit_default_params
 
     def test_init_param_n_annotators(self):
         lr = AnnotatorLogisticRegression()
@@ -158,7 +171,7 @@ class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
             (None, None),
             (self.classes, None),
             (np.arange(1, self.n_classes + 1), TypeError),
-            ("abc", ValueError),
+            ("abc", TypeError),
         ]
         self._test_param("init", "classes", test_cases)
 

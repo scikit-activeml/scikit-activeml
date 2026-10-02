@@ -58,6 +58,21 @@ Classification
      - - Text Transformer with Linear Probing
 
 
+Multilabel Classification
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :class: no-tag-filter
+
+   * - Tutorial
+     - Data
+     - Models
+   * - :doc:`Pool-based Multilabel Active Learning: Getting Started </generated/tutorials/30_pool_multilabel_getting_started>`
+     - Audio
+     - - Perch v2 Embeddings with Multi-layer Perceptron Probing
+
+
 Regression
 ^^^^^^^^^^
 
@@ -119,7 +134,7 @@ Classification
      - Models
    * - :doc:`Stream-based Active Learning: Getting Started </generated/tutorials/20_stream_getting_started>`
      - Text
-     - - Sentence Transformer with Parzen Window Classifier
+     - - SentenceTransformers embeddings with classifiers from scikit-learn, River, CapyMOA
    * - :doc:`Stream-based Active Learning in Batches </generated/tutorials/21_stream_batch_with_pool_al>`
      - Synthetic
      - - Parzen Window Classifier

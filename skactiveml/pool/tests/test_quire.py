@@ -12,6 +12,7 @@ from skactiveml.pool._quire import (
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled
 
 
@@ -50,6 +51,18 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             {"missing_label": "none"},
             {"y": ["0", "1", "none", "none"]},
         )
+
+    def test_nested_classes_resolve_before_capability_rejection(self):
+        strategy = Quire(classes=[[0, 1, 2], [0, 1, 2]])
+        y = np.array([[0, 1], [1, 2], [np.nan, np.nan], [np.nan, np.nan]])
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Quire does not support target capability.*multi-output",
+        ):
+            strategy.query(X=self.X, y=y)
+
+        assert_no_query_state(self, strategy)
 
     def test_init_param_lmbda(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

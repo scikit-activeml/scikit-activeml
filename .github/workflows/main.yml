@@ -8,9 +8,9 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -33,9 +33,9 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13']
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -58,9 +58,9 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -87,9 +87,9 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13']
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -109,13 +109,13 @@ jobs:
       run: |
         pytest
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v7
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true
         flags: ${{ matrix.python-version }}
     - name: 'Upload Coverage Artifact'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: cov_${{ matrix.python-version }}
         path: coverage.xml
@@ -125,9 +125,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.13']
+        python-version: ['3.14']
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -157,9 +157,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.13']
+        python-version: ['3.14']
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -172,15 +172,16 @@ jobs:
         sudo apt-get install ffmpeg
         python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt
-        pip install --upgrade -r requirements_opt.txt -r requirements_opt_max.txt
+        pip install --upgrade -r requirements_opt.txt
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
         pip install -r requirements_extra.txt
     - name: Create documentation with sphinx
       run: |
+        sphinx-build -b doctest docs docs/_build/doctest
         sphinx-build -b html docs docs/_build
         zip -r docs.zip docs
     - name: 'Upload Docs Artifact'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: docs_${{ matrix.python-version }}.zip
         path: docs

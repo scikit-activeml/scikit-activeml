@@ -49,6 +49,9 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This strategy supports only single-output
+        regression.
 
     References
     ----------
@@ -56,6 +59,10 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
        change for active learning in regression, IEEE International Conference
        on Data Mining, pages 51--60, 2013.
     """
+
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def __init__(
         self,
@@ -65,9 +72,12 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         feature_map=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.bootstrap_size = bootstrap_size
         self.n_train = n_train

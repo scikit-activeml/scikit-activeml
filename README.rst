@@ -18,7 +18,7 @@ A Comprehensive and User-Friendly Active Learning Library
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
    :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C3.13-blue.svg
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.11%20%7C3.12%20%7C3.13%20%7C3.14-blue.svg
    :target: https://pypi.org/project/scikit-activeml/
 
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
@@ -439,6 +439,11 @@ modality, and models used in the tutorial.
      - Classification
      - Image
      - - Vision Transformer with Full Fine-tuning
+   * - `Pool-based Multilabel Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/30_pool_multilabel_getting_started>`_
+     - Pool
+     - Multilabel Classification
+     - Audio
+     - - Perch v2 Embeddings with Multi-layer Perceptron Probing
    * - `Advanced Active Learning for Regression Tasks <https://scikit-activeml.github.io/latest/generated/tutorials/07_pool_advanced_regression>`_
      - Pool
      - Regression
@@ -450,7 +455,7 @@ modality, and models used in the tutorial.
      - Stream
      - Classification
      - Text
-     - - Sentence Transformer with Parzen Window Classifier
+     - - SentenceTransformers embeddings with classifiers from scikit-learn, River, CapyMOA
 
 .. examples_end
 

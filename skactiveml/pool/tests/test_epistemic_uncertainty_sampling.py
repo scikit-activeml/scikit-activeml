@@ -56,6 +56,9 @@ class TestEpistemicUncertaintySampling(
             query_default_params_clf=query_default_params_clf,
         )
 
+    def test_fitted_multilabel_classifier_rejected_before_state(self):
+        self._test_fitted_multilabel_classifier_rejection()
+
     def test_init_param_precompute(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(None, TypeError), ([], TypeError), (0, TypeError)]

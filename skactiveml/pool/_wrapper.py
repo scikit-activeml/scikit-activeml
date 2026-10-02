@@ -2,7 +2,9 @@ from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     check_random_state,
+    check_equal_missing_label,
     is_labeled,
+    is_unlabeled,
     labeled_indices,
     unlabeled_indices,
     check_scalar,
@@ -12,10 +14,138 @@ from ..utils import (
 from math import ceil
 import numpy as np
 from joblib import Parallel, delayed, cpu_count
+from sklearn import clone
 import warnings
+from ._target import (
+    _check_resolved_target_capability,
+    _collect_declared_authorities,
+    _reconcile_target_declarations,
+)
 
 
-class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
+class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
+    """Base class for wrappers preserving the wrapped target semantics.
+
+    A wrapper owns the reconciliation of its own target declaration with the
+    declarations of the strategies it wraps and with the estimators passed as
+    query arguments. It therefore keeps every step that depends on wrapper
+    internals, i.e., traversing the wrapped strategy chain, discovering
+    declared authorities among the query arguments, and validating the wrapped
+    capabilities. The wrapper-agnostic steps, i.e., comparing target
+    declarations, resolving target specifications, and checking capabilities,
+    are shared through :mod:`skactiveml.pool._target`.
+    """
+
+    @property
+    def _target_capabilities(self):
+        return getattr(
+            self.query_strategy, "_target_capabilities", frozenset()
+        )
+
+    @property
+    def _target_authority_params(self):
+        """Delegate the declared authority roles to the wrapped strategy."""
+        return getattr(self.query_strategy, "_target_authority_params", ())
+
+    def _resolve_wrapped_target_type(self, y, query_kwargs):
+        """Resolve the target type this wrapper must preserve.
+
+        This is the entry point of the wrapper's target reconciliation. It
+        fails before any query state is committed.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `self.missing_label`).
+        query_kwargs : dict
+            The keyword arguments forwarded to the wrapped query strategy.
+
+        Returns
+        -------
+        target_type : str
+            The resolved target type.
+        """
+        self._check_wrapped_strategy()
+        target_type, target_spec = _reconcile_target_declarations(
+            self._collect_target_declarations(),
+            self._collect_target_authorities(query_kwargs),
+            y,
+            missing_label=self.missing_label,
+            owner_name=type(self).__name__,
+        )
+        self._check_wrapped_target_capability(target_type, target_spec)
+        is_unlabeled(
+            y,
+            missing_label=self.missing_label,
+            target_type=target_type,
+        )
+        return target_type
+
+    def _check_wrapped_strategy(self):
+        """Check the wrapped strategy's type and missing label."""
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+        check_equal_missing_label(
+            self.query_strategy.missing_label, self.missing_label
+        )
+
+    def _collect_target_declarations(self):
+        """Collect the target declarations along the wrapped chain.
+
+        Returns
+        -------
+        declarations : list of (str, str)
+            The declared target types with their declaring component's name,
+            ordered from this wrapper to the innermost wrapped strategy. A
+            cyclic chain is traversed only once per strategy.
+        """
+        declarations = [(self.target_type, type(self).__name__)]
+        seen_strategies = {id(self)}
+        strategy = self.query_strategy
+        while strategy is not None and id(strategy) not in seen_strategies:
+            seen_strategies.add(id(strategy))
+            declarations.append(
+                (
+                    getattr(strategy, "target_type", "auto"),
+                    type(strategy).__name__,
+                )
+            )
+            strategy = getattr(strategy, "query_strategy", None)
+        return declarations
+
+    def _collect_target_authorities(self, query_kwargs):
+        """Discover the target authorities among the query arguments."""
+        return _collect_declared_authorities(
+            self._target_authority_params, query_kwargs
+        )
+
+    def _check_wrapped_target_capability(self, target_type, target_spec):
+        """Check the resolved target against the wrapped capabilities."""
+        capabilities = self._target_capabilities
+        if capabilities:
+            _check_resolved_target_capability(
+                type(self.query_strategy).__name__,
+                target_type,
+                target_spec,
+                capabilities,
+            )
+
+    def _query_strategy_for_target_type(self, target_type):
+        query_strategy = self.query_strategy
+        if getattr(query_strategy, "target_type", None) == "auto":
+            query_strategy = clone(query_strategy).set_params(
+                target_type=target_type
+            )
+        return query_strategy
+
+
+class SubSamplingWrapper(_TargetPreservingWrapper):
     """Sub-sampling Wrapper
 
     This class implements a wrapper for single-annotator pool-based strategies
@@ -28,6 +158,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
     option to mask all candidates that were not included in the subsample. This
     can further improve the runtime for query strategies that utilize all
     available unlabeled data in their selection.
+
+    Resolved multi-label targets preserve sample-level masks, so each row must
+    be either fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -53,6 +186,10 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The selected target type must be supported by
+        `query_strategy`. Automatic resolution preserves target semantics
+        declared by the wrapped strategy or a supplied estimator.
     """
 
     def __init__(
@@ -63,9 +200,12 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         embed_samples_func=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.query_strategy = query_strategy
         self.max_candidates = max_candidates
@@ -89,9 +229,11 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X,y)` are
@@ -136,21 +278,26 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_wrapped_target_type(y, query_kwargs)
+        query_strategy = self._query_strategy_for_target_type(target_type)
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_type,
         )
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
+
         check_scalar(self.exclude_non_subsample, "exclude_non_subsample", bool)
-        seed_multiplier = (
-            int(is_labeled(y, missing_label=self.missing_label_).sum()) + 1
+        is_lbld = is_labeled(
+            y=y,
+            missing_label=self.missing_label_,
+            target_type=target_type,
         )
+        seed_multiplier = int(is_lbld.sum() + 1)
         max_candidates = self.max_candidates
         if isinstance(self.max_candidates, int):
             check_scalar(
@@ -186,7 +333,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         # subsampling with no explicit provided candidates
         if candidates is None:
             candidate_indices = unlabeled_indices(
-                y=y, missing_label=self.missing_label_
+                y=y,
+                missing_label=self.missing_label_,
+                target_type=target_type,
             )
             # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
@@ -221,7 +370,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         # check if to exclude unlabeled non-candidate training data
         if self.exclude_non_subsample:
             all_labeled = labeled_indices(
-                y=y, missing_label=self.missing_label_
+                y=y,
+                missing_label=self.missing_label_,
+                target_type=target_type,
             )
             if candidates is not None and candidates.ndim > 1:
                 subset_and_labeled_indices = all_labeled
@@ -247,7 +398,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         if self.embed_samples_func:
             new_X = self.embed_samples_func(new_X)
 
-        qs_output = self.query_strategy.query(
+        qs_output = query_strategy.query(
             X=new_X,
             y=new_y,
             candidates=new_candidates,
@@ -261,6 +412,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         utilities = None
         if return_utilities:
             queried_indices, utilities = qs_output
+        effective_batch_size = len(np.atleast_1d(queried_indices))
 
         # retransform queried indices and utilities as if no training data was
         # removed
@@ -272,7 +424,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             # transform to original utilities shape
             if utilities is not None:
                 new_utilities = np.full(
-                    shape=(batch_size, len(X)), fill_value=np.nan
+                    shape=(effective_batch_size, len(X)), fill_value=np.nan
                 )
                 transformed_new_candidates = subset_and_labeled_indices[
                     new_candidates
@@ -294,13 +446,14 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         if return_utilities:
             if candidates is None or candidates.ndim == 1:
                 new_utilities = np.full(
-                    shape=(batch_size, len(X)), fill_value=np.nan
+                    shape=(effective_batch_size, len(X)), fill_value=np.nan
                 )
                 new_utilities[:, candidate_indices] = -np.inf
                 new_utilities[:, new_candidates] = utilities[:, new_candidates]
             else:
                 new_utilities = np.full(
-                    shape=(batch_size, len(candidates)), fill_value=np.nan
+                    shape=(effective_batch_size, len(candidates)),
+                    fill_value=np.nan,
                 )
                 new_utilities[:, candidate_indices] = -np.inf
                 new_utilities[:, new_candidate_indices] = utilities
@@ -311,13 +464,16 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             return new_queried_indices
 
 
-class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
+class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
     """Parallel Utility Estimation Wrapper
 
     This class implements a wrapper for single-annotator pool-based strategies
     such that utilities for candidates can be calculated in parallel. The main
     assumption for this is that the utility computations are independent from
     another. Therefore, only `batch_size=1` is supported.
+
+    Resolved multi-label targets preserve sample-level masks, so each row must
+    be either fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -335,6 +491,10 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target type. The selected target type must be supported by
+        `query_strategy`. Automatic resolution preserves target semantics
+        declared by the wrapped strategy or a supplied estimator.
 
     """
 
@@ -345,9 +505,12 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         parallel_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.query_strategy = query_strategy
         self.n_jobs = n_jobs
@@ -370,9 +533,11 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features), (default=None)
 
@@ -419,24 +584,27 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_wrapped_target_type(y, query_kwargs)
+        query_strategy = self._query_strategy_for_target_type(target_type)
 
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_type,
         )
-
         if batch_size != 1:
             raise ValueError("`batch_size` must be set to 1.")
+        # Determine candidate samples for selection.
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates, X=X, y=y, target_type=target_type
+        )
 
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
-
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
-
+        # Determine number of parallel jobs.
         if self.parallel_dict is None:
             parallel_dict = {}
         elif isinstance(self.parallel_dict, dict):
@@ -452,12 +620,11 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"`parallel_dict` is of type `{type(self.parallel_dict)}` "
                 f"but must be a dictionary or None."
             )
-
         parallel_dict["n_jobs"] = min(self.n_jobs, len(X_cand))
         parallel_pool = Parallel(**parallel_dict)
 
         def query_lambda_func(candidate):
-            return self.query_strategy.query(
+            return query_strategy.query(
                 X=X,
                 y=y,
                 candidates=np.array(candidate),
@@ -466,10 +633,14 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 **query_kwargs,
             )
 
+        # Never split into more chunks than there are candidates, because an
+        # empty chunk would ask the wrapped strategy to select from an
+        # exhausted candidate pool and contribute no utilities.
         if parallel_dict["n_jobs"] < 0:
-            chunks = np.array_split(X_cand, cpu_count())
+            n_chunks = min(cpu_count(), len(X_cand))
         else:
-            chunks = np.array_split(X_cand, parallel_dict["n_jobs"])
+            n_chunks = parallel_dict["n_jobs"]
+        chunks = np.array_split(X_cand, n_chunks)
         qs_outputs = parallel_pool(
             delayed(query_lambda_func)(c) for c in chunks
         )

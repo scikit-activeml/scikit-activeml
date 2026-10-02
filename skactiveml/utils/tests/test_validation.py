@@ -18,10 +18,117 @@ from skactiveml.utils import (
     check_random_state,
     check_class_prior,
 )
-from skactiveml.utils._validation import _check_callable
+from skactiveml.utils._validation import (
+    _canonicalize_multilabel_probas,
+    _check_1d_class_list,
+    _check_callable,
+    _check_forward_outputs,
+    _check_probas_are_valid,
+    _has_nested_classes,
+)
 
 
 class TestValidation(unittest.TestCase):
+    def test_check_probas_are_valid(self):
+        valid_cases = [
+            (np.array([[0.25, 0.75], [1.0, 0.0]]), False),
+            (np.array([[0.25, 0.75], [1.0, 0.0]]), True),
+        ]
+        for probas, is_multilabel in valid_cases:
+            with self.subTest(is_multilabel=is_multilabel):
+                _check_probas_are_valid(probas, is_multilabel=is_multilabel)
+
+        invalid_cases = [
+            (np.array([[2.0, -1.0]]), False),
+            (np.array([[1.5, -0.5]]), False),
+            (np.array([[0.25, 0.25]]), False),
+            (np.array([[np.nan, np.nan]]), False),
+            (np.array([[2.0, -1.0]]), True),
+            (np.array([[np.nan, 0.5]]), True),
+        ]
+        for probas, is_multilabel in invalid_cases:
+            with self.subTest(
+                probas=probas.tolist(), is_multilabel=is_multilabel
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "'probas' are invalid"
+                ):
+                    _check_probas_are_valid(
+                        probas, is_multilabel=is_multilabel
+                    )
+
+    def test_canonicalize_multilabel_probas(self):
+        probas_array = np.array([[0.2, 0.8], [0.7, 0.3]])
+        np.testing.assert_allclose(
+            _canonicalize_multilabel_probas(
+                probas_array, n_samples=2, n_outputs=2
+            ),
+            probas_array,
+        )
+        np.testing.assert_allclose(
+            _canonicalize_multilabel_probas(
+                [[0.2, 0.8], [0.7, 0.3]],
+                n_samples=2,
+                n_outputs=2,
+            ),
+            probas_array,
+        )
+
+        probas_list = [
+            np.array([[0.8, 0.2], [0.3, 0.7]]),
+            np.array([[0.2, 0.8], [0.7, 0.3]]),
+        ]
+        np.testing.assert_allclose(
+            _canonicalize_multilabel_probas(
+                probas_list, n_samples=2, n_outputs=2
+            ),
+            np.array([[0.2, 0.8], [0.7, 0.3]]),
+        )
+
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.array([0.2, 0.7]), np.array([[0.2, 0.8], [0.7, 0.3]])],
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.ones((2, 3)), np.ones((2, 2))],
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.ones((3, 2)), np.ones((3, 2))],
+            n_samples=2,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.ones((2, 2)), np.ones((2, 2))],
+            n_outputs=3,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            np.ones((3, 2)),
+            n_samples=2,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            np.ones((2, 3)),
+            n_outputs=2,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            np.ones(2),
+        )
+        self.assertRaises(ValueError, _canonicalize_multilabel_probas, None)
+        self.assertIsNone(
+            _canonicalize_multilabel_probas(None, allow_none=True)
+        )
+
     def test_check_scalar(self):
         x = 5
         self.assertRaises(
@@ -71,6 +178,14 @@ class TestValidation(unittest.TestCase):
         )
         check_scalar(x=np.nan, name="x", target_type=float)
 
+    def test_check_scalar_accepts_large_integer_without_upper_bound(self):
+        check_scalar(
+            x=10**20,
+            name="x",
+            target_type=(float, int),
+            min_val=0,
+        )
+
     def test_check_classifier_params(self):
         self.assertRaises(
             ValueError,
@@ -118,12 +233,73 @@ class TestValidation(unittest.TestCase):
             classes=["a", "b"],
             missing_label="a",
         )
+        self.assertRaises(
+            ValueError,
+            check_classifier_params,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            cost_matrix=np.eye(2),
+        )
+        self.assertRaises(
+            ValueError,
+            check_classifier_params,
+            classes=[[0, -1], [0, 1]],
+            missing_label=-1,
+        )
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=["2", 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
         self.assertRaises(ValueError, check_classes, classes=[1, 2, 2])
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            check_classes([])
+        with self.assertRaisesRegex(ValueError, "uniformly flat or nested"):
+            check_classes([[0, 1], 0])
+        with self.assertRaisesRegex(TypeError, "reusable iterable"):
+            check_classes(iter([0, 1]))
+        with self.assertRaisesRegex(TypeError, r"classes\[0\].*reusable"):
+            check_classes([iter([0, 1]), [0, 1]])
+        self.assertIsNone(check_classes(None))
+
+    def test_private_class_validation_helpers(self):
+        self.assertFalse(_has_nested_classes(2))
+        self.assertFalse(_has_nested_classes([0, 1]))
+        self.assertTrue(_has_nested_classes([[0, 1], [0, 1]]))
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            _has_nested_classes([])
+        for classes in ([0, [0, 1]], [[0, 1], 0]):
+            with self.subTest(classes=classes):
+                with self.assertRaisesRegex(
+                    ValueError, "uniformly flat or nested"
+                ):
+                    _has_nested_classes(classes)
+
+        self.assertRaises(TypeError, _check_1d_class_list, 2, name="classes")
+        self.assertRaises(
+            ValueError,
+            _check_1d_class_list,
+            np.array([[1, 2]]),
+            name="classes",
+        )
+        self.assertRaises(
+            ValueError,
+            _check_1d_class_list,
+            [],
+            name="classes",
+        )
+        self.assertRaises(
+            ValueError,
+            _check_1d_class_list,
+            [[1], [2]],
+            name="classes",
+        )
+        self.assertRaises(
+            TypeError,
+            _check_1d_class_list,
+            [{}, {"a": 1}],
+            name="classes",
+        )
 
     def test_check_class_prior(self):
         self.assertRaises(TypeError, check_class_prior, None, 1)
@@ -191,6 +367,19 @@ class TestValidation(unittest.TestCase):
         X = [[1, 2], [3, 4]]
         y = [1, 0]
         X_cand = [[5, 6]]
+        with self.assertRaisesRegex(ValueError, "target_type.*one of"):
+            check_X_y(X, y, target_type="invalid")
+        with self.assertRaisesRegex(
+            ValueError, "multi-label.*two-dimensional"
+        ):
+            check_X_y(X, y, target_type="multi-label")
+        with self.assertRaisesRegex(
+            ValueError, "multi-output.*two-dimensional"
+        ):
+            check_X_y(X, y, target_type="multi-output")
+        with self.assertRaisesRegex(ValueError, "at least two target columns"):
+            check_X_y(X, [[1], [0]], target_type="multi-output")
+
         X, y, sample_weight = check_X_y(X, y)
         np.testing.assert_array_equal(sample_weight, np.array([1.0, 1.0]))
         X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
@@ -202,23 +391,22 @@ class TestValidation(unittest.TestCase):
         self.assertTrue(isinstance(X, np.ndarray))
         y = [[1], [0]]
         X, y, X_cand, sample_weight, _ = check_X_y(
-            X, y, X_cand, sample_weight, multi_output=True
+            X, y, X_cand, sample_weight, target_type="multi-label"
         )
         self.assertTrue(isinstance(y, np.ndarray))
+        _, y_multi_output, _ = check_X_y(
+            X, [[1, 0], [0, 1]], target_type="multi-output"
+        )
+        np.testing.assert_array_equal(
+            y_multi_output, np.array([[1, 0], [0, 1]])
+        )
         y = np.array([1, 0], dtype=object)
         X, y, X_cand, sample_weight, _ = check_X_y(
             X, y, X_cand, sample_weight, y_numeric=True
         )
         X_cand_false = [[5]]
-        self.assertRaises(
-            ValueError,
-            check_X_y,
-            X,
-            y,
-            X_cand_false,
-            sample_weight,
-            multi_output=True,
-        )
+        with self.assertRaisesRegex(ValueError, "number of features"):
+            check_X_y(X, y, X_cand_false, sample_weight)
         y = np.array([[1, 0, 1], [2, 0, 1]])
         self.assertRaises(
             ValueError,
@@ -227,8 +415,67 @@ class TestValidation(unittest.TestCase):
             y,
             X_cand,
             sample_weight,
-            multi_output=True,
+            target_type="multi-label",
         )
+
+    def test_check_X_y_accepts_numpy_floating_nan_sentinels(self):
+        X = [[1], [2]]
+
+        for dtype in (np.float16, np.float32, np.float64, np.longdouble):
+            with self.subTest(dtype=dtype):
+                missing_label = dtype(np.nan)
+                y = np.array([0, missing_label], dtype=dtype)
+
+                _, checked_y, _ = check_X_y(X, y, missing_label=missing_label)
+
+                np.testing.assert_array_equal(
+                    np.isnan(checked_y), [False, True]
+                )
+
+    def test_check_X_y_deprecated_multi_output(self):
+        X = [[1, 2], [3, 4]]
+        y_2d = [[1, 0], [0, 1]]
+        y_1d = [1, 0]
+
+        # `multi_output=True` warns and validates `y` as multi-label.
+        with self.assertWarnsRegex(
+            FutureWarning, "multi_output.*deprecated.*target_type"
+        ):
+            _, y_out, _ = check_X_y(X, y_2d, multi_output=True)
+        np.testing.assert_array_equal(y_out, np.array(y_2d))
+
+        # `multi_output=False` warns and validates `y` as single-output.
+        with self.assertWarnsRegex(FutureWarning, "multi_output"):
+            _, y_out, _ = check_X_y(X, y_1d, multi_output=False)
+        np.testing.assert_array_equal(y_out, np.array(y_1d))
+
+        # A `target_type` other than the default wins over the legacy keyword,
+        # which the single-output default alone does not.
+        with self.assertWarnsRegex(FutureWarning, "multi_output"):
+            _, y_out, _ = check_X_y(
+                X, y_2d, target_type="multi-output", multi_output=False
+            )
+        np.testing.assert_array_equal(y_out, np.array(y_2d))
+        with self.assertWarnsRegex(FutureWarning, "multi_output"):
+            _, y_out, _ = check_X_y(
+                X, y_2d, target_type="single-output", multi_output=True
+            )
+        np.testing.assert_array_equal(y_out, np.array(y_2d))
+
+        # Unlike `multi_output=True`, `target_type="multi-label"` requires a
+        # two-dimensional `y`, so a legacy one-dimensional call now fails.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            with self.assertRaisesRegex(
+                ValueError, "multi-label.*two-dimensional"
+            ):
+                check_X_y(X, y_1d, multi_output=True)
+
+        # Omitting the keyword emits no deprecation warning.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            check_X_y(X, y_1d)
+            check_X_y(X, y_2d, target_type="multi-label")
 
     def test_check_random_state(self):
         seed = 12
@@ -322,6 +569,15 @@ class TestValidation(unittest.TestCase):
         indices_now_unique = check_indices(ind_not_unique, A, unique=True)
         self.assertEqual(len(indices_now_unique), 1)
 
+    def test_check_indices_empty_selection(self):
+        # An empty selection is valid, e.g., an exhausted candidate pool.
+        A = np.array([[4, 5], [6, 1], [3, 4]])
+
+        indices = check_indices(np.array([], dtype=int), A)
+
+        self.assertEqual(indices.shape, (0,))
+        self.assertTrue(np.issubdtype(indices.dtype, np.integer))
+
     def test_check_indices_n_dimensions(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])
         ind = np.array([[0, 1], [2, 0]])
@@ -373,6 +629,18 @@ class TestValidation(unittest.TestCase):
                 0.1, SplitBudgetManager(budget=0.2), SplitBudgetManager
             )
 
+        class DummyBudgetManager:
+            def __init__(self, budget):
+                self.budget = budget
+
+        budget_manager = check_budget_manager(
+            0.1,
+            None,
+            DummyBudgetManager,
+            {"random_state": 0},
+        )
+        self.assertEqual(budget_manager.budget, 0.1)
+
     def test_check_n_features(self):
 
         # Define a simple DummyEstimator
@@ -416,3 +684,23 @@ class TestValidation(unittest.TestCase):
             X = np.array([[1, 2], [3, 4]])
             with self.assertRaises(ValueError):
                 check_n_features(est, X, reset=False)
+
+    def test_check_forward_outputs(self):
+        self.assertRaises(TypeError, _check_forward_outputs, [])
+        self.assertRaises(ValueError, _check_forward_outputs, {})
+        self.assertRaises(
+            TypeError,
+            _check_forward_outputs,
+            {"proba": (0,)},
+        )
+        self.assertRaises(
+            ValueError,
+            _check_forward_outputs,
+            {"proba": (-1, None)},
+        )
+        self.assertRaises(
+            TypeError,
+            _check_forward_outputs,
+            {"proba": (0, "bad")},
+        )
+        _check_forward_outputs({"proba": (0, None), "emb": (1, lambda x: x)})

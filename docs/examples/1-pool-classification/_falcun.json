@@ -5,7 +5,7 @@
     "method" : "Fast Active Learning by Contrastive UNcertainty (FALCUN)",
     "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
-    "tags" : ["pool",  "classification", "single-annotator", "diverse-batch"],
+    "tags" : ["pool",  "classification", "single-annotator", "multi-label", "diverse-batch"],
     "title" : "Fast Active Learning by Contrastive UNcertainty (FALCUN)",
     "refs" : ["gilhuber2024falcun"],
     "sequence" : ["title", "text_0", "plot", "refs"],

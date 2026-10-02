@@ -22,10 +22,21 @@ class TestMaxHerding(
             "X": self.X,
             "y": self.y,
         }
+        params_clf_multilabel = {
+            "X": self.X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[np.full(2, -1.0) for _ in range(len(self.X) - 2)],
+                ]
+            ),
+        }
         super().setUp(
             qs_class=MaxHerding,
             init_default_params={"missing_label": -1},
             query_default_params_clf=query_default_params,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_metric(self):

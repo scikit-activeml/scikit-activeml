@@ -95,6 +95,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. This classifier supports only single-output
+        classification with multiple annotators.
 
 
     Attributes
@@ -126,6 +129,13 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         "annotator_perf",
         "annotator_class",
     }
+    _annotation_type = "multi-annotator"
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
 
     def __init__(
         self,
@@ -142,12 +152,14 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.n_annotators = n_annotators
         self.tol = tol
@@ -186,7 +198,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         """
         # Check input data.
         X, y, sample_weight = self._validate_data(
-            X=X, y=y, sample_weight=sample_weight, y_ensure_1d=False
+            X=X, y=y, sample_weight=sample_weight
         )
 
         # Ensure value of 'tol' to be a positive integer.
@@ -238,11 +250,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         # Set auxiliary variables.
         n_classes = len(self.classes_)
         if self.n_features_in_ is not None:
-            if len(y.shape) != 2:
-                raise ValueError(
-                    "`y` must be an array-like of shape "
-                    "`(n_samples, n_annotators)`."
-                )
             self.n_annotators_ = y.shape[1]
         else:
             if self.n_annotators is None:

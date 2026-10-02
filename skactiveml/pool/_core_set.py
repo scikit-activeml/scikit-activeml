@@ -1,11 +1,3 @@
-"""
-Module implementing the core-set query strategy.
-
-Core-set selection problem aims to find a small subset given a large labeled
-dataset such that a model learned over the small subset is competitive over the
-whole dataset.
-"""
-
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
@@ -27,16 +19,19 @@ from sklearn.metrics import pairwise_distances_argmin_min
 class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """Core Set
 
-    This class implements core-set based query strategies, i.e., the
+    This class implements the core-set based query strategy, i.e., the
     standard greedy algorithm for the k-center problem [1]_. CoreSet
-    applies a k-center (farthest-first) selection in an embedding space,
+    applies a k-center (farthest-first) selection in a feature space,
     seeded by the labeled set, to minimize the maximum distance of unlabeled
     samples to the labeled/selected samples. It is a pure diversity criterion
-    without explicit consideration of prediction uncertainty.
+    without explicit consideration of prediction uncertainty. Originally,
+    this query strategy was only proposed for classification. Nevertheless, it
+    is task-agnostic such that it can handle class labels, numerical targets,
+    and multilabel targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
-    metric : str or callable, default='euclidean'
+    metric : str or callable, default="euclidean"
         The metric must comply with the function
         `sklearn.metrics.pairwise_distances_argmin_min`.
     metric_dict : dict, default=None
@@ -46,6 +41,10 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -53,15 +52,28 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
        Networks: A Core-Set Approach. In Int. Conf. Learn. Represent., 2018.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
+
     def __init__(
         self,
         metric="euclidean",
         metric_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict
@@ -81,9 +93,11 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -124,12 +138,26 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_query_target_type(y)
+
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            target_type=target_type,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        # Determine candidate samples for selection.
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates, X=X, y=y, target_type=target_type
+        )
 
+        # Perform selection depending on whether the candidate samples are part
+        # of `X` or not.
         if mapping is not None:
             query_indices, utilities = k_greedy_center(
                 X=X,
@@ -140,17 +168,27 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 mapping=mapping,
                 metric=self.metric,
                 metric_dict=self.metric_dict,
+                target_type=target_type,
             )
         else:
             selected_samples = labeled_indices(
-                y=y, missing_label=self.missing_label_
+                y=y,
+                missing_label=self.missing_label_,
+                target_type=target_type,
             )
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
-            y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
-            y_with_cand = np.concatenate(
-                (y_cand, y[selected_samples]), axis=None
+            y_cand_shape = (
+                (n_new_cand, y.shape[1])
+                if target_type == "multi-label"
+                else (n_new_cand,)
             )
+            y_cand = np.full(
+                shape=y_cand_shape,
+                fill_value=self.missing_label_,
+                dtype=y.dtype,
+            )
+            y_with_cand = np.concatenate((y_cand, y[selected_samples]), axis=0)
             mapping = np.arange(n_new_cand)
             query_indices, utilities = k_greedy_center(
                 X=X_with_cand,
@@ -162,8 +200,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 n_new_cand=n_new_cand,
                 metric=self.metric,
                 metric_dict=self.metric_dict,
+                target_type=target_type,
             )
-
         if return_utilities:
             return query_indices, utilities
         else:
@@ -180,37 +218,41 @@ def k_greedy_center(
     n_new_cand=None,
     metric="euclidean",
     metric_dict=None,
+    target_type="single-output",
 ):
-    """
-    An active learning method that greedily forms a batch to minimize the
+    """An active learning method that greedily forms a batch to minimize the
     maximum distance to a cluster center among all unlabeled datapoints.
 
     Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
-       Training data set, usually complete, i.e., including the labeled and
-       unlabeled samples.
-    y : np.ndarray of shape (n_samples,)
+        Training data set, usually complete, i.e., including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by `self.missing_label`).
+        indicated by `self.missing_label`). If `y` is two-dimensional, a
+        row `y[i]` must either contain only observed labels or only
+        `missing_label` values, i.e., no mixing within a row.
     batch_size : int, default=1
-       The number of samples to be selected in one AL cycle.
+        The number of samples to be selected in one AL cycle.
     random_state : None or int or np.random.RandomState, default=None
-       Random state for candidate selection.
+        Random state for candidate selection.
     missing_label : scalar or string or np.nan or None, default=np.nan
-       Value to represent a missing label.
+        Value to represent a missing label.
     mapping : None or np.ndarray of shape (n_candidates,), default=None
-       Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
+        Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
     n_new_cand : int or None, default=None
-       The number of new candidates that are additionally added to `X`.
-       Only used for the case, that in the query function with the shape of
-       `candidates` is `(n_candidates, n_feature)`.
+        The number of new candidates that are additionally added to `X`.
+        Only used for the case, that in the query function with the shape of
+        `candidates` is `(n_candidates, n_feature)`.
     metric : str or callable, default='euclidean'
         The metric must comply with the function
         `sklearn.metrics.pairwise_distances_argmin_min`.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the function
         `sklearn.metrics.pairwise_distances_argmin_min` as `metric_kwargs`.
+    target_type : "single-output" or "multi-label", default="single-output"
+        Resolved target type used for sample-level label masks.
 
     Returns
     -------
@@ -237,27 +279,37 @@ def k_greedy_center(
         - If `candidates` is of shape `(n_candidates, n_features)`,
           the indexing refers to the samples in `candidates`.
     """
-    # valid the input shape whether is valid or not.
+    # Validate input parameters.
     X = check_array(X, allow_nd=True)
-    y = check_array(
-        y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
-    )
-    y = column_or_1d(y, warn=True)
+    if target_type == "single-output":
+        y = check_array(
+            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
+        )
+        y = column_or_1d(y, warn=True)
+    elif target_type == "multi-label":
+        y = check_array(
+            y, ensure_2d=True, ensure_all_finite="allow-nan", dtype=None
+        )
+    else:
+        raise ValueError(
+            "`target_type` must be either 'single-output' or 'multi-label'."
+        )
     check_consistent_length(X, y)
-
-    selected_samples = labeled_indices(y, missing_label=missing_label)
-
     random_state_ = check_random_state(random_state)
 
     if mapping is None:
-        mapping = unlabeled_indices(y, missing_label=missing_label)
+        mapping = unlabeled_indices(
+            y=y,
+            missing_label=missing_label,
+            target_type=target_type,
+        )
     else:
         mapping = column_or_1d(mapping, dtype=int, warn=True)
 
     if not isinstance(batch_size, int):
-        raise TypeError("batch_size must be a integer")
+        raise TypeError("`batch_size` must be an `integer`.")
 
-    # initialize the utilities matrix with
+    # Initialize the utility matrix.
     if n_new_cand is None:
         utilities = np.zeros(shape=(batch_size, X.shape[0]))
     elif isinstance(n_new_cand, int):
@@ -270,8 +322,12 @@ def k_greedy_center(
     else:
         raise TypeError("Only n_new_cand with type int is supported.")
 
+    selected_samples = labeled_indices(
+        y=y,
+        missing_label=missing_label,
+        target_type=target_type,
+    )
     query_indices = np.zeros(batch_size, dtype=int)
-
     for i in range(batch_size):
         if i == 0:
             update_dist = _update_distances(
@@ -300,7 +356,7 @@ def k_greedy_center(
         # select index
         query_indices[i] = rand_argmax(
             utilities[i], random_state=random_state_
-        )[0]
+        ).item()
 
     return query_indices, utilities
 
