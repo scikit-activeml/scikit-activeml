@@ -6,6 +6,7 @@ import numpy as np
 
 from skactiveml.utils._label_dtype import (
     _LABELS,
+    _NO_MISSING_LABEL,
     _NUMERICAL_LABELS,
     _TASK_AGNOSTIC_LABELS,
     _as_class_vocabulary_array,
@@ -18,6 +19,8 @@ from skactiveml.utils._label_dtype import (
     _lossless_decode_dtype,
     _matches_missing_label,
     _missing_mask_and_family,
+    _python_scalar,
+    _scalar_label_family,
 )
 
 
@@ -551,6 +554,139 @@ class TestMissingMaskAndFamily(unittest.TestCase):
         scanner.assert_not_called()
         self.assertEqual(family, "float")
         self.assertEqual(is_missing.sum(), 5 * 10**5)
+
+    def test_large_object_arrays_are_checked_per_type(self):
+        module = "skactiveml.utils._label_dtype"
+        cases = [
+            (["cat", "dog", "none", "none"], "none", "str"),
+            ([0, 1, np.nan, np.nan], np.nan, "int"),
+            (["cat", None, "dog", None], None, "str"),
+        ]
+        for values, missing_label, expected_family in cases:
+            with self.subTest(missing_label=missing_label):
+                y = np.array(values * 2500, dtype=object)
+                with (
+                    unittest.mock.patch(
+                        f"{module}._matches_missing_label"
+                    ) as matcher,
+                    unittest.mock.patch(
+                        f"{module}._scalar_label_family",
+                        wraps=_scalar_label_family,
+                    ) as scanner,
+                    unittest.mock.patch(
+                        f"{module}._python_scalar", wraps=_python_scalar
+                    ) as converter,
+                ):
+                    is_missing, family = _missing_mask_and_family(
+                        y, missing_label, name="y"
+                    )
+                matcher.assert_not_called()
+                self.assertLessEqual(scanner.call_count, 2)
+                self.assertLessEqual(converter.call_count, 2)
+                self.assertEqual(is_missing.sum(), 5000)
+                self.assertEqual(family, expected_family)
+
+    def test_type_groups_match_the_entry_by_entry_checks(self):
+        import enum
+        from decimal import Decimal
+
+        class Level(enum.IntEnum):
+            LOW = 1
+
+        class CaselessStr(str):
+            def __eq__(self, other):
+                return isinstance(other, str) and (
+                    self.lower() == other.lower()
+                )
+
+            __hash__ = str.__hash__
+
+        values = [
+            0,
+            -1,
+            2**63,
+            2**64 - 1,
+            2**64,
+            -(2**63) - 1,
+            np.int64(3),
+            np.uint64(2**64 - 1),
+            np.longlong(-5),
+            True,
+            np.bool_(False),
+            0.5,
+            np.float32(1.5),
+            np.float16(2.5),
+            np.nan,
+            np.float32(np.nan),
+            np.uint32(0x7F800001).view(np.float32),
+            np.inf,
+            "a",
+            "none",
+            "none\x00",
+            np.str_("none"),
+            None,
+            Level.LOW,
+            CaselessStr("None"),
+            np.longdouble(1.5),
+            np.timedelta64(3, "ns"),
+            b"a",
+            1 + 2j,
+            Decimal("1.5"),
+        ]
+        missing_labels = [
+            _NO_MISSING_LABEL,
+            None,
+            np.nan,
+            "none",
+            "none\x00",
+            CaselessStr("NONE"),
+            -1,
+        ]
+
+        def outcome(y, missing_label):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                try:
+                    if missing_label is _NO_MISSING_LABEL:
+                        result = _label_family(y, name="y")
+                    else:
+                        is_missing, family = _missing_mask_and_family(
+                            y, missing_label, name="y"
+                        )
+                        result = (
+                            is_missing.dtype,
+                            is_missing.shape,
+                            is_missing.tolist(),
+                            family,
+                        )
+                except Exception as error:
+                    result = (type(error), str(error))
+            return result, [(w.category, str(w.message)) for w in caught]
+
+        cases = []
+        for i, first in enumerate(values):
+            for j, second in enumerate(values):
+                y = np.empty(64, dtype=object)
+                y[:] = [first, second] * 32
+                if (i + j) % 2:
+                    y = y.reshape(-1, 2).T
+                cases += [
+                    ((first, second), y, missing_label)
+                    for missing_label in missing_labels
+                ]
+        grouped = [outcome(y, label) for _, y, label in cases]
+        with unittest.mock.patch(
+            "skactiveml.utils._label_dtype._group_by_type", return_value=None
+        ):
+            reference = [outcome(y, label) for _, y, label in cases]
+        mismatches = [
+            (pair, label)
+            for (pair, _, label), actual, expected in zip(
+                cases, grouped, reference
+            )
+            if actual != expected
+        ]
+        self.assertEqual(mismatches, [])
 
     def test_classification_labels_must_not_mix_numeric_families(self):
         cases = [

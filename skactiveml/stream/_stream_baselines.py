@@ -2,6 +2,7 @@ import numpy as np
 
 from ..base import SingleAnnotatorStreamQueryStrategy
 from ..utils import check_scalar
+from ..utils._validation import _validate_budget_update
 
 # Label-free baselines consume neither labels nor a model. They declare the
 # same task-agnostic capabilities as their pool-based counterparts.
@@ -148,20 +149,18 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         check_scalar(
             self.allow_exceeding_budget, "allow_exceeding_budget", bool
         )
         _validate_update_state(self)
-        # update observed samples and queried samples
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
         self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
         # update the random state assuming, that query(..., simulate=True) was
@@ -322,16 +321,15 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried, with
-            `0 <= queried_indices <= n_candidates`.
+            `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        queried = _validate_budget_update(candidates, queried_indices)
         _validate_update_state(self)
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
         self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
         return self

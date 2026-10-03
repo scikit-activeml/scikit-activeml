@@ -22,6 +22,7 @@ from skactiveml.utils import (
     call_func,
     check_budget_manager,
 )
+from skactiveml.utils._validation import _validate_budget_update
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
     DensityBasedSplitBudgetManager,
@@ -34,11 +35,9 @@ from skactiveml.stream.budgetmanager import (
 def _copy_budget_manager(budget_manager):
     """Copy acquisition state and isolate lazily initialized random state."""
     manager = deepcopy(budget_manager)
-    if hasattr(manager, "random_state_"):
-        manager.random_state_ = deepcopy(
-            check_random_state(manager.random_state_)
-        )
-    elif hasattr(manager, "random_state"):
+    if not hasattr(manager, "random_state_") and hasattr(
+        manager, "random_state"
+    ):
         # None would otherwise attach the copy to NumPy's global generator
         # when its first query initializes random_state_.
         manager.random_state = deepcopy(
@@ -48,36 +47,27 @@ def _copy_budget_manager(budget_manager):
 
 
 def _update_budget_manager(
-    budget_manager, candidate, queried, budget_manager_param_dict, index
+    budget_manager,
+    candidate,
+    queried,
+    budget_manager_param_dict,
+    index,
+    eligible,
 ):
-    """Advance one observation with local indices and aligned utilities."""
+    """Mask ineligible utilities and advance one observation."""
     params = budget_manager_param_dict.copy()
     if "utilities" in params:
-        params["utilities"] = np.asarray(params["utilities"])[
-            index : index + 1
-        ]
+        params["utilities"] = (
+            np.asarray(params["utilities"])[index : index + 1]
+            if eligible
+            else np.array([np.nan])
+        )
     call_func(
         budget_manager.update,
-        candidates=[candidate],
+        candidates=[candidate if eligible else np.nan],
         queried_indices=[0] if queried else [],
         **params,
     )
-
-
-def _validate_budget_update(candidates, queried_indices):
-    """Validate original-batch indices before any observation is committed."""
-    indices = np.asarray(queried_indices)
-    if indices.ndim != 1:
-        raise IndexError("`queried_indices` must be one-dimensional.")
-    if indices.size and not np.issubdtype(indices.dtype, np.integer):
-        raise IndexError("`queried_indices` must contain integer indices.")
-    if np.any(indices < 0) or np.any(indices >= len(candidates)):
-        raise IndexError(
-            "`queried_indices` must index the original candidates."
-        )
-    queried = np.zeros(len(candidates), dtype=bool)
-    queried[indices.astype(int)] = True
-    return queried
 
 
 class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
@@ -227,7 +217,11 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
             ).reshape([-1])
             utilities = 1 - confidence
-        budget_manager = _copy_budget_manager(self.budget_manager_)
+        # Querying leaves an initialized budget manager unchanged, so only
+        # the acquisitions simulated for later candidates need a copy.
+        budget_manager = self.budget_manager_
+        if not hasattr(budget_manager, "budget_"):
+            budget_manager = _copy_budget_manager(budget_manager)
         tmp_min_dist = self.min_dist_
         tmp_window = self.window_
         self.min_dist_ = copy(tmp_min_dist)
@@ -242,12 +236,17 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 queried = eligible and len(selected) > 0
                 if queried:
                     queried_indices.append(t)
+                if t == len(candidates) - 1:
+                    break
+                if budget_manager is self.budget_manager_:
+                    budget_manager = _copy_budget_manager(budget_manager)
                 _update_budget_manager(
                     budget_manager,
-                    x_cand if eligible else np.nan,
+                    x_cand,
                     queried,
                     {"utilities": utilities},
                     t,
+                    eligible=eligible,
                 )
                 self.window_.append(x_cand)
         finally:
@@ -279,15 +278,18 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Optional kwargs for each single-observation budget-manager
             update. If provided, `utilities` must align with the original
             candidates; it is sliced into one-element arrays for the observed
-            samples. Other kwargs are forwarded unchanged. Supply `utilities`
-            when the budget manager requires them for updating.
+            samples. Utilities of candidates rejected by the density filter
+            are passed as NaN. Other kwargs are forwarded unchanged. Supply
+            `utilities` when the budget manager requires them for updating.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        queried = _validate_budget_update(candidates, queried_indices)
+        queried = _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
@@ -304,6 +306,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
+        self._sync_default_budget_manager()
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -331,10 +334,11 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             local_density_factor = self._calculate_ldf([x_cand])
             _update_budget_manager(
                 self.budget_manager_,
-                x_cand if local_density_factor > 0 else np.nan,
+                x_cand,
                 queried[i],
                 budget_manager_param_dict,
                 i,
+                eligible=local_density_factor > 0,
             )
             self.window_.append(x_cand)
         return self
@@ -356,7 +360,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         """
         ldf = 0
         if len(self.window_) >= 1:
-            distances = self.dist_func_(self.window_, candidates).ravel()
+            distances = self.dist_func_(
+                self.window_, candidates, **self.dist_func_dict_
+            ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
             for i in np.where(is_new_nn)[0]:
@@ -451,6 +457,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
+        self._sync_default_budget_manager()
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -718,7 +725,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         confidence = np.max(predict_proba, axis=1)
         utilities = 1 - confidence
 
-        budget_manager = _copy_budget_manager(self.budget_manager_)
+        budget_manager = self.budget_manager_
+        if not hasattr(budget_manager, "budget_"):
+            budget_manager = _copy_budget_manager(budget_manager)
         density_state = {
             name: getattr(self, name)
             for name in (
@@ -746,13 +755,19 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                     queried = eligible and len(selected) > 0
                     if queried:
                         queried_indices.append(i)
-                    _update_budget_manager(
-                        budget_manager,
-                        x_cand if eligible else np.nan,
-                        queried,
-                        {"utilities": utilities},
-                        i,
-                    )
+                    if i < len(candidates) - 1:
+                        if budget_manager is self.budget_manager_:
+                            budget_manager = _copy_budget_manager(
+                                budget_manager
+                            )
+                        _update_budget_manager(
+                            budget_manager,
+                            x_cand,
+                            queried,
+                            {"utilities": utilities},
+                            i,
+                            eligible=eligible,
+                        )
                 self.t_ += 1
         finally:
             self.__dict__.update(density_state)
@@ -782,15 +797,20 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Optional kwargs for each single-observation budget-manager
             update. If provided, `utilities` must align with the original
             candidates; it is sliced into one-element arrays for the observed
-            samples. Other kwargs are forwarded unchanged. Supply `utilities`
-            when the budget manager requires them for updating.
+            samples. With `force_full_budget=True`, utilities of candidates
+            rejected by the density filter are passed as NaN. Otherwise,
+            these candidates are skipped. Other kwargs are forwarded
+            unchanged. Supply `utilities` when the budget manager requires
+            them for updating.
 
         Returns
         -------
         self : CognitiveDualQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        queried = _validate_budget_update(candidates, queried_indices)
+        queried = _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
         self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -812,6 +832,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
+        self._sync_default_budget_manager()
         # _init_members
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -851,10 +872,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             if eligible or self.force_full_budget:
                 _update_budget_manager(
                     self.budget_manager_,
-                    x_cand if eligible else np.nan,
+                    x_cand,
                     queried[i],
                     budget_manager_param_dict,
                     i,
+                    eligible=eligible,
                 )
             self.t_ += 1
         return self
@@ -881,7 +903,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         theta = 0
         if len(self.cognition_window_) >= 1:
             distances = self.dist_func_(
-                self.cognition_window_, candidates
+                self.cognition_window_, candidates, **self.dist_func_dict_
             ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
@@ -896,7 +918,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             self.f_[t] = 1 / (self.theta_[t] + 1)
             tmp = -self.f_[t] * (t_x - self.t_x_[t])
             self.s_[t] = np.exp(tmp)
-        if len(self.cognition_window_) > self.cognition_window_size:
+        if len(self.cognition_window_) >= self.cognition_window_size:
             # remove element with the smallest memory strength
             remove_index = np.argmin(self.s_)
             self.cognition_window_.pop(remove_index)
@@ -1012,6 +1034,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
+        self._sync_default_budget_manager()
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances

@@ -561,7 +561,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     empty labeled training subset, and an `estimator` rejecting a labeled
     training subset that carries fewer than two distinct classes in at least
     one output. Both set `is_fitted_` to `False` and emit a warning. Every
-    other `estimator` failure is raised.
+    other `estimator` failure is raised. With an explicit `cost_matrix`,
+    `predict` minimizes expected costs under this fallback distribution.
 
     References
     ----------
@@ -748,23 +749,22 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        if self.is_fitted_:
-            if self.cost_matrix is None:
-                y_pred = self.estimator_.predict(X, **predict_kwargs)
-                if self._is_multilabel_target():
-                    y_pred = self._check_multilabel_predictions(
-                        y_pred, n_samples=len(X)
-                    )
-                y_pred = np.asarray(y_pred).astype(
-                    self._class_label_dtype(), copy=False
+        if self.cost_matrix is not None:
+            P = self.predict_proba(X)
+            costs = np.dot(P, self.cost_matrix_)
+            y_pred = rand_argmin(
+                costs, random_state=self.random_state_, axis=1
+            )
+            y_pred = self._decode_class_labels(y_pred)
+        elif self.is_fitted_:
+            y_pred = self.estimator_.predict(X, **predict_kwargs)
+            if self._is_multilabel_target():
+                y_pred = self._check_multilabel_predictions(
+                    y_pred, n_samples=len(X)
                 )
-            else:
-                P = self.predict_proba(X)
-                costs = np.dot(P, self.cost_matrix_)
-                y_pred = rand_argmin(
-                    costs, random_state=self.random_state_, axis=1
-                )
-                y_pred = self._decode_class_labels(y_pred)
+            y_pred = np.asarray(y_pred).astype(
+                self._class_label_dtype(), copy=False
+            )
         else:
             p = self.predict_proba([X[0]])
             if self._is_multilabel_target():
@@ -1504,7 +1504,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             _check_probas_are_valid(complete_rows, is_multilabel=False)
 
     def _normalize_single_output_proba(self, P, n_samples):
-        """Align a single-output probability array to `classes_`.
+        """Align single-output probabilities to `classes_` and validate them.
 
         The wrapped estimator's probability columns follow its own learned
         class vocabulary, which may be ordered differently from `classes_` and
@@ -1530,7 +1530,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ------
         ValueError
             If the probabilities can be reconciled with neither the learned
-            nor the declared class vocabulary.
+            nor the declared class vocabulary, or are not valid class
+            probabilities.
         """
         P = np.asarray(P, dtype=float)
         if P.ndim != 2 or P.shape[0] != n_samples:
@@ -1551,9 +1552,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     f"classes, declare `classes` matching the estimator, or "
                     f"return probabilities for all declared classes."
                 )
-            return P
-
-        return _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+        else:
+            P = _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+        self._check_estimator_probas_are_valid(P, is_multilabel=False)
+        return P
 
     def _normalize_multilabel_proba_list(self, P, n_samples):
         """Align a list of per-output probability matrices to `classes_`.
@@ -1726,7 +1728,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
+        `classes` is not none. If both the wrapper and `estimator` specify a
+        cost matrix, their costs must agree for each pair of class labels,
+        even if their declared class orders differ.
     window_size : int, default=None,
         Value to represent the estimator sliding window size for X, y and
         sample weight. If `None` the window is unrestricted in its size.
@@ -2128,16 +2132,21 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if (
             self.cost_matrix is not None
             and self.estimator.cost_matrix is not None
-            and not np.array_equiv(
-                self.cost_matrix, self.estimator.cost_matrix
-            )
         ):
-            raise ValueError(
-                "'cost_matrix' and estimator.cost_matrix must be equal. "
-                "Got {} is not equal to {}.".format(
-                    self.cost_matrix, self.estimator.cost_matrix
+            class_indices = [
+                list(self.classes).index(c) for c in inner_classes
+            ]
+            aligned_costs = np.asarray(self.cost_matrix, dtype=float)[
+                np.ix_(class_indices, class_indices)
+            ]
+            if not np.array_equal(
+                aligned_costs,
+                np.asarray(self.estimator.cost_matrix, dtype=float),
+            ):
+                raise ValueError(
+                    "'cost_matrix' and estimator.cost_matrix must be equal "
+                    "after aligning their class labels."
                 )
-            )
         # self.missing_label is not testet completly and
         # needs to be checked for the general test.
         # if general test is removed, remove this check.
@@ -2386,8 +2395,9 @@ if successful_skorch_torch_import:
             values of a multi-label target must lie within `[0, 1]`.
 
             - If `True`, invalid probabilities raise a `ValueError`.
-            - If `False`, the first forward output is passed on unchecked,
-              e.g., to interpret scores that are not probabilities. The
+            - If `False`, the values of the first forward output are passed
+              on unchecked, e.g., to interpret scores that are not
+              probabilities. Their shape is checked in either case. The
               caller is then responsible for the consumers of these values.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
@@ -2651,23 +2661,30 @@ if successful_skorch_torch_import:
             P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
             check_scalar(self.validate_proba, "validate_proba", bool)
             is_multilabel = self._uses_multilabel_target()
-            if is_multilabel:
-                target_spec = getattr(self, "target_spec_", None)
-                classes = (
-                    target_spec.classes
-                    if target_spec is not None
-                    else self.classes
-                )
-                n_outputs = len(classes)
-                expected_shape = (len(X), n_outputs)
-                if np.shape(P) != expected_shape:
+            target_spec = getattr(self, "target_spec_", None)
+            classes = (
+                target_spec.classes
+                if target_spec is not None
+                else self.classes
+            )
+            expected_shape = (len(X), len(classes))
+            if np.shape(P) != expected_shape:
+                if is_multilabel:
                     raise ValueError(
                         "Expected `predict_proba` of the Skorch module to "
                         "return positive-class probabilities of shape "
-                        f"`(n_samples, {n_outputs})`, exactly "
+                        f"`(n_samples, {len(classes)})`, exactly "
                         f"`{expected_shape}`, for multi-label "
                         f"classification, got {np.shape(P)}."
                     )
+                raise ValueError(
+                    "Expected `predict_proba` of the Skorch module to "
+                    "return class probabilities of shape "
+                    f"`(n_samples, {len(classes)})`, exactly "
+                    f"`{expected_shape}`, for the classes "
+                    f"{_format_classes(classes)}, got {np.shape(P)}. The "
+                    "module needs one output unit per class."
+                )
             if self.validate_proba:
                 _check_probas_are_valid(
                     P,
@@ -3076,7 +3093,7 @@ if successful_capymoa_import:
                 ordered according to the attribute `self.classes_`.
             """
             import capymoa
-            import capymoa.instance
+            import capymoa.core
 
             check_is_fitted(self)
             predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
@@ -3086,7 +3103,7 @@ if successful_capymoa_import:
             if self.is_fitted_:
                 p_list = []
                 for x in X:
-                    x_instance = capymoa.instance.Instance(
+                    x_instance = capymoa.core.Instance(
                         schema=self.schema_, instance=x
                     )
                     p_i = self.estimator_.predict_proba(x_instance)
@@ -3169,7 +3186,7 @@ if successful_capymoa_import:
             """
             import capymoa
             import capymoa.base
-            import capymoa.instance
+            import capymoa.core
 
             had_established_target_spec = (
                 fit_function == "partial_fit"
@@ -3235,7 +3252,7 @@ if successful_capymoa_import:
                 for i in range(len(y_train)):
                     x_inst = X_train[i]
                     y_inst = y_train[i].item()
-                    instance = capymoa.instance.LabeledInstance.from_array(
+                    instance = capymoa.core.LabeledInstance.from_array(
                         self.schema_,
                         x=x_inst,
                         y_index=y_inst,

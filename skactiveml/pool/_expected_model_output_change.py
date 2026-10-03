@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn import clone
 from sklearn.utils.validation import check_array, _check_n_features
 from sklearn.metrics import mean_squared_error
 
@@ -7,6 +6,7 @@ from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 from skactiveml.pool.utils import _update_reg, conditional_expect
 from skactiveml.utils import (
     check_type,
@@ -147,11 +147,27 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(ProbabilisticRegressor,),
+        )
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
-        check_type(reg, "reg", ProbabilisticRegressor)
         integration_dict = (
             {"method": "assume_linear"}
             if self.integration_dict is None
@@ -170,17 +186,10 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         else:
             X_eval = check_array(X_eval)
             _check_n_features(self, X_eval, reset=False)
-        check_type(fit_reg, "fit_reg", bool)
         loss = mean_squared_error if self.loss is None else self.loss
         _check_callable(loss, "self.loss", n_positional_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         y_pred = reg.predict(X_eval)
 

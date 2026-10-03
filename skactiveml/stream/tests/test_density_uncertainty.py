@@ -3,10 +3,11 @@ from copy import deepcopy
 
 import numpy as np
 from skactiveml.base import BudgetManager
-from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.metrics.pairwise import manhattan_distances, pairwise_distances
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.stream.budgetmanager import (
+    BalancedIncrementalQuantileFilter,
     DensityBasedSplitBudgetManager,
     FixedUncertaintyBudgetManager,
 )
@@ -292,11 +293,113 @@ def _assert_partition_invariance(test_case, strategy_type):
         np.random.set_state(original_global_state)
 
 
+def _assert_biqf_excludes_ineligible_utilities(test_case, strategy_type):
+    candidates = np.array([[0.0], [1.0], [0.5], [10.0], [0.75], [20.0]])
+    eligible = np.array([False, True, True, False, True, False])
+    classifier = ParzenWindowClassifier(
+        classes=[0, 1], metric_dict={"gamma": 1.0}
+    ).fit([[-1.0], [1.0]], [0, 1])
+    kwargs = (
+        {}
+        if strategy_type is StreamDensityBasedAL
+        else {"force_full_budget": True}
+    )
+    results = []
+    for boundaries in (list(range(1, 7)), [6]):
+        strategy = strategy_type(
+            budget_manager=BalancedIncrementalQuantileFilter(budget=0.2),
+            random_state=0,
+            **kwargs,
+        )
+        selected, utilities, start = [], [], 0
+        for stop in boundaries:
+            batch = candidates[start:stop]
+            queried, batch_utilities = strategy.query(
+                batch, classifier, return_utilities=True
+            )
+            strategy.update(batch, queried, {"utilities": batch_utilities})
+            selected.extend(start + i for i in queried)
+            utilities.extend(batch_utilities)
+            start = stop
+        np.testing.assert_array_equal(
+            strategy.budget_manager_.history_sorted_,
+            np.where(eligible, utilities, np.nan),
+        )
+        results.append((selected, strategy))
+    test_case.assertEqual(results[1][0], results[0][0])
+    _assert_acquisition_state_equal(test_case, results[1][1], results[0][1])
+
+
+def _assert_dist_func_dict_is_forwarded(test_case, strategy_type):
+    candidates = np.random.RandomState(0).uniform(size=(30, 2))
+    classifier = ParzenWindowClassifier(classes=[0, 1]).fit(
+        [[0.0, 0.0]], [np.nan]
+    )
+    kwargs = {"random_state": 0, "budget": 0.3}
+    if strategy_type is not StreamDensityBasedAL:
+        kwargs["force_full_budget"] = True
+    if strategy_type is CognitiveDualQueryStrategyFixUn:
+        kwargs["classes"] = [0, 1]
+
+    def distance(X, Y, *, metric):
+        return pairwise_distances(X, Y, metric=metric)
+
+    results = []
+    for dist_params in (
+        {"dist_func": distance, "dist_func_dict": {"metric": "manhattan"}},
+        {"dist_func": manhattan_distances},
+        {},
+    ):
+        strategy = strategy_type(**kwargs, **dist_params)
+        selected = []
+        for start in (0, 15):
+            batch = candidates[start : start + 15]
+            queried = strategy.query(batch, classifier)
+            strategy.update(batch, queried)
+            selected.extend(start + i for i in queried)
+        results.append((selected, strategy))
+    test_case.assertEqual(results[0][0], results[1][0])
+    _assert_acquisition_state_equal(test_case, results[0][1], results[1][1])
+    test_case.assertFalse(
+        np.allclose(results[0][1].min_dist_, results[2][1].min_dist_)
+    )
+
+
 class TemplateCognitiveDualQueryStrategy(
     TemplateSingleAnnotatorStreamQueryStrategy
 ):
     def test_partition_invariance(self):
         _assert_partition_invariance(self, self.qs_class)
+
+    def test_dist_func_dict_is_forwarded(self):
+        _assert_dist_func_dict_is_forwarded(self, self.qs_class)
+
+    def test_cognition_window_holds_at_most_its_size(self):
+        candidates = np.random.RandomState(0).uniform(size=(12, 1))
+        kwargs = {"force_full_budget": True, "random_state": 0}
+        if self.qs_class is CognitiveDualQueryStrategyFixUn:
+            kwargs["classes"] = [0, 1]
+        for size in (1, 2, 5):
+            with self.subTest(size=size):
+                strategy = self.qs_class(cognition_window_size=size, **kwargs)
+                for i, candidate in enumerate(candidates):
+                    strategy.update([candidate], [])
+                    for name in (
+                        "cognition_window_",
+                        "min_dist_",
+                        "theta_",
+                        "s_",
+                        "t_x_",
+                        "f_",
+                    ):
+                        self.assertEqual(
+                            len(getattr(strategy, name)), min(i + 1, size)
+                        )
+                batch_strategy = self.qs_class(
+                    cognition_window_size=size, **kwargs
+                )
+                batch_strategy.update(candidates, [])
+                _assert_acquisition_state_equal(self, batch_strategy, strategy)
 
     def test_init_param_density_threshold(self):
         test_cases = []
@@ -397,8 +500,22 @@ class TestCognitiveDualQueryStrategy(
             query_default_params_clf=query_default_params_clf,
         )
 
+    def test_biqf_excludes_ineligible_utilities(self):
+        _assert_biqf_excludes_ineligible_utilities(self, self.qs_class)
+
     def test_batch_accounts_for_earlier_acquisitions(self):
         _assert_batch_accounts_for_earlier_acquisitions(self, self.qs_class)
+
+    def test_evicted_samples_do_not_count_towards_density(self):
+        strategy = CognitiveDualQueryStrategy(
+            cognition_window_size=1,
+            budget_manager=RecordingBudgetManager(),
+            random_state=0,
+        )
+        candidates = np.array([[0.0], [10.0], [0.0]])
+        strategy.update(candidates, [], {"utilities": np.ones(3)})
+        history = strategy.budget_manager_.history_
+        self.assertEqual([entry[0].tolist() for entry in history], [[10.0]])
 
     def test_update_accepts_its_own_filtered_query_indices(self):
         classifier = _empty_classifier()
@@ -439,8 +556,13 @@ class TestCognitiveDualQueryStrategy(
                 strategy.update(candidates, [acquired], params)
                 history = strategy.budget_manager_.history_
                 expected_indices = list(range(8)) if full else [1, 2, 5]
-                self.assertEqual(
-                    [entry[2] for entry in history], expected_indices
+                expected_utilities = (
+                    [np.nan, 1, 2, np.nan, np.nan, 5, np.nan, np.nan]
+                    if full
+                    else [1, 2, 5]
+                )
+                np.testing.assert_array_equal(
+                    [entry[2] for entry in history], expected_utilities
                 )
                 self.assertEqual(
                     [entry[1] for entry in history],
@@ -489,7 +611,7 @@ class TestCognitiveDualQueryStrategy(
                     )
 
     def test_query(self):
-        expected_output = [1, 4, 5, 6, 10, 15]
+        expected_output = [4, 5, 6, 7, 11]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,
@@ -534,7 +656,7 @@ class TestCognitiveDualQueryStrategyVarUn(
         )
 
     def test_query(self):
-        expected_output = [4, 5, 6, 7, 15]
+        expected_output = [4, 5, 6, 7]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,
@@ -579,7 +701,7 @@ class TestCognitiveDualQueryStrategyRanVarUn(
         )
 
     def test_query(self):
-        expected_output = [1, 4, 5, 6, 10, 15]
+        expected_output = [4, 5, 6, 7, 11]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,
@@ -733,11 +855,17 @@ class TestStreamDensityBasedAL(
             query_default_params_clf=query_default_params_clf,
         )
 
+    def test_biqf_excludes_ineligible_utilities(self):
+        _assert_biqf_excludes_ineligible_utilities(self, self.qs_class)
+
     def test_batch_accounts_for_earlier_acquisitions(self):
         _assert_batch_accounts_for_earlier_acquisitions(self, self.qs_class)
 
     def test_partition_invariance(self):
         _assert_partition_invariance(self, self.qs_class)
+
+    def test_dist_func_dict_is_forwarded(self):
+        _assert_dist_func_dict_is_forwarded(self, self.qs_class)
 
     def test_invalid_indices_do_not_advance_state(self):
         _assert_invalid_indices_do_not_advance_state(self, self.qs_class)

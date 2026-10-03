@@ -68,7 +68,8 @@ for c in range(n_cycles):
     title = ax.text(
         0.5,
         1.05,
-        f"Decision boundary after acquiring {c} labels\n"
+        "Decision boundary after acquiring "
+        f"{len(labeled_indices(y, missing_label=MISSING_LABEL))} labels\n"
         f"Test Accuracy: {clf.score(X_test, y_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
         ha="center",
@@ -76,7 +77,7 @@ for c in range(n_cycles):
     )
 
     # Update plot with utility values, samples, and decision boundary.
-    X_labeled = X[labeled_indices(y)]
+    X_labeled = X[labeled_indices(y, missing_label=MISSING_LABEL)]
     ax = plot_utilities(
         qs,
         "$query_params",

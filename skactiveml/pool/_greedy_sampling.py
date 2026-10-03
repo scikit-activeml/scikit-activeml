@@ -20,9 +20,11 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling in the Feature Space (GSx)
 
     This class implements the query strategy Greedy Sampling in the Feature
-    Space (GSx) [1]_ that tries to select those samples that increase the
-    diversity of the feature space the most. It does this by selecting those
-    features that are the furthest away from all previously labeled samples.
+    Space (GSx) [1]_. It selects candidates that maximize the minimum distance
+    to labeled samples outside the candidate set and samples already selected
+    in the batch. If no labeled samples remain outside the candidate set, the
+    first selected sample minimizes the sum of distances to the samples in
+    `X`.
     Originally, this query strategy was only proposed for regression.
     Nevertheless, it is task-agnostic such that it can handle class labels,
     numerical targets, and multilabel targets represented by a
@@ -99,7 +101,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Labeled candidates remain eligible and are
+              excluded from the initial centers.
             - If `candidates` is of shape `(n_candidates, ...)`, the candidate
               samples are directly given in `candidates` (not necessarily
               contained in `X`).
@@ -124,7 +127,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
+            Utilities for samples outside the candidate set and samples
+            already selected in the batch are set to `np.nan`.
 
             - If `candidates` is `None`, the indexing refers to the samples
               in `X`.
@@ -151,7 +155,6 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             candidates=candidates, X=X, y=y, target_type=target_type
         )
 
-        # Determine already labeled samples.
         sample_indices = np.arange(len(X), dtype=int)
         selected_indices = labeled_indices(
             y=y,
@@ -165,6 +168,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         else:
             X_all = X
             candidate_indices = mapping
+            selected_indices = np.setdiff1d(selected_indices, mapping)
 
         query_indices_cand, utilities_cand = _greedy_sampling(
             X_cand,

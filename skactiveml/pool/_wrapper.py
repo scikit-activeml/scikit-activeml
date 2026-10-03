@@ -22,6 +22,54 @@ from ._target import (
     _reconcile_target_declarations,
 )
 
+# Query arguments aligned to the candidate samples if `candidates` contains
+# samples instead of indices.
+_CANDIDATE_ALIGNED_KWARGS = ["sample_weight_candidates", "utility_weight"]
+
+
+def _subset_query_kwargs(
+    query_kwargs, names, indices, n_aligned, n_aligned_name
+):
+    """Subset the keyword arguments in `names` by `indices`.
+
+    Parameters
+    ----------
+    query_kwargs : dict-like
+        Keyword arguments to be passed to the wrapped query strategy.
+    names : list of str
+        Names of the keyword arguments being aligned to the sample set that is
+        subset by `indices`.
+    indices : array-like of shape (n_subset_samples,)
+        Indices of the samples of this sample set being kept.
+    n_aligned : int
+        Number of samples of this sample set before subsetting.
+    n_aligned_name : str
+        Name of `n_aligned` being used for the error message.
+
+    Returns
+    -------
+    query_kwargs : dict-like
+        Keyword arguments whose aligned entries are subset, leaving the arrays
+        of the caller unchanged.
+    """
+    query_kwargs = dict(query_kwargs)
+    for name in names:
+        value = query_kwargs.get(name)
+        # Scalars are forwarded unchanged, such that the wrapped query
+        # strategy reports them.
+        if np.ndim(value) == 0:
+            continue
+        value = np.asarray(value)
+        # A length mismatch is reported here, since the subset could
+        # otherwise have a length the wrapped query strategy accepts.
+        if len(value) != n_aligned:
+            raise ValueError(
+                f"`{name}` must have length `{n_aligned_name}` but "
+                f"{len(value)} != {n_aligned}."
+            )
+        query_kwargs[name] = value[indices]
+    return query_kwargs
+
 
 class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
     """Base class for wrappers preserving the wrapped target semantics.
@@ -408,20 +456,22 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             X_aligned_kwargs = ["sample_weight"]
             # `utility_weight` weights the samples whose utilities are
             # computed, which are the candidate samples in this case.
-            query_kwargs = self._subset_query_kwargs(
+            query_kwargs = _subset_query_kwargs(
                 query_kwargs,
-                ["sample_weight_candidates", "utility_weight"],
+                _CANDIDATE_ALIGNED_KWARGS,
                 new_candidate_indices,
                 len(candidates),
+                "n_candidates",
             )
         else:
             X_aligned_kwargs = ["sample_weight", "utility_weight"]
         if self.exclude_non_subsample:
-            query_kwargs = self._subset_query_kwargs(
+            query_kwargs = _subset_query_kwargs(
                 query_kwargs,
                 X_aligned_kwargs,
                 subset_and_labeled_indices,
                 len(X),
+                "n_samples",
             )
 
         if self.embed_samples_func:
@@ -498,40 +548,6 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             return new_queried_indices, new_utilities
         else:
             return new_queried_indices
-
-    def _subset_query_kwargs(self, query_kwargs, names, indices, n_aligned):
-        """Subset the keyword arguments in `names` by `indices`.
-
-        Parameters
-        ----------
-        query_kwargs : dict-like
-            Keyword arguments to be passed to the wrapped query strategy.
-        names : list of str
-            Names of the keyword arguments being aligned to the sample set
-            that is subset by `indices`.
-        indices : array-like of shape (n_subset_samples,)
-            Indices of the samples of this sample set being kept.
-        n_aligned : int
-            Number of samples of this sample set before subsetting.
-
-        Returns
-        -------
-        query_kwargs : dict-like
-            Keyword arguments whose aligned entries are subset, leaving the
-            arrays of the caller unchanged.
-        """
-        query_kwargs = dict(query_kwargs)
-        for name in names:
-            value = query_kwargs.get(name)
-            if value is None:
-                continue
-            value = np.asarray(value)
-            # Keyword arguments of an unexpected length are forwarded
-            # unchanged, such that the wrapped query strategy reports them
-            # instead of this wrapper subsetting them into a valid length.
-            if len(value) == n_aligned:
-                query_kwargs[name] = value[indices]
-        return query_kwargs
 
     def _embed_query_kwargs(self, query_kwargs, names):
         """Embed the sample sets given by the keyword arguments in `names`.
@@ -748,15 +764,19 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
         parallel_dict["n_jobs"] = min(self.n_jobs, len(X_cand))
         parallel_pool = Parallel(**parallel_dict)
 
-        def query_lambda_func(candidate):
-            return query_strategy.query(
+        def query_lambda_func(chunk_candidates, chunk_kwargs):
+            _, utilities = query_strategy.query(
                 X=X,
                 y=y,
-                candidates=np.array(candidate),
+                candidates=chunk_candidates,
                 batch_size=1,
                 return_utilities=True,
-                **query_kwargs,
+                **chunk_kwargs,
             )
+            # Utilities of index candidates refer to the samples in `X`.
+            if mapping is None:
+                return utilities[0]
+            return utilities[0][chunk_candidates]
 
         # Never split into more chunks than there are candidates, because an
         # empty chunk would ask the wrapped strategy to select from an
@@ -765,13 +785,36 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
             n_chunks = min(cpu_count(), len(X_cand))
         else:
             n_chunks = parallel_dict["n_jobs"]
-        chunks = np.array_split(X_cand, n_chunks)
-        qs_outputs = parallel_pool(
-            delayed(query_lambda_func)(c) for c in chunks
-        )
-
+        if mapping is None:
+            # Candidate-aligned arguments are split along with the candidate
+            # samples.
+            chunks = [
+                (
+                    X_cand[positions],
+                    _subset_query_kwargs(
+                        query_kwargs,
+                        _CANDIDATE_ALIGNED_KWARGS,
+                        positions,
+                        len(X_cand),
+                        "n_candidates",
+                    ),
+                )
+                for positions in np.array_split(
+                    np.arange(len(X_cand)), n_chunks
+                )
+            ]
+        else:
+            # Index candidates keep the arguments aligned to `X` valid and
+            # are scored by the wrapped strategy as in a direct query.
+            chunks = [
+                (indices, query_kwargs)
+                for indices in np.array_split(mapping, n_chunks)
+            ]
         utilities_cand = np.concatenate(
-            [qs_output[1][0] for qs_output in qs_outputs], axis=0
+            parallel_pool(
+                delayed(query_lambda_func)(*chunk) for chunk in chunks
+            ),
+            axis=0,
         )
 
         if mapping is None:

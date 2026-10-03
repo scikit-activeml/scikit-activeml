@@ -1,4 +1,5 @@
 import unittest
+from itertools import product
 
 import numpy as np
 from sklearn.base import clone
@@ -32,7 +33,12 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
 
     def test_init_param_metric(self):
         test_cases = []
-        test_cases += [("rbf", None), (None, TypeError), ([], TypeError)]
+        test_cases += [
+            ("rbf", None),
+            ("invalid", TypeError),
+            (None, TypeError),
+            ([], TypeError),
+        ]
         self._test_param("init", "metric", test_cases)
 
     def test_init_param_metric_dict(self):
@@ -43,45 +49,6 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
             ([], TypeError),
         ]
         self._test_param("init", "metric_dict", test_cases)
-
-    def test_init_param_mu_0(self):
-        if hasattr(self.estimator_class, "mu_0"):
-            test_cases = []
-            test_cases += [(0, None), (0.2, None), ("Test", TypeError)]
-            self._test_param("init", "mu_0", test_cases)
-
-    def test_init_param_kappa_0(self):
-        if hasattr(self.estimator_class, "kappa_0"):
-            test_cases = []
-            test_cases += [
-                (0.1, None),
-                (1, None),
-                (-1.0, None),
-                ("Test", TypeError),
-            ]
-            self._test_param("init", "kappa_0", test_cases)
-
-    def test_init_param_sigma_sq_0(self):
-        if hasattr(self.estimator_class, "sigma_sq_0"):
-            test_cases = []
-            test_cases += [
-                (1.0, None),
-                (1, None),
-                (-1.0, None),
-                ("Test", TypeError),
-            ]
-            self._test_param("init", "sigma_sq_0", test_cases)
-
-    def test_init_param_nu_0(self):
-        if hasattr(self.estimator_class, "nu_0"):
-            test_cases = []
-            test_cases += [
-                (2.5, None),
-                (1, None),
-                (-1.0, None),
-                ("Test", TypeError),
-            ]
-            self._test_param("init", "nu_0", test_cases)
 
     def test_predict(self):
         reg = self.estimator_class(**self.start_parameter)
@@ -130,6 +97,138 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
         y_pred = reg.predict_target_distribution(X).logpdf(0)
 
         self.assertEqual(y_pred.shape, (len(X),))
+
+    def test_numeric_dtypes_match_float64_predictions(self):
+        X = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        X_test = np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 1.0]])
+        y = np.array([0.5, np.nan, 2.5, 4.0])
+        for metric in ("rbf", "precomputed"):
+            X_train = X if metric == "rbf" else X @ X.T + 1
+            X_query = X_test if metric == "rbf" else X_test @ X.T + 1
+            for weights in (None, np.ones(4), np.array([1.0, 0.0, 2.0, 3.0])):
+                reference = self.estimator_class(metric=metric).fit(
+                    X_train, y, sample_weight=weights
+                )
+                expected = reference.predict(
+                    X_query, return_std=True, return_entropy=True
+                )
+                expected_dist = reference.predict_target_distribution(X_query)
+                for dtype, target_dtype in product(
+                    (np.int64, np.float32, np.float64),
+                    (np.float32, np.float64),
+                ):
+                    with self.subTest(
+                        metric=metric,
+                        dtype=dtype,
+                        target_dtype=target_dtype,
+                        sample_weight=weights,
+                    ):
+                        typed_weights = (
+                            None if weights is None else weights.astype(dtype)
+                        )
+                        reg = self.estimator_class(metric=metric).fit(
+                            X_train.astype(dtype),
+                            y.astype(target_dtype),
+                            sample_weight=typed_weights,
+                        )
+                        actual = reg.predict(
+                            X_query.astype(dtype),
+                            return_std=True,
+                            return_entropy=True,
+                        )
+                        np.testing.assert_allclose(
+                            actual, expected, rtol=1e-6, atol=1e-8
+                        )
+                        dist = reg.predict_target_distribution(
+                            X_query.astype(dtype)
+                        )
+                        np.testing.assert_allclose(
+                            dist.stats(moments="mv"),
+                            expected_dist.stats(moments="mv"),
+                            rtol=1e-6,
+                            atol=1e-8,
+                        )
+                        for method in ("pdf", "logpdf"):
+                            np.testing.assert_allclose(
+                                getattr(dist, method)([0.0, 1.0, 2.0]),
+                                getattr(expected_dist, method)(
+                                    [0.0, 1.0, 2.0]
+                                ),
+                                rtol=1e-6,
+                                atol=1e-8,
+                            )
+
+    def test_unlabeled_sample_weights_preserve_fallback(self):
+        datasets = [
+            ("rbf", np.array([[0.0], [1.0], [2.0]]), [[0.5], [1.5]]),
+            ("rbf", np.empty((0, 1)), [[0.5], [1.5]]),
+            ("precomputed", np.eye(3), np.ones((2, 3))),
+        ]
+        for missing_label, (metric, X, X_test) in product(
+            (np.nan, -1, None, "missing"), datasets
+        ):
+            y = np.full(len(X), missing_label)
+            reg = self.estimator_class(
+                metric=metric, missing_label=missing_label
+            ).fit(X, y)
+            expected = reg.predict(
+                X_test, return_std=True, return_entropy=True
+            )
+            for weight in (0.0, 1.0):
+                with self.subTest(
+                    metric=metric,
+                    missing_label=missing_label,
+                    n_samples=len(X),
+                    weight=weight,
+                ):
+                    reg.fit(X, y, sample_weight=np.full(len(X), weight))
+                    actual = reg.predict(
+                        X_test, return_std=True, return_entropy=True
+                    )
+                    np.testing.assert_allclose(actual, expected)
+                    self.assertTrue(np.isfinite(actual).all())
+
+    def test_fit_rejects_zero_weights_on_labeled_samples(self):
+        X = np.array([[0.0], [1.0], [2.0]])
+        for y, weights in (
+            ([0.0, 1.0, 2.0], [0.0, 0.0, 0.0]),
+            ([0.0, np.nan, 2.0], [0.0, 1.0, 0.0]),
+        ):
+            with self.subTest(y=y, sample_weight=weights):
+                with self.assertRaisesRegex(
+                    ValueError, "must not be all zero"
+                ):
+                    self.estimator_class().fit(X, y, sample_weight=weights)
+
+    def test_callable_kernel_matches_builtin_and_precomputed(self):
+        def kernel(x, y, gamma):
+            return np.exp(-gamma * np.sum((x - y) ** 2))
+
+        X = np.array([[-1.0, 0.0], [0.0, 0.5], [1.0, 1.5], [2.0, 1.0]])
+        X_test = np.array([[-0.5, 0.25], [0.5, 1.0], [1.5, 1.25]])
+        y = np.array([0.0, np.nan, 3.0, 2.0])
+        gamma = 0.7
+        K_train = pairwise_kernels(X, metric="rbf", gamma=gamma)
+        K_test = pairwise_kernels(X_test, X, metric="rbf", gamma=gamma)
+        for weights in (None, np.array([0.5, 1.0, 2.0, 3.0])):
+            reference = self.estimator_class(
+                metric="rbf", metric_dict={"gamma": gamma}
+            ).fit(X, y, sample_weight=weights)
+            expected = reference.predict(
+                X_test, return_std=True, return_entropy=True
+            )
+            for metric, metric_dict, X_train, X_query in (
+                (kernel, {"gamma": gamma}, X, X_test),
+                ("precomputed", None, K_train, K_test),
+            ):
+                with self.subTest(metric=metric, sample_weight=weights):
+                    reg = self.estimator_class(
+                        metric=metric, metric_dict=metric_dict
+                    ).fit(X_train, y, sample_weight=weights)
+                    actual = reg.predict(
+                        X_query, return_std=True, return_entropy=True
+                    )
+                    np.testing.assert_allclose(actual, expected)
 
     def test_precomputed_matches_feature_kernel_on_fit_and_refit(self):
         X = np.array([[-1.0, 0.0], [0.0, 0.5], [1.0, 1.5], [2.0, 1.0]])
@@ -221,6 +320,37 @@ class TestNICKernelEstimator(
         self.y = np.array([1, 2, 3])
         self.X_cand = np.array([[2, 1], [3, 5]])
 
+    def test_init_param_mu_0(self):
+        test_cases = [
+            (0, None),
+            (0.2, None),
+            (-1.5, None),
+            ("Test", TypeError),
+            (np.nan, ValueError),
+            (np.inf, ValueError),
+            (-np.inf, ValueError),
+        ]
+        self._test_param("init", "mu_0", test_cases)
+
+    def test_init_param_kappa_0(self):
+        self._test_nonnegative_prior_param("kappa_0", [0.1, 1])
+
+    def test_init_param_sigma_sq_0(self):
+        self._test_nonnegative_prior_param("sigma_sq_0", [1.0, 1])
+
+    def test_init_param_nu_0(self):
+        self._test_nonnegative_prior_param("nu_0", [2.5, 1])
+
+    def _test_nonnegative_prior_param(self, name, valid_values):
+        test_cases = [(value, None) for value in [0, *valid_values]]
+        test_cases += [
+            (-1.0, ValueError),
+            ("Test", TypeError),
+            (np.nan, ValueError),
+            (np.inf, ValueError),
+        ]
+        self._test_param("init", name, test_cases)
+
     def test_fit(self):
         reg = NICKernelRegressor(**self.start_parameter)
         X = 5
@@ -293,6 +423,65 @@ class TestNICKernelEstimator(
             reg.predict([[0.0]])
         with self.assertRaisesRegex(ValueError, "no evidence"):
             reg.predict_target_distribution([[0.0]])
+
+    def test_predict_rejects_zero_posterior_degrees_of_freedom(self):
+        unlabeled = NICKernelRegressor(nu_0=0).fit([[0.0]], [np.nan])
+        labeled = NICKernelRegressor(nu_0=0, metric_dict={"gamma": 500.0}).fit(
+            [[0.0], [0.0], [0.0]], [0.0, 1.0, 2.0]
+        )
+
+        for reg, X in [(unlabeled, [[0.0]]), (labeled, [[0.0], [50.0]])]:
+            for method in [reg.predict, reg.predict_target_distribution]:
+                with self.subTest(
+                    n_labels=len(reg.y_), method=method.__name__
+                ):
+                    with self.assertRaisesRegex(
+                        ValueError, "no evidence for the target variance"
+                    ):
+                        method(X)
+
+        mean, std = labeled.predict([[0.0]], return_std=True)
+        self.assertTrue(np.isfinite(mean).all())
+        self.assertTrue(np.isfinite(std).all())
+
+    def test_zero_posterior_scale_is_a_point_mass(self):
+        X = np.array([[0.0], [10.0], [5.0]])
+        zero = np.array([True, False, True])
+        for nu_0 in [0.5, 1.5, 2.5]:
+            with self.subTest(nu_0=nu_0):
+                reg = NICKernelRegressor(
+                    mu_0=1.0,
+                    sigma_sq_0=0,
+                    nu_0=nu_0,
+                    metric_dict={"gamma": 1000.0},
+                ).fit([[0.0], [0.0], [10.0]], [1.0, 1.0, 3.0])
+
+                mean, std, entropy = reg.predict(
+                    X, return_std=True, return_entropy=True
+                )
+                np.testing.assert_array_equal(mean[zero], [1.0, 1.0])
+                np.testing.assert_array_equal(std[zero], [0.0, 0.0])
+                self.assertGreater(std[1], 0)
+                self.assertTrue(np.isfinite(entropy).all())
+                self.assertLess(np.max(entropy[zero]), entropy[1])
+                for part, part_alone in zip(
+                    (mean, std, entropy),
+                    reg.predict(X[[1]], return_std=True, return_entropy=True),
+                ):
+                    np.testing.assert_array_equal(part[[1]], part_alone)
+
+                dist = reg.predict_target_distribution(X)
+                quantiles = dist.ppf(np.array([[0.01], [0.5], [0.99]]))
+                np.testing.assert_allclose(quantiles[:, zero], np.ones((3, 2)))
+                y_samples = reg.sample_y(X, n_samples=5, random_state=0)
+                np.testing.assert_allclose(y_samples[zero], np.ones((2, 5)))
+
+        reg = NICKernelRegressor(kappa_0=0, sigma_sq_0=0).fit(
+            [[0.0], [1.0]], [1.0, 1.0]
+        )
+        mean, std = reg.predict([[0.0], [0.5]], return_std=True)
+        np.testing.assert_array_equal(mean, [1.0, 1.0])
+        np.testing.assert_array_equal(std, [0.0, 0.0])
 
     def test_predict_rejects_a_negative_kernel_mass(self):
         reg = NICKernelRegressor(metric="linear").fit(

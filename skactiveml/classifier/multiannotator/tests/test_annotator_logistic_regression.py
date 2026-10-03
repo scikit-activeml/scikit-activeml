@@ -120,42 +120,65 @@ class TestAnnotatorLogisticRegression(
         self.assertEqual(lr.annot_prior_full, 1)
         lr = AnnotatorLogisticRegression(annot_prior_full=2)
         self.assertEqual(lr.annot_prior_full, 2)
-        lr = AnnotatorLogisticRegression(
-            annot_prior_full=0, missing_label="nan"
+        self._test_param(
+            "init",
+            "annot_prior_full",
+            [(0, ValueError), ([1, 1], ValueError)],
         )
-        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
-        lr = AnnotatorLogisticRegression(
-            annot_prior_full=[1, 1], missing_label="nan"
-        )
-        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+        for value in (np.nan, np.inf, -np.inf):
+            self._test_param(
+                "init",
+                "annot_prior_full",
+                [(value, ValueError), ([1, 1, value], ValueError)],
+                replace_fit_params={"y": self.y_nan},
+            )
+        for X, y in (
+            (self.X, self.y_nan),
+            (self.X, self.y),
+            (self.X[:0], self.y[:0]),
+        ):
+            self._test_param(
+                "init",
+                "annot_prior_full",
+                [(0.5, ValueError), ([1, 1, 0.5], ValueError)],
+                replace_init_params={"annot_prior_diag": 2},
+                replace_fit_params={"X": X, "y": y},
+            )
 
     def test_init_param_annot_prior_diag(self):
         lr = AnnotatorLogisticRegression()
         self.assertEqual(lr.annot_prior_diag, 0)
         lr = AnnotatorLogisticRegression(annot_prior_diag=2)
         self.assertEqual(lr.annot_prior_diag, 2)
-        lr = AnnotatorLogisticRegression(
-            annot_prior_diag=-0.1, missing_label="nan"
+        self._test_param(
+            "init",
+            "annot_prior_diag",
+            [(-0.1, ValueError), ([0, 0, -0.1], ValueError)],
         )
-        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
-        lr = AnnotatorLogisticRegression(
-            annot_prior_diag=[0, 0, -0.1], missing_label="nan"
-        )
-        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+        for value in (np.nan, np.inf, -np.inf):
+            self._test_param(
+                "init",
+                "annot_prior_diag",
+                [(value, ValueError), ([0, 0, value], ValueError)],
+                replace_fit_params={"y": self.y_nan},
+            )
 
     def test_init_param_weights_prior(self):
         lr = AnnotatorLogisticRegression()
         self.assertEqual(lr.weights_prior, 1)
         lr = AnnotatorLogisticRegression(weights_prior=0)
-        self.assertEqual(lr.annot_prior_diag, 0)
-        lr = AnnotatorLogisticRegression(
-            weights_prior=[0, 1], missing_label="nan"
+        self.assertEqual(lr.weights_prior, 0)
+        self._test_param(
+            "init",
+            "weights_prior",
+            [([0, 1], TypeError), (-0.1, ValueError)],
         )
-        self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
-        lr = AnnotatorLogisticRegression(
-            weights_prior=-0.1, missing_label="nan"
+        self._test_param(
+            "init",
+            "weights_prior",
+            [(value, ValueError) for value in (np.nan, np.inf, -np.inf)],
+            replace_fit_params={"y": self.y_nan},
         )
-        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
 
     def test_init_param_cost_matrix(self):
         test_cases = [
@@ -174,6 +197,112 @@ class TestAnnotatorLogisticRegression(
             ("abc", TypeError),
         ]
         self._test_param("init", "classes", test_cases)
+
+    def test_probability_outputs_with_supported_priors(self):
+        X = np.array([[-1.0], [0.0], [1.0], [2.0]])
+        y_sparse = np.array(
+            [[0.0, np.nan], [1.0, 1.0], [np.nan, 2.0], [np.nan, np.nan]]
+        )
+        for full, diag in ((1, 0), (1, 2), (2.5, 0.5), ([1, 2.5], [0, 2])):
+            for y in (np.full_like(y_sparse, np.nan), y_sparse, y_sparse[:0]):
+                with self.subTest(full=full, diag=diag, y=y):
+                    clf = AnnotatorLogisticRegression(
+                        classes=[0, 1, 2],
+                        n_annotators=2,
+                        annot_prior_full=full,
+                        annot_prior_diag=diag,
+                        max_iter=3,
+                        random_state=0,
+                    ).fit(X[: len(y)], y)
+                    self._assert_valid_probability_outputs(clf, X)
+
+    def test_zero_weight_rows_match_removed_rows(self):
+        X = np.array([[-2.0], [-1.0], [0.0], [1.0], [2.0]])
+        y = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.0, np.nan],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+            ]
+        )
+        weights = np.array(
+            [[1.0, 2.0], [0.0, 0.0], [0.0, 100.0], [3.0, 1.0], [7.0, np.nan]]
+        )
+        keep = [0, 3]
+        for max_iter in (1, 4):
+            with self.subTest(max_iter=max_iter):
+                params = dict(
+                    classes=[0, 1], max_iter=max_iter, random_state=0
+                )
+                with np.errstate(divide="raise", invalid="raise"):
+                    clf = AnnotatorLogisticRegression(**params).fit(
+                        X, y, sample_weight=weights
+                    )
+                reference = AnnotatorLogisticRegression(**params).fit(
+                    X[keep], y[keep], sample_weight=weights[keep]
+                )
+                np.testing.assert_allclose(clf.W_, reference.W_)
+                np.testing.assert_allclose(clf.Alpha_, reference.Alpha_)
+                np.testing.assert_allclose(
+                    clf.predict_proba(X), reference.predict_proba(X)
+                )
+                self._assert_valid_probability_outputs(clf, X)
+
+    def test_zero_weight_annotations_match_missing_labels(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        y = np.array([[0.0, 1.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
+        weights = np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 0.0], [1.0, 4.0]])
+        params = dict(classes=[0, 1], max_iter=4, random_state=0)
+        clf = AnnotatorLogisticRegression(**params).fit(
+            X, y, sample_weight=weights
+        )
+        reference = AnnotatorLogisticRegression(**params).fit(
+            X, np.where(weights == 0, np.nan, y), sample_weight=weights
+        )
+        np.testing.assert_allclose(clf.W_, reference.W_)
+        np.testing.assert_allclose(clf.Alpha_, reference.Alpha_)
+        np.testing.assert_allclose(
+            clf.predict_proba(X), reference.predict_proba(X)
+        )
+        self._assert_valid_probability_outputs(clf, X)
+
+    def test_all_zero_weights_match_unlabeled_fallback(self):
+        X = np.array([[-1.0], [0.0], [1.0]])
+        y = np.array([[0.0, np.nan], [1.0, 0.0], [np.nan, 1.0]])
+        for full, diag in ((1, 0), (2, 3)):
+            with self.subTest(full=full, diag=diag):
+                params = dict(
+                    classes=[0, 1],
+                    annot_prior_full=full,
+                    annot_prior_diag=diag,
+                    max_iter=3,
+                    random_state=0,
+                )
+                with np.errstate(divide="raise", invalid="raise"):
+                    clf = AnnotatorLogisticRegression(**params).fit(
+                        X, y, sample_weight=np.zeros_like(y)
+                    )
+                reference = AnnotatorLogisticRegression(**params).fit(
+                    X, np.full_like(y, np.nan)
+                )
+                np.testing.assert_array_equal(clf.W_, reference.W_)
+                np.testing.assert_allclose(clf.Alpha_, reference.Alpha_)
+                np.testing.assert_allclose(clf.predict_proba(X), 0.5)
+                self._assert_valid_probability_outputs(clf, X)
+
+    def _assert_valid_probability_outputs(self, clf, X):
+        probas, performance, annotator_probas, logits = clf.predict_proba(
+            X, extra_outputs=["annotator_perf", "annotator_class", "logits"]
+        )
+        for values in (clf.Alpha_, probas, performance, annotator_probas):
+            self.assertTrue(np.isfinite(values).all())
+            self.assertTrue((values >= 0).all())
+            self.assertTrue((values <= 1).all())
+        for values in (clf.Alpha_, probas, annotator_probas):
+            np.testing.assert_allclose(values.sum(axis=-1), 1.0)
+        self.assertTrue(np.isfinite(logits).all())
 
     def test_sample_weights_follow_observed_rows(self):
         X = np.array([[-2.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [2.0, 1.0]])
@@ -403,6 +532,7 @@ class TestAnnotatorLogisticRegression(
         P = lr.predict_proba(X=self.X)
         np.testing.assert_array_equal(P, np.ones_like(P) * 0.5)
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = lr.predict_proba(X=self.X)
         np.testing.assert_array_equal(np.sum(P, axis=1), np.ones(len(P)))
 
     def test_predict(self):

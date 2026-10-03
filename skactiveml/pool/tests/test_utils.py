@@ -8,11 +8,13 @@ from scipy.stats import norm
 from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
 from sklearn.datasets import make_blobs
 
+from skactiveml.base import SkactivemlRegressor
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
@@ -246,11 +248,17 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         iclf = self.iclf()
         self.assertRaises((ValueError, TypeError), iclf.precompute, "str", [0])
         self.assertRaises((ValueError, TypeError), iclf.precompute, [10], [0])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.precompute, indices, [0])
 
     def test_precompute_param_idx_pred(self):
         iclf = self.iclf()
         self.assertRaises((ValueError, TypeError), iclf.precompute, [0], "str")
         self.assertRaises((ValueError, TypeError), iclf.precompute, [0], [10])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.precompute, [0], indices)
 
     def test_precompute_param_fit_params(self):
         iclf = self.iclf(use_speed_up=True)
@@ -305,6 +313,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises((ValueError, TypeError), iclf.fit, 0)
         self.assertRaises((ValueError, TypeError), iclf.fit, "wrong_str")
         self.assertRaises((ValueError, TypeError), iclf.fit, [10])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.fit, indices)
 
     def test_fit_param_y(self):
         iclf = self.iclf()
@@ -329,6 +340,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises((ValueError, TypeError), iclf.partial_fit, 0)
         self.assertRaises((ValueError, TypeError), iclf.partial_fit, "str")
         self.assertRaises((ValueError, TypeError), iclf.partial_fit, [10])
+        for indices in [[1.9], [-1], [True]]:
+            with self.subTest(indices=indices):
+                self.assertRaises(ValueError, iclf.partial_fit, indices)
 
     def test_partial_fit_param_y(self):
         iclf = self.iclf().fit([0])
@@ -966,6 +980,49 @@ class TestApproximation(unittest.TestCase):
                 )
                 np.testing.assert_allclose(result, expected, atol=1e-10)
 
+    def test_conditional_expectation_handles_zero_standard_deviations(self):
+        normal_reg = SklearnNormalRegressor(
+            GaussianProcessRegressor(kernel=RBF(), alpha=0, optimizer=None)
+        ).fit(np.array([[0.0], [1.0]]), np.array([2.0, 3.0]))
+        nic_reg = NICKernelRegressor(
+            mu_0=2.0, sigma_sq_0=0, metric_dict={"gamma": 5000.0}
+        ).fit(np.array([[0.0], [0.5]]), np.array([2.0, 3.0]))
+        heavy_tailed_nic_reg = NICKernelRegressor(
+            mu_0=2.0, sigma_sq_0=0, nu_0=0.5, metric_dict={"gamma": 5000.0}
+        ).fit(np.array([[0.0], [0.5], [0.5]]), np.array([2.0, 3.0, 1.0]))
+        X = np.array([[0.0], [0.5], [1.0]])
+
+        for (name, reg), parameters, vector_func in itertools.product(
+            [
+                ("normal", normal_reg),
+                ("nic", nic_reg),
+                ("heavy_tailed_nic", heavy_tailed_nic_reg),
+            ],
+            [
+                {"method": "assume_linear"},
+                {"method": "monte_carlo"},
+                {"method": "quantile", "quantile_method": "trapezoid"},
+                {"method": "quantile", "quantile_method": "quadrature"},
+                {"method": "gauss_hermite"},
+                {"method": "dynamic_quad"},
+            ],
+            [True, False],
+        ):
+            mean, std = reg.predict(X, return_std=True)
+            zero = std == 0
+            np.testing.assert_array_equal(zero, [True, False, True])
+            with self.subTest(reg=name, **parameters, vector_func=vector_func):
+                result = conditional_expect(
+                    X=X,
+                    func=lambda idx, x, y: np.asarray(y, dtype=float) ** 2,
+                    reg=reg,
+                    random_state=0,
+                    vector_func=vector_func,
+                    **parameters,
+                )
+                self.assertTrue(np.isfinite(result).all())
+                np.testing.assert_allclose(result[zero], mean[zero] ** 2)
+
     def test_conditional_expectation_handles_degenerate_quantile_grids(self):
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
@@ -1258,6 +1315,60 @@ class TestFunctions(unittest.TestCase):
             bootstrap_size=5,
             n_train=1.9,
         )
+
+    def test_bootstrap_training_size(self):
+        class RecordingRegressor(SkactivemlRegressor):
+            def fit(self, X, y, sample_weight=None):
+                self.X_fit_ = X
+                self.y_fit_ = y
+                self.sample_weight_fit_ = sample_weight
+                return self
+
+            def predict(self, X):
+                return np.zeros(len(X))
+
+        X = np.arange(10).reshape(-1, 1)
+        y = np.arange(10, dtype=float)
+        y[-2:] = np.nan
+        test_cases = [
+            (0.5, 5),
+            (0.25, 3),
+            (0.01, 1),
+            (1.0, 10),
+            (1, 1),
+            (2, 2),
+            (10, 10),
+            (12, 12),
+        ]
+        for n_train, expected_size in test_cases:
+            for sample_weight in [None, np.arange(1, 11)]:
+                with self.subTest(
+                    n_train=n_train,
+                    weighted=sample_weight is not None,
+                ):
+                    regressors = _bootstrap_estimators(
+                        RecordingRegressor(),
+                        X,
+                        y,
+                        bootstrap_size=3,
+                        n_train=n_train,
+                        sample_weight=sample_weight,
+                        random_state=0,
+                    )
+                    self.assertEqual(len(regressors), 3)
+                    for reg in regressors:
+                        self.assertEqual(reg.X_fit_.shape, (expected_size, 1))
+                        sampled_indices = reg.X_fit_[:, 0]
+                        np.testing.assert_array_equal(
+                            reg.y_fit_, y[sampled_indices]
+                        )
+                        if sample_weight is None:
+                            self.assertIsNone(reg.sample_weight_fit_)
+                        else:
+                            np.testing.assert_array_equal(
+                                reg.sample_weight_fit_,
+                                sample_weight[sampled_indices],
+                            )
 
     def test_cross_entropy(self):
         X_1 = np.arange(3 * 2).reshape(3, 2)

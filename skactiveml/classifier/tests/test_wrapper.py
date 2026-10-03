@@ -8,6 +8,8 @@ import warnings
 import inspect
 
 from copy import deepcopy
+from itertools import product
+from unittest.mock import patch
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
@@ -889,6 +891,52 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         self.assertFalse(clf.is_fitted_)
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
+
+    def test_fallback_predictions_minimize_explicit_costs(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        X_test = np.zeros((32, 1))
+        for classes, observed in product(
+            ([0, 1], [1, 0], ["z", "a"]), (False, True)
+        ):
+            with self.subTest(classes=classes, observed=observed):
+                y = [classes[0] if observed else None] * len(X)
+                costs = [[2 if observed else 0, 1], [100, 0]]
+                clf = SklearnClassifier(
+                    LogisticRegression(),
+                    classes=classes,
+                    missing_label=None,
+                    cost_matrix=costs,
+                    random_state=0,
+                ).fit(X, y)
+
+                self.assertFalse(clf.is_fitted_)
+                prediction = clf.predict(X_test)
+                np.testing.assert_array_equal(
+                    prediction, [classes[1]] * len(X_test)
+                )
+                assert_predicts_class_dtype(self, prediction, clf.classes_)
+
+    def test_fallback_cost_ties_are_reproducible(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        X_test = np.zeros((64, 1))
+        for observed in (False, True):
+            with self.subTest(observed=observed):
+                predictions = []
+                for _ in range(2):
+                    clf = SklearnClassifier(
+                        LogisticRegression(),
+                        classes=["a", "b", "c"],
+                        missing_label=None,
+                        cost_matrix=[[0, 0, 4], [0, 0, 4], [1, 1, 0]],
+                        random_state=0,
+                    ).fit(X, ["a" if observed else None] * len(X))
+                    self.assertFalse(clf.is_fitted_)
+                    prediction = clf.predict(X_test)
+                    np.testing.assert_array_equal(
+                        np.unique(prediction), ["a", "b"]
+                    )
+                    predictions.append(prediction)
+                np.testing.assert_array_equal(*predictions)
 
     def test_multilabel_predict_proba(self):
         X = self.X_ml
@@ -2080,6 +2128,40 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 self.assertRaisesRegex(
                     ValueError, message, clf.predict_proba, self.X_ml
                 )
+
+    def test_invalid_single_output_probabilities_are_rejected(self):
+        invalid_rows = [[np.inf, 0.0], [-0.1, 1.1], [0.4, 0.4], [np.nan, 1.1]]
+        for classes_, invalid_row in product(
+            [np.array([0, 1]), None], invalid_rows
+        ):
+            with self.subTest(classes_=classes_, invalid_row=invalid_row):
+                proba = np.full((len(self.X_ml), 2), 0.5)
+                proba[0] = invalid_row
+                clf = self._prefit_single_output_clf(
+                    proba=proba, classes_=classes_
+                )
+
+                self.assertRaisesRegex(
+                    ValueError,
+                    "'probas' are invalid",
+                    clf.predict_proba,
+                    self.X_ml,
+                )
+
+    def test_single_output_nan_probabilities_keep_prior_fallback(self):
+        for classes_ in [np.array([0, 1]), None]:
+            with self.subTest(classes_=classes_):
+                proba = np.full((len(self.X_ml), 2), 0.5)
+                proba[0] = [np.nan, 0.5]
+                clf = self._prefit_single_output_clf(
+                    proba=proba, classes_=classes_
+                )
+
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    P = clf.predict_proba(self.X_ml)
+
+                np.testing.assert_allclose(P, np.full_like(P, 0.5))
 
     def test_unlearned_probability_column_class_is_rejected(self):
         clf = self._prefit_single_output_clf(
@@ -3628,6 +3710,93 @@ class TestSlidingWindowClassifier(
                     )
                     self.assertIsNone(member.cost_matrix)
 
+    def test_costs_agree_across_inner_and_outer_class_orders(self):
+        X = np.array([[-1.0], [0.0], [1.0]])
+        query = np.array([[-0.5], [0.5]])
+        canonical_costs = np.array([[0, 1, 2], [100, 0, 2], [100, 1, 0]])
+        outer_order = [2, 0, 1]
+        inner_order = [1, 2, 0]
+        outer_costs = canonical_costs[np.ix_(outer_order, outer_order)]
+        inner_costs = canonical_costs[np.ix_(inner_order, inner_order)]
+        for classes, method, source in product(
+            ([0, 1, 2], ["a", "b", "c"]),
+            ("fit", "partial_fit"),
+            ("outer", "inner", "both"),
+        ):
+            with self.subTest(classes=classes, method=method, source=source):
+                member = ParzenWindowClassifier(
+                    classes=[classes[i] for i in inner_order],
+                    cost_matrix=None if source == "outer" else inner_costs,
+                    missing_label=None,
+                )
+                clf = SlidingWindowClassifier(
+                    member,
+                    classes=[classes[i] for i in outer_order],
+                    cost_matrix=None if source == "inner" else outer_costs,
+                    missing_label=None,
+                )
+                getattr(clf, method)(X, [None] * len(X))
+                np.testing.assert_array_equal(
+                    clf.predict(query), [classes[1]] * len(query)
+                )
+                np.testing.assert_array_equal(
+                    clf.cost_matrix_, canonical_costs
+                )
+
+                clf.partial_fit(X, classes)
+                expected = np.asarray(classes)[
+                    np.argmin(
+                        clf.predict_proba(query) @ canonical_costs, axis=1
+                    )
+                ]
+                np.testing.assert_array_equal(clf.predict(query), expected)
+                if source == "outer":
+                    self.assertIsNone(member.cost_matrix)
+                else:
+                    np.testing.assert_array_equal(
+                        member.cost_matrix, inner_costs
+                    )
+                np.testing.assert_array_equal(
+                    outer_costs,
+                    canonical_costs[np.ix_(outer_order, outer_order)],
+                )
+                np.testing.assert_array_equal(
+                    inner_costs,
+                    canonical_costs[np.ix_(inner_order, inner_order)],
+                )
+
+    def test_equal_arrays_with_conflicting_class_costs_are_rejected(self):
+        X = np.array([[-1.0], [1.0]])
+        for classes, method in product(
+            ([0, 1], ["a", "b"]), ("fit", "partial_fit")
+        ):
+            with self.subTest(classes=classes, method=method):
+                member = ParzenWindowClassifier(
+                    classes=classes[::-1], missing_label=None
+                )
+                clf = SlidingWindowClassifier(
+                    member,
+                    classes=classes,
+                    cost_matrix=[[0, 1], [100, 0]],
+                    missing_label=None,
+                ).fit(X, [None, None])
+                window_before = np.asarray(clf.X_train_).copy()
+                predictions_before = clf.predict(X)
+                member.cost_matrix = [[0, 1], [100, 0]]
+
+                assert_fit_failure_is_transactional(
+                    self,
+                    clf,
+                    lambda: getattr(clf, method)(X + 1, classes),
+                    ValueError,
+                    "cost_matrix",
+                )
+
+                np.testing.assert_array_equal(clf.X_train_, window_before)
+                np.testing.assert_array_equal(
+                    clf.predict(X), predictions_before
+                )
+
 
 if successful_skorch_torch_import:
 
@@ -3821,6 +3990,49 @@ assert np.isfinite(estimator.predict_proba(X)).all()
 
             self.assertFalse(hasattr(clf, "target_spec_"))
             self.assertFalse(hasattr(clf, "_le"))
+
+        def test_predict_proba_rejects_class_count_mismatch(self):
+            X = self.X[:4]
+            y = np.array([0, 1, 0, 1])
+            for n_units, validate_proba, fitted in product(
+                [3, 1], [True, False], [False, True]
+            ):
+                if fitted and n_units == 1:
+                    continue
+                with self.subTest(
+                    n_units=n_units,
+                    validate_proba=validate_proba,
+                    fitted=fitted,
+                ):
+                    init_params = deepcopy(self.init_default_params)
+                    init_params.update(
+                        {
+                            "module": nn.Linear(1, n_units),
+                            "classes": [0, 1],
+                            "validate_proba": validate_proba,
+                            "forward_outputs": {
+                                "proba": (0, nn.Softmax(dim=-1)),
+                                "logits": (0, None),
+                            },
+                        }
+                    )
+                    clf = SkorchClassifier(**init_params)
+                    if fitted:
+                        clf.fit(X, y)
+                    for method, kwargs in [
+                        (clf.predict_proba, {}),
+                        (clf.predict_proba, {"extra_outputs": "logits"}),
+                        (clf.predict, {}),
+                    ]:
+                        with self.assertRaisesRegex(
+                            ValueError,
+                            rf"shape `\(n_samples, 2\)`.+got \(4, {n_units}\)"
+                            ".+one output unit per class",
+                        ):
+                            method(X, **kwargs)
+                    if not fitted:
+                        self.assertFalse(hasattr(clf, "target_spec_"))
+                        self.assertFalse(hasattr(clf, "_le"))
 
         def test_prefit_multilabel_rejects_cost_matrix(self):
             init_params = deepcopy(self.init_default_params)
@@ -5459,6 +5671,21 @@ if successful_capymoa_import:
                         self.assertEqual(pred_proba[:, 0].sum(), len(X))
                         self.assertFalse(clf.is_fitted_)
 
+        def test_predict_proba_pads_short_estimator_probabilities(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["classes"] = [0, 1, 2]
+            clf = CapyMOAClassifier(**init_params)
+            clf.fit(**self.fit_default_params)
+            with patch.object(
+                clf.estimator_,
+                "predict_proba",
+                return_value=np.array([0.25, 0.75]),
+            ):
+                P = clf.predict_proba(self.X[:3])
+            np.testing.assert_array_equal(
+                P, np.tile([0.25, 0.75, 0.0], (3, 1))
+            )
+
         def test_is_fitted(self):
             init_params = deepcopy(self.init_default_params)
             init_params["classes"] = [0, 1]
@@ -5520,7 +5747,7 @@ if successful_capymoa_import:
             # fit a capymoa classifier and returns its predict_proba results of
             # from capymoa classifiers
             from capymoa.stream import Schema
-            from capymoa.instance import LabeledInstance, Instance
+            from capymoa.core import LabeledInstance, Instance
 
             column_list = [f"f{i}" for i in range(X_train.shape[1])]
             column_list += ["label"]

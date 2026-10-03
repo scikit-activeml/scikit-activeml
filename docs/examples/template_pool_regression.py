@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt, animation
 from scipy.stats import uniform
 
-from skactiveml.utils import MISSING_LABEL, is_labeled
+from skactiveml.utils import MISSING_LABEL, is_labeled, labeled_indices
 
 "$import_reg|from skactiveml.regressor import NICKernelRegressor"
 "$import_misc"
@@ -75,7 +75,8 @@ for c in range(n_cycles):
     title = ax_1.text(
         0.5,
         1.05,
-        f"Prediction after acquiring {c} labels\n"
+        "Prediction after acquiring "
+        f"{len(labeled_indices(y, missing_label=MISSING_LABEL))} labels\n"
         f"Test R-squared score: {reg.score(X_test, y_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
         ha="center",
@@ -101,7 +102,7 @@ for c in range(n_cycles):
     )
 
     # Plot the samples and their labels.
-    is_lbld = is_labeled(y)
+    is_lbld = is_labeled(y, missing_label=MISSING_LABEL)
     ax_1.scatter(X[~is_lbld], y_true[~is_lbld], c="lightblue")
     ax_1.scatter(X[is_lbld], y[is_lbld], c="orange")
 

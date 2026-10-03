@@ -74,8 +74,17 @@ class TestExpectedModelChangeMaximization(
     def test_init_param_n_train(self):
         test_cases = [
             (1, None),
+            (2, None),
+            (0, ValueError),
+            (-1, ValueError),
+            (0.5, None),
+            (1.0, None),
             (0.0, ValueError),
+            (-0.5, ValueError),
             (1.5, ValueError),
+            (np.nan, ValueError),
+            (np.inf, ValueError),
+            (-np.inf, ValueError),
             ("illegal", TypeError),
         ]
         self._test_param("init", "n_train", test_cases)

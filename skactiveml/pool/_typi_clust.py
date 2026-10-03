@@ -12,8 +12,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the Typical Clustering (TypiClust) query strategy
     [1]_, which clusters embeddings of both labeled and unlabeled data with
-    `n_clusters=n_labeled_samples + batch_size`, treating clusters that contain
-    labeled samples as covered. It then selects the most typical sample
+    `n_clusters=n_labeled_samples + batch_size`. Here, `n_labeled_samples`
+    counts labeled samples outside the candidate set. Clusters containing
+    these samples are covered. It then selects the most typical sample
     (highest local density / smallest mean kNN distance) from up to
     `batch_size` uncovered clusters, ensuring diversity while avoiding already
     represented regions. Originally, this query strategy was only proposed for
@@ -106,7 +107,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Labeled candidates remain eligible and do
+              not mark their clusters as covered.
             - Candidate samples passed directly with shape
               `(n_candidates, n_features)` are not supported because TypiClust
               requires a mapping to samples in `X`.
@@ -126,7 +128,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan. The indexing
+            Utilities for samples outside the candidate set and samples
+            already selected in the batch are set to `np.nan`. The indexing
             refers to the samples in `X`.
         """
         target_type = self._resolve_query_target_type(y)
@@ -168,12 +171,12 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             target_type=target_type,
         )
 
-        # Determine already labeled samples.
         labeled_sample_indices = labeled_indices(
             y=y,
             missing_label=self.missing_label,
             target_type=target_type,
         )
+        labeled_sample_indices = np.setdiff1d(labeled_sample_indices, mapping)
 
         # Set number of clusters.
         n_clusters = len(labeled_sample_indices) + batch_size

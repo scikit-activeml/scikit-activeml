@@ -156,6 +156,59 @@ class TestTypiClust(
         ]
         self._test_param("init", "k", test_cases)
 
+    def test_query_param_candidates(self):
+        super().test_query_param_candidates()
+
+        X = np.array([[0.0], [0.1], [5.0], [10.0]])
+        for target_type in ["single-output", "multi-label"]:
+            for labels in [[0, 1, 0, 1], [0, np.nan, 0, 1]]:
+                y = np.array(labels, dtype=float)
+                if target_type == "multi-label":
+                    y = np.column_stack([y, y])
+                for candidates, batch_size in [
+                    ([0, 1], 1),
+                    ([0, 1], 2),
+                    (np.arange(4), 4),
+                ]:
+                    with self.subTest(
+                        target_type=target_type,
+                        labels=labels,
+                        candidates=candidates,
+                        batch_size=batch_size,
+                    ):
+                        indices, utilities = TypiClust(
+                            random_state=0, target_type=target_type
+                        ).query(
+                            X,
+                            y,
+                            candidates=candidates,
+                            batch_size=batch_size,
+                            return_utilities=True,
+                        )
+                        self.assertEqual(len(np.unique(indices)), batch_size)
+                        self.assertTrue(np.isin(indices, candidates).all())
+                        first_utilities = utilities[0][
+                            np.isfinite(utilities[0])
+                        ]
+                        expected = (
+                            np.full(2, 1 / (0.1 + 1e-7))
+                            if batch_size == 1
+                            else [1]
+                        )
+                        np.testing.assert_allclose(first_utilities, expected)
+                        for i, idx in enumerate(indices):
+                            self.assertTrue(np.isfinite(utilities[i, idx]))
+                            self.assertTrue(
+                                np.isnan(utilities[i, indices[:i]]).all()
+                            )
+                        self.assertTrue(
+                            np.isnan(
+                                utilities[
+                                    :, ~np.isin(np.arange(4), candidates)
+                                ]
+                            ).all()
+                        )
+
     def test_query(self):
         # test case 1: with the same random state the init pick up
         # is the same

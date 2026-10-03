@@ -9,7 +9,9 @@ from sklearn.utils.validation import (
 from ._label import MISSING_LABEL, is_labeled, is_unlabeled
 from ._label_dtype import (
     _as_class_vocabulary_array,
+    _as_label_array,
     _check_compatible_kinds,
+    _lossless_decode_dtype,
 )
 from ._label_encoder import ExtLabelEncoder
 
@@ -68,9 +70,12 @@ def ext_confusion_matrix(
        confusion_matrix.html>`_
     """
     # Check input.
-    y_true = column_or_1d(y_true)
+    y_true = column_or_1d(_as_label_array(y_true))
     y_pred = check_array(
-        y_pred, ensure_all_finite=False, ensure_2d=False, dtype=None
+        _as_label_array(y_pred),
+        ensure_all_finite=False,
+        ensure_2d=False,
+        dtype=None,
     )
     if y_pred.ndim == 1:
         y_pred = y_pred.reshape(-1, 1)
@@ -79,7 +84,10 @@ def ext_confusion_matrix(
         raise ValueError(
             "'normalize' must be one of {'true', 'pred', 'all', " "None}."
         )
-    y = np.column_stack((y_true, y_pred))
+    label_dtype = _lossless_decode_dtype([y_true, y_pred.ravel()])
+    y = np.concatenate(
+        (y_true[:, np.newaxis], y_pred), axis=1, dtype=label_dtype
+    )
     le = ExtLabelEncoder(missing_label=missing_label)
     y = le.fit_transform(y)
     if np.sum(is_unlabeled(y[:, 0], missing_label=-1)):
@@ -94,7 +102,7 @@ def ext_confusion_matrix(
         # strict subset of the observed labels.
         ExtLabelEncoder(classes=classes, missing_label=missing_label).fit([])
         report_classes = _as_class_vocabulary_array(classes)
-        _check_compatible_kinds(le.classes_, report_classes, name="classes")
+        _check_compatible_kinds(y_true, report_classes, name="classes")
 
         class_indices = []
         next_unobserved_index = len(le.classes_)

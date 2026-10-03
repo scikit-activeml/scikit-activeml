@@ -50,6 +50,17 @@ _INT64_MIN = -(2**63)
 _INT64_MAX = 2**63 - 1
 _UINT64_MAX = 2**64 - 1
 
+# Exact types whose entries are checked per type. `np.longdouble` is left out:
+# a second rejected type besides `None` could change which error is raised.
+_GROUPED_TYPES = frozenset(
+    [bool, int, float, str, type(None)]
+    + [np.bool_, np.str_, np.float16, np.float32, np.float64]
+    + [np.dtype(code).type for code in np.typecodes["AllInteger"]]
+)
+
+# Short arrays, such as class vocabularies, are faster to check entry by entry.
+_MIN_GROUPED_SIZE = 64
+
 
 def _as_label_array(y):
     """Convert target sequences without rounding integers or stringifying them.
@@ -242,6 +253,37 @@ def _scalar_label_family(value, *, name):
     )
 
 
+def _group_by_type(flat):
+    """Locate the entries of each exact type in a flat object array.
+
+    Parameters
+    ----------
+    flat : numpy.ndarray of shape (n_entries,) and dtype object
+        The entries to group.
+
+    Returns
+    -------
+    groups : dict or None
+        The Boolean mask of the entries of each exact type, or `None` if the
+        entries are to be checked one by one.
+    """
+    if flat.size < _MIN_GROUPED_SIZE:
+        return None
+    types = list(map(type, flat))
+    distinct = dict.fromkeys(types)
+    if not distinct.keys() <= _GROUPED_TYPES:
+        return None
+    if len(distinct) == 1:
+        return {types[0]: np.ones(flat.shape, dtype=bool)}
+    codes = {value_type: code for code, value_type in enumerate(distinct)}
+    type_codes = np.fromiter(
+        map(codes.__getitem__, types), dtype=np.intp, count=flat.size
+    )
+    return {
+        value_type: type_codes == code for value_type, code in codes.items()
+    }
+
+
 def _scan_object_labels(y, missing_label, *, name):
     """Locate the missing labels and the label families of an object array.
 
@@ -262,6 +304,38 @@ def _scan_object_labels(y, missing_label, *, name):
     families : set of str
         The label families observed among the remaining entries.
     """
+    flat = y.ravel()
+    # Numeric missing labels other than NaN need exact scalar comparisons.
+    by_type = (
+        missing_label is _NO_MISSING_LABEL
+        or missing_label is None
+        or isinstance(missing_label, str)
+        or _is_nan_missing_label(missing_label)
+    )
+    groups = _group_by_type(flat) if by_type else None
+    if groups is not None:
+        is_missing = np.zeros(flat.shape, dtype=bool)
+        families = set()
+        for value_type, mask in groups.items():
+            if missing_label is None and value_type is type(None):
+                is_missing[mask] = True
+            elif isinstance(missing_label, str) and issubclass(
+                value_type, str
+            ):
+                # A plain str would be compared without its trailing NULs.
+                is_missing[mask] = flat[mask] == np.asarray(
+                    missing_label, dtype=object
+                )
+            elif _is_nan_missing_label(missing_label) and issubclass(
+                value_type, (float, np.floating)
+            ):
+                is_missing[mask] = np.isnan(flat[mask].astype(value_type))
+            observed = mask & ~is_missing
+            if observed.any():
+                families.add(
+                    _scalar_label_family(flat[observed.argmax()], name=name)
+                )
+        return is_missing.reshape(y.shape), families
     is_missing = []
     families = set()
     for value in y.flat:
@@ -741,12 +815,28 @@ def _check_integer_labels(values, *, name):
     ValueError
         If no signed or unsigned 64-bit integer dtype holds every integer.
     """
-    integers = [
-        _python_scalar(value)
-        for value in values.flat
-        if isinstance(value, (int, np.integer))
-        and not isinstance(value, (bool, np.bool_))
-    ]
+    flat = values.ravel()
+    groups = _group_by_type(flat)
+    if groups is None:
+        integers = [
+            _python_scalar(value)
+            for value in values.flat
+            if isinstance(value, (int, np.integer))
+            and not isinstance(value, (bool, np.bool_))
+        ]
+    else:
+        integers = []
+        for value_type, mask in groups.items():
+            if issubclass(value_type, (int, np.integer)) and not issubclass(
+                value_type, (bool, np.bool_)
+            ):
+                group = flat[mask]
+                if value_type is not int:
+                    group = group.astype(value_type)
+                integers += [
+                    _python_scalar(group.min()),
+                    _python_scalar(group.max()),
+                ]
     if not integers:
         return
     smallest, largest = min(integers), max(integers)

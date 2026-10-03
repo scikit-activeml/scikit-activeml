@@ -180,14 +180,15 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         # Storages for saving query indices and utilities.
         query_indices_cand = np.empty(batch_size, dtype=int)
         utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
+        gains = None
 
         # Greedy selection (cf. lines 3 to 6 of Algorithm 1 in [1]).
         for b in range(batch_size):
             if k_max is not None:
                 # Compute utilities if labeled data is available.
-                utilities_cand[b] = np.mean(
-                    np.maximum(K_cand - k_max, 0), axis=1
-                )
+                gains = np.subtract(K_cand, k_max, out=gains)
+                np.maximum(gains, 0, out=gains)
+                utilities_cand[b] = np.mean(gains, axis=1)
             else:
                 # Fallback to the kernel-based densities as utilities if
                 # labeled data is unavailable.

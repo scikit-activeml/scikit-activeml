@@ -35,7 +35,10 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
     Learning (RT-AL) [1]_, which is based on a regression tree and selects the
     number `n_k` of samples to be selected from each leaf `k` given a certain
     `batch size`. It than uses one of the three methods 'random', 'diversity',
-    or 'representativity' to select `n_k` samples from each leaf `k`.
+    or 'representativity' to select `n_k` samples from each leaf `k`. A leaf
+    can never be asked for more samples than it has candidates. If a leaf
+    would get more, the surplus is passed on to the other leaves that still
+    have candidates left.
 
     Parameters
     ----------
@@ -216,7 +219,12 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
         # Calculate the number of samples to be selected from each leaf k.
         n_k = _calc_acquisitions_per_leaf(
-            X, y, reg, missing_label=self.missing_label_, batch_size=batch_size
+            X,
+            y,
+            reg,
+            missing_label=self.missing_label_,
+            batch_size=batch_size,
+            X_cand=X_cand,
         )
 
         # Discretize number of leaf acquisitions.
@@ -243,7 +251,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                         rand_argmax(
                             batch_utilities_cand[len(query_indices)],
                             random_state=self.random_state_,
-                        )
+                        )[0]
                     )
 
         elif self.method == "diversity":
@@ -274,27 +282,42 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                         rand_argmax(
                             batch_utilities_cand[len(query_indices)],
                             random_state=self.random_state_,
-                        )
+                        )[0]
                     )
 
         elif self.method == "representativity":
-            # Perform a k-means clustering in leaf k with n_k clusters.
             query_indices = np.empty(shape=batch_size, dtype=int)
             l_cand = np.full(len(X_cand), fill_value=-1, dtype=int)
             for leaf in np.argwhere(n_k_discrete != 0).flatten():
-                X_cand_leaf = X_cand[leaf_indices_cand == leaf]
+                indices_leaf = np.flatnonzero(leaf_indices_cand == leaf)
+                X_cand_leaf = X_cand[indices_leaf]
+                n_acquisitions = n_k_discrete[leaf]
+                n_clusters = min(
+                    n_acquisitions, len(np.unique(X_cand_leaf, axis=0))
+                )
                 kmeans = KMeans(
-                    n_k_discrete[leaf], random_state=self.random_state_
+                    n_clusters, random_state=self.random_state_
                 ).fit(X_cand_leaf)
+                clusters = kmeans.labels_.copy()
+                cluster_sizes = np.bincount(clusters, minlength=n_acquisitions)
+                # Duplicate feature vectors can limit the cluster count.
+                for cluster in np.flatnonzero(cluster_sizes == 0):
+                    largest = np.argmax(cluster_sizes)
+                    moved = np.flatnonzero(clusters == largest)[-1]
+                    clusters[moved] = cluster
+                    cluster_sizes[largest] -= 1
+                    cluster_sizes[cluster] = 1
 
-                l_cand[leaf_indices_cand == leaf] = kmeans.predict(
-                    X_cand_leaf
-                ) + np.sum(n_k_discrete[0:leaf])
-
-                centroids = kmeans.cluster_centers_
-                query_indices[
-                    np.sum(n_k_discrete[0:leaf]) + range(n_k_discrete[leaf])
-                ] = pairwise_distances_argmin(centroids, X_cand, axis=1)
+                offset = np.sum(n_k_discrete[:leaf])
+                l_cand[indices_leaf] = clusters + offset
+                for cluster in range(n_acquisitions):
+                    members = indices_leaf[clusters == cluster]
+                    centroid = X_cand[members].mean(axis=0, keepdims=True)
+                    query_indices[offset + cluster] = members[
+                        pairwise_distances_argmin(
+                            centroid, X_cand[members], axis=1
+                        )[0]
+                    ]
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
@@ -340,6 +363,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 f'methods are "random", "diversity", and "representativity".'
             )
 
+        query_indices = np.asarray(query_indices, dtype=int)
         if mapping is None:
             batch_utilities = batch_utilities_cand
         else:
@@ -390,7 +414,9 @@ def _discretize_acquisitions_per_leaf(n_k, batch_size, random_state):
     return n_k_discrete.astype(int)
 
 
-def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
+def _calc_acquisitions_per_leaf(
+    X, y, reg, missing_label, batch_size=1, X_cand=None
+):
     """Computes the number of samples to be selected from each leaf of the
     regression tree.
 
@@ -408,11 +434,14 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
         Fitted regressor to predict the data.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
+    X_cand : array-like of shape (n_candidates, n_features), default=None
+        Candidate samples. If `None`, use the unlabeled samples in `X`.
 
     Returns
     -------
-    n_samples_per_leaf : numpy.ndarray of shape (n_leafs)
-        Number of samples per leaf.
+    n_k : numpy.ndarray of shape (n_nodes,)
+        Fractional acquisitions per tree node, bounded by the number of
+        candidates in that node. Internal nodes receive zero acquisitions.
     """
     is_lbld, y_labeled = _observed_numerical_labels(y, missing_label)
 
@@ -432,17 +461,28 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
             "parameter `min_samples_leaf` of `reg` to >= 2."
         )
 
-    # Compute the probability p_k that an unlabeled sample belongs to leaf k.
-    leaf_unlabeled = reg.apply(X[~is_lbld])
-    samples_per_leaf = np.bincount(leaf_unlabeled, minlength=len(v_k))
-    p_k = samples_per_leaf / sum(~is_lbld)
+    if X_cand is None:
+        X_cand = X[~is_lbld]
+    leaf_candidates = reg.apply(X_cand)
+    capacity = np.bincount(leaf_candidates, minlength=len(v_k))
+    p_k = capacity / len(X_cand)
+    weights = np.sqrt(p_k * v_k)
+    n_k = np.zeros_like(weights)
+    available = np.flatnonzero(capacity)
+    remaining = min(batch_size, len(X_cand))
 
-    # Compute the number of sample to be selected from each leaf of the
-    # regression tree.
-    n_k = np.sqrt(p_k * v_k)
-    if np.sum(n_k) == 0:
-        n_k = np.full_like(n_k, fill_value=batch_size / reg.tree_.node_count)
-    else:
-        n_k = batch_size * n_k / np.sum(n_k)
+    # Redistribute quotas that exceed the remaining candidate capacity.
+    while remaining > 0:
+        available_weights = weights[available]
+        if available_weights.sum() == 0:
+            available_weights = np.ones(len(available))
+        allocation = remaining * available_weights / available_weights.sum()
+        full = allocation >= capacity[available]
+        if not np.any(full):
+            n_k[available] = allocation
+            break
+        n_k[available[full]] = capacity[available[full]]
+        remaining -= capacity[available[full]].sum()
+        available = available[~full]
 
     return n_k

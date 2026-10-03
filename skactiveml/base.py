@@ -44,7 +44,6 @@ from .utils import (
     check_indices,
     check_n_features,
     check_type,
-    compute_vote_vectors,
 )
 
 __all__ = [
@@ -79,6 +78,8 @@ _TARGET_SPEC_NOT_PROVIDED = object()
 # name (e.g. the labeled-vs-unlabeled `discriminator` of `DiscriminativeAL`)
 # solve an auxiliary problem and are therefore no semantic authority for `y`.
 _TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
+
+_DEFAULT_BUDGET = 0.1
 
 
 def _maps_to_samples(candidates):
@@ -148,41 +149,6 @@ def _guard_exhausted_candidate_pool(query):
     return guarded_query
 
 
-def _guard_own_query(cls):
-    """Guard the `query` a pool query strategy defines itself.
-
-    A `query` published through a descriptor, i.e. the one `match_signature`
-    creates, is guarded through the function that descriptor binds, so that
-    the descriptor keeps owning how `query` is exposed. Any other publication
-    is rejected at class definition time rather than silently left unguarded.
-
-    Parameters
-    ----------
-    cls : type
-        The pool query strategy whose own `query` is to be guarded.
-
-    Raises
-    ------
-    TypeError
-        If `cls` publishes `query` in a way this guard does not cover.
-    """
-    query = cls.__dict__.get("query")
-    if query is None:
-        return
-    if inspect.isfunction(query):
-        cls.query = _guard_exhausted_candidate_pool(query)
-        return
-    published_query = getattr(query, "fn", None)
-    if inspect.isfunction(published_query):
-        query.fn = _guard_exhausted_candidate_pool(published_query)
-        return
-    raise TypeError(
-        f"'{cls.__name__}' publishes `query` as {type(query).__name__}, which "
-        "the exhausted candidate pool guard does not cover. Extend "
-        "`_guard_own_query` for that publication."
-    )
-
-
 def _reuse_established_target_spec(resolved_spec, established_spec=None):
     if established_spec is None:
         return resolved_spec
@@ -193,6 +159,17 @@ def _reuse_established_target_spec(resolved_spec, established_spec=None):
             f"{resolved_spec!r}."
         )
     return established_spec
+
+
+def _check_budget(budget):
+    """Return `budget`, or `_DEFAULT_BUDGET` if it is `None`, after checking
+    that it is a float in `(0, 1]`.
+    """
+    budget = _DEFAULT_BUDGET if budget is None else budget
+    check_scalar(
+        budget, "budget", float, min_val=0.0, max_val=1.0, min_inclusive=False
+    )
+    return budget
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -228,10 +205,37 @@ class PoolQueryStrategy(QueryStrategy):
     """
 
     def __init_subclass__(cls, **kwargs):
-        # Every `query` is guarded, so that the shared validation can answer an
-        # exhausted candidate pool for all pool strategies at once.
+        """Guard the `query` a pool query strategy defines itself.
+
+        Every `query` is guarded, so that the shared validation can answer an
+        exhausted candidate pool for all pool strategies at once. A `query`
+        published through a descriptor, i.e. the one `match_signature`
+        creates, is guarded through the function that descriptor binds, so
+        that the descriptor keeps owning how `query` is exposed. Any other
+        publication is rejected at class definition time rather than silently
+        left unguarded.
+
+        Raises
+        ------
+        TypeError
+            If `cls` publishes `query` in a way this guard does not cover.
+        """
         super().__init_subclass__(**kwargs)
-        _guard_own_query(cls)
+        query = cls.__dict__.get("query")
+        if query is None:
+            return
+        if inspect.isfunction(query):
+            cls.query = _guard_exhausted_candidate_pool(query)
+            return
+        published_query = getattr(query, "fn", None)
+        if inspect.isfunction(published_query):
+            query.fn = _guard_exhausted_candidate_pool(published_query)
+            return
+        raise TypeError(
+            f"'{cls.__name__}' publishes `query` as {type(query).__name__}, "
+            "which the exhausted candidate pool guard does not cover. Extend "
+            "`PoolQueryStrategy.__init_subclass__` for that publication."
+        )
 
     def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
@@ -1183,6 +1187,12 @@ class BudgetManager(ABC, BaseEstimator):
         """Ask the budget manager which `utilities` are sufficient to query the
         corresponding labels.
 
+        The first call may initialize the manager. Once initialized, querying
+        must leave its acquisition state unchanged, including counters,
+        thresholds, histories, and random state. Repeated calls with the same
+        utilities and parameters must return the same indices until `update`
+        advances that state.
+
         Parameters
         ----------
         utilities : array-like of shape (n_samples,)
@@ -1202,6 +1212,9 @@ class BudgetManager(ABC, BaseEstimator):
     def update(self, candidates, queried_indices, *args, **kwargs):
         """Updates the budget manager.
 
+        If called before `query_by_utility`, this method must also initialize
+        all state required for subsequent queries.
+
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
@@ -1210,7 +1223,7 @@ class BudgetManager(ABC, BaseEstimator):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
@@ -1220,21 +1233,10 @@ class BudgetManager(ABC, BaseEstimator):
         raise NotImplementedError
 
     def _validate_budget(self):
-        """check the assigned `budget` and set the default value 0.1 if
-        `budget` is set to `None`.
+        """Validate `budget` and store it as `budget_`, which is
+        `_DEFAULT_BUDGET` if `budget` is `None`.
         """
-        if self.budget is not None:
-            self.budget_ = self.budget
-        else:
-            self.budget_ = 0.1
-        check_scalar(
-            self.budget_,
-            "budget",
-            float,
-            min_val=0.0,
-            max_val=1.0,
-            min_inclusive=False,
-        )
+        self.budget_ = _check_budget(self.budget)
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.
@@ -1391,9 +1393,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for budget_manager.
+            Optional kwargs for `budget_manager`. If supplied, `utilities`
+            must be a one-dimensional array with one value per candidate.
 
         Returns
         -------
@@ -1412,21 +1415,19 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget(self):
-        """Creates a copy "budget_" if budget is a float between 0 and 1. If it
-        is `None`, `budget_` is set to 0.1.
+        """Validate `budget` and store it as `budget_`, which is
+        `_DEFAULT_BUDGET` if `budget` is `None`.
         """
-        if self.budget is not None:
-            self.budget_ = self.budget
-        else:
-            self.budget_ = 0.1
-        check_scalar(
-            self.budget_,
-            "budget",
-            float,
-            min_val=0.0,
-            max_val=1.0,
-            min_inclusive=False,
-        )
+        self.budget_ = _check_budget(self.budget)
+
+    def _sync_default_budget_manager(self):
+        """Apply `budget` to `budget_manager_` if it is the default one. Its
+        other parameters keep the values it was created with.
+        """
+        if self.budget_manager is None:
+            self._validate_budget()
+            if self.budget_manager_.budget != self.budget:
+                self.budget_manager_.set_params(budget=self.budget)
 
     def _validate_data(
         self,
@@ -2167,19 +2168,20 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     def _compute_class_frequency_vectors(self, y, sample_weight):
         """Convert encoded targets to per-sample class-frequency vectors."""
-        if self.target_spec_.target_type == "single-output":
-            return compute_vote_vectors(
-                y=y,
-                w=sample_weight,
-                classes=np.arange(len(self.classes_)),
-                missing_label=-1,
-            )
-
         weights = (
             np.ones_like(y, dtype=float)
             if sample_weight is None
             else np.asarray(sample_weight, dtype=float).copy()
         )
+        if self.target_spec_.target_type == "single-output":
+            is_lbld = y != -1
+            weights = weights[is_lbld]
+            V = np.zeros((len(y), len(self.classes_)))
+            V[np.flatnonzero(is_lbld), y[is_lbld].astype(int)] += np.where(
+                np.isnan(weights), 0, weights
+            )
+            return V
+
         if weights.ndim == 1:
             weights = np.repeat(weights[:, np.newaxis], y.shape[1], axis=1)
         is_missing = y == -1

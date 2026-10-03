@@ -266,12 +266,12 @@ class IndexClassifierWrapper:
             'unlabeled'.
         """
         idx_fit = check_array(
-            idx_fit, ensure_2d=False, dtype=int, input_name="`idx_fit`"
+            idx_fit, ensure_2d=False, dtype=None, input_name="`idx_fit`"
         )
         idx_fit = check_indices(idx_fit, self.X, dim=0)
 
         idx_pred = check_array(
-            idx_pred, ensure_2d=False, dtype=int, input_name="`idx_pred`"
+            idx_pred, ensure_2d=False, dtype=None, input_name="`idx_pred`"
         )
         idx_pred = check_indices(idx_pred, self.X, dim=0)
 
@@ -344,7 +344,7 @@ class IndexClassifierWrapper:
             The fitted `IndexClassifierWrapper`.
         """
         # check idx
-        idx = check_array(idx, ensure_2d=False, dtype=int, input_name="`idx`")
+        idx = check_array(idx, ensure_2d=False, dtype=None, input_name="`idx`")
         idx = check_indices(
             idx, self.X, dim=0, unique=self.enforce_unique_samples
         )
@@ -438,7 +438,7 @@ class IndexClassifierWrapper:
 
         # check idx
         add_idx = check_array(
-            idx, ensure_2d=False, dtype=int, input_name="`add_idx`"
+            idx, ensure_2d=False, dtype=None, input_name="`add_idx`"
         )
         add_idx = check_indices(
             add_idx, self.X, dim=0, unique=self.enforce_unique_samples
@@ -956,7 +956,8 @@ def expected_target_val(X, target_func, reg, **kwargs):
         - 'dynamic_quad' uses `scipy's` function `expect` on the
           `rv_continuous` random variable of `reg`, which in turn uses a
           dynamic gaussian quadrature routine for calculating the integral.
-          Performance is worse using a vector function.
+          A random variable with zero standard deviation is evaluated at its
+          mean instead. Performance is worse using a vector function.
     quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
@@ -1047,6 +1048,8 @@ def conditional_expect(
         - 'dynamic_quad' uses `scipy's` function `expect` on the
           `rv_continuous` random variable of `reg`, which in turn uses a
           dynamic gaussian quadrature routine for calculating the integral.
+          A random variable with zero standard deviation is evaluated at its
+          mean instead.
           Performance is worse using a vector function.
     quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
@@ -1250,9 +1253,12 @@ def conditional_expect(
                 func_out = func(np.arange(len(X)), X, np.full((len(X), 1), y))
                 return float(to_scalar_if_singleton(func_out[idx]))
 
-            expectation[idx] = cond_dist.expect(
-                quad_function_wrapper,
-                **quad_dict,
-            )
+            if cond_dist.std() == 0:
+                expectation[idx] = quad_function_wrapper(cond_dist.mean())
+            else:
+                expectation[idx] = cond_dist.expect(
+                    quad_function_wrapper,
+                    **quad_dict,
+                )
 
     return expectation

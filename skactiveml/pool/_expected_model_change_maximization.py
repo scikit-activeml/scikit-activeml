@@ -8,6 +8,7 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 from skactiveml.utils import (
     check_type,
     simple_batch,
@@ -35,7 +36,8 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
     n_train : int or float, default=0.5
         The size of a bootstrap compared to the training data if of type float.
         Must lie in the range of (0, 1]. The total size of a bootstrap if of
-        type int. Must be greater or equal to 1.
+        type int. Must be greater or equal to 1. Fractional sizes are rounded
+        up. Samples are drawn with replacement.
     ord : int or string, default=2
         The norm to measure the gradient length. Argument will be passed to
         `np.linalg.norm`.
@@ -154,20 +156,29 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
               refers to the indexing in `candidates`.
         """
 
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(SkactivemlRegressor,),
+        )
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
-        check_type(reg, "reg", SkactivemlRegressor)
-        check_type(fit_reg, "fit_reg", bool)
         if self.feature_map is not None:
             _check_callable(self.feature_map, "self.feature_map")
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -229,7 +240,10 @@ def _bootstrap_estimators(
     bootstrap_size : int, default=5
         The number of trained bootstraps.
     n_train : int or float, default=0.5
-        The size of each bootstrap training data set.
+        The size of each bootstrap training data set. An integer specifies
+        the sample count and must be at least 1. A float in (0, 1] specifies
+        a fraction of the training samples, rounded up to an integer count.
+        Samples are drawn with replacement.
     sample_weight: array-like of shape (n_samples,), default=None
         Weights of training samples in `X`.
     random_state : int or np.random.RandomState or None, default=None
@@ -244,18 +258,17 @@ def _bootstrap_estimators(
     check_X_y(X=X, y=y, sample_weight=sample_weight)
     check_scalar(bootstrap_size, "bootstrap_size", int, min_val=1)
 
-    check_type(n_train, "n_train", int, float)
-    if isinstance(n_train, int) and n_train < 1:
-        raise ValueError(
-            f"`n_train` has value `{type(n_train)}`, but must have a value "
-            f"greater or equal to one, if of type `int`."
+    if isinstance(n_train, int):
+        check_scalar(n_train, "n_train", int, min_val=1)
+    else:
+        check_scalar(
+            n_train,
+            "n_train",
+            float,
+            min_val=0,
+            max_val=1,
+            min_inclusive=False,
         )
-    elif isinstance(n_train, float) and n_train <= 0 or n_train > 1:
-        raise ValueError(
-            f"`n_train` has value `{type(n_train)}`, but must have a value "
-            f"between zero and one, excluding zero, if of type `float`."
-        )
-    if isinstance(n_train, float):
         n_train = math.ceil(n_train * len(X))
 
     check_type(est, "est", SkactivemlClassifier, SkactivemlRegressor)
@@ -264,7 +277,7 @@ def _bootstrap_estimators(
     bootstrap_est = [clone(est) for _ in range(bootstrap_size)]
     sample_indices = np.arange(len(X))
     subsets_indices = [
-        random_state.choice(sample_indices, size=int(len(X) * n_train + 1))
+        random_state.choice(sample_indices, size=int(n_train))
         for _ in range(bootstrap_size)
     ]
 

@@ -250,7 +250,7 @@ class TestRandomVariableUncertainty(
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = [0, 1, 2, 4, 5, 6, 7, 12]
+        expected_output = [0, 2, 3, 5, 6, 7, 8, 15]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,

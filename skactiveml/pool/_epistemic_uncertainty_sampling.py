@@ -9,6 +9,7 @@ import warnings
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
+from scipy.special import xlogy, xlog1py
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils.extmath import safe_sparse_dot
 
@@ -387,9 +388,9 @@ def _pwc_ml_1(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta**p) * ((1 - theta) ** n)) / (
-        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
-    )
+    log_likelihood = xlogy(p, theta) + xlog1py(n, -theta)
+    log_maximum = xlogy(p, p / (n + p)) + xlogy(n, n / (n + p))
+    piH = np.exp(log_likelihood - log_maximum)
     return -np.minimum(piH, 2 * theta - 1)
 
 
@@ -414,9 +415,9 @@ def _pwc_ml_0(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta**p) * ((1 - theta) ** n)) / (
-        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
-    )
+    log_likelihood = xlogy(p, theta) + xlog1py(n, -theta)
+    log_maximum = xlogy(p, p / (n + p)) + xlogy(n, n / (n + p))
+    piH = np.exp(log_likelihood - log_maximum)
     return -np.minimum(piH, 1 - 2 * theta)
 
 
@@ -435,7 +436,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
     y : np.array
         The labels of the labeled pool X.
     clf : skactiveml.classifier.SklearnClassifier
-        Only a wrapped logistic regression is supported as classifier.
+        A fitted wrapper around logistic regression.
     sample_weight : array-like of shape (n_samples,), default=None
         Sample weights for `X`, only used if `clf` is a logistic regression
         classifier.
@@ -457,12 +458,14 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
             "clf has to be a wrapped LogisticRegression "
             "classifier but \n{}\n was given.".format(clf)
         )
-    if len(clf.classes) != 2:
+    if len(clf.classes_) != 2:
         raise ValueError(
             "epistemic is only implemented for two-class "
             "problems, {} classes were given."
-            "".format(len(clf.classes))
+            "".format(len(clf.classes_))
         )
+
+    y = np.where(np.asarray(y) == clf.classes_[1], 1, -1)
 
     # Get the probability predictions.
     probas = clf.predict_proba(X_cand)
@@ -492,8 +495,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
     x0 = np.zeros((X_cand.shape[1] + 1))
 
     # Set initial epistemic scores.
-    pi1 = np.maximum(2 * probas[:, 0] - 1, 0)
-    pi0 = np.maximum(1 - 2 * probas[:, 0], 0)
+    pi1 = np.maximum(2 * probas[:, 1] - 1, 0)
+    pi0 = np.maximum(1 - 2 * probas[:, 1], 0)
 
     # Compute pi0, pi1 for every x in candidates.
     for i, x in enumerate(X_cand):
@@ -548,7 +551,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
                             sample_weight=sample_weight,
                             gamma=gamma,
                         ),
-                        1 - 2 * alpha_p,
+                        1 - 2 * alpha_n,
                     ),
                 )
             Qn, Qp = np.delete(Qn, 0), np.delete(Qp, -1)
@@ -571,7 +574,7 @@ def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
     X : np.ndarray
         The labeled pool used to fit the classifier.
     y : np.ndarray
-        The labels of the labeled pool X.
+        Labels of the labeled pool `X`, encoded as -1 and +1.
     sample_weight : np.ndarray of shape (n_samples,), default=None
         Sample weights for X, only used if clf is a logistic regression
         classifier.
@@ -608,7 +611,7 @@ def _loglike_logreg(w, X, y, sample_weight=None, gamma=1):
     X : array-like of shape (n_samples, n_features)
         Training data.
     y : np.ndarray of shape (n_samples,)
-        The labels of the training data X.
+        Training labels encoded as -1 and +1.
     sample_weight : array-like of shape (n_samples,) default=None
         Array of weights that are assigned to individual samples.
         If not provided, then each sample is given unit weight.
@@ -682,7 +685,7 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
     X : array-like of shape (n_samples, n_features)
         Training data.
     y : ndarray of shape (n_samples,)
-        Array of labels.
+        Training labels encoded as -1 and +1.
     alpha : float
         Regularization parameter. alpha is equal to 1 / C.
     sample_weight : array-like of shape (n_samples,) default=None
@@ -734,7 +737,7 @@ def _intercept_dot(w, X, y):
     X : array-like of shape (n_samples, n_features)
         Training data.
     y : np.ndarray of shape (n_samples,)
-        Array of labels.
+        Training labels encoded as -1 and +1.
 
     Returns
     -------

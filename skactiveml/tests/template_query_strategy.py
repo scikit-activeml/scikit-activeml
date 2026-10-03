@@ -1,6 +1,8 @@
 import inspect
 import warnings
 from copy import deepcopy
+from itertools import product
+from unittest.mock import patch
 
 import numpy as np
 from numpy.random import RandomState
@@ -509,6 +511,84 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param("init", "missing_label", test_cases)
 
+        if "reg" not in inspect.signature(self.qs_class.query).parameters:
+            return
+
+        reference = None
+        for fit_reg in [True, False]:
+            for missing_label in [np.nan, -1, None]:
+                with self.subTest(
+                    missing_label=missing_label, fit_reg=fit_reg
+                ):
+                    init_params = deepcopy(self.init_default_params)
+                    init_params["missing_label"] = missing_label
+                    query_params = deepcopy(self.query_default_params_reg)
+                    y = np.asarray(
+                        query_params["y"],
+                        dtype=object if missing_label is None else float,
+                    ).copy()
+                    y[is_unlabeled(y, ml)] = missing_label
+                    query_params["y"] = y
+                    query_params["reg"].set_params(missing_label=missing_label)
+                    if not fit_reg:
+                        query_params["reg"].fit(query_params["X"], y)
+                    query_params["fit_reg"] = fit_reg
+                    query_params["return_utilities"] = True
+
+                    qs = self.qs_class(**init_params)
+                    result = qs.query(**query_params)
+                    if reference is None:
+                        reference = result
+                    else:
+                        np.testing.assert_array_equal(result[0], reference[0])
+                        np.testing.assert_allclose(result[1], reference[1])
+
+    def test_query_param_reg(self, test_cases=None):
+        super().test_query_param_reg(test_cases=test_cases)
+        if "reg" not in inspect.signature(self.qs_class.query).parameters:
+            return
+
+        for fit_reg in [True, False]:
+            for missing_label in [-1, None]:
+                with self.subTest(
+                    missing_label=missing_label, fit_reg=fit_reg
+                ):
+                    query_params = deepcopy(self.query_default_params_reg)
+                    reg = query_params["reg"]
+                    if not fit_reg:
+                        reg.fit(query_params["X"], query_params["y"])
+                    y = np.asarray(query_params["y"], dtype=object).copy()
+                    y[is_unlabeled(y, reg.missing_label)] = missing_label
+                    query_params.update(y=y, fit_reg=fit_reg)
+                    init_params = deepcopy(self.init_default_params)
+                    init_params["missing_label"] = missing_label
+                    qs = self.qs_class(**init_params)
+
+                    with patch.object(
+                        type(reg),
+                        "fit",
+                        autospec=True,
+                        side_effect=type(reg).fit,
+                    ) as fit:
+                        with self.assertRaisesRegex(
+                            ValueError, "missing_label"
+                        ):
+                            qs.query(**query_params)
+                        fit.assert_not_called()
+                    assert_no_query_state(self, qs)
+
+        query_params = deepcopy(self.query_default_params_reg)
+        reg = query_params["reg"].fit(query_params["X"], query_params["y"])
+        query_params.update(
+            y=np.column_stack([query_params["y"], query_params["y"]]),
+            reg=reg,
+            fit_reg=False,
+        )
+        qs = self.qs_class(**deepcopy(self.init_default_params))
+        with self.assertRaisesRegex(ValueError, "Single-output regression"):
+            qs.query(**query_params)
+        assert_no_query_state(self, qs)
+
     def test_init_param_target_type(self):
         self.assertIn(
             "target_type",
@@ -632,6 +712,11 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 cases = test_cases + [
                     (np.nan, ValueError),
                     (Dummy, TypeError),
+                    ([0.5], ValueError),
+                    ([-1], ValueError),
+                    ([-len(query_params["y"]) - 1], ValueError),
+                    ([len(query_params["y"])], ValueError),
+                    ([True], ValueError),
                     ([ulbd_idx[0]], None),
                 ]
                 self._test_param(
@@ -1227,7 +1312,10 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 query_params["return_utilities"] = True
                 query_ids, utils = qs.query(**query_params)
 
-                self.assertEqual(len(query_ids), batch_size)
+                self.assertIsInstance(query_ids, np.ndarray)
+                self.assertEqual(query_ids.shape, (batch_size,))
+                self.assertTrue(np.issubdtype(query_ids.dtype, np.integer))
+                self.assertEqual(len(np.unique(query_ids)), batch_size)
                 self.assertEqual(len(utils), batch_size)
                 self.assertEqual(len(utils[0]), len(query_params["X"]))
                 n_labeled = sum(is_labeled(query_params["y"], missing_label))
@@ -1240,7 +1328,10 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
                     ids, utilities = qs.query(**query_params)
-                    self.assertEqual(len(ids), max_batch_size)
+                    self.assertIsInstance(ids, np.ndarray)
+                    self.assertEqual(ids.shape, (max_batch_size,))
+                    self.assertTrue(np.issubdtype(ids.dtype, np.integer))
+                    self.assertEqual(len(np.unique(ids)), max_batch_size)
 
     def test_query_multilabel_batch_variation(self):
         if self.query_default_params_clf_multilabel is None:
@@ -2122,7 +2213,14 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             init_params["random_state"] = np.random.RandomState(0)
             qs = self.qs_class(**init_params)
             qs2 = self.qs_class(**init_params)
-            X = [[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75], [0.5, 0.5]]
+            X = [
+                [0.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.75, 0.75],
+                [0.5, 0.5],
+            ]
             y_true = [0, 0, 1, 1, 1, 0]
             query_default_params1 = deepcopy(self.query_default_params_clf)
             query_params = inspect.signature(self.qs_class.query).parameters
@@ -2146,7 +2244,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 query_default_params1["return_utilities"] = True
                 qs_output, u = qs.query(**query_default_params1)
                 budget_manager_param_dict1 = {"utilities": u}
-                qs_outputs.extend(qs_output)
+                qs_outputs.extend(i + idx for idx in qs_output)
                 call_func(
                     qs.update,
                     candidates=np.array(x).reshape([1, -1]),
@@ -2163,9 +2261,96 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 budget_manager_param_dict=budget_manager_param_dict1,
             )
             query_default_params1["candidates"] = X
-            _, expected_utilities = qs.query(**query_default_params1)
-            _, utilities = qs2.query(**query_default_params1)
+            expected_output, expected_utilities = qs.query(
+                **query_default_params1
+            )
+            output, utilities = qs2.query(**query_default_params1)
+            np.testing.assert_array_equal(output, expected_output)
             np.testing.assert_almost_equal(expected_utilities, utilities)
+            assert_state_unchanged(self, qs2, qs)
+
+    def test_set_params_budget(self):
+        query_params = deepcopy(self.query_default_params_clf)
+        if query_params is None:
+            return
+        query_params["return_utilities"] = True
+        n_features = np.shape(query_params["candidates"])[1]
+        candidates = RandomState(0).uniform(0, 10, size=(40, n_features))
+        init_params = deepcopy(self.init_default_params)
+        init_params.update(budget=0.3, random_state=0)
+
+        def query_and_update(qs, chunk):
+            query_params["candidates"] = chunk
+            queried_indices, utilities = qs.query(**query_params)
+            call_func(
+                qs.update,
+                candidates=chunk,
+                queried_indices=queried_indices,
+                budget_manager_param_dict={"utilities": utilities},
+            )
+
+        for budget, update_first in product([0.05, 1.0], [False, True]):
+            qs = self.qs_class(**init_params)
+            query_and_update(qs, candidates[:20])
+            qs.set_params(budget=budget)
+            expected = deepcopy(qs)
+            if hasattr(expected, "budget_manager_"):
+                expected.budget_manager_.set_params(budget=budget)
+            query_params["candidates"] = candidates[20:]
+            if update_first:
+                queried_indices, utilities = deepcopy(expected).query(
+                    **query_params
+                )
+                for strategy in [qs, expected]:
+                    call_func(
+                        strategy.update,
+                        candidates=candidates[20:],
+                        queried_indices=queried_indices,
+                        budget_manager_param_dict={"utilities": utilities},
+                    )
+            else:
+                output, utilities = qs.query(**query_params)
+                expected_output, expected_utilities = expected.query(
+                    **query_params
+                )
+                np.testing.assert_array_equal(output, expected_output)
+                np.testing.assert_allclose(utilities, expected_utilities)
+            assert_state_unchanged(self, qs, expected)
+
+        init_signature = inspect.signature(self.qs_class.__init__)
+        if "budget_manager" in init_signature.parameters:
+            qs = self.qs_class(**init_params)
+            query_and_update(qs, candidates[:20])
+            qs = self.qs_class(
+                **init_params, budget_manager=clone(qs.budget_manager_)
+            )
+            query_and_update(qs, candidates[:20])
+            qs.set_params(budget=1.0)
+            query_and_update(qs, candidates[20:])
+            self.assertEqual(qs.budget_manager_.budget, 0.3)
+
+    def test_set_params_budget_rejects_invalid_budgets(self):
+        init_params = deepcopy(self.init_default_params)
+        init_params["budget"] = 1.0
+        update_params = deepcopy(self.update_params)
+        update_params["candidates"] = [[0.0]]
+        for budget, err in [
+            (1, TypeError),
+            (True, TypeError),
+            (np.float32(1.0), TypeError),
+            (np.array(1.0), TypeError),
+            (1.5, ValueError),
+            (0.0, ValueError),
+            (-0.1, ValueError),
+        ]:
+            with self.subTest(budget=budget):
+                qs = self.qs_class(**init_params)
+                qs.update(**deepcopy(update_params))
+                qs.set_params(budget=budget)
+                before = deepcopy(qs)
+                with self.assertRaises(err):
+                    qs.update(**deepcopy(update_params))
+                assert_state_unchanged(self, qs, before)
 
     def test_query_param_return_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -2213,10 +2398,36 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         test_cases += [
             ("string", IndexError),
             (Dummy, IndexError),
+            (0, IndexError),
+            ([-1], IndexError),
+            ([1], IndexError),
+            ([0.5], IndexError),
+            ([0.0], None),
+            ([True], IndexError),
+            ([[0]], IndexError),
+            ([np.nan], IndexError),
+            (np.array([2**64 - 1], dtype=np.uint64), IndexError),
             ([], None),
             ([0], None),
+            ([0, 0], None),
         ]
         self._test_param("update", "queried_indices", test_cases)
+
+    def test_update_param_budget_manager_param_dict(self, test_cases=None):
+        if (
+            "budget_manager_param_dict"
+            not in inspect.signature(self.qs_class.update).parameters
+        ):
+            return
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            ({"utilities": []}, ValueError),
+            ({"utilities": [0.1, 0.2]}, ValueError),
+            ({"utilities": [[0.1]]}, ValueError),
+            ({"utilities": 0.1}, ValueError),
+            ({"utilities": [0.1]}, None),
+        ]
+        self._test_param("update", "budget_manager_param_dict", test_cases)
 
     def _test_param(
         self,
@@ -2259,7 +2470,18 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
                     qs = self.qs_class(**init_params)
                     if test_func == "update":
+                        check_state = err is not None and test_param in (
+                            "queried_indices",
+                            "budget_manager_param_dict",
+                        )
+                        before = deepcopy(qs) if check_state else None
                         self._check_update_param(qs, update_params, err)
+                        if check_state:
+                            assert_state_unchanged(self, qs, before)
+                            qs.update(**deepcopy(self.update_params))
+                            before = deepcopy(qs)
+                            self._check_update_param(qs, update_params, err)
+                            assert_state_unchanged(self, qs, before)
                     elif err is None:
                         qs.query(**query_params)
                     else:

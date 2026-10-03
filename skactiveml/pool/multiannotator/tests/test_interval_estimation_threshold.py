@@ -516,6 +516,47 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
             y=self.y,
         )
 
+    def test_query_random_state_breaks_annotation_ties(self):
+        X = np.arange(6.0).reshape(-1, 1)
+        y = np.array([[0.0, 1.0]] * 4 + [[np.nan, np.nan]] * 2)
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            X, [0.0, 1.0, 0.0, 1.0, np.nan, np.nan]
+        )
+        self.addCleanup(np.random.set_state, np.random.get_state())
+        for batch_size in [1, "adaptive"]:
+            with self.subTest(batch_size=batch_size):
+                results = []
+                for global_seed in range(10):
+                    np.random.seed(global_seed)
+                    global_state = np.random.get_state()
+                    results.append(
+                        IntervalEstimationThreshold(random_state=42).query(
+                            X,
+                            y,
+                            clf,
+                            fit_clf=False,
+                            batch_size=batch_size,
+                            return_utilities=True,
+                        )
+                    )
+                    np.testing.assert_array_equal(
+                        np.random.get_state()[1], global_state[1]
+                    )
+                    self.assertEqual(np.random.get_state()[2], global_state[2])
+                for query_indices, utilities in results[1:]:
+                    np.testing.assert_array_equal(query_indices, results[0][0])
+                    np.testing.assert_array_equal(utilities, results[0][1])
+
+                selected_annotators = {
+                    tuple(
+                        IntervalEstimationThreshold(random_state=seed).query(
+                            X, y, clf, fit_clf=False, batch_size=batch_size
+                        )[:, 1]
+                    )
+                    for seed in range(10)
+                }
+                self.assertGreater(len(selected_annotators), 1)
+
     def test_query_param_candidates(self):
         ie_thresh = IntervalEstimationThreshold()
         self.assertRaises(

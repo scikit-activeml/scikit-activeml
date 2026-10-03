@@ -1,10 +1,10 @@
 import numpy as np
-from sklearn import clone
 
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 
 from skactiveml.pool.utils import (
     _update_reg,
@@ -144,12 +144,26 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(ProbabilisticRegressor,),
         )
-
-        check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(fit_reg, "fit_reg", bool)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
 
         X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
         if len(X_eval) == 0:
@@ -174,12 +188,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         utilities_cand = self._kullback_leibler_divergence(
             X_eval,

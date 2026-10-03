@@ -18,7 +18,12 @@ from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
 from sklearn.model_selection import train_test_split
 
-from skactiveml.utils import MISSING_LABEL, is_labeled, simple_batch
+from skactiveml.utils import (
+    MISSING_LABEL,
+    is_labeled,
+    labeled_indices,
+    simple_batch,
+)
 from skactiveml.visualization import (
     plot_decision_boundary,
     plot_contour_for_samples,
@@ -71,7 +76,7 @@ for c in range(n_cycles):
     clf.fit(X, y)
 
     # Get labeled samples.
-    X_labeled = X[is_labeled(y)]
+    X_labeled = X[is_labeled(y, missing_label=MISSING_LABEL)]
 
     # Query the next sample(s).
     if not switching_point:
@@ -96,7 +101,9 @@ for c in range(n_cycles):
     title = ax.text(
         0.5,
         1.05,
-        f"Decision boundary after acquring {c} labels with {strategy}\n"
+        "Decision boundary after acquiring "
+        f"{len(labeled_indices(y, missing_label=MISSING_LABEL))} labels "
+        f"with {strategy}\n"
         f"Test Accuracy: {clf.score(X_test, y_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
         ha="center",

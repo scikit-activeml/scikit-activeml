@@ -77,6 +77,52 @@ class TestGreedySamplingX(
                 replace_query_params=query_params,
             )
 
+    def test_query_param_candidates(self):
+        super().test_query_param_candidates()
+
+        X = np.arange(4).reshape(-1, 1)
+        for target_type in ["single-output", "multi-label"]:
+            for labels in [[0, 1, 0, 1], [0, np.nan, 0, 1]]:
+                y = np.array(labels, dtype=float)
+                if target_type == "multi-label":
+                    y = np.column_stack([y, y])
+                for candidates in [[0, 1], np.arange(4)]:
+                    with self.subTest(
+                        target_type=target_type,
+                        labels=labels,
+                        candidates=candidates,
+                    ):
+                        indices, utilities = GreedySamplingX(
+                            random_state=0, target_type=target_type
+                        ).query(
+                            X,
+                            y,
+                            candidates=candidates,
+                            batch_size=len(candidates),
+                            return_utilities=True,
+                        )
+                        np.testing.assert_array_equal(
+                            np.sort(indices), candidates
+                        )
+                        expected = (
+                            [2, 1, np.nan, np.nan]
+                            if len(candidates) == 2
+                            else [-6, -4, -4, -6]
+                        )
+                        np.testing.assert_allclose(utilities[0], expected)
+                        for i, idx in enumerate(indices):
+                            self.assertTrue(np.isfinite(utilities[i, idx]))
+                            self.assertTrue(
+                                np.isnan(utilities[i, indices[:i]]).all()
+                            )
+                        self.assertTrue(
+                            np.isnan(
+                                utilities[
+                                    :, ~np.isin(np.arange(4), candidates)
+                                ]
+                            ).all()
+                        )
+
     def test_query(self):
         X = np.arange(7).reshape(7, 1)
         y = np.append([1], np.full(6, MISSING_LABEL))
