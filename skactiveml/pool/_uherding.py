@@ -439,9 +439,14 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         # Perform sequential batch selection.
         query_indices_cand = np.empty(batch_size, dtype=int)
         utilities_cand = np.empty((batch_size, len(X_cand_repr)), dtype=float)
+        gains = np.empty_like(
+            K_cand, dtype=np.result_type(unc_cand, K_cand, k_max)
+        )
         for b in range(batch_size):
-            gains = np.maximum(K_cand - k_max[:, None], 0.0)
-            utilities_cand[b] = np.mean(unc_cand[:, None] * gains, axis=0)
+            np.subtract(K_cand, k_max[:, None], out=gains)
+            np.maximum(gains, 0.0, out=gains)
+            np.multiply(unc_cand[:, None], gains, out=gains)
+            utilities_cand[b] = np.mean(gains, axis=0)
             utilities_cand[b][query_indices_cand[:b]] = np.nan
             query_indices_cand[b] = rand_argmax(
                 utilities_cand[b], random_state=self.random_state_
