@@ -123,3 +123,6 @@ Classification
    * - :doc:`Stream-based Active Learning in Batches </generated/tutorials/21_stream_batch_with_pool_al>`
      - Synthetic
      - - Parzen Window Classifier
+   * - :doc:`Stream-based Active Learning with River </generated/tutorials/22_river_classifier>`
+     - Synthetic
+     - - Adaptive Random Forest
