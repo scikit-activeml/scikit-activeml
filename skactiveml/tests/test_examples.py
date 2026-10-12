@@ -15,6 +15,8 @@ from docs.generate import (
     generate_examples,
     generate_strategy_overview_rst,
     generate_visualizations_rst,
+    generate_documentation_readme,
+    post_process_tutorials,
     get_strategy_metadata,
     get_skactiveml_methods,
 )
@@ -236,8 +238,8 @@ class TestExamples(unittest.TestCase):
             return file.read()
 
     def test_strategy_overview_has_one_table_per_scenario(self):
-        # Merge tasks and annotator settings while retaining every example
-        # and its original link, including methods that support both tasks.
+        # Merge tasks and annotator settings, linking to complete API galleries
+        # instead of selecting one demonstration for each method.
         json_data = {
             "1-pool-classification": {
                 "data": [
@@ -304,18 +306,13 @@ class TestExamples(unittest.TestCase):
         )[1].split(OVERVIEW_SCENARIOS["stream"] + "\n", 1)
         self.assertEqual(pool_table.count(".. list-table::"), 1)
         self.assertEqual(stream_table.count(".. list-table::"), 1)
-        self.assertEqual(
-            pool_table.count("</generated/sphinx_gallery_examples/"), 3
-        )
-        self.assertEqual(
-            stream_table.count("</generated/sphinx_gallery_examples/"), 1
-        )
-        self.assertIn(
-            "3-pool-multi-annotator/plot-SingleAnnotatorWrapper-", pool_table
-        )
+        self.assertNotIn("/plot-", overview)
+        self.assertNotIn("*Example:", overview)
+        self.assertEqual(pool_table.count("</generated/api/"), 3)
+        self.assertEqual(stream_table.count("</generated/api/"), 1)
         self.assertLess(
-            pool_table.index(":doc:`Greedy Sampling"),
-            pool_table.index(":doc:`Random Sampling"),
+            pool_table.index("Greedy Sampling"),
+            pool_table.index("Random Sampling"),
         )
         self.assertIn("| Single-output classification", pool_table)
         self.assertIn("| Regression", pool_table)
@@ -343,9 +340,11 @@ class TestExamples(unittest.TestCase):
 
         self.assertIn("Pool-based Active Learning\n", overview)
         self.assertEqual(overview.count(".. list-table::"), 1)
+        self.assertIn("Random Sampling", overview)
         self.assertIn(
-            "9-unmapped/plot-RandomSampling-Random_Sampling", overview
+            "/generated/api/skactiveml.pool.RandomSampling", overview
         )
+        self.assertNotIn("9-unmapped", overview)
         self.assertNotIn("\n9-unmapped\n", overview)
 
     def test_strategy_overview_offers_one_choice_per_setup_property(self):
@@ -508,22 +507,30 @@ class TestExamples(unittest.TestCase):
             )
             with open(path.join(directory, "index.rst")) as file:
                 index = file.read()
+            section_indexes = {}
+            for section in json_data:
+                with open(path.join(directory, section, "index.rst")) as file:
+                    section_indexes[section] = file.read()
 
-        groups = [
-            re.findall(
-                r"^   (generated/examples/.*\.py)$", block, re.MULTILINE
-            )
-            for block in index.split(".. minigallery::")[1:]
-        ]
-        self.assertEqual(len(groups), 5)
-        all_examples = [example for group in groups for example in group]
+        all_examples = re.findall(
+            r"^\s+(generated/examples/.*\.py)$", index, re.MULTILINE
+        )
         expected_count = sum(
             len(section["data"]) for section in json_data.values()
         )
         self.assertEqual(len(all_examples), expected_count)
         self.assertEqual(len(set(all_examples)), expected_count)
 
-        classification, multilabel, regression, multiannotator, stream = groups
+        def illustrated_examples(section):
+            return re.findall(
+                r"^\s+(generated/examples/.*\.py)$",
+                section_indexes[section],
+                re.MULTILINE,
+            )
+
+        classification = illustrated_examples("1-pool-classification")
+        regression = illustrated_examples("2-pool-regression")
+        stream = illustrated_examples("4-stream")
         # Broad capabilities must not duplicate a classification animation
         # under regression or multilabel. Keep the existing example URL.
         random = (
@@ -531,36 +538,61 @@ class TestExamples(unittest.TestCase):
             "plot-RandomSampling-Random_Sampling.py"
         )
         self.assertIn(random, classification)
-        self.assertNotIn(random, multilabel + regression)
+        self.assertNotIn(random, regression + stream)
         for cls in [
             "LabelCardinalityInconsistency",
             "MaxLossReductionMaxConfidence",
         ]:
             self.assertTrue(
-                any(f"/plot-{cls}-" in item for item in multilabel)
-            )
-            self.assertFalse(
                 any(f"/plot-{cls}-" in item for item in classification)
             )
         self.assertTrue(
             all("/2-pool-regression/" in item for item in regression)
         )
-        self.assertTrue(
-            all("/3-pool-multi-annotator/" in item for item in multiannotator)
+        self.assertEqual(
+            sum("/3-pool-multi-annotator/" in item for item in classification),
+            3,
         )
         self.assertTrue(all("/4-stream/" in item for item in stream))
         self.assertIn(
             "Strategy Overview </generated/strategy_overview>", index
         )
-        # Existing subgallery pages stay in the documentation navigation.
-        for section in json_data:
+        # Each example has exactly one task-page owner, independent of its
+        # physical source directory. The legacy annotation collection remains.
+        owned_documents = []
+        for section in [
+            "1-pool-classification",
+            "2-pool-regression",
+            "4-stream",
+        ]:
             self.assertIn(f"   {section}/index", index)
+            owned_documents.extend(
+                re.findall(
+                    r"^\s+(/generated/sphinx_gallery_examples/.*)$",
+                    section_indexes[section],
+                    re.MULTILINE,
+                )
+            )
+        self.assertEqual(len(owned_documents), expected_count)
+        self.assertEqual(len(set(owned_documents)), expected_count)
+        legacy = section_indexes["3-pool-multi-annotator"]
+        self.assertIn(":orphan:", legacy)
+        self.assertNotIn(".. toctree::", legacy)
+        self.assertNotIn("   3-pool-multi-annotator/index", index)
+        self.assertIn("Diverse · configured query size: 4 samples", index)
+        self.assertIn("configured query size: 3 sample–annotator pairs", index)
+        self.assertNotIn("configured query size:", section_indexes["4-stream"])
 
     def test_visualizations_reject_unhandled_setups(self):
         data = self._overview_example(
             "StreamRandomSampling", "Random", "Baseline", package="stream"
         )
         data["template"] = "examples/template_stream_regression.py"
+        data["example_setup"] = {
+            "task": "regression",
+            "target": "single-output",
+            "annotators": "single-annotator",
+        }
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, "No visualization group"):
                 generate_visualizations_rst(
@@ -568,6 +600,81 @@ class TestExamples(unittest.TestCase):
                     {"4-stream": {"data": [data]}},
                     examples_path="generated/examples",
                 )
+
+    def test_documentation_readme_links_keep_build_version(self):
+        readme = path.join(self.skaml_path, "README.rst")
+        with open(readme) as file:
+            original = file.read()
+        with tempfile.TemporaryDirectory() as directory:
+            destination = path.join(directory, "readme.rst")
+            generate_documentation_readme(readme, destination)
+            with open(destination) as file:
+                rendered = file.read()
+        self.assertNotIn("scikit-activeml.github.io/latest/", rendered)
+        self.assertIn("Strategy Overview", rendered)
+        self.assertIn("</generated/strategy_overview>`", rendered)
+        self.assertIn(
+            "</generated/tutorials/30_pool_multilabel_getting_started>`",
+            rendered,
+        )
+        self.assertIn(
+            ".. image:: /logos/scikit-activeml-query-strategy-overview.svg",
+            rendered,
+        )
+        self.assertIn(".. image:: /logos/readme_pool.gif", rendered)
+        self.assertIn(".. image:: /logos/readme_stream.gif", rendered)
+        with open(readme) as file:
+            self.assertEqual(file.read(), original)
+
+    def test_tutorial_documentation_links_in_colab_match_version(self):
+        for version in ["latest", "development", "1.0"]:
+            for colab in [False, True]:
+                with self.subTest(version=version, colab=colab):
+                    notebook = {
+                        "metadata": {},
+                        "cells": [
+                            {
+                                "cell_type": "markdown",
+                                "source": [
+                                    "[Targets](../../target_semantics.rst"
+                                    "#classification)\n",
+                                    "[Strategies](../strategy_overview.rst)\n",
+                                    "[Notebook]"
+                                    "(00_pool_getting_started.ipynb)",
+                                ],
+                            },
+                        ],
+                    }
+                    with tempfile.TemporaryDirectory() as directory:
+                        filename = path.join(directory, "example.ipynb")
+                        with open(filename, "w") as file:
+                            json.dump(notebook, file)
+                        post_process_tutorials(
+                            directory,
+                            "generated/tutorials_colab",
+                            show_installation_code=colab,
+                            version=version,
+                        )
+                        with open(filename) as file:
+                            source = "".join(
+                                json.load(file)["cells"][0]["source"]
+                            )
+                    prefix = f"https://scikit-activeml.github.io/{version}/"
+                    targets = (
+                        prefix + "target_semantics.html#classification"
+                        if colab
+                        else "../../target_semantics.rst#classification"
+                    )
+                    strategies = (
+                        prefix + "generated/strategy_overview.html"
+                        if colab
+                        else "../strategy_overview.rst"
+                    )
+                    self.assertIn(f"[Targets]({targets})", source)
+                    self.assertIn(f"[Strategies]({strategies})", source)
+                    self.assertIn(
+                        "[Notebook](00_pool_getting_started.ipynb)", source
+                    )
 
 
 class Dummy:

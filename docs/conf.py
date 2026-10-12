@@ -12,6 +12,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import json
 import os
 import sys
 
@@ -25,6 +26,7 @@ from docs.generate import (
     generate_api_reference_rst,
     generate_examples,
     generate_visualizations_rst,
+    generate_documentation_readme,
     generate_tutorials,
     generate_switcher,
     get_skactiveml_methods,
@@ -97,6 +99,34 @@ nitpick_ignore = [
 
 # nbsphinx_execute = 'always'
 nbsphinx_execute = "never"
+
+# Use CDN modules directly and give the bundled modules their real asset URL.
+_widget_bundle = (
+    "https://cdn.jsdelivr.net/npm/"
+    "@jupyter-widgets/html-manager@1.0.15/dist/embed-amd"
+)
+_widget_modules = (
+    "@jupyter-widgets/base",
+    "@jupyter-widgets/controls",
+    "@jupyter-widgets/base7",
+    "@jupyter-widgets/controls7",
+    "@jupyter-widgets/html-manager",
+    "@jupyter-widgets/html-manager/dist/libembed-amd",
+)
+nbsphinx_widgets_path = _widget_bundle + ".js"
+nbsphinx_widgets_options = {"data-jupyter-widgets-cdn-only": ""}
+nbsphinx_requirejs_options = {
+    "onload": "require.config("
+    + json.dumps({"paths": dict.fromkeys(_widget_modules, _widget_bundle)})
+    + ");"
+}
+
+# Saved widget descriptions use the MathJax 2 typesetting interface.
+mathjax_path = (
+    "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js"
+    "?config=TeX-AMS-MML_HTMLorMML"
+)
+mathjax2_config = {}
 
 # Napoleon settings
 napoleon_numpy_docstring = True
@@ -184,6 +214,7 @@ os.makedirs(
 # a list of builtin themes.
 #
 html_theme = "pydata_sphinx_theme"
+html_context = {"default_mode": "auto"}
 
 html_logo = "logos/scikit-activeml-logo.png"
 
@@ -220,7 +251,7 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-html_css_files = ["strategy_filters.css"]
+html_css_files = ["strategy_filters.css", "notebooks.css", "visualizations.css"]
 
 html_js_files = [
     "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js",
@@ -308,6 +339,9 @@ copy_gallery_notebooks_dst_path = "generated/sphinx_gallery_notebooks/"
 
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
+generate_documentation_readme("../README.rst", "generated/readme.rst")
+exclude_patterns.append("generated/readme.rst")
+
 json_data = generate_examples(
     gen_path="generated/examples/",
     json_path="examples/",
@@ -356,6 +390,8 @@ def expand_visualization_contents(
 ):
     """Keep all example setups reachable from the gallery's contents panel."""
     if pagename == "generated/sphinx_gallery_examples/index":
+        context["theme_show_toc_level"] = 3
+    elif pagename == "generated/sphinx_gallery_examples/1-pool-classification/index":
         context["theme_show_toc_level"] = 2
 
 

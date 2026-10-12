@@ -56,12 +56,13 @@ artists = []
 
 # Active learning cycle:
 n_cycles = "$n_cycles|20"
+batch_size = "$batch_size|1"
 for c in range(n_cycles):
     # Fit the classifier with current labels.
     clf.fit(X, y)
 
     # Query the next sample(s).
-    query_idx = qs.query("$query_params")
+    query_idx = qs.query("$query_params", batch_size=batch_size)
 
     # Capture the current plot state.
     coll_old = list(ax.collections)
@@ -82,6 +83,7 @@ for c in range(n_cycles):
         qs,
         "$query_params",
         "$plot_utility_params|candidates=None",
+        batch_size=batch_size,
         res="$res|25",
         feature_bound=feature_bound,
         ax=ax,

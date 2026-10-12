@@ -8,12 +8,12 @@ learning framework `scikit-learn <https://scikit-learn.org/stable/>`__.
 Overview
 --------
 
-Our philosophy is to extend the ``sklearn`` ecosystem with the most relevant
+Our philosophy is to extend the scikit-learn ecosystem with the most relevant
 query strategies for active learning and to implement tools for working with
 partially unlabeled data. An overview of our repository's structure is provided
 in the image below. Each node represents a class or interface, and the arrows
 illustrate the inheritance hierarchy among them. Dashed nodes indicate
-functionality that is not yet available in our library. `scikit-learn`
+functionality that is not yet available in our library. scikit-learn
 is used in this image for identification only and does not imply endorsement.
 
 .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
@@ -64,12 +64,12 @@ There are several ways to create a local Python environment, such as
 `virtualenv <https://www.google.com/search?client=safari&rls=en&q=virtualenv&ie=UTF-8&oe=UTF-8>`__,
 `pipenv <https://pipenv.pypa.io/en/latest/>`__, or
 `miniconda <https://docs.conda.io/en/latest/miniconda.html>`__. One possible
-workflow is to install ``miniconda`` and use it to create a Python environment.
+workflow is to install miniconda and use it to create a Python environment.
 
 Example with miniconda
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Create a new Python environment named **scikit-activeml**:
+Create a new Python environment named ``scikit-activeml``:
 
 .. code:: bash
 
@@ -81,7 +81,7 @@ To ensure that the correct environment is active:
 
    conda activate scikit-activeml
 
-Then install ``pip``:
+Then install pip:
 
 .. code:: bash
 
@@ -118,17 +118,17 @@ environment, you can additionally use:
 
 As in the README, the ``opt`` extra does **not** install PyTorch automatically.
 Please install the appropriate PyTorch build separately for your hardware and
-CUDA setup if your contribution depends on ``torch``/``skorch`` features.
-If your contribution uses ``capymoa``, you also need a Java runtime. One
-simple option with ``conda`` is:
+CUDA setup if your contribution depends on PyTorch/skorch features.
+If your contribution uses CapyMOA, you also need a Java runtime. One
+simple option with conda is:
 
 .. code:: bash
 
    conda install conda-forge::openjdk
 
-After the pip installation is successful, you must install ``pandoc`` and
-``ghostscript``, and ``ffmpeg`` if they are not already installed. For example,
-via ``conda`` you can do this as follows:
+After the pip installation is successful, you must install pandoc and
+ghostscript, and ffmpeg if they are not already installed. For example,
+via conda you can do this as follows:
 
 .. code:: bash
 
@@ -421,7 +421,7 @@ For typical class parameters we use standard names:
 +==============================+==========================================+
 | ``random_state``             | Integer that acts as random seed         |
 |                              | or ``np.random.RandomState`` like        |
-|                              | sklearn.                                 |
+|                              | scikit-learn.                            |
 +------------------------------+------------------------------------------+
 | ``budget``                   | The share of labels that the strategy is |
 |                              | allowed to query.                        |
@@ -593,7 +593,7 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | ``random_state``                  | Integer that acts as random seed  |
 |                                   | or ``np.random.RandomState`` like |
-|                                   | sklearn                           |
+|                                   | scikit-learn                      |
 +-----------------------------------+-----------------------------------+
 
 .. _query-by-utilities-1:
@@ -1181,12 +1181,13 @@ Examples
 
 Two of our main goals are to make active learning more understandable and
 improve our framework's usability. Therefore, we require an example for each
-query strategy. Add a JSON file to the appropriate scenario directory under
-``docs/examples/``. Each scenario directory must contain a ``README.rst``;
+query strategy. Add a JSON file to an existing example directory under
+``docs/examples/``. Each directory must contain a ``README.rst``;
 the documentation generator recursively scans these directories and creates
-the example pages, notebooks, and strategy overview. Current directories cover
-pool classification, pool regression, multi-annotator pool, and stream
-examples.
+the example pages, notebooks, and strategy overview. Existing directory names
+are retained for stable published paths. Reader-facing groups use Pool or
+Stream, then Classification or Regression. Target and annotator settings are
+described separately for each demonstrated setup.
 
 Each JSON file contains a list of example entries with the following fields:
 
@@ -1203,7 +1204,7 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | Informativeness, Representativeness, Hybrid, Baseline,   |
 |                  | and Wrapper.                                             |
 +------------------+----------------------------------------------------------+
-| ``template``     | Defines the general setup/setting of the example.        |
+| ``template``     | Selects the rendering code for the example.              |
 |                  | Supported templates include:                             |
 |                  | ``examples/template_pool.py``,                           |
 |                  | ``examples/template_pool_multilabel.py``,                |
@@ -1215,6 +1216,14 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | documented method variant. Tags include ``pool``,        |
 |                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
 |                  | ``classification``, ``multi-label``, and ``regression``. |
++------------------+----------------------------------------------------------+
+| ``example_setup``| The actual task, target, and annotator setting shown.    |
+|                  | Pool examples also specify the demonstrated selection    |
+|                  | rule. See the field values below.                        |
++------------------+----------------------------------------------------------+
+| ``batch_size``   | Pool query batch size, stored as a string, e.g., ``"3"``.|
+|                  | Shared by the executable example and its setup caption.  |
+|                  | Omit for native stream examples.                         |
 +------------------+----------------------------------------------------------+
 | ``title``        | Title of the example, usually named after the query      |
 |                  | strategy.                                                |
@@ -1255,11 +1264,47 @@ Each JSON file contains a list of example entries with the following fields:
 The strategy overview obtains complete task, target, and annotator combinations
 from the class's ``_target_capabilities``. The ``tags`` restrict these to the
 documented method variant. They describe supported use cases. The ``template``
-field describes the setup illustrated by the linked example. For variants whose
-constructor parameters change their capabilities, add ``capability_params``
+field selects the rendering code; ``example_setup`` describes the setup
+actually illustrated by the demonstration. For variants whose constructor
+parameters change their capabilities, add ``capability_params``
 with those parameters as a JSON object, for example
 ``{"method": "expected_average_precision"}``. These parameters are used for
 capability inspection, independently of the example code in ``init_qs``.
+
+Each ``example_setup`` is a small JSON object using these fields:
+
+* ``task``: ``"classification"`` or ``"regression"``.
+* ``target``: ``"single-output"`` or ``"multi-label"``.
+* ``annotators``: ``"single-annotator"`` or ``"multi-annotator"``.
+* ``selection`` for pool examples: ``"top-k-batch"``, ``"diverse-batch"``,
+  ``"random-batch"``, or ``"single-sample"`` for the selection rule actually
+  demonstrated. Omit this field for native stream examples.
+
+For example, a pool demonstration of diverse multi-label selection uses:
+
+.. code-block:: json
+
+   {
+       "example_setup": {
+           "task": "classification",
+           "target": "multi-label",
+           "annotators": "single-annotator",
+           "selection": "diverse-batch"
+       },
+       "batch_size": "1"
+   }
+
+Keep these values consistent with the template, estimator, and query arguments.
+The pool ``batch_size`` is used for execution and the displayed batch count;
+do not maintain a separate caption count. It counts selected samples for a
+single annotator, including complete multi-label vectors, or sample–annotator
+pairs for multiple annotators. If a demonstration collects stream arrivals
+before querying a pool strategy, distinguish its arrival batch size from the
+number of acquired samples. Native stream examples describe their budget and
+update workflow and omit pool selection and batch-size metadata.
+Choose a count compatible with the selected template's plotting layout.
+For example, the ordinary and multi-label pool templates show one acquisition
+per cycle, while the classification batch template shows four.
 
 Pool entries must specify their batching behavior using ``top-k-batch``,
 ``diverse-batch``, or ``random-batch``. Use ``single-sample`` for an entry
@@ -1269,14 +1314,15 @@ explains qualifications such as random selection within tree leaves.
 The overview marks generic pool wrappers' target support as dependent on the
 wrapped strategy. The sub-sampling wrapper also inherits its batching rule.
 
-The visualization landing page groups examples by the setup demonstrated by
-their ``template``, independently of the capabilities listed in ``tags``.
-For example, an entry using ``template_pool.py`` belongs to single-output
-classification even if its strategy also supports regression or multi-label
-targets. ``template_pool_multilabel.py`` places an example in the multi-label
-group. The layout lives in ``docs/_templates/visualizations.rst.jinja``. Its
-mini-galleries use the existing generated scripts and keep example URLs
-stable. Sphinx-Gallery sorts cards by their displayed example titles.
+The visualization landing page groups examples using ``example_setup``,
+independently of the capabilities listed in ``tags``. An example with
+``target="single-output"`` remains a single-output demonstration even if its
+strategy also supports multi-label targets. The strategy overview describes
+supported capabilities and links to the API class page, whose gallery lists
+every associated demonstration. The layout lives in
+``docs/_templates/visualizations.rst.jinja``. Its mini-galleries use the
+existing generated scripts and keep example URLs stable. Cards are sorted
+alphabetically by their displayed example titles within each task block.
 
 Testing and Code Coverage
 -------------------------
@@ -1287,9 +1333,95 @@ viewed `here <https://app.codecov.io/gh/scikit-activeml/scikit-activeml>`__.
 Documentation
 -------------
 
-Guidelines for writing documentation in ``scikit-activeml`` adopt the
+Guidelines for writing documentation in scikit-activeml adopt the
 `scikit-learn guidelines <https://scikit-learn.org/stable/developers/contributing.html#guidelines-for-writing-documentation>`__
 used by scikit-learn.
+
+Use Pool and Stream for sample availability and Classification and Regression
+for the prediction task. Use single-output and multi-label for target types,
+and single-annotator and multi-annotator for annotation settings. A target or
+annotator setting qualifies a task; it is not another prediction task. Use
+``multi-label`` and ``multi-annotator`` in prose and headings. Preserve literal
+Python identifiers and package names such as ``multilabel`` and
+``multiannotator``.
+
+Use Sphinx ``:doc:`` and ``:ref:`` links within the documentation so readers
+stay in the version they are browsing. Notebook links to project
+documentation use relative document-source paths, such as
+``../../target_semantics.rst``. Sphinx renders them as HTML links; Colab copies
+resolve them to HTML URLs for their documentation version. Preserve public page
+paths, notebook/example filenames, and section fragments. When changing a heading,
+retain its previous fragment using an explicit target. Tutorials keep a direct
+hidden toctree for their notebooks, and example navigation retains its existing
+generated URLs.
+
+In-depth Tutorial Design
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tutorial notebooks help a machine learning audience design experiments and
+annotation workflows with scikit-activeml. They demonstrate the framework's
+capabilities through concise, adaptable code. Assume familiarity with Python,
+NumPy, supervised learning, and the scikit-learn estimator interface. Explain
+active learning concepts where they help readers use the framework.
+
+Use a flexible layout suited to one scenario or study question:
+
+* **Opening:** briefly state the goal, the capabilities demonstrated, and
+  expected knowledge. The reader-facing roadmap belongs in ``tutorials.rst``.
+* **Main example:** keep classifier and strategy construction, querying,
+  annotation, fitting, and relevant evaluation easy to locate and adapt.
+  Explain framework-specific choices beside their use. Include necessary
+  support code within the notebook, grouping longer helpers before the
+  relevant workflow. Put experiment settings together and method parameters
+  beside their construction. Use explicit variations or straightforward
+  comparison loops rather than a general experiment runner.
+* **Outlook:** briefly suggest useful adaptations and selected next steps.
+
+Results should serve the notebook's goal. A workflow demonstration may use
+qualitative outputs; a comparative study needs appropriate evidence and a
+brief explanation of its particular evaluation protocol. Interpret results
+within that experiment's scope. Equations, reference sections, quantitative
+comparisons, and summary tables are not required elements.
+
+For published studies, save the reference outputs with the configuration
+that produced them. Expensive notebooks default to ``QUICK_RUN=False`` and
+offer cheaper execution through ``QUICK_RUN=True``. Keep their strategy lists
+visible so readers can comment out methods. Simpler notebooks use ordinary
+editable settings. Preserve each substantive comparison and interface
+variation in the saved results, and explain that changed settings produce
+different outputs. Keep installation guidance short. Activate cuML before
+estimator imports where used. Use throttled progress displays, with elapsed
+time confined to those displays. Keep environment inventories, stage timings,
+and validation code outside the notebook. Use a simple setup warning filter
+to keep example output focused.
+
+Use small, self-contained plotting settings: 11-point axes and ticks,
+12-point titles, and 10-point legends. Where colors identify query strategies,
+use gray for random sampling and blue for uncertainty sampling. Use complete
+legends and layouts suited to the scenario and documentation width. Keep class
+colors consistent across scatter plots. Let metric-axis limits follow the
+displayed curves and bands with modest padding. For repeated learning curves,
+use light bands showing one sample standard deviation (``ddof=1``); single
+runs need no variation bands. Numerical legend summaries can replace separate
+score tables. State what those values average and avoid repeating them in
+printed output. Label counts according to what was acquired, distinguishing
+samples, multi-label rows, repeated annotations, and stream arrivals. Explain
+whether initial labels are included. Inspect the published rendering for
+clipping and overlap.
+
+Save annotation widget state when it reliably renders in the built HTML.
+Check it in a clean browser without a kernel, including refresh, model/output
+buffers, assets, and rendering errors. If embedding fails, capture an accurate
+screenshot of the current interface. Caption the actual recorded state and
+explain that callbacks require a live notebook. Check callback behavior
+separately from unattended execution.
+
+Before publishing executable changes that affect results or saved outputs,
+run the published configuration from a fresh kernel. Check notebook validity,
+code/output consistency, and rendered figures outside the tutorial. Use
+smaller configurations during development and proportionate checks for prose
+changes. Sphinx builds display saved tutorial outputs; they do not execute
+these notebooks.
 
 Building the Documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1309,7 +1441,7 @@ Issue Tracking
 
 We use `GitHub Issues <https://github.com/scikit-activeml/scikit-activeml/issues>`__
 as our issue tracker. If you believe you have found a bug in
-``scikit-activeml``, please report it there. Documentation bugs can also be reported.
+scikit-activeml, please report it there. Documentation bugs can also be reported.
 
 Checking If a Bug Already Exists
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

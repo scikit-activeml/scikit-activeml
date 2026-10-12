@@ -71,6 +71,7 @@ artists = []
 
 # The active learning cycle:
 n_cycles = "$n_cycles|20"
+batch_size = "$batch_size|1"
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
@@ -82,7 +83,12 @@ for c in range(n_cycles):
     if not switching_point:
         # DWUS
         query_idx, utils = qs.query(
-            X=X, y=y, clf=clf, utility_weight=density, return_utilities=True
+            X=X,
+            y=y,
+            clf=clf,
+            utility_weight=density,
+            batch_size=batch_size,
+            return_utilities=True,
         )
         utilities = utils[0]
         switching_point = utilities[query_idx[0]] - u_max < delta
@@ -90,10 +96,12 @@ for c in range(n_cycles):
         strategy = "DWUS"
     else:
         # DWUS + US
-        utils_US = qs.query(X=X, y=y, clf=clf, return_utilities=True)[1][0]
+        utils_US = qs.query(
+            X=X, y=y, clf=clf, batch_size=batch_size, return_utilities=True
+        )[1][0]
         err = np.nanmean(utils_US)
         utilities = (1 - err) * utils_US + err * density
-        query_idx = simple_batch(utilities, random_state)
+        query_idx = simple_batch(utilities, random_state, batch_size=batch_size)
         strategy = "DWUS + US"
 
     # Plot the labeled data.

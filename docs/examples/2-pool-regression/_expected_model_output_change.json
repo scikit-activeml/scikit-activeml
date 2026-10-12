@@ -6,6 +6,13 @@
     "method" : "Expected Model Output Change",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Expected Model Output Change",
     "refs" : ["kading2018active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

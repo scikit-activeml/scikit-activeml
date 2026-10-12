@@ -6,6 +6,13 @@
     "method" : "Regression based Kullback Leibler Divergence Maximization",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Regression Based Kullback Leibler Divergence Maximization",
     "refs" : ["elreedy2019novel"],
     "sequence" : ["title", "text_0", "plot", "refs"],

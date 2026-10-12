@@ -188,27 +188,28 @@ def get_strategy_metadata(data):
     }
 
 
-EXAMPLE_SETUP_LABELS = {
-    "pool-classification": "single-output classification",
-    "pool-multilabel": "multi-label classification",
-    "pool-regression": "regression",
-    "pool-multi-annotator": "classification with multiple annotators",
-    "stream-classification": "single-output classification",
-}
+EXAMPLE_GROUPS = (
+    "pool-classification",
+    "pool-classification-batch",
+    "pool-multilabel",
+    "pool-regression",
+    "pool-multi-annotator",
+    "stream-classification",
+)
 
 
 def _example_setup(data):
     """Identify the demonstrated setup, independently of supported tasks."""
-    template = Path(data.get("template", "")).stem
-    if not template:
-        return None
+    demonstrated = data["example_setup"]
     scenario = data["package"].split(".")[0]
-    if "regression" in template:
+    if demonstrated["task"] == "regression":
         setup = "regression"
-    elif "multilabel" in template:
+    elif demonstrated["target"] == "multi-label":
         setup = "multilabel"
-    elif "multi_annotator" in template:
+    elif demonstrated["annotators"] == "multi-annotator":
         setup = "multi-annotator"
+    elif scenario == "pool" and int(data["batch_size"]) > 1:
+        setup = "classification-batch"
     else:
         setup = "classification"
     return f"{scenario}-{setup}"
@@ -222,12 +223,11 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
     reference the scripts below ``examples_path`` (relative to the Sphinx
     source directory), retaining existing example URLs and thumbnails.
     """
-    examples = {setup: [] for setup in EXAMPLE_SETUP_LABELS}
-    sections = []
+    examples = {setup: [] for setup in EXAMPLE_GROUPS}
+    documents = {setup: [] for setup in examples}
     for section, contents in json_data.items():
         if not contents["data"]:
             continue
-        sections.append(section)
         for data in contents["data"]:
             setup = _example_setup(data)
             if setup not in examples:
@@ -237,9 +237,60 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
             filename = (
                 f"plot-{data['class']}-{data['method'].replace(' ', '_')}.py"
             )
+            caption = ""
+            if data["package"].split(".")[0] == "pool":
+                rule = OVERVIEW_BATCH_LABELS[
+                    data["example_setup"]["selection"]
+                ].removesuffix(" batch")
+                count = int(data["batch_size"])
+                unit = (
+                    "sample–annotator pair"
+                    if data["example_setup"]["annotators"] == "multi-annotator"
+                    else "sample"
+                )
+                if count != 1:
+                    unit += "s"
+                caption = f"{rule} · configured query size: {count} {unit}"
             examples[setup].append(
-                (Path(examples_path) / section / filename).as_posix()
+                {
+                    "path": (
+                        Path(examples_path) / section / filename
+                    ).as_posix(),
+                    "caption": caption,
+                    "method": data.get("title", data["method"]),
+                }
             )
+            documents[setup].append(
+                (
+                    data.get("title", data["method"]),
+                    f"/generated/sphinx_gallery_examples/{section}/{filename[:-3]}",
+                )
+            )
+
+    for group in examples.values():
+        group.sort(key=lambda example: example["method"].casefold())
+    # Source directories and leaf URLs stay fixed. Only these task pages own
+    # example toctrees; the legacy multi-annotator page remains a collection.
+    section_groups = OrderedDict(
+        [
+            (
+                "1-pool-classification",
+                [
+                    "pool-classification",
+                    "pool-classification-batch",
+                    "pool-multilabel",
+                    "pool-multi-annotator",
+                ],
+            ),
+            ("2-pool-regression", ["pool-regression"]),
+            ("4-stream", ["stream-classification"]),
+        ]
+    )
+    sections = [
+        section
+        for section, groups in section_groups.items()
+        if any(examples[group] for group in groups)
+    ]
 
     docs_path = Path(__file__).parent
     environment = Environment(
@@ -250,11 +301,32 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
     rendered = environment.get_template("visualizations.rst.jinja").render(
         intro=(docs_path / "examples" / "README.rst").read_text(),
         examples=examples,
-        sections=sorted(sections),
+        sections=sections,
     )
     destination = Path(gen_path) / "index.rst"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(rendered)
+
+    section_template = environment.get_template(
+        "visualization_section.rst.jinja"
+    )
+    for section in [*sections, "3-pool-multi-annotator"]:
+        owned_documents = [
+            document
+            for group in section_groups.get(section, [])
+            for _, document in sorted(
+                documents[group], key=lambda item: item[0].casefold()
+            )
+        ]
+        destination = Path(gen_path) / section / "index.rst"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            section_template.render(
+                section=section,
+                examples=examples,
+                documents=owned_documents,
+            )
+        )
 
 
 def _format_generated_python_script(file_path, line_length=79):
@@ -265,6 +337,41 @@ def _format_generated_python_script(file_path, line_length=79):
         mode=black.Mode(line_length=line_length),
         write_back=black.WriteBack.YES,
     )
+
+
+def generate_documentation_readme(src_path, dst_path):
+    """Make the README inclusions use this documentation build's pages.
+
+    The standalone README continues to link to the latest published docs.
+    Sphinx document links in this generated copy resolve within the current
+    build, including when served below a numbered version prefix.
+    """
+    content = Path(src_path).read_text()
+
+    def document_link(match):
+        label = " ".join(match[1].split())
+        document = "".join(match[2].split())
+        if document.endswith(".html"):
+            document = document[:-5]
+        return f":doc:`{label} </{document}>`"
+
+    content = re.sub(
+        r"`([^`]+?)\s*<https://scikit-activeml\s*\.github\.io/latest/([^>]+)>`_",
+        document_link,
+        content,
+    )
+    content = content.replace(
+        ":target: https://scikit-activeml.github.io/latest/",
+        ":target: index.html",
+    )
+    content = content.replace(
+        "https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/"
+        "refs/heads/development/docs/logos/",
+        "/logos/",
+    )
+    destination = Path(dst_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(content)
 
 
 def generate_api_reference_rst(gen_path):
@@ -471,10 +578,11 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "Stream strategies decide which arriving samples to label "
             "within a **budget**.\n\n"
             "Each table entry is a method, variant, or wrapped configuration. "
-            "Filters describe the setups that entry supports. The linked "
-            "visualization illustrates the example setup noted below its "
-            "method name. API class names link to the implementation "
-            "documentation.\n"
+            "Filters describe the setups that entry supports. API class "
+            "names link to the implementation documentation and its gallery "
+            "of examples using that class. The "
+            ":doc:`Visualizations </generated/sphinx_gallery_examples/index>` "
+            "catalogue groups examples by the setup they demonstrate.\n"
         )
         file.write("\n")
         file.write(
@@ -543,7 +651,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
 
 def json_data_to_strategy_table(json_data, gen_path):
-    """Collect one table per scenario while preserving example links."""
+    """Collect one capability table per acquisition scenario."""
     rows_by_scenario = {scenario: [] for scenario in OVERVIEW_SCENARIOS}
     # The hidden third column carries complete setups for browser filtering.
     head_line = [
@@ -571,14 +679,7 @@ def json_data_to_strategy_table(json_data, gen_path):
             package = skactiveml
             for subpackage in data["package"].split("."):
                 package = getattr(package, subpackage)
-            methods_text = (
-                f":doc:`{method_label} </generated/sphinx_gallery_examples/"
-                f"{section_name}/plot-{qs_name}-"
-                f'{method.replace(" ", "_")}>`'
-            )
-            example_label = EXAMPLE_SETUP_LABELS.get(_example_setup(data), "")
-            if example_label:
-                methods_text += f"\n\n*Example: {example_label}.*"
+            methods_text = method_label
             strategy_text = (
                 f":doc:`{qs_name} </{rel_api_path}/"
                 f"{package.__name__}.{qs_name}>`"
@@ -1266,6 +1367,37 @@ def post_process_tutorials(
                 version,
             )
             if show_installation_code:
+                # Sphinx resolves document-source links in rendered notebooks.
+                # Colab needs absolute, version-specific HTML destinations.
+                notebook = json.loads(processed_file_content)
+                for cell in notebook["cells"]:
+                    if cell["cell_type"] != "markdown":
+                        continue
+                    source = cell["source"]
+                    lines = [source] if isinstance(source, str) else source
+
+                    def documentation_link(match):
+                        page = os.path.normpath(
+                            os.path.join("generated/tutorials", match[1])
+                        ).replace(os.sep, "/")
+                        page = re.sub(r"\.rst(?=#|$)", ".html", page)
+                        return (
+                            "](https://scikit-activeml.github.io/"
+                            f"{version}/{page})"
+                        )
+
+                    lines = [
+                        re.sub(
+                            r"\]\((\.\./(?:\.\./)?[^\s)]+\.(?:rst|html)(?:#[^\s)]+)?)\)",
+                            documentation_link,
+                            line,
+                        )
+                        for line in lines
+                    ]
+                    cell["source"] = (
+                        lines[0] if isinstance(source, str) else lines
+                    )
+                processed_file_content = json.dumps(notebook)
                 processed_file_content = uncomment_installation_code(
                     processed_file_content
                 )

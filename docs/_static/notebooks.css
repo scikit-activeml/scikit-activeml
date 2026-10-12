@@ -1,0 +1,6 @@
+/* nbsphinx sets an inline height for retina PNGs. Preserve their proportions
+   when the page constrains their width. */
+.nboutput .output_area img {
+    max-width: 100%;
+    height: auto !important;
+}

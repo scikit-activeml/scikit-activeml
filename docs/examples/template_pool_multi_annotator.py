@@ -74,6 +74,7 @@ artists = []
 
 # Active learning cycle:
 n_cycles = "$n_cycles|20"
+batch_size = "$batch_size|3"
 for c in range(n_cycles):
     # Fit the classifier with the majority votes of the current labels.
     y_mv = majority_vote(y, missing_label=MISSING_LABEL, random_state=0)
@@ -100,7 +101,7 @@ for c in range(n_cycles):
     ) / np.sum(is_labeled(y, missing_label=MISSING_LABEL)[:, has_labels], axis=0)
 
     # Query the next sample(s).
-    query_idx = qs.query("$query_params")
+    query_idx = qs.query("$query_params", batch_size=batch_size)
 
     # Capture the current plot state.
     coll_old = list(ax1.collections) + list(ax2.collections)
@@ -122,7 +123,10 @@ for c in range(n_cycles):
     # axes = plot_annotator_utilities(ma_qs, X=X, y=y, clf=clf, axes=axes, feature_bound=bound)
     X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, 25)
     _, utilities = qs.query(
-        "$query_params", return_utilities=True, candidates=mesh_samples
+        "$query_params",
+        batch_size=batch_size,
+        return_utilities=True,
+        candidates=mesh_samples,
     )
     ax1.contourf(
         X_mesh,

@@ -73,7 +73,7 @@ Unlabeled data is represented by the value :code:`missing_label` in the
 label vector :code:`y_train`. Note that the packages `torch <https://pytorch.org/>`_,
 `sentence_transformers <https://www.sbert.net/>`_, and `datasets
 <https://huggingface.co/docs/datasets/en/quickstart>`_ are not included in the
-default :code:`skactiveml` installation and must be installed separately. You
+default scikit-activeml installation and must be installed separately. You
 can do this via:
 
 .. code-block:: bash
@@ -82,7 +82,7 @@ can do this via:
    pip install -U 'scikit-activeml[opt]' datasets sentence-transformers
 
 Note that you might need to adjust this command for GPU support with
-:code:`torch`.
+PyTorch.
 
 .. code-block:: python
 
@@ -211,7 +211,7 @@ stream. Unlabeled data is represented by the value :code:`missing_label` in
 the label vector :code:`y_train`. Note that the packages `torch <https://pytorch.org/>`_,
 `transformers <https://huggingface.co/docs/transformers/en/quicktour>`_, and `datasets
 <https://huggingface.co/docs/datasets/en/quickstart>`_ are not included in the
-default :code:`skactiveml` installation and must be installed separately.
+default scikit-activeml installation and must be installed separately.
 
 .. code-block:: bash
 
@@ -219,7 +219,7 @@ default :code:`skactiveml` installation and must be installed separately.
    pip install -U 'scikit-activeml[opt]' datasets transformers
 
 Note that you might need to adjust this command for GPU support with
-:code:`torch`.
+PyTorch.
 
 .. code-block:: python
 
@@ -337,11 +337,11 @@ optional dependencies for better support of **deep active learning**:
 
    pip install -U 'scikit-activeml[opt]'
 
-The ``opt`` installs additional packages such as ``skorch`` to enable
+The ``opt`` installs additional packages such as skorch to enable
 more sophisticated deep learning support.
 Version constraints are chosen to be reasonably flexible so that scikit-activeml
 can integrate well into an existing environment. The optional deep learning functionality
-(via ``skorch``) assumes that ``torch`` (PyTorch) is already installed in
+(via skorch) assumes that PyTorch is already installed in
 your environment. Since the correct PyTorch build depends on your hardware
 and CUDA setup, we do **not** install PyTorch automatically.
 
@@ -403,7 +403,7 @@ tested core dependencies via:
 For better orientation, we provide an `overview <https://scikit-activeml
 .github.io/latest/generated/strategy_overview.html>`_
 (including paper references and `visual examples <https://scikit-activeml.github.io/latest/generated/sphinx_gallery_examples/index.html>`_)
-of the over **60 query strategies** implemented by ``skactiveml``. The
+of the over **60 query strategies** implemented by scikit-activeml. The
 following mind map illustrates different attributes of a query strategy.
 
 .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/scikit-activeml-query-strategy-overview.svg
@@ -432,28 +432,28 @@ modality, and models used in the tutorial.
      - Task
      - Data
      - Model
-   * - `Deep Active Learning for Fine-tuning Vision Transformers <https://scikit-activeml.github.io/latest/generated/tutorials/01_deep_pool_al_with_skorch>`_
+   * - `Deep Active Learning by Fine-tuning DINOv2 <https://scikit-activeml.github.io/latest/generated/tutorials/01_deep_pool_al_with_skorch.html>`_
      - Pool
      - Classification
      - Image
-     - - DINOv2 Vision Transformer with Full Fine-tuning
-   * - `Pool-based Multilabel Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/30_pool_multilabel_getting_started>`_
+     - - DINOv2 with a trainable backbone and classification head
+   * - `Pool-based Multilabel Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/30_pool_multilabel_getting_started.html>`_
      - Pool
      - Multilabel Classification
      - Audio
-     - - Perchv2 Embeddings with Multi-layer Perceptron Probing
-   * - `Advanced Active Learning for Regression Tasks <https://scikit-activeml.github.io/latest/generated/tutorials/07_pool_advanced_regression>`_
+     - - Perch v2 embeddings and an MLP
+   * - `Advanced Pool-based Active Learning for Regression <https://scikit-activeml.github.io/latest/generated/tutorials/07_pool_advanced_regression.html>`_
      - Pool
      - Regression
      - Tabular
-     - - Extreme Gradient Boosted Tree
-       - Multi-layer Perceptron
-       - Random Forest
-   * - `Stream-based Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/20_stream_getting_started>`_
+     - - Gradient-boosted trees (XGBoost)
+       - MLP
+       - Random forest
+   * - `Stream-based Active Learning with scikit-learn, River, and CapyMOA <https://scikit-activeml.github.io/latest/generated/tutorials/20_stream_getting_started.html>`_
      - Stream
      - Classification
      - Text
-     - - SentenceTransformers embeddings with classifiers from scikit-learn, River, CapyMOA
+     - - SentenceTransformer embeddings with scikit-learn, River, and CapyMOA classifiers
 
 .. examples_end
 
@@ -461,7 +461,7 @@ modality, and models used in the tutorial.
 
 📝 Citing
 ---------
-If you use ``skactiveml`` in your research or projects, please cite the
+If you use scikit-activeml in your research or projects, please cite the
 following work and consider starring the repository to help others discover it:
 
 .. code-block:: bibtex

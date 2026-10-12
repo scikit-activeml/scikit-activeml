@@ -62,13 +62,14 @@ artists = [[] for j in range("$n_cycles|5")]
 
 # Active learning cycle.
 n_cycles = "$n_cycles|5"
+batch_size = "$batch_size|4"
 for c in range(n_cycles):
     # Train the classifier with the current labels.
     clf.fit(X, y)
 
     # Query the next batch of samples; retrieve both indices and utility values.
     query_idx, utilities = qs.query(
-        "$query_params", batch_size=4, return_utilities=True
+        "$query_params", batch_size=batch_size, return_utilities=True
     )
 
     title = fig.text(

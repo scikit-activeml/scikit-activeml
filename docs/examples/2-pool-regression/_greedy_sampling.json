@@ -6,6 +6,13 @@
     "category" :  "Representativeness",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "classification", "single-annotator", "multi-label", "diverse-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "1",
     "title" : "Greedy Sampling on the Feature Space (GSx)",
     "refs" : ["wu2019active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -21,6 +28,13 @@
     "category" :  "Representativeness",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "1",
     "title" : "Greedy Sampling on the Target Space (GSy)",
     "refs" : ["wu2019active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -36,6 +50,13 @@
     "category" :  "Representativeness",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "1",
     "title" : "Improved Greedy Sampling (GSi)",
     "refs" : ["wu2019active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

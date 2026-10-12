@@ -1,0 +1,43 @@
+{% from "visualization_macros.rst.jinja" import heading, pool_classification, pool_regression, stream_classification, multiple_annotators %}
+{% if section == "3-pool-multi-annotator" %}
+:orphan:
+
+{% endif %}
+.. _sphx_glr_generated_sphinx_gallery_examples_{{ section }}:
+
+{% if section == "1-pool-classification" %}
+{{ heading("Pool-based Active Learning: Classification", "=") }}
+
+The groups below illustrate classification with different target types,
+annotation settings, and acquisition batch sizes. They describe the setup
+shown in each animation. Use the
+:doc:`Strategy Overview </generated/strategy_overview>` to find a strategy's
+supported setups.
+
+{{ pool_classification(examples, "-") }}
+{% elif section == "2-pool-regression" %}
+{{ heading("Pool-based Active Learning: Regression", "=") }}
+
+{{ pool_regression(examples) }}
+{% elif section == "4-stream" %}
+{{ heading("Stream-based Active Learning: Classification", "=") }}
+
+{{ stream_classification(examples, "-") }}
+{% elif section == "3-pool-multi-annotator" %}
+{{ heading("Pool-based Active Learning: Multi-annotator Learning", "=") }}
+
+Multiple annotators describe how classification labels are obtained. These
+illustrations also appear in the
+:doc:`pool classification collection <../1-pool-classification/index>`.
+
+{{ multiple_annotators(examples, "-") }}
+{% endif %}
+{% if documents %}
+
+.. toctree::
+   :hidden:
+
+{% for document in documents %}
+   {{ document }}
+{% endfor %}
+{% endif %}

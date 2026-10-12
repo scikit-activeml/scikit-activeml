@@ -6,6 +6,13 @@
     "category" : "Representativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "regression", "single-annotator", "multi-label", "diverse-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "1",
     "title" : "Discriminative Active Learning (DAL)",
     "refs" : ["gissin2019discriminative"],
     "sequence" : ["title", "text_0", "plot", "refs"],

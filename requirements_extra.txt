@@ -7,7 +7,7 @@ sphinxcontrib-bibtex~=2.6
 numpydoc~=1.9
 nbsphinx~=0.9
 nbformat~=5.10
-sphinx-gallery~=0.19
+sphinx-gallery>=0.22.1,<1
 sphinx-copybutton
 sphinx-sitemap
 pybtex~=0.25

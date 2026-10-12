@@ -10,6 +10,18 @@ Target resolution combines these properties in a
 checks whether it supports that specification. A specification can be valid
 even when a component does not support it.
 
+Pool and Stream describe how samples become available, independently of these
+label semantics. Classification and Regression are prediction tasks;
+single-output and multi-label describe target types; single-annotator and
+multi-annotator describe the annotation setting. For example, classification
+with multiple annotators is a classification task with single-output targets
+and a multi-annotator setting. The
+:doc:`Tutorials <tutorials>` and
+:doc:`Visualizations <generated/sphinx_gallery_examples/index>` use Pool or
+Stream, then the task, to organize their demonstrated setups. The
+:doc:`Strategy Overview <generated/strategy_overview>` filters describe
+supported combinations.
+
 Public API
 ==========
 
@@ -481,7 +493,8 @@ Multi-label Pool Strategy Capabilities
 
 The following pool strategies query complete multi-label vectors. Use the
 ``Multi-label`` filter in the
-:doc:`Strategy Overview <generated/strategy_overview>` to find their examples.
+:doc:`Strategy Overview <generated/strategy_overview>` to find compatible
+methods. Their API class pages link to the associated demonstrations.
 
 Native multi-label methods
     :class:`~skactiveml.pool.MaxLossReductionMaxConfidence` and
@@ -789,6 +802,9 @@ provided a label, and the other has not.
 Multi-annotator estimators and strategies keep this annotation type. Strategies
 return ``(sample, annotator)`` pairs so that each requested label identifies
 both the sample and its annotator.
+For pool queries, ``batch_size`` counts these pairs. Repeated requests for the
+same sample count separately. In a single-annotator workflow, it instead counts
+selected samples, each supplying one target or a complete multi-label vector.
 
 Multi-annotator specifications currently require single-output targets. With
 ``target_type="auto"``, the resolver assigns ``"single-output"`` and rejects

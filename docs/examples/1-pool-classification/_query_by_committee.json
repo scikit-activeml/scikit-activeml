@@ -6,6 +6,13 @@
     "category" :  "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Query-by-Committee (QBC) with Kullback-Leibler Divergence",
     "refs" : ["seung1992query","mccallum1998employing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -24,6 +31,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Query-by-Committee (QBC) with Vote Entropy",
     "refs" : ["seung1992query","engelson1996minimizing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -41,6 +55,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Query-by-Committee (QBC) with Variation Ratios",
     "refs" : ["seung1992query","beluch2018power"],
     "sequence" : ["title", "text_0", "plot", "refs"],

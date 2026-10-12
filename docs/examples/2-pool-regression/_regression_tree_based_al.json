@@ -6,6 +6,12 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool_regression_batch.py",
     "tags" : ["pool", "regression", "single-annotator", "random-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "random-batch"
+    },
     "batch_note" : "Random selection within tree leaves",
     "title" : "Regression Tree Based Active Learning (RT-AL) with Random Selection",
     "refs" : ["jose2023regression"],
@@ -25,6 +31,12 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool_regression_batch.py",
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
     "title" : "Regression Tree Based Active Learning (RT-AL) with Diversity Selection",
     "refs" : ["jose2023regression"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -43,6 +55,12 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool_regression_batch.py",
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
     "title" : "Regression Tree Based Active Learning (RT-AL) with Representativity Selection",
     "refs" : ["jose2023regression"],
     "sequence" : ["title", "text_0", "plot", "refs"],

@@ -6,6 +6,13 @@
     "category" : "Wrapper",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "top-k-batch", "diverse-batch", "random-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Sub-sampling Wrapper",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -27,6 +34,13 @@
     "category" : "Wrapper",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "single-sample"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "single-sample"
+    },
+    "batch_size" : "1",
     "title" : "Parallel Utility Estimation Wrapper",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],

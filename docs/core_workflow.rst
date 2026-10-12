@@ -9,11 +9,23 @@ selects which labels to acquire within that budget. A query strategy chooses
 samples whose labels are expected to help train the model. You then request
 those labels from an *oracle*, such as a domain expert.
 
-``scikit-activeml`` builds on
+scikit-activeml builds on
 `scikit-learn <https://scikit-learn.org/stable/>`_. You pass the data and known
 labels to an estimator, use a query strategy to select samples, and add the
 requested labels to the data. The examples below show this cycle for
-classification, regression, multiple annotators, and data streams.
+classification and regression, with variations in targets, annotators, and
+sample availability.
+
+The documentation uses Pool and Stream to describe how samples become
+available, and Classification and Regression for the prediction task.
+Single-output and multi-label describe the targets; single-annotator and
+multi-annotator describe who provides labels. These dimensions are separate:
+a multi-annotator workflow still has a prediction task and a target type.
+The :doc:`Tutorials <tutorials>` and
+:doc:`Visualizations <generated/sphinx_gallery_examples/index>` organize
+demonstrations by Pool or Stream, then by prediction task. The
+:doc:`Strategy Overview <generated/strategy_overview>` filters show the setups
+each strategy supports.
 
 
 The Active Learning Cycle
@@ -43,10 +55,13 @@ The following terms are used throughout the documentation.
    * - Candidates
      - The samples the query strategy is allowed to select from.
    * - Batch
-     - The samples selected in one cycle. ``batch_size`` sets their number.
+     - The annotation requests selected in one pool cycle. ``batch_size``
+       counts samples or complete multi-label vectors with a single
+       annotator, and sample–annotator pairs with multiple annotators.
    * - Budget
-     - The number of labels that can be afforded, which usually determines
-       when the cycle stops.
+     - The annotation requests that can be afforded, which usually determine
+       when the cycle stops. State whether a request acquires one target,
+       a complete label vector, or one annotator's answer.
 
 One classification cycle has three steps:
 
@@ -137,6 +152,7 @@ records which of them have been labeled so far. The example below uses two
 clusters generated with :func:`~sklearn.datasets.make_blobs`, a logistic
 regression classifier, and uncertainty sampling, which selects the samples
 whose predicted class is least certain.
+It demonstrates single-output classification with a single annotator.
 
 :class:`~skactiveml.classifier.SklearnClassifier` lets a scikit-learn classifier
 fit a partially labeled ``y``. Set ``classes`` to declare the class vocabulary
@@ -214,8 +230,10 @@ be selected and how the returned indices are interpreted.
      - Positions in ``candidates``
 
 Support for separate feature arrays depends on the strategy. ``batch_size``
-sets how many samples are selected in one cycle. A batch lets you request
-several labels at once.
+sets how many samples are selected in one single-annotator pool cycle.
+For multi-label targets, each selected sample supplies a complete label vector.
+With multiple annotators, ``batch_size`` instead counts sample–annotator pairs;
+several requests can refer to the same sample.
 
 With ``return_utilities=True``, the strategy also returns the scores used to
 select samples. The utilities have one row per selection in the batch, with
@@ -242,7 +260,9 @@ Workflow Variations
 ===================
 
 The following examples change the estimator, the label representation, or the
-query interface for each task and annotation setting.
+query interface. Regression changes the prediction task, multi-label
+classification changes the target type, multiple annotators change the
+annotation setting, and streaming changes how samples become available.
 
 
 Regression
@@ -282,6 +302,8 @@ In multi-label classification, ``y`` has one column per binary label output.
 Declare ``target_type="multi-label"`` explicitly on both the classifier and
 the query strategy. Each query requests a complete label vector. Every row of
 ``y`` must be fully labeled or fully missing.
+With a single annotator, ``batch_size`` counts these complete vectors, which
+is also the number of selected samples.
 
 .. doctest::
 
@@ -380,7 +402,13 @@ current sample as ``candidates``. ``query()`` proposes a selection; call
 state. Call it after every decision, including when nothing was queried.
 
 The example uses :class:`~skactiveml.stream.PeriodicSampling` to query labels
-at a fixed rate.
+at a fixed rate for single-output classification with a single annotator.
+An arrival batch counts incoming samples; the acquired query batch counts
+only those chosen for annotation. They can have different sizes. Native
+stream strategies use their budget and update state to decide which arrivals
+to label. The :doc:`batch-stream tutorial
+<generated/tutorials/21_stream_batch_with_pool_al>` demonstrates collecting
+arrivals before querying a pool strategy.
 
 .. doctest::
 
@@ -472,7 +500,7 @@ Where to Go Next
    * - Process a data stream
      - :doc:`Stream-based Active Learning with scikit-learn, River, and CapyMOA <generated/tutorials/20_stream_getting_started>`
    * - Query complete label vectors
-     - :doc:`Pool-based Multilabel Active Learning: Getting Started <generated/tutorials/30_pool_multilabel_getting_started>`
+     - :doc:`Pool-based Multi-label Active Learning: Getting Started <generated/tutorials/30_pool_multilabel_getting_started>`
    * - Select a query strategy
      - :doc:`Strategy Overview <generated/strategy_overview>`
    * - Inspect classes, methods, and parameters

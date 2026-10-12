@@ -1,0 +1,75 @@
+.visualization-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem;
+}
+
+.visualization-card {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--pst-color-border);
+    border-radius: 0.5rem;
+    background: var(--pst-color-surface);
+}
+
+.visualization-card .sphx-glr-thumbnails {
+    display: block;
+    min-width: 0;
+    margin: 0;
+}
+
+.visualization-card .sphx-glr-thumbcontainer,
+.visualization-card .sphx-glr-thumbcontainer:hover {
+    min-width: 0;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+}
+
+.visualization-card .sphx-glr-thumbcontainer .figure {
+    width: min(100%, 160px);
+    margin: 0;
+}
+
+.visualization-card .sphx-glr-thumbcontainer img {
+    max-width: min(100%, 160px);
+    height: auto;
+}
+
+.visualization-card .sphx-glr-thumbcontainer p {
+    margin: 0;
+}
+
+.visualization-card .sphx-glr-thumbcontainer a.internal {
+    padding: 0;
+}
+
+.visualization-card .sphx-glr-thumbnail-title {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
+.visualization-card-caption {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    overflow-wrap: anywhere;
+    color: var(--pst-color-text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.visualization-card-caption p {
+    margin: 0;
+}
+
+.visualization-card:focus-within,
+.visualization-card:hover {
+    border-color: var(--pst-color-primary);
+}

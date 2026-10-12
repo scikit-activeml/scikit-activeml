@@ -6,6 +6,13 @@
     "method" : "Expected Model Variance Reduction",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Expected Model Variance Reduction",
     "refs" : ["cohn1996active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

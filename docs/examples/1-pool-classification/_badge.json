@@ -6,6 +6,13 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool",  "classification", "single-annotator", "multi-label", "diverse-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "4",
     "title" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
     "refs" : ["ash2020deep"],
     "sequence" : ["title", "text_0", "plot", "refs"],

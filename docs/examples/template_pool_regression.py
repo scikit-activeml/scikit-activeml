@@ -63,12 +63,13 @@ artists = []
 
 # Active learning cycle.
 n_cycles = "$n_cycles|20"
+batch_size = "$batch_size|1"
 for c in range(n_cycles):
     # Fit the regressor using the current labels.
     reg.fit(X, y)
 
     # Query the next sample(s).
-    query_idx = qs.query("$query_params")
+    query_idx = qs.query("$query_params", batch_size=batch_size)
 
     # Record current plot elements.
     coll_old = list(ax_1.collections) + list(ax_2.collections)
@@ -89,7 +90,10 @@ for c in range(n_cycles):
 
     # Compute utility values for the test candidates.
     _, utilities_test = qs.query(
-        "$query_params", candidates=X_test, return_utilities=True
+        "$query_params",
+        batch_size=batch_size,
+        candidates=X_test,
+        return_utilities=True,
     )
     utilities_test = (utilities_test - utilities_test.min()).flatten()
     if np.any(utilities_test != utilities_test[0]):

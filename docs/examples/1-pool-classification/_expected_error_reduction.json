@@ -6,6 +6,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Value of Information (VOI) on Unlabeled Samples",
     "refs" : ["joshi2009multi"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -25,6 +32,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Value of Information (VOI) on Labeled Samples",
     "refs" : ["margineantu2005active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -43,6 +57,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Value of Information (VOI)",
     "refs" : ["kapoor2007selective"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -61,6 +82,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Monte-Carlo Expected Error Reduction (EER) with Log-Loss",
     "refs" : ["roy2001toward"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -76,6 +104,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Monte-Carlo Expected Error Reduction (EER) with Misclassification-Loss",
     "refs" : ["roy2001toward"],
     "sequence" : ["title", "text_0", "plot", "refs"],

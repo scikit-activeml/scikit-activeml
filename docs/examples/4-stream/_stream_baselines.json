@@ -6,6 +6,11 @@
     "category" : "Baseline",
     "template" : "examples/template_stream.py",
     "tags" : ["stream", "regression", "classification", "single-annotator", "multi-label"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator"
+    },
     "title" : "Stream Random Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -23,6 +28,11 @@
     "category" : "Baseline",
     "template" : "examples/template_stream.py",
     "tags" : ["stream", "regression", "classification", "single-annotator", "multi-label"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator"
+    },
     "title" : "Periodic Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],

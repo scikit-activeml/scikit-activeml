@@ -6,6 +6,13 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "classification", "single-annotator", "multi-label", "diverse-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "1",
     "title" : "Uncertainty Herding (UHerding)",
     "refs" : ["bae2025uncertainty"],
     "sequence" : ["title", "text_0", "plot", "refs"],

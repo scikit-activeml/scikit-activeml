@@ -6,6 +6,13 @@
     "category" :  "Informativeness",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool",  "classification", "single-annotator", "diverse-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "diverse-batch"
+    },
+    "batch_size" : "4",
     "title" : "Batch Bayesian Active Learning by Disagreement (BatchBALD)",
     "refs" : ["houlsby2011bayesian", "kirsch2019batchbald"],
     "sequence" : ["title", "text_0", "plot", "refs"],

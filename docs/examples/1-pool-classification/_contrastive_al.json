@@ -6,6 +6,13 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Contrastive Active Learning (CAL)",
     "refs" : ["margatina2021active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

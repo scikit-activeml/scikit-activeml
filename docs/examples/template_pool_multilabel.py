@@ -84,12 +84,13 @@ for label_idx, label_ax in enumerate(label_axes):
 
 # Active learning cycle.
 n_cycles = "$n_cycles|20"
+batch_size = "$batch_size|1"
 for c in range(n_cycles):
     # Fit the classifier with the currently observed label vectors.
     clf.fit(X, y)
 
     # Query one complete label vector.
-    query_idx = qs.query("$query_params")
+    query_idx = qs.query("$query_params", batch_size=batch_size)
 
     # Capture the current plot state.
     collections_before = [list(ax.collections) for ax in label_axes]
@@ -109,6 +110,7 @@ for c in range(n_cycles):
     # resulting background for every label output.
     _, utilities = qs.query(
         "$query_params",
+        batch_size=batch_size,
         candidates=mesh_samples,
         return_utilities=True,
     )

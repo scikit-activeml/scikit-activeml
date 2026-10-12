@@ -6,6 +6,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool", "regression", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "regression",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Query-by-Committee (QBC) with Empirical Variance",
     "refs" : ["seung1992query","burbidge2007active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

@@ -6,6 +6,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool_multilabel.py",
     "tags" : ["pool", "classification", "single-annotator", "multi-label", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "multi-label",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Label Cardinality Inconsistency (LCI)",
     "refs" : ["wang2019multi"],
     "sequence" : ["title", "text_0", "plot", "refs"],

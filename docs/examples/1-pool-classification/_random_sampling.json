@@ -6,6 +6,13 @@
     "category" : "Baseline",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator", "multi-label", "random-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "random-batch"
+    },
+    "batch_size" : "1",
     "title" : "Random Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],

@@ -6,6 +6,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Epistemic Uncertainty Sampling (EpisUS)",
     "refs" : ["nguyen2019epistemic"],
     "sequence" : ["title", "text_0", "plot", "refs"],

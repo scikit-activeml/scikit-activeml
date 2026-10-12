@@ -6,6 +6,11 @@
     "category" : "Informativeness",
     "template" : "examples/template_stream.py",
     "tags" : ["stream", "classification", "single-annotator"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator"
+    },
     "title" : "Fixed-Uncertainty",
     "refs" : ["zliobaite2014active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -22,6 +27,11 @@
     "category" : "Informativeness",
     "template" : "examples/template_stream.py",
     "tags" : ["stream", "classification", "single-annotator"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator"
+    },
     "title" : "Variable-Uncertainty",
     "refs" : ["zliobaite2014active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -38,6 +48,11 @@
     "category" : "Informativeness",
     "template" : "examples/template_stream.py",
     "tags" : ["stream", "classification", "single-annotator"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator"
+    },
     "title" : "Randomized-Variable-Uncertainty",
     "refs" : ["zliobaite2014active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -54,6 +69,11 @@
     "category" : "Hybrid",
     "template" : "examples/template_stream.py",
     "tags" : ["stream", "classification", "single-annotator"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator"
+    },
     "title" : "Split",
     "refs" : ["zliobaite2014active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

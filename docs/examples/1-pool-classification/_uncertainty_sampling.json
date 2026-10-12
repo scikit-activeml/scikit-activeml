@@ -6,6 +6,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "multi-label", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Uncertainty Sampling (US) with Margin",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -22,6 +29,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "multi-label", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Uncertainty Sampling (US) with Least-Confidence",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -37,6 +51,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "multi-label", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Uncertainty Sampling (US) with Entropy",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -52,6 +73,13 @@
     "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "classification", "single-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "capability_params" : {"method": "expected_average_precision"},
     "title": "Uncertainty Sampling with Expected Average Precision (USAP)",
     "refs": [
@@ -76,6 +104,13 @@
     "category" : "Hybrid",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator", "multi-label", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "1",
     "title" : "Density-weighted Uncertainty Sampling (DWUS)",
     "refs" : ["donmez2007dual"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -95,6 +130,13 @@
     "category" : "Hybrid",
     "template" : "examples/1-pool-classification/template_DUAL.py",
     "tags" : ["pool", "classification", "single-annotator", "multi-label", "single-sample"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "single-annotator",
+      "selection" : "single-sample"
+    },
+    "batch_size" : "1",
     "batch_note" : "The DUAL recipe selects one sample per cycle",
     "title" : "Dual Strategy for Active Learning",
     "refs" : ["donmez2007dual"],

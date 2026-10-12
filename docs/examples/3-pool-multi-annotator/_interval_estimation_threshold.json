@@ -6,6 +6,13 @@
     "category" : "Baseline",
     "template" : "examples/template_pool_multi_annotator.py",
     "tags" : ["pool", "classification", "multi-annotator", "top-k-batch"],
+    "example_setup" : {
+      "task" : "classification",
+      "target" : "single-output",
+      "annotators" : "multi-annotator",
+      "selection" : "top-k-batch"
+    },
+    "batch_size" : "3",
     "title" : "Interval Estimation Threshold",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -13,6 +20,6 @@
     "import_misc" : ["from skactiveml.pool.multiannotator import IntervalEstimationThreshold",
       "from skactiveml.pool.multiannotator import IntervalEstimationAnnotModel"],
     "init_qs" : "IntervalEstimationThreshold(random_state=random_state)",
-    "query_params" : "X=X, y=y, clf=clf, fit_clf=False, batch_size=3"
+    "query_params" : "X=X, y=y, clf=clf, fit_clf=False"
   }
 ]
