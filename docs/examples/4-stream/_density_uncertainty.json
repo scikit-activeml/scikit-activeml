@@ -8,8 +8,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Density Based Active Learning for Data Streams",
     "refs" : ["ienco2014high"],
@@ -29,8 +29,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Cognitive Dual-Query Strategy with Random Sampling",
     "refs" : ["liu2023active"],
@@ -50,8 +50,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Cognitive Dual-Query Strategy with Fixed-Uncertainty",
     "refs" : ["liu2023active"],
@@ -71,8 +71,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Cognitive Dual-Query Strategy with Variable-Uncertainty",
     "refs" : ["liu2023active"],
@@ -92,8 +92,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Cognitive Dual-Query Strategy with Randomized-Variable-Uncertainty",
     "refs" : ["liu2023active"],

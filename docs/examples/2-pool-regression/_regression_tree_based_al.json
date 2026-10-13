@@ -8,8 +8,8 @@
     "tags" : ["pool", "regression", "single-annotator", "random-batch"],
     "example_setup" : {
       "task" : "regression",
-      "target" : "single-output",
-      "annotators" : "single-annotator",
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator",
       "selection" : "random-batch"
     },
     "batch_note" : "Random selection within tree leaves",
@@ -33,8 +33,8 @@
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
     "example_setup" : {
       "task" : "regression",
-      "target" : "single-output",
-      "annotators" : "single-annotator",
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator",
       "selection" : "diverse-batch"
     },
     "title" : "Regression Tree Based Active Learning (RT-AL) with Diversity Selection",
@@ -57,8 +57,8 @@
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
     "example_setup" : {
       "task" : "regression",
-      "target" : "single-output",
-      "annotators" : "single-annotator",
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator",
       "selection" : "diverse-batch"
     },
     "title" : "Regression Tree Based Active Learning (RT-AL) with Representativity Selection",

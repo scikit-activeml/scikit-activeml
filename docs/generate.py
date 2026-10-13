@@ -90,12 +90,12 @@ OVERVIEW_FILTERS = [
     ),
     (
         "target",
-        "Targets",
+        "Target Type",
         [("single-output", "Single-output"), ("multi-label", "Multi-label")],
     ),
     (
         "annotators",
-        "Annotators",
+        "Annotation Type",
         [
             ("single-annotator", "Single annotator"),
             ("multi-annotator", "Multiple annotators"),
@@ -204,9 +204,9 @@ def _example_setup(data):
     scenario = data["package"].split(".")[0]
     if demonstrated["task"] == "regression":
         setup = "regression"
-    elif demonstrated["target"] == "multi-label":
+    elif demonstrated["target_type"] == "multi-label":
         setup = "multilabel"
-    elif demonstrated["annotators"] == "multi-annotator":
+    elif demonstrated["annotation_type"] == "multi-annotator":
         setup = "multi-annotator"
     elif scenario == "pool" and int(data["batch_size"]) > 1:
         setup = "classification-batch"
@@ -245,7 +245,7 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
                     rule = OVERVIEW_BATCH_LABELS[demonstrated["selection"]]
                     unit = (
                         "sample–annotator pairs"
-                        if demonstrated["annotators"] == "multi-annotator"
+                        if demonstrated["annotation_type"] == "multi-annotator"
                         else "samples"
                     )
                     caption = f"{rule} of {count} {unit}"

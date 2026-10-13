@@ -8,8 +8,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Probabilistic Active Learning in Datastreams",
     "refs" : ["kottke2015probalistic"],

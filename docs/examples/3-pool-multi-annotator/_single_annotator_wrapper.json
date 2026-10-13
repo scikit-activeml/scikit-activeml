@@ -8,8 +8,8 @@
     "tags" : ["pool", "classification", "multi-annotator", "random-batch"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "multi-annotator",
+      "target_type" : "single-output",
+      "annotation_type" : "multi-annotator",
       "selection" : "random-batch"
     },
     "batch_size" : "3",
@@ -30,8 +30,8 @@
     "tags" : ["pool", "classification", "multi-annotator", "diverse-batch"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "multi-annotator",
+      "target_type" : "single-output",
+      "annotation_type" : "multi-annotator",
       "selection" : "diverse-batch"
     },
     "batch_size" : "3",

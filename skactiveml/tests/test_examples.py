@@ -597,8 +597,8 @@ class TestExamples(unittest.TestCase):
         data["template"] = "examples/template_stream_regression.py"
         data["example_setup"] = {
             "task": "regression",
-            "target": "single-output",
-            "annotators": "single-annotator",
+            "target_type": "single-output",
+            "annotation_type": "single-annotator",
         }
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, "No visualization group"):

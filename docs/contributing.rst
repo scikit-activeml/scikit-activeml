@@ -1274,8 +1274,8 @@ capability inspection, independently of the example code in ``init_qs``.
 Each ``example_setup`` is a small JSON object using these fields:
 
 * ``task``: ``"classification"`` or ``"regression"``.
-* ``target``: ``"single-output"`` or ``"multi-label"``.
-* ``annotators``: ``"single-annotator"`` or ``"multi-annotator"``.
+* ``target_type``: ``"single-output"`` or ``"multi-label"``.
+* ``annotation_type``: ``"single-annotator"`` or ``"multi-annotator"``.
 * ``selection`` for pool examples: ``"top-k-batch"``, ``"diverse-batch"``,
   ``"random-batch"``, or ``"single-sample"`` for the strategy's batch
   selection rule. Omit this field for native stream examples.
@@ -1287,8 +1287,8 @@ For example, a pool demonstration of diverse multi-label selection uses:
    {
        "example_setup": {
            "task": "classification",
-           "target": "multi-label",
-           "annotators": "single-annotator",
+           "target_type": "multi-label",
+           "annotation_type": "single-annotator",
            "selection": "diverse-batch"
        },
        "batch_size": "1"
@@ -1317,8 +1317,9 @@ wrapped strategy. The sub-sampling wrapper also inherits its batching rule.
 
 The visualization landing page groups examples using ``example_setup``,
 independently of the capabilities listed in ``tags``. An example with
-``target="single-output"`` remains a single-output demonstration even if its
-strategy also supports multi-label targets. The strategy overview describes
+``"target_type": "single-output"`` remains a single-output demonstration even
+if its strategy also supports the multi-label target type. The strategy
+overview describes
 supported capabilities and links to the API class page, whose gallery lists
 every associated demonstration. The layout lives in
 ``docs/_templates/visualizations.rst.jinja``. Its mini-galleries use the

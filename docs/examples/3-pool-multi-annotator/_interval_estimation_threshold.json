@@ -8,8 +8,8 @@
     "tags" : ["pool", "classification", "multi-annotator", "top-k-batch"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "multi-annotator",
+      "target_type" : "single-output",
+      "annotation_type" : "multi-annotator",
       "selection" : "top-k-batch"
     },
     "batch_size" : "3",

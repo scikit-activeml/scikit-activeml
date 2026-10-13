@@ -8,8 +8,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Fixed-Uncertainty",
     "refs" : ["zliobaite2014active"],
@@ -29,8 +29,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Variable-Uncertainty",
     "refs" : ["zliobaite2014active"],
@@ -50,8 +50,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Randomized-Variable-Uncertainty",
     "refs" : ["zliobaite2014active"],
@@ -71,8 +71,8 @@
     "tags" : ["stream", "classification", "single-annotator"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Split",
     "refs" : ["zliobaite2014active"],

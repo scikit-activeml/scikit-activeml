@@ -8,8 +8,8 @@
     "tags" : ["stream", "regression", "classification", "single-annotator", "multi-label"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Stream Random Sampling",
     "refs" : [],
@@ -30,8 +30,8 @@
     "tags" : ["stream", "regression", "classification", "single-annotator", "multi-label"],
     "example_setup" : {
       "task" : "classification",
-      "target" : "single-output",
-      "annotators" : "single-annotator"
+      "target_type" : "single-output",
+      "annotation_type" : "single-annotator"
     },
     "title" : "Periodic Sampling",
     "refs" : [],
