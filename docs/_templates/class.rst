@@ -36,6 +36,8 @@
    {% endif %}
    {% endblock %}
 
+{% include "license_notice.rst" %}
+
 {% for item in methods %}
 {%- if item != '__init__' and item in native_methods %}
 .. automethod:: {{ fullname }}.{{ item }}

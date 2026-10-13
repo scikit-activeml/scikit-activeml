@@ -678,6 +678,9 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
 
     All rights reserved.
 
+    The full license text is distributed with scikit-activeml in
+    `LICENSES/scikit-learn/COPYING-1.0.X`.
+
     Parameters
     ----------
     w : ndarray of shape (n_features,) or (n_features + 1,)
@@ -729,6 +732,9 @@ def _intercept_dot(w, X, y):
     Copyright (c) 2007-2021 The scikit-learn developers.
 
     All rights reserved.
+
+    The full license text is distributed with scikit-activeml in
+    `LICENSES/scikit-learn/COPYING-1.0.X`.
 
     Parameters
     ----------

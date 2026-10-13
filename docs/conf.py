@@ -35,7 +35,7 @@ from docs.generate import (
 # -- Project information -----------------------------------------------------
 
 project = "scikit-activeml"
-copyright = "2025"
+copyright = "2020-2026"
 author = (
     "Marek Herde, "
     "Minh Tuan Pham, "
@@ -45,10 +45,10 @@ author = (
     "Pascal Mergard, "
     "Christoph Sandrock, "
     "Jiaying Cheng, "
-    "Atal Roghman,"
-    "Mehmet Mjüde, "
+    "Atal Roghman, "
+    "Mehmet Müjde, "
     "Lukas Rauch, "
-    "Bernhard Sick "
+    "Bernhard Sick"
 )
 
 # The short X.Y version
@@ -271,6 +271,7 @@ html_sidebars = {
     "contributing": [],  # no primary sidebar for this page
     "generated/strategy_overview": [],  # no primary sidebar for this page
     "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
+    "licenses": [],  # no primary sidebar for this page
 }
 
 
