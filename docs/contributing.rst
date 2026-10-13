@@ -241,7 +241,7 @@ method enforces the implementation of the sample-selection logic.
 Target Semantics and Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Target data has an explicit public contract. Read the
+Labels and target semantics have an explicit public contract. Read the
 :doc:`target_semantics` reference before changing estimators, query strategies,
 label helpers, or multi-annotator components. In particular:
 
@@ -254,9 +254,9 @@ label helpers, or multi-annotator components. In particular:
   fitted target specification; query strategies resolve each query and do not
   retain a last-query specification;
 - add tests for every supported target combination and for invalid or
-  unsupported combinations, including ambiguous two-dimensional targets and
+  unsupported combinations, including ambiguous two-dimensional labels and
   complete-row requirements for multi-label data;
-- operate on encoded targets for multi-label data, because each label output
+- operate on encoded labels for multi-label data, because each label output
   may declare its own binary class vocabulary, e.g.
   ``[["no", "yes"], ["off", "on"]]``. A pool strategy test supplying
   ``query_default_params_clf_multilabel`` runs the shared custom class
@@ -1031,7 +1031,7 @@ Standard regressor implementations are part of the subpackage
 +-------------------+---------------------------------------------------------+
 | ``fit``           | Method to fit the regressor for given training data.    |
 +-------------------+---------------------------------------------------------+
-| ``predict``       | Method predicting the target values for samples.        |
+| ``predict``       | Method predicting the labels for samples.               |
 +-------------------+---------------------------------------------------------+
 
 .. _init-3:
@@ -1062,7 +1062,7 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the target values of the training   |
+| ``y``                             | Contains the labels of the training          |
 |                                   | samples. Missing labels are represented by   |
 |                                   | the attribute ``missing_label``. Usually,    |
 |                                   | ``y`` is a column array except for multi-    |
@@ -1070,7 +1070,7 @@ Required Parameters:
 |                                   | with columns for each target type.           |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
-|                                   | targets. Must have the same shape as ``y``.  |
+|                                   | labels. Must have the same shape as ``y``.   |
 +-----------------------------------+----------------------------------------------+
 
 Returns:
@@ -1112,7 +1112,7 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``y_pred``                        | The estimated targets per sample, |
+| ``y_pred``                        | The estimated labels per sample,  |
 |                                   | as an array of shape              |
 |                                   | ``(n_samples,)``.                 |
 +-----------------------------------+-----------------------------------+
@@ -1141,7 +1141,7 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples for which predictions are made.      |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the true target values for each     |
+| ``y``                             | Contains the true labels for each            |
 |                                   | sample.                                      |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Defines the importance of each sample when   |
@@ -1182,12 +1182,12 @@ Examples
 Two of our main goals are to make active learning more understandable and
 improve our framework's usability. Therefore, we require an example for each
 query strategy. Add a JSON file to an existing example directory under
-``docs/examples/``. Each directory must contain a ``README.rst``;
-the documentation generator recursively scans these directories and creates
+``docs/examples/``. Each directory must contain a ``README.rst``.
+The documentation generator recursively scans these directories and creates
 the example pages, notebooks, and strategy overview. Existing directory names
 are retained for stable published paths. Reader-facing groups use Pool or
-Stream, then Classification or Regression. Target and annotator settings are
-described separately for each demonstrated setup.
+Stream, then Classification or Regression. Target types and annotation types
+are described separately for each demonstrated setup.
 
 Each JSON file contains a list of example entries with the following fields:
 
@@ -1217,7 +1217,7 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
 |                  | ``classification``, ``multi-label``, and ``regression``. |
 +------------------+----------------------------------------------------------+
-| ``example_setup``| The actual task, target, and annotator setting shown.    |
+| ``example_setup``| The task, target type, and annotation type shown.        |
 |                  | Pool examples also specify the demonstrated selection    |
 |                  | rule. See the field values below.                        |
 +------------------+----------------------------------------------------------+
@@ -1261,10 +1261,10 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | regression template.)                                    |
 +------------------+----------------------------------------------------------+
 
-The strategy overview obtains complete task, target, and annotator combinations
-from the class's ``_target_capabilities``. The ``tags`` restrict these to the
+The strategy overview obtains complete task, target type, and annotation type
+combinations from ``_target_capabilities``. The ``tags`` restrict these to the
 documented method variant. They describe supported use cases. The ``template``
-field selects the rendering code; ``example_setup`` describes the setup
+field selects the rendering code, and ``example_setup`` describes the setup
 actually illustrated by the demonstration. For variants whose constructor
 parameters change their capabilities, add ``capability_params``
 with those parameters as a JSON object, for example
@@ -1312,7 +1312,7 @@ Pool entries must specify their batching behavior using ``top-k-batch``,
 restricted to one sample per cycle. It cannot be combined with batch tags.
 Stream entries do not carry pool batching tags. An optional ``batch_note``
 explains qualifications such as random selection within tree leaves.
-The overview marks generic pool wrappers' target support as dependent on the
+The overview shows that generic pool wrappers' target types depend on the
 wrapped strategy. The sub-sampling wrapper also inherits its batching rule.
 
 The visualization landing page groups examples using ``example_setup``,
@@ -1340,9 +1340,12 @@ Guidelines for writing documentation in scikit-activeml adopt the
 used by scikit-learn.
 
 Use Pool and Stream for sample availability and Classification and Regression
-for the prediction task. Use single-output and multi-label for target types,
-and single-annotator and multi-annotator for annotation settings. A target or
-annotator setting qualifies a task; it is not another prediction task. Use
+for the prediction task. Name the two setup dimensions target type
+(single-output or multi-label) and annotation type (single-annotator or
+multi-annotator), as ``TargetSpec`` does. They qualify a task and are not
+prediction tasks themselves. Call every value of ``y`` a label. Use
+annotation only for the act of labeling, as in annotation request or
+annotation session, and annotator for the person who provides labels. Use
 ``multi-label`` and ``multi-annotator`` in prose and headings. Preserve literal
 Python identifiers and package names such as ``multilabel`` and
 ``multiannotator``.
@@ -1407,7 +1410,7 @@ use light bands showing one sample standard deviation (``ddof=1``); single
 runs need no variation bands. Numerical legend summaries can replace separate
 score tables. State what those values average and avoid repeating them in
 printed output. Label counts according to what was acquired, distinguishing
-samples, multi-label rows, repeated annotations, and stream arrivals. Explain
+samples, multi-label rows, repeated labels, and stream arrivals. Explain
 whether initial labels are included. Inspect the published rendering for
 clipping and overlap.
 

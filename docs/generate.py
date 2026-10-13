@@ -571,8 +571,8 @@ def generate_strategy_overview_rst(gen_path, json_data):
         file.write("\n")
         file.write(
             "Furthermore, we distinguish between **regression** and "
-            "**classification** as supervised learning tasks. Classification "
-            "targets may be **multi-label**, and labels can be provided by a "
+            "**classification** as supervised learning tasks. Classification can "
+            "have a **multi-label** target type, and labels can come from a "
             "**single annotator** or "
             "**multiple annotators**. Pool strategies can select batches "
             "using **top-k** utility scores, **diversity**, or **random "
@@ -584,7 +584,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "names link to the implementation documentation and its gallery "
             "of examples using that class. The "
             ":doc:`Visualizations </generated/sphinx_gallery_examples/index>` "
-            "catalogue groups examples by the setup they demonstrate.\n"
+            "catalog groups examples by the setup they demonstrate.\n"
         )
         file.write("\n")
         file.write(
@@ -730,7 +730,9 @@ def json_data_to_strategy_table(json_data, gen_path):
             else:
                 properties.append("Stream budget")
             if metadata["conditional"]:
-                properties.append("Target support depends on wrapped strategy")
+                properties.append(
+                    "Target type support depends on wrapped strategy"
+                )
             if data.get("batch_note"):
                 properties.append(data["batch_note"])
             properties_text = "\n".join(f"| {value}" for value in properties)

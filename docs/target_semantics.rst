@@ -353,9 +353,9 @@ be mixed.
      - Reject: NaN is not the configured missing label.
 
 The label helpers :func:`~skactiveml.utils.is_labeled` and
-:func:`~skactiveml.utils.is_unlabeled` do not know the prediction task. For
-single-output targets, they accept values valid for either classification or
-regression. An object array mixing integers and floating-point values is
+:func:`~skactiveml.utils.is_unlabeled` do not know the prediction task. For the
+single-output target type, they accept values valid for either classification
+or regression. An object array mixing integers and floating-point values is
 accepted as possible regression data. A Boolean/integer mixture is invalid for
 both tasks and is rejected. Components that know the task apply its rules.
 
@@ -796,7 +796,7 @@ Multiple Annotators
 
 The target type describes the label to predict. The annotation type describes
 who provides it. In a multi-annotator matrix, each column holds one annotator's
-labels for the same target. A row such as ``[0, NaN]`` is valid: one annotator
+labels for the same task. A row such as ``[0, NaN]`` is valid: one annotator
 provided a label, and the other has not.
 
 Multi-annotator estimators and strategies keep this annotation type. Strategies
@@ -804,15 +804,16 @@ return ``(sample, annotator)`` pairs so that each requested label identifies
 both the sample and its annotator.
 For pool queries, ``batch_size`` counts these pairs. Repeated requests for the
 same sample count separately. In a single-annotator workflow, it instead counts
-selected samples, each supplying one target or a complete multi-label vector.
+selected samples, each supplying one label or a complete multi-label vector.
 
-Multi-annotator specifications currently require single-output targets. With
-``target_type="auto"``, the resolver assigns ``"single-output"`` and rejects
-nested class vocabularies. Combining ``annotation_type="multi-annotator"``
-with ``target_type="multi-label"`` or ``target_type="multi-output"`` fails
-during resolution. The two-dimensional label matrix has no separate dimensions
-for annotators and outputs. Supporting both would require another
-representation; see :ref:`recognized-future-semantics`.
+Multi-annotator specifications currently require the single-output target type.
+With ``target_type="auto"``, the resolver assigns ``"single-output"`` and
+rejects nested class vocabularies. Combining
+``annotation_type="multi-annotator"`` with ``target_type="multi-label"`` or
+``target_type="multi-output"`` fails during resolution. The two-dimensional
+label matrix has no separate dimensions for annotators and outputs. Supporting
+both would require another representation; see
+:ref:`recognized-future-semantics`.
 
 Errors and Component Capabilities
 =================================
