@@ -5,7 +5,9 @@
     margin: 1rem 0 2rem;
 }
 
-.visualization-card {
+/* The theme's .docutils.container rule would otherwise remove the padding. */
+.visualization-card.docutils.container {
+    position: relative;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -22,8 +24,10 @@
     margin: 0;
 }
 
+/* A static container lets the thumbnail link cover the whole card. */
 .visualization-card .sphx-glr-thumbcontainer,
 .visualization-card .sphx-glr-thumbcontainer:hover {
+    position: static;
     min-width: 0;
     height: auto;
     margin: 0;
@@ -53,13 +57,21 @@
 .visualization-card .sphx-glr-thumbnail-title {
     max-width: 100%;
     overflow-wrap: anywhere;
+    text-wrap: balance;
     text-align: center;
+}
+
+/* The card shows the title, so drop the gallery's partial hover overlay. */
+.visualization-card .sphx-glr-thumbcontainer[tooltip]:hover::before,
+.visualization-card .sphx-glr-thumbcontainer[tooltip]:hover::after {
+    display: none;
 }
 
 .visualization-card-caption {
     margin-top: auto;
     padding-top: 0.75rem;
     overflow-wrap: anywhere;
+    text-wrap: balance;
     color: var(--pst-color-text-muted);
     font-size: 0.875rem;
     text-align: center;

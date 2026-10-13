@@ -11,5 +11,5 @@ regression. Within classification, separate groups explain the animation
 layouts for target types, annotators, and acquisition batches. A strategy
 may support additional setups: use the
 :doc:`Strategy Overview </generated/strategy_overview>` to filter methods by
-their supported setups. Cards describe the acquisition rule and count used
-in each pool example and are ordered alphabetically by example title.
+their supported setups. Batch cards name their batch rule and size. Cards
+are ordered alphabetically by example title.

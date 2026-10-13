@@ -272,6 +272,9 @@ html_sidebars = {
     "generated/strategy_overview": [],  # no primary sidebar for this page
     "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
     "licenses": [],  # no primary sidebar for this page
+    "core_workflow": [],  # no primary sidebar for this page
+    "target_semantics": [],  # no primary sidebar for this page
+    "generated/tutorials/*": [],  # no primary sidebar for these pages
 }
 
 

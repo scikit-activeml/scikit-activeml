@@ -148,8 +148,6 @@ including repeated labels for a sample.
 
    * - .. _multilabel-classification:
 
-       .. _id1:
-
        :doc:`Pool-based Multi-label Active Learning: Getting Started </generated/tutorials/30_pool_multilabel_getting_started>`
 
        *Multi-label; single annotator.*
@@ -222,7 +220,7 @@ whose labels are acquired. Collecting ten arrivals and requesting one label
 uses an arrival batch of ten and a query batch of one.
 
 
-.. _id2:
+.. _id1:
 
 Classification
 ^^^^^^^^^^^^^^

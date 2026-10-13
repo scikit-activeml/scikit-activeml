@@ -239,18 +239,16 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
             )
             caption = ""
             if data["package"].split(".")[0] == "pool":
-                rule = OVERVIEW_BATCH_LABELS[
-                    data["example_setup"]["selection"]
-                ].removesuffix(" batch")
                 count = int(data["batch_size"])
-                unit = (
-                    "sample–annotator pair"
-                    if data["example_setup"]["annotators"] == "multi-annotator"
-                    else "sample"
-                )
-                if count != 1:
-                    unit += "s"
-                caption = f"{rule} · configured query size: {count} {unit}"
+                if count > 1:
+                    demonstrated = data["example_setup"]
+                    rule = OVERVIEW_BATCH_LABELS[demonstrated["selection"]]
+                    unit = (
+                        "sample–annotator pairs"
+                        if demonstrated["annotators"] == "multi-annotator"
+                        else "samples"
+                    )
+                    caption = f"{rule} of {count} {unit}"
             examples[setup].append(
                 {
                     "path": (
@@ -312,9 +310,13 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
     )
     for section in [*sections, "3-pool-multi-annotator"]:
         owned_documents = [
-            document
+            (
+                f"{title} with Multiple Annotators <{document}>"
+                if group == "pool-multi-annotator"
+                else document
+            )
             for group in section_groups.get(section, [])
-            for _, document in sorted(
+            for title, document in sorted(
                 documents[group], key=lambda item: item[0].casefold()
             )
         ]
@@ -637,7 +639,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
             file.write(
                 table_data_to_rst_table(
                     table,
-                    widths="36 23 1 25 15",
+                    widths="30 19 1 36 14",
                     header_lines=1,
                     classes="strategy-table",
                 )

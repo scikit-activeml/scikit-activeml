@@ -1222,7 +1222,7 @@ Each JSON file contains a list of example entries with the following fields:
 |                  | rule. See the field values below.                        |
 +------------------+----------------------------------------------------------+
 | ``batch_size``   | Pool query batch size, stored as a string, e.g., ``"3"``.|
-|                  | Shared by the executable example and its setup caption.  |
+|                  | Shared by the executable example and its batch caption.  |
 |                  | Omit for native stream examples.                         |
 +------------------+----------------------------------------------------------+
 | ``title``        | Title of the example, usually named after the query      |
@@ -1277,8 +1277,8 @@ Each ``example_setup`` is a small JSON object using these fields:
 * ``target``: ``"single-output"`` or ``"multi-label"``.
 * ``annotators``: ``"single-annotator"`` or ``"multi-annotator"``.
 * ``selection`` for pool examples: ``"top-k-batch"``, ``"diverse-batch"``,
-  ``"random-batch"``, or ``"single-sample"`` for the selection rule actually
-  demonstrated. Omit this field for native stream examples.
+  ``"random-batch"``, or ``"single-sample"`` for the strategy's batch
+  selection rule. Omit this field for native stream examples.
 
 For example, a pool demonstration of diverse multi-label selection uses:
 
@@ -1295,9 +1295,10 @@ For example, a pool demonstration of diverse multi-label selection uses:
    }
 
 Keep these values consistent with the template, estimator, and query arguments.
-The pool ``batch_size`` is used for execution and the displayed batch count;
-do not maintain a separate caption count. It counts selected samples for a
-single annotator, including complete multi-label vectors, or sample–annotator
+The pool ``batch_size`` is used for execution and, if it is larger than one,
+for the card caption. Do not maintain a separate caption count. It counts
+selected samples for a single annotator, including complete multi-label
+vectors, or sample–annotator
 pairs for multiple annotators. If a demonstration collects stream arrivals
 before querying a pool strategy, distinguish its arrival batch size from the
 number of acquired samples. Native stream examples describe their budget and

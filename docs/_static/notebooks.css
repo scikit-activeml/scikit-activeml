@@ -4,3 +4,18 @@
     max-width: 100%;
     height: auto !important;
 }
+
+/* Saved widgets: on narrow screens, wrap the button column above wide
+   outputs instead of shrinking it to zero width. */
+.nboutput .widget-hbox {
+    flex-wrap: wrap;
+}
+
+.nboutput .widget-hbox > .widget-vbox {
+    flex-shrink: 0;
+}
+
+.nboutput .widget-output .jp-RenderedText pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

@@ -571,7 +571,8 @@ class TestExamples(unittest.TestCase):
             self.assertIn(f"   {section}/index", index)
             owned_documents.extend(
                 re.findall(
-                    r"^\s+(/generated/sphinx_gallery_examples/.*)$",
+                    r"^\s+(?:[^<\n]*<)?"
+                    r"(/generated/sphinx_gallery_examples/[^>\n]+)>?$",
                     section_indexes[section],
                     re.MULTILINE,
                 )
@@ -582,9 +583,12 @@ class TestExamples(unittest.TestCase):
         self.assertIn(":orphan:", legacy)
         self.assertNotIn(".. toctree::", legacy)
         self.assertNotIn("   3-pool-multi-annotator/index", index)
-        self.assertIn("Diverse · configured query size: 4 samples", index)
-        self.assertIn("configured query size: 3 sample–annotator pairs", index)
-        self.assertNotIn("configured query size:", section_indexes["4-stream"])
+        self.assertIn("Diverse batch of 4 samples", index)
+        self.assertIn("batch of 3 sample–annotator pairs", index)
+        self.assertNotIn(" of 1 sample", index)
+        self.assertNotIn(
+            "visualization-card-caption", section_indexes["4-stream"]
+        )
 
     def test_visualizations_reject_unhandled_setups(self):
         data = self._overview_example(

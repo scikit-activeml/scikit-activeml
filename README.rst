@@ -437,9 +437,9 @@ modality, and models used in the tutorial.
      - Classification
      - Image
      - - DINOv2 with a trainable backbone and classification head
-   * - `Pool-based Multilabel Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/30_pool_multilabel_getting_started.html>`_
+   * - `Pool-based Multi-label Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/30_pool_multilabel_getting_started.html>`_
      - Pool
-     - Multilabel Classification
+     - Classification
      - Audio
      - - Perch v2 embeddings and an MLP
    * - `Advanced Pool-based Active Learning for Regression <https://scikit-activeml.github.io/latest/generated/tutorials/07_pool_advanced_regression.html>`_
