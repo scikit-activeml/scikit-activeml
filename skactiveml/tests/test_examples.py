@@ -117,7 +117,10 @@ class TestExamples(unittest.TestCase):
                     )
 
     def test_api_reference_prioritizes_native_methods(self):
-        environment = Environment(loader=FileSystemLoader(self.docs_path))
+        templates_path = path.join(self.docs_path, "_templates")
+        environment = Environment(
+            loader=FileSystemLoader([self.docs_path, templates_path])
+        )
         environment.filters["underline"] = lambda value: value
         template = environment.get_template("_templates/class.rst")
         test_cases = [
