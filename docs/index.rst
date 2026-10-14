@@ -30,6 +30,10 @@
    :end-before: examples_end
 
 .. include:: generated/readme.rst
+   :start-after: contributing_start
+   :end-before: contributing_end
+
+.. include:: generated/readme.rst
    :start-after: citing_start
    :end-before: citing_end
 

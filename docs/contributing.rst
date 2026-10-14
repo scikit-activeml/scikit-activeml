@@ -41,109 +41,121 @@ project with new enhancements and bug fixes.
 Getting Help
 ~~~~~~~~~~~~
 
-If you have any questions, please reach out to other developers via the
-following channels:
-
--  `GitHub Issues <https://github.com/scikit-activeml/scikit-activeml/issues>`__
+Ask questions in
+`GitHub Discussions <https://github.com/scikit-activeml/scikit-activeml/discussions>`__.
+Report bugs and request features in
+`GitHub Issues <https://github.com/scikit-activeml/scikit-activeml/issues>`__.
 
 Roadmap
 ~~~~~~~
 
 Our roadmap is summarized in the issue
-`Upcoming Features <https://github.com/scikit-activeml/scikit-activeml/issues/145>`__.
+`Planned Features <https://github.com/scikit-activeml/scikit-activeml/issues/145>`__.
 
 Get Started
 -----------
 
-Before you contribute to this project, please follow the steps below.
+Before you contribute to this project, please follow the steps below. By
+contributing, you agree to follow our
+`Code of Conduct <https://github.com/scikit-activeml/scikit-activeml/blob/master/CODE_OF_CONDUCT.md>`__.
+
+Get the Code
+~~~~~~~~~~~~
+
+Fork the repository with the GitHub
+`Fork <https://github.com/scikit-activeml/scikit-activeml/fork>`__ button and
+clone your fork. Add the main repository as ``upstream``, so that you can
+start each branch from its latest ``development`` branch:
+
+.. code:: bash
+
+   git clone https://github.com/<your-username>/scikit-activeml.git
+   cd scikit-activeml
+   git remote add upstream https://github.com/scikit-activeml/scikit-activeml.git
 
 Setup Development Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are several ways to create a local Python environment, such as
-`virtualenv <https://www.google.com/search?client=safari&rls=en&q=virtualenv&ie=UTF-8&oe=UTF-8>`__,
+`virtualenv <https://virtualenv.pypa.io/>`__,
 `pipenv <https://pipenv.pypa.io/en/latest/>`__, or
 `miniconda <https://docs.conda.io/en/latest/miniconda.html>`__. One possible
 workflow is to install miniconda and use it to create a Python environment.
 
-Example with miniconda
+Example with Miniconda
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Create a new Python environment named ``scikit-activeml``:
+Create a new Python environment named ``scikit-activeml``. scikit-activeml
+supports Python 3.11 to 3.14:
 
 .. code:: bash
 
-   conda create -n scikit-activeml
+   conda create -n scikit-activeml python=3.13
 
-To ensure that the correct environment is active:
+Activate the environment:
 
 .. code:: bash
 
    conda activate scikit-activeml
 
-Then install pip:
-
-.. code:: bash
-
-   conda install pip
-
 Install Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 
-Now, install the required project dependencies for development. A standard
-editable contributor setup uses the ``dev`` extra:
+With the environment active, install the package in editable mode with the
+development dependencies of the ``dev`` extra. Run this in the cloned
+repository:
 
 .. code:: bash
 
-   # Make sure your scikit-activeml Python environment is active!
-   cd <project-root>
    pip install -e '.[dev]'
 
-If you also need the optional dependencies used by deep learning features,
-streaming integrations, or tutorials, install the ``opt`` extra alongside the
-development dependencies:
+The ``opt`` extra adds the packages of ``requirements_opt.txt``, which the
+skorch, River, and CapyMOA integrations use. CI checks the full coverage with
+these packages installed. The tutorials need further packages, which their
+installation cells list.
 
 .. code:: bash
 
    pip install -e '.[dev,opt]'
 
-This uses the same ``opt`` extra described in the installation section of the
-README and pulls in the packages listed in ``requirements_opt.txt``. If you
-need the maximum tested dependency set for local reproduction of the CI
-environment, you can additionally use:
-
-.. code:: bash
-
-   pip install -e '.[dev,max,opt_max]'
-
 As in the README, the ``opt`` extra does **not** install PyTorch automatically.
 Please install the appropriate PyTorch build separately for your hardware and
-CUDA setup if your contribution depends on PyTorch/skorch features.
-If your contribution uses CapyMOA, you also need a Java runtime. One
-simple option with conda is:
+CUDA setup if your contribution depends on PyTorch or skorch. CapyMOA needs a
+Java runtime. With the ``opt`` extra installed, the CapyMOA tests fail without
+one. One simple option with conda is:
 
 .. code:: bash
 
    conda install conda-forge::openjdk
 
-After the pip installation is successful, you must install pandoc and
-ghostscript, and ffmpeg if they are not already installed. For example,
-via conda you can do this as follows:
+The ``max`` and ``opt_max`` extras cap the dependencies at the newest versions
+tested for the last release. Use them if a newer dependency release breaks
+your setup. CI itself tests the oldest supported and the newest available
+versions.
+
+.. code:: bash
+
+   pip install -e '.[dev,max,opt_max]'
+
+After the pip installation, install pandoc, ghostscript, and ffmpeg if they
+are not already installed. For example, with conda:
 
 .. code:: bash
 
    conda install -c conda-forge pandoc ghostscript ffmpeg
 
-
-We also provide a `pre-commit <https://pre-commit.com/>`__
-configuration that offers automatic linting checks using
-`black <https://black.readthedocs.io/en/stable/>`__ and
-`flake8 <https://flake8.pycqa.org/en/latest/>`__. To use these pre-commit
-hooks, you need to install them:
+We also provide a `pre-commit <https://pre-commit.com/>`__ configuration that
+checks the formatting with
+`black <https://black.readthedocs.io/en/stable/>`__ and lints with
+`flake8 <https://flake8.pycqa.org/en/latest/>`__ before each commit. Install
+the hooks:
 
 .. code:: bash
 
-  pre-commit install
+   pre-commit install
+
+The hooks use black and flake8 from the active environment, so activate it
+before you commit.
 
 Contributing Code
 -----------------
@@ -179,7 +191,7 @@ it in a private file in that subpackage. If several subpackages use a general
 helper and it does not import from ``skactiveml.base``, put it in a clearly
 named private file under ``skactiveml/utils``.
 
-Do not import helper functions or constants from ``skactiveml.base``; that
+Do not import helper functions or constants from ``skactiveml.base``. That
 file is for base classes. If a helper must import a base class, keep it in the
 subpackage that uses it. ``skactiveml/pool/_target.py`` is an example. Put
 exception classes in ``skactiveml/exceptions.py``.
@@ -191,52 +203,83 @@ strategies.
 Example for Code Contribution Cycle (C3) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Fork the repository using the GitHub
-   `Fork <https://github.com/scikit-activeml/scikit-activeml/fork>`__ button.
+1. Start a branch from the latest ``development`` branch:
 
-2. Clone your fork to your local machine:
+   .. code:: bash
 
-.. code:: bash
+      git fetch upstream
+      git switch -c <branch-name> upstream/development
 
-   git clone https://github.com/<your-username>/scikit-activeml.git
+2. Implement your changes. For a new query strategy, follow
+   `Adding a Query Strategy`_. Then run the tests:
 
-3. Create a new branch for your changes from the ``development`` branch:
+   .. code:: bash
 
-.. code:: bash
+      python -m pytest --no-cov -n 6
 
-   git checkout -b <branch-name>
+   With several workers, limit the threads of each worker, for example with
+   ``OMP_NUM_THREADS=1 python -m pytest --no-cov -n 6``. Otherwise, the tests
+   may run much slower.
 
-4. After you have finished implementing the feature, ensure that all tests pass.
-   You can run the tests using:
+3. Check that the tests cover every line, as `Testing and Code Coverage`_
+   describes.
 
-.. code:: bash
+4. Commit and push your changes. Write one-line commit messages in the
+   imperative mood, such as "Fix CapyMOAClassifier for capymoa 0.15".
 
-   python -m pytest --no-cov -n 6
+   .. code:: bash
 
-Make sure you have covered all lines with tests.
+      git add <modified-files>
+      git commit -m "<commit-message>"
+      git push -u origin <branch-name>
 
-.. code:: bash
+5. Open a pull request with ``development`` as its base branch, and name the
+   issue it closes. The pull request runs these checks:
 
-   python -m pytest -n 6
+   * The tests with Python 3.11 to 3.14, with the oldest supported and the
+     newest available dependencies, each with and without the optional ones.
+   * Full coverage in the tests with the optional dependencies.
+   * ``black --check`` and ``flake8`` for syntax errors and undefined names.
+   * The doctest and HTML builds of the documentation.
 
-5. Commit and push your changes.
-
-.. code:: bash
-
-   git add <modified-files>
-   git commit -m "<commit-message>"
-   git push
-
-6. Create a pull request.
+Contributions are licensed under the project's
+`BSD 3-Clause License <https://github.com/scikit-activeml/scikit-activeml/blob/master/LICENSE.txt>`__.
 
 Query Strategies
 ----------------
 
 All query strategies inherit from the abstract superclass
 ``skactiveml.base.QueryStrategy``, which is implemented in ``skactiveml/base.py``.
-This superclass inherits from ``sklearn.base.Estimator``. Its optional
+This superclass inherits from scikit-learn's ``BaseEstimator``. Its optional
 ``random_state`` parameter controls reproducibility, and the abstract ``query``
 method enforces the implementation of the sample-selection logic.
+
+Adding a Query Strategy
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A new query strategy needs these steps:
+
+1. Implement the class in a private module of its subpackage, such as
+   ``skactiveml/pool/_my_strategy.py``. Name the module after the class, as
+   `General Coding Conventions`_ describes.
+2. Import the class in the subpackage's ``__init__.py`` and add it to
+   ``__all__``. The API reference, the example generator, and the tests find
+   strategies through ``__all__``.
+3. Declare the supported target combinations in ``_target_capabilities``, as
+   `Target Semantics and Compatibility`_ describes.
+4. Write the docstrings in the numpydoc style. Cite the method's papers in a
+   ``References`` section with numbered entries, such as ``.. [1]``.
+5. Add tests, as the Testing sections below describe. Pool and stream
+   strategies reuse the template of their type. It requires a test named
+   ``test_init_param_<name>`` for each constructor parameter, a test named
+   ``test_query_param_<name>`` for each ``query`` parameter, and
+   ``test_query``. The template already has these tests for the shared
+   parameters. Multi-annotator strategies use ``unittest.TestCase``.
+6. Add the papers' BibTeX entries to ``docs/refs.bib`` and an example entry,
+   as `Examples`_ describes.
+7. Run the tests, check the coverage as `Testing and Code Coverage`_
+   describes, and build the documentation as `Building the Documentation`_
+   describes.
 
 Target Semantics and Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -245,30 +288,30 @@ Labels and target semantics have an explicit public contract. Read the
 :doc:`target_semantics` reference before changing estimators, query strategies,
 label helpers, or multi-annotator components. In particular:
 
-- resolve target meaning with
-  :func:`~skactiveml.utils.resolve_target_spec`; do not infer semantics from
-  array shape or values alone;
-- declare the exact target combinations a component supports through its
-  ``_target_capabilities``;
-- preserve the fitted ``target_spec_`` on estimators and wrappers that retain a
-  fitted target specification; query strategies resolve each query and do not
-  retain a last-query specification;
-- add tests for every supported target combination and for invalid or
+- Resolve the target meaning with
+  :func:`~skactiveml.utils.resolve_target_spec`. Do not infer it from the
+  array shape or the values alone.
+- Declare the exact target combinations a component supports in its
+  ``_target_capabilities``.
+- Keep the fitted ``target_spec_`` on estimators and wrappers that retain a
+  fitted target specification. Query strategies resolve the specification in
+  each query and do not retain it.
+- Add tests for every supported target combination and for invalid or
   unsupported combinations, including ambiguous two-dimensional labels and
-  complete-row requirements for multi-label data;
-- operate on encoded labels for multi-label data, because each label output
-  may declare its own binary class vocabulary, e.g.
-  ``[["no", "yes"], ["off", "on"]]``. A pool strategy test supplying
-  ``query_default_params_clf_multilabel`` runs the shared custom class
-  vocabulary contract automatically. If its acquisition path needs auxiliary
-  inputs, override ``_multilabel_custom_vocabulary_params`` and record the
-  override in ``skactiveml/pool/tests/test_multilabel_contracts.py``
+  complete-row requirements for multi-label data.
+- Operate on encoded labels for multi-label data, because each label output
+  may declare its own binary class vocabulary, such as
+  ``[["no", "yes"], ["off", "on"]]``. A pool strategy test that supplies
+  ``query_default_params_clf_multilabel`` runs the shared contract for custom
+  class vocabularies automatically. If the strategy needs auxiliary inputs for
+  this contract, override ``_multilabel_custom_vocabulary_params``. Record the
+  override in ``test_multilabel_contracts.py`` in ``skactiveml/pool/tests/``,
   instead of skipping the contract.
 
 When adding multi-label support to a pool strategy, update the inventory in
-``skactiveml/pool/tests/test_multilabel_contracts.py`` and the
-:ref:`multilabel-strategy-inventory`. The tests group strategies by their use of
-probabilities; the reference groups them by their use of multi-label data.
+``test_multilabel_contracts.py`` and the :ref:`multilabel-strategy-inventory`.
+The tests group strategies by their use of probabilities. The reference groups
+them by their use of multi-label data.
 
 Single-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -278,9 +321,8 @@ Single-annotator Pool-based Query Strategies
 General
 ^^^^^^^
 
-Single-annotator pool-based query strategies are stored in the file
-``skactiveml/pool/*.py`` and inherit from
-``skactiveml.base.SingleAnnotatorPoolQueryStrategy``.
+Single-annotator pool-based query strategies live in ``skactiveml/pool/`` and
+inherit from ``SingleAnnotatorPoolQueryStrategy`` in ``skactiveml.base``.
 
 The class must implement the following methods:
 
@@ -302,11 +344,17 @@ For typical class parameters, we use standard names:
 +------------------------------+----------------------------------------------+
 | Parameter                    | Description                                  |
 +==============================+==============================================+
-| ``random_state``             | An integer or a np.random.RandomState,       |
+| ``missing_label``            | Value that marks a missing label, ``np.nan`` |
+|                              | by default.                                  |
++------------------------------+----------------------------------------------+
+| ``random_state``             | An integer or a ``np.random.RandomState``,   |
 |                              | similar to scikit-learn.                     |
 +------------------------------+----------------------------------------------+
-| ``prior``, optional          | Prior probabilities for the distribution     |
-|                              | in probabilistic strategies.                 |
+| ``target_type``              | The declared target type, ``"auto"`` by      |
+|                              | default. See :doc:`target_semantics`.        |
++------------------------------+----------------------------------------------+
+| ``prior``, optional          | Prior probabilities for the distribution in  |
+|                              | probabilistic strategies.                    |
 +------------------------------+----------------------------------------------+
 | ``method``, optional         | A string for classes that implement multiple |
 |                              | methods.                                     |
@@ -329,9 +377,8 @@ Required Parameters:
 |                                   | including both labeled and unlabeled         |
 |                                   | samples).                                    |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Labels of the training dataset. (May include |
-|                                   | unlabeled samples, indicated by a            |
-|                                   | MISSING_LABEL.)                              |
+| ``y``                             | Labels of the training dataset, with         |
+|                                   | ``missing_label`` for unlabeled samples.     |
 +-----------------------------------+----------------------------------------------+
 | ``candidates``, optional          | If ``candidates`` is None, the unlabeled     |
 |                                   | samples from (X, y) are considered as        |
@@ -379,11 +426,13 @@ Use the ``self._validate_data`` method (implemented in the superclass) exactly
 once for structural validation of the query inputs ``X`` and ``y``. Target
 resolution is a separate semantic step and may intentionally precede
 ``self._validate_data`` so that invalid or unsupported target semantics fail
-before estimator fitting or query-state initialization. Fit the classifier or
-regressor if it is not yet fitted (using ``fit_if_not_fitted`` from ``utils``).
-Calculate utilities via an extra public function. Use the ``simple_batch``
-function from ``utils`` to determine the query indices and set the utilities in
-naive batch query strategies.
+before estimator fitting or query-state initialization. If ``fit_clf`` or
+``fit_reg`` is ``True``, fit a clone of the classifier or regressor.
+``_fit_and_resolve_estimator_target_spec`` in ``skactiveml/pool/_target.py``
+does this and resolves the target specification. Calculate utilities via an
+extra public function. Use the ``simple_batch`` function from ``utils`` to
+determine the query indices and set the utilities in naive batch query
+strategies.
 
 .. _testing-1:
 
@@ -391,10 +440,11 @@ Testing
 ^^^^^^^
 
 Pool-strategy tests live in ``skactiveml/pool/tests``. Reuse the test template
-``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorPoolQueryStrategy``.
-Specify ``qs_class`` and ``init_default_params`` in the template setup and,
-depending on the supported task, ``query_default_params_reg`` or
-``query_default_params_clf``. Refer to the template for the complete contract.
+``TemplateSingleAnnotatorPoolQueryStrategy`` from
+``skactiveml.tests.template_query_strategy``. Specify ``qs_class`` and
+``init_default_params`` in the template setup and, depending on the supported
+task, ``query_default_params_reg`` or ``query_default_params_clf``. Refer to
+the template for the complete contract.
 
 Keep test helpers in the narrowest module that owns them. A helper used by one
 test module stays in that module. Put broadly reused assertions and fixture
@@ -409,10 +459,10 @@ Single-annotator Stream-based Query Strategies
 General
 ^^^^^^^
 
-All query strategies are stored in ``skactiveml/stream/*.py``.
-Every query strategy inherits from
-``skactiveml.base.SingleAnnotatorStreamQueryStrategy``. Every query strategy has
-either an internal budget handling or an outsourced ``budget_manager``.
+Stream-based query strategies live in ``skactiveml/stream/`` and inherit from
+``SingleAnnotatorStreamQueryStrategy`` in ``skactiveml.base``. Every query
+strategy has either an internal budget handling or an outsourced
+``budget_manager``.
 
 For typical class parameters we use standard names:
 
@@ -431,16 +481,17 @@ For typical class parameters we use standard names:
 
 The class must implement the following methods:
 
-+------------+-----------------------------------------------------------------+
-| Function   | Description                                                     |
-+============+=================================================================+
-| ``init``   | Function for initialization.                                    |
-+------------+-----------------------------------------------------------------+
-| ``query``  | Identify the instances whose labels to select without adapting  |
-|            | the internal state.                                             |
-+------------+-----------------------------------------------------------------+
-| ``update`` | Adapting the budget monitoring according to the queried labels. |
-+------------+-----------------------------------------------------------------+
++--------------+--------------------------------------------------------------+
+| Method       | Description                                                  |
++==============+==============================================================+
+| ``__init__`` | Method for initialization.                                   |
++--------------+--------------------------------------------------------------+
+| ``query``    | Identify the samples whose labels to query, without changing |
+|              | the internal state.                                          |
++--------------+--------------------------------------------------------------+
+| ``update``   | Update the budget monitoring according to the queried        |
+|              | labels.                                                      |
++--------------+--------------------------------------------------------------+
 
 .. _query-method-2:
 
@@ -449,58 +500,54 @@ The class must implement the following methods:
 
 Required Parameters:
 
-+------------------------------+-------------------------------------------------------------+
-| Parameter                    | Description                                                 |
-+==============================+=============================================================+
-| ``candidates``               | Set of candidate instances,                                 |
-|                              | inherited from                                              |
-|                              | ``SingleAnnotatorStreamBasedQueryStrategy``.                |
-+------------------------------+-------------------------------------------------------------+
-| ``clf``, optional            | The classifier used by the                                  |
-|                              | strategy.                                                   |
-+------------------------------+-------------------------------------------------------------+
-| ``X``, optional              | Set of labeled and unlabeled                                |
-|                              | instances.                                                  |
-+------------------------------+-------------------------------------------------------------+
-| ``y``, optional              | Labels of ``X`` (it may be set to                           |
-|                              | ``MISSING_LABEL`` if ``y`` is                               |
-|                              | unknown).                                                   |
-+------------------------------+-------------------------------------------------------------+
-| ``sample_weight``, optional  | Weights for each instance in                                |
-|                              | ``X`` or ``None`` if all are                                |
-|                              | equally weighted.                                           |
-+------------------------------+-------------------------------------------------------------+
-| ``fit_clf``, optional        | Uses ``X`` and ``y`` to fit the classifier.                 |
-+------------------------------+-------------------------------------------------------------+
-| ``return_utilities``         | Whether to return the candidates' utilities,                |
-|                              | inherited from ``SingleAnnotatorStreamBasedQueryStrategy``. |
-+------------------------------+-------------------------------------------------------------+
++--------------------------------+--------------------------------------------+
+| Parameter                      | Description                                |
++================================+============================================+
+| ``candidates``                 | The candidate samples.                     |
++--------------------------------+--------------------------------------------+
+| ``clf``, optional              | The classifier used by the strategy.       |
++--------------------------------+--------------------------------------------+
+| ``X``, optional                | Labeled and unlabeled samples.             |
++--------------------------------+--------------------------------------------+
+| ``y``, optional                | Labels of ``X``, with the classifier's     |
+|                                | ``missing_label`` for unknown labels.      |
++--------------------------------+--------------------------------------------+
+| ``sample_weight``, optional    | Weights of the samples in ``X``, or        |
+|                                | ``None`` if all are equally weighted.      |
++--------------------------------+--------------------------------------------+
+| ``fit_clf``, optional          | If ``True``, fit the classifier on ``X``   |
+|                                | and ``y``.                                 |
++--------------------------------+--------------------------------------------+
+| ``return_utilities``, optional | Whether to return the candidates'          |
+|                                | utilities.                                 |
++--------------------------------+--------------------------------------------+
 
 Returns:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``queried_indices``               | Indices of the best instances     |
-|                                   | from ``X_Cand``.                  |
-+-----------------------------------+-----------------------------------+
-| ``utilities``                     | Utilities of all candidate        |
-|                                   | instances, only if                |
-|                                   | ``return_utilities`` is ``True``. |
-+-----------------------------------+-----------------------------------+
++-----------------------------------+-----------------------------------------+
+| Parameter                         | Description                             |
++===================================+=========================================+
+| ``queried_indices``               | Indices of the queried samples in       |
+|                                   | ``candidates``.                         |
++-----------------------------------+-----------------------------------------+
+| ``utilities``                     | Utilities of all candidates, only if    |
+|                                   | ``return_utilities`` is ``True``.       |
++-----------------------------------+-----------------------------------------+
 
 .. _general-advice-2:
 
-General advice
+General Advice
 ''''''''''''''
 
-The ``query`` method must not change the internal state of the ``query``
-strategy (``budget``, ``budget_manager`` and ``random_state`` included) to allow
-for assessing multiple instances with the same state. Update the internal state
-in the ``update()`` method. If the class implements a classifier (``clf``) the
-optional attributes need to be implement. Use ``self._validate_data`` method
-(is implemented in superclass). Check the input ``X`` and ``y`` only once. Fit
-classifier if ``fit_clf`` is set to ``True``.
+The ``query`` method must not change the internal state of the query strategy,
+including ``budget``, ``budget_manager``, and ``random_state``, so that several
+samples can be assessed with the same state. Update the internal state in the
+``update`` method. If the strategy uses a classifier (``clf``), it also accepts
+the optional parameters ``X``, ``y``, ``sample_weight``, and ``fit_clf``. Use
+the ``self._validate_data`` method of the superclass, and check the inputs
+``X`` and ``y`` only once. If ``fit_clf`` is ``True``, fit a clone of the
+classifier. In both cases, resolve its target specification with
+``self._resolve_clf_target_spec(clf, y)``.
 
 .. _update-1:
 
@@ -509,63 +556,62 @@ classifier if ``fit_clf`` is set to ``True``.
 
 Required Parameters:
 
-+-------------------------------+----------------------------------------------+
-| Parameter                     | Description                                  |
-+===============================+==============================================+
-| ``candidates``                | Set of candidate instances,                  |
-|                               | inherited from                               |
-|                               | ``SingleAnnotatorStreamBasedQueryStrategy``. |
-+-------------------------------+----------------------------------------------+
-| ``queried_indices``           | Typically the return value of                |
-|                               | ``query``.                                   |
-+-------------------------------+----------------------------------------------+
-| ``budget_manager_param_dict`` | Provides additional parameters to            |
-|                               | the ``update`` method of the                 |
-|                               | ``budget_manager`` (only include             |
-|                               | if a ``budget_manager`` is used).            |
-+-------------------------------+----------------------------------------------+
++-------------------------------+---------------------------------------------+
+| Parameter                     | Description                                 |
++===============================+=============================================+
+| ``candidates``                | The candidate samples.                      |
++-------------------------------+---------------------------------------------+
+| ``queried_indices``           | Indices of the queried samples in           |
+|                               | ``candidates``, typically the return value  |
+|                               | of ``query``.                               |
++-------------------------------+---------------------------------------------+
+| ``budget_manager_param_dict`` | Further parameters for the ``update``       |
+|                               | method of the budget manager. Only for      |
+|                               | strategies with a budget manager.           |
++-------------------------------+---------------------------------------------+
 
 .. _general-advice-3:
 
-General advice
+General Advice
 ''''''''''''''
 
-Use ``self._validate_data`` in the case the strategy is used without using
-the ``query`` method (if parameters need to be initialized before the
-update). If a ``budget_manager`` is used forward the update call to the
-``budget_manager.update`` method.
+``update`` must also work before the first ``query``. Validate ``candidates``
+and ``queried_indices`` first, for example with ``_validate_budget_update``
+from ``skactiveml.utils._validation``, so that invalid input leaves the state
+unchanged. If the strategy uses a ``budget_manager``, create it if needed and
+forward the call to ``budget_manager.update``.
 
 .. _testing-2:
 
 Testing
 ^^^^^^^
 Stream-strategy tests live in ``skactiveml/stream/tests``. Reuse the test
-template
-``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorStreamQueryStrategy``.
-Specify ``qs_class`` and ``init_default_params`` in the template setup and,
-depending on the supported task, ``query_default_params_reg`` or
-``query_default_params_clf``. Refer to the template for the complete contract.
+template ``TemplateSingleAnnotatorStreamQueryStrategy`` from
+``skactiveml.tests.template_query_strategy``. Specify ``qs_class`` and
+``init_default_params`` in the template setup and, depending on the supported
+task, ``query_default_params_reg`` or ``query_default_params_clf``. Refer to
+the template for the complete contract.
 
 .. _general-advice-4:
 
 ``budget_manager``
 ^^^^^^^^^^^^^^^^^^
 
-All budget managers are stored in
-``skactiveml/stream/budgetmanager/*.py``. The class must implement the
+Budget managers live in ``skactiveml/stream/budgetmanager/`` and inherit from
+``BudgetManager`` in ``skactiveml.base``. The class must implement the
 following methods:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``__init__``                      | Function for initialization       |
-+-----------------------------------+-----------------------------------+
-| ``query_by_utilities``            | Identify which instances to query |
-|                                   | based on the assessed utility     |
-+-----------------------------------+-----------------------------------+
-| ``update``                        | Adapting the budget monitoring    |
-|                                   | according to the queried labels   |
-+-----------------------------------+-----------------------------------+
++----------------------+------------------------------------------------------+
+| Method               | Description                                          |
++======================+======================================================+
+| ``__init__``         | Method for initialization.                           |
++----------------------+------------------------------------------------------+
+| ``query_by_utility`` | Identify the samples to query, based on their        |
+|                      | utilities.                                           |
++----------------------+------------------------------------------------------+
+| ``update``           | Update the budget monitoring according to the        |
+|                      | queried labels.                                      |
++----------------------+------------------------------------------------------+
 
 Once initialized, ``query_by_utility`` must leave the budget manager's
 acquisition state unchanged, including counters, thresholds, histories, and
@@ -580,83 +626,85 @@ this contract for both initialization paths.
 ``update``
 ^^^^^^^^^^
 
-The update method of the budget manager has the same functionality as
-the query strategy update.
+The ``update`` method of the budget manager advances its state, as the
+``update`` method of a query strategy does.
 
 Required Parameters:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``budget``                        | % of labels that the strategy is  |
-|                                   | allowed to query                  |
-+-----------------------------------+-----------------------------------+
-| ``random_state``                  | Integer that acts as random seed  |
-|                                   | or ``np.random.RandomState`` like |
-|                                   | scikit-learn                      |
-+-----------------------------------+-----------------------------------+
++------------------------------+----------------------------------------------+
+| Parameter                    | Description                                  |
++==============================+==============================================+
+| ``candidates``               | The candidate samples.                       |
++------------------------------+----------------------------------------------+
+| ``queried_indices``          | Indices of the queried samples in            |
+|                              | ``candidates``.                              |
++------------------------------+----------------------------------------------+
+
+Some budget managers need more arguments, such as the ``utilities`` of
+``BalancedIncrementalQuantileFilter``.
 
 .. _query-by-utilities-1:
 
-``query_by_utilities``
-^^^^^^^^^^^^^^^^^^^^^^
+.. _query-by-utilities:
+
+``query_by_utility``
+^^^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
 
-+-----------------------------------+------------------------------------+
-| Parameter                         | Description                        |
-+===================================+====================================+
-| ``utilities``                     | The ``utilities`` of ``candidates``|
-|                                   | calculated by the query strategy,  |
-|                                   | inherited from ``BudgetManager``   |
-+-----------------------------------+------------------------------------+
++------------------------------+----------------------------------------------+
+| Parameter                    | Description                                  |
++==============================+==============================================+
+| ``utilities``                | The utilities of the candidates, computed by |
+|                              | the query strategy.                          |
++------------------------------+----------------------------------------------+
 
 Returns:
 
-+-----------------------------------+------------------------------------+
-| Parameter                         | Description                        |
-+===================================+====================================+
-| ``queried_indices``               | The indices of samples in          |
-|                                   | candidates whose labels are        |
-|                                   | queried, with                      |
-|                                   | ``0 <= queried_indices <=          |
-|                                   | n_candidates``.                    |
-+-----------------------------------+------------------------------------+
++------------------------------+----------------------------------------------+
+| Parameter                    | Description                                  |
++==============================+==============================================+
+| ``queried_indices``          | Indices of the candidates whose labels are   |
+|                              | queried, with ``0 <= queried_indices <       |
+|                              | n_candidates``.                              |
++------------------------------+----------------------------------------------+
 
 
 .. _general-advice-5:
 
-General advice for working with a ``budget_manager``:
-'''''''''''''''''''''''''''''''''''''''''''''''''''''
+General Advice for Working with a ``budget_manager``
+''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-If a ``budget_manager`` is used, the ``_validate_data`` of the query
-strategy needs to be adapted accordingly:
+A query strategy with a ``budget_manager`` creates its working copy with
+``check_budget_manager`` from ``skactiveml.utils``, in ``_validate_data`` or
+in a first ``update``:
 
--  If only a ``budget`` is given use the default ``budget_manager`` with
-   the given budget
--  If only a ``budget_manager`` is given use the ``budget_manager``
--  If both are not given use the default ``budget_manager`` with the
-   default budget
--  If both are given and the budget differs from
-   ``budget_manager.budget`` throw an error
+- With only a ``budget``, it creates the default budget manager with this
+  budget.
+- With only a ``budget_manager``, it uses a copy of it.
+- With neither, it creates the default budget manager with its default
+  budget.
+- With both, it uses the budget manager and warns if the budgets differ.
+
+Then call ``self._sync_default_budget_manager()``, so that a changed ``budget``
+reaches the default budget manager.
 
 .. _testing-3:
 
 Testing
 ^^^^^^^
 Budget-manager tests live in ``skactiveml/stream/budgetmanager/tests`` and
-share the template
-``skactiveml.tests.template_budget_manager.TemplateBudgetManager``. Specify
-``bm_class``, ``init_default_params``, and ``query_by_utility_params`` in the
-template setup, then adjust the generated tests as needed.
+share the template ``TemplateBudgetManager`` from
+``skactiveml.tests.template_budget_manager``. Specify ``bm_class``,
+``init_default_params``, and ``query_by_utility_params`` in the template
+setup, then adjust the generated tests as needed.
 
 
 Multi-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All query strategies are stored in
-``skactiveml/pool/multiannotator/*.py`` and inherit
-``skactiveml.base.MultiAnnotatorPoolQueryStrategy``.
+Multi-annotator query strategies live in ``skactiveml/pool/multiannotator/``
+and inherit from ``MultiAnnotatorPoolQueryStrategy`` in ``skactiveml.base``.
 
 The class must implement the following methods:
 
@@ -684,12 +732,11 @@ Required Parameters:
 |                                   | labeled and unlabeled samples.    |
 +-----------------------------------+-----------------------------------+
 | ``y``                             | Labels of the training data set   |
-|                                   | for each annotator (possibly      |
-|                                   | including unlabeled ones          |
-|                                   | indicated by self.MISSING_LABEL), |
-|                                   | meaning that ``y[i, j]`` contains |
-|                                   | the label annotated by annotator  |
-|                                   | ``i`` for sample ``j``.           |
+|                                   | for each annotator, with          |
+|                                   | ``missing_label`` for missing     |
+|                                   | labels. ``y[i, j]`` holds the     |
+|                                   | label of annotator ``j`` for      |
+|                                   | sample ``i``.                     |
 +-----------------------------------+-----------------------------------+
 | ``candidates``, optional          | If ``candidates`` is ``None``,    |
 |                                   | the samples from ``(X, y)``, for  |
@@ -780,13 +827,12 @@ Returns:
 
 .. _general-advice-6:
 
-General advice
+General Advice
 ''''''''''''''
 
-Use ``self._validate_data`` (implemented in the superclass).
-Check the input ``X`` and ``y`` only once. Fit classifier if it is not
-yet fitted (may use ``fit_if_not_fitted`` form ``utils``). If the
-strategy combines a single annotator query strategy with a performance
+Use ``self._validate_data`` (implemented in the superclass). Check the inputs
+``X`` and ``y`` only once. Fit the classifier only if ``fit_clf`` is ``True``.
+If the strategy combines a single-annotator query strategy with a performance
 estimate:
 
 -  define an aggregation function,
@@ -853,6 +899,9 @@ annotators are implemented in the subpackage
 +-----------------------------------+----------------------------------------------+
 | ``random_state``, optional        | Ensures reproducibility (cf. scikit-learn).  |
 +-----------------------------------+----------------------------------------------+
+| ``target_type``, optional         | The declared target type, ``"auto"`` by      |
+|                                   | default. See :doc:`target_semantics`.        |
++-----------------------------------+----------------------------------------------+
 
 .. _fit-1:
 
@@ -867,12 +916,14 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the class labels of the training    |
-|                                   | samples. Missing labels are represented by   |
-|                                   | the attribute ``missing_label``. Usually,    |
-|                                   | ``y`` is a column array except for multi-    |
-|                                   | annotator classifiers, which expect a matrix |
-|                                   | with columns for each annotator.             |
+| ``y``                             | Class labels of the training samples, with   |
+|                                   | ``missing_label`` for missing labels. For    |
+|                                   | single-output classification, ``y`` has the  |
+|                                   | shape ``(n_samples,)``, and for multi-label  |
+|                                   | classification ``(n_samples, n_outputs)``.   |
+|                                   | Multi-annotator classifiers expect           |
+|                                   | ``(n_samples, n_annotators)``. See           |
+|                                   | :doc:`target_semantics`.                     |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | class labels. Must have the same shape as    |
@@ -929,9 +980,9 @@ Returns:
 General Advice
 ^^^^^^^^^^^^^^
 
-Check parameter ``X`` regarding its shape, i.e., use superclass method
-``self._check_n_features`` to ensure a correct number of features. Check
-that the classifier has been fitted. If the classifier is a
+Check parameter ``X`` regarding its shape, i.e., use ``check_n_features`` from
+``skactiveml.utils`` to ensure a correct number of features. Check that the
+classifier has been fitted. If the classifier is a
 ``skactiveml.base.ClassFrequencyEstimator``, this method is already
 implemented in the superclass.
 
@@ -954,8 +1005,8 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``y_pred``                        | The estimated class label         |
-|                                   | of each per sample.               |
+| ``y_pred``                        | The predicted class label of each |
+|                                   | sample.                           |
 +-----------------------------------+-----------------------------------+
 
 .. _general-advice-9:
@@ -1012,10 +1063,10 @@ Testing
 ~~~~~~~
 
 Classifier tests live in ``skactiveml/classifier/tests`` and reuse the template
-``skactiveml.tests.template_estimator.TemplateSkactivemlClassifier``. Specify
-``estimator_class``, ``init_default_params``, ``fit_default_params``, and
-``predict_default_params`` in the template setup, then adjust the generated
-tests as needed.
+``TemplateSkactivemlClassifier`` from ``skactiveml.tests.template_estimator``.
+Specify ``estimator_class``, ``init_default_params``, ``fit_default_params``,
+and ``predict_default_params`` in the template setup, then adjust the
+generated tests as needed.
 
 Regressors
 ----------
@@ -1048,6 +1099,9 @@ Required Parameters:
 +-----------------------------------+----------------------------------------------+
 | ``missing_label``, optional       | Value representing a missing label.          |
 +-----------------------------------+----------------------------------------------+
+| ``target_type``, optional         | The declared target type, ``"auto"`` by      |
+|                                   | default. See :doc:`target_semantics`.        |
++-----------------------------------+----------------------------------------------+
 
 .. _fit-2:
 
@@ -1062,12 +1116,10 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the labels of the training          |
-|                                   | samples. Missing labels are represented by   |
-|                                   | the attribute ``missing_label``. Usually,    |
-|                                   | ``y`` is a column array except for multi-    |
-|                                   | target regressors, which expect a matrix     |
-|                                   | with columns for each target type.           |
+| ``y``                             | Labels of the training samples, of shape     |
+|                                   | ``(n_samples,)``, with ``missing_label`` for |
+|                                   | missing labels. Regressors reject labels     |
+|                                   | with several columns.                        |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | labels. Must have the same shape as ``y``.   |
@@ -1122,9 +1174,9 @@ Returns:
 General Advice
 ^^^^^^^^^^^^^^
 
-Check parameter ``X`` regarding its shape, i.e., use method
-``skactiveml.utils.check_n_features`` to ensure a correct number of
-features. Check that the regressor has been fitted. If the regressor is a
+Check parameter ``X`` regarding its shape, i.e., use ``check_n_features`` from
+``skactiveml.utils`` to ensure a correct number of features. Check that the
+regressor has been fitted. If the regressor is a
 ``skactiveml.base.ProbabilisticRegressor``, this method is already
 implemented in the superclass.
 
@@ -1154,7 +1206,7 @@ Returns:
 | Parameter                         | Description                       |
 +===================================+===================================+
 | ``score``                         | R2 score of ``self.predict(X)``   |
-|                                   |  regarding ``y``.                 |
+|                                   | regarding ``y``.                  |
 +-----------------------------------+-----------------------------------+
 
 General Advice
@@ -1170,10 +1222,10 @@ Testing
 ~~~~~~~
 
 Regressor tests live in ``skactiveml/regressor/tests`` and reuse the template
-``skactiveml.tests.template_estimator.TemplateSkactivemlRegressor``. Specify
-``estimator_class``, ``init_default_params``, ``fit_default_params``, and
-``predict_default_params`` in the template setup, then adjust the generated
-tests as needed.
+``TemplateSkactivemlRegressor`` from ``skactiveml.tests.template_estimator``.
+Specify ``estimator_class``, ``init_default_params``, ``fit_default_params``,
+and ``predict_default_params`` in the template setup, then adjust the
+generated tests as needed.
 
 
 Examples
@@ -1396,8 +1448,18 @@ Add a new generic wrapper there.
 Testing and Code Coverage
 -------------------------
 
-Please ensure test coverage is close to 100%. The current code coverage can be
-viewed `here <https://app.codecov.io/gh/scikit-activeml/scikit-activeml>`__.
+CI requires that the tests cover every line of ``skactiveml``. To list the
+lines that the tests miss, run:
+
+.. code:: bash
+
+   python -m pytest -n 6 --cov-report=term-missing:skip-covered
+
+CI checks this coverage with the optional dependencies, PyTorch, and a Java
+runtime installed. Without the optional dependencies, the tests leave out the
+skorch, River, and CapyMOA integrations. The coverage of the published
+branches is on
+`Codecov <https://app.codecov.io/gh/scikit-activeml/scikit-activeml>`__.
 
 Documentation
 -------------
@@ -1529,13 +1591,21 @@ Building the Documentation
 
 To ensure your documentation examples execute successfully and the pages are
 well formatted, activate the ``scikit-activeml`` environment and build them
-using Sphinx. The configuration queries release tags and external inventories,
-so a network connection is required:
+using Sphinx. Install the optional dependencies and PyTorch first. Otherwise,
+the API reference lacks the skorch, River, and CapyMOA wrappers and the
+PyTorch-based multi-annotator classifiers. The configuration queries release
+tags and external inventories, so a network connection is required:
 
 .. code:: bash
 
    python -m sphinx -b doctest docs docs/_build/doctest
    python -m sphinx -b html docs docs/_build
+
+The build generates and runs the visualization examples on all CPU cores. Set
+the environment variable ``num_cpus`` to use fewer, such as ``num_cpus=4``.
+Local builds run the examples with 50 samples and 5 cycles. Set the
+environment variable ``FULLEXAMPLES``, such as ``FULLEXAMPLES=1``, to run them
+at full size, as the website does.
 
 Issue Tracking
 --------------
@@ -1555,16 +1625,8 @@ the search box at the top of the issue tracker page (filter by the ``bug`` label
 Reporting an Issue
 ~~~~~~~~~~~~~~~~~~
 
-Use the following labels when reporting an issue:
-
-+------------------+-------------------------------------------+
-| Label            | Use Case                                  |
-+==================+===========================================+
-| ``bug``          | Something isn't working                   |
-+------------------+-------------------------------------------+
-| ``enhancement``  | Request for a new feature                 |
-+------------------+-------------------------------------------+
-| ``documentation``| Improvement or additions to documentation |
-+------------------+-------------------------------------------+
-| ``question``     | General questions                         |
-+------------------+-------------------------------------------+
+Open the issue with the matching form: *Bug report*, *Documentation
+improvement*, or *Feature request*. The maintainers add the labels. Ask
+questions in
+`GitHub Discussions <https://github.com/scikit-activeml/scikit-activeml/discussions>`__
+instead.

@@ -385,9 +385,8 @@ downgrades within your existing environment.
    pip install -U 'scikit-activeml[max,opt_max]'
 
 This setup uses the versions listed in ``requirements_max.txt`` and
-``requirements_opt_max.txt`` and corresponds to the configuration used in
-our continuous integration tests. You can also install only the maximum
-tested core dependencies via:
+``requirements_opt_max.txt``, the newest versions tested for this release.
+You can also install only the maximum tested core dependencies via:
 
 .. code-block:: bash
 
@@ -459,6 +458,20 @@ modality, and models used in the tutorial.
      - - SentenceTransformer embeddings with scikit-learn, River, and CapyMOA classifiers
 
 .. examples_end
+
+.. contributing_start
+
+🤝 Contributing
+---------------
+Contributions are welcome, from bug reports to new query strategies. The
+`contributing guide <https://scikit-activeml.github.io/latest/contributing.html>`_
+explains how to set up a development environment, add a query strategy, and
+open a pull request. Ask questions in
+`GitHub Discussions <https://github.com/scikit-activeml/scikit-activeml/discussions>`_
+and report bugs in
+`GitHub Issues <https://github.com/scikit-activeml/scikit-activeml/issues>`_.
+
+.. contributing_end
 
 .. citing_start
 
