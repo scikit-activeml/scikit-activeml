@@ -378,7 +378,8 @@ mark numeric NaN values as missing.
    >>> is_unlabeled(np.array([0.0, np.nan, 1.0]), missing_label="nan")
    Traceback (most recent call last):
        ...
-   TypeError: `missing_label='nan'` is a string and is not compatible with the floating-point labels in `y`. ...
+   TypeError: `missing_label='nan'` is a string and is not compatible with
+   the floating-point labels in `y`. ...
    >>> is_unlabeled(np.array([0.0, np.nan, 1.0]), missing_label=np.nan)
    array([False,  True, False])
 

@@ -718,6 +718,11 @@ class TestExamples(unittest.TestCase):
         )
         self.assertIn(".. image:: /logos/readme_pool.gif", rendered)
         self.assertIn(".. image:: /logos/readme_stream.gif", rendered)
+        self.assertIn(
+            ".. image:: /logos/scikit-activeml-logo-dark.png\n"
+            "   :class: only-dark",
+            rendered,
+        )
         with open(readme) as file:
             self.assertEqual(file.read(), original)
 

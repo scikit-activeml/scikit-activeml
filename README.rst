@@ -427,7 +427,7 @@ modality, and models used in the tutorial.
 
 .. list-table::
    :header-rows: 1
-   :class: no-tag-filter
+   :class: tutorial-summary-table
 
    * - Tutorial
      - Scenario

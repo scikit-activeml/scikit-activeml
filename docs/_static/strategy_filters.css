@@ -162,6 +162,48 @@
     .strategy-filter-options {
         margin-left: 0;
     }
+
+    /* Show each strategy as a block instead of a table that scrolls
+       sideways. */
+    .strategy-table {
+        min-width: 0;
+    }
+
+    .strategy-table thead {
+        display: none;
+    }
+
+    .strategy-table,
+    .strategy-table tbody,
+    .strategy-table tr,
+    .strategy-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .strategy-table tr {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--pst-color-border);
+    }
+
+    .strategy-table td {
+        padding: 0.125rem 0.5rem;
+        border: 0;
+    }
+
+    .strategy-table td:first-child > p:first-child {
+        font-weight: 600;
+    }
+
+    .strategy-table td:nth-child(2) > p:first-child::before {
+        content: "API class: ";
+        font-weight: 600;
+    }
+
+    .strategy-table td:nth-child(5) > p:first-child::before {
+        content: "Reference: ";
+        font-weight: 600;
+    }
 }
 
 @media (forced-colors: active) {

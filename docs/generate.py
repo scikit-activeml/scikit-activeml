@@ -470,6 +470,14 @@ def generate_documentation_readme(src_path, dst_path):
         "refs/heads/development/docs/logos/",
         "/logos/",
     )
+    # The logo's wordmark is dark gray. Dark mode shows a light variant.
+    content = re.sub(
+        r"(\.\. image:: )\S+/(scikit-activeml-logo)\.png\n"
+        r"   :class: dark-light\n((?:   :.+\n)*)",
+        r"\1/logos/\2.png\n   :class: only-light\n\3\n"
+        r"\1/logos/\2-dark.png\n   :class: only-dark\n\3",
+        content,
+    )
     destination = Path(dst_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(content)
@@ -1631,7 +1639,11 @@ def uncomment_installation_code(file_content):
     return output
 
 
-def export_legend(handles, labels, ax, path="legend.pdf", expand=None, ncol=4):
+# Legends are 4 inches wide, so phones show them at nearly full size.
+LEGEND_FIGSIZE = (4, 4)
+
+
+def export_legend(handles, labels, ax, path="legend.pdf", expand=None, ncol=2):
     if expand is None:
         expand = [-5, -5, 5, 5]
 
@@ -1659,14 +1671,14 @@ def export_legend(handles, labels, ax, path="legend.pdf", expand=None, ncol=4):
 
 def generate_stream_classification_legend(path):
     handles = []
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4), tight_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
     labels = []
 
-    labels.append("Sample Of Class 0")
+    labels.append("Sample of Class 0")
     handles.append(ax.plot([], [], color="blue")[0])
-    labels.append("Sample Of Class 1")
+    labels.append("Sample of Class 1")
     handles.append(ax.plot([], [], color="red")[0])
-    labels.append("Unlabled Sample")
+    labels.append("Unlabeled Sample")
     handles.append(ax.plot([], [], color="grey")[0])
     labels.append("Current Sample")
     handles.append(ax.plot([], [], color="grey", linewidth=3)[0])
@@ -1679,7 +1691,7 @@ def generate_stream_classification_legend(path):
 def generate_classification_legend(path):
     handles = []
     labels = []
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4), tight_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
 
     labels.append("Decision Boundary")
     handles.append(ax.plot([], [], color="black")[0])
@@ -1687,9 +1699,9 @@ def generate_classification_legend(path):
     handles.append(
         ax.scatter([], [], marker=".", color="gray", s=100, alpha=0.8)
     )
-    labels.append("Sample Of Class 0")
+    labels.append("Sample of Class 0")
     handles.append(ax.scatter([], [], marker=".", color="blue"))
-    labels.append("Sample Of Class 1")
+    labels.append("Sample of Class 1")
     handles.append(ax.scatter([], [], marker=".", color="red"))
     labels.append("75% Confidence Class 0")
     handles.append(ax.plot([], [], color="blue", ls="--")[0])
@@ -1706,12 +1718,12 @@ def generate_classification_legend(path):
 def generate_regression_legend(path):
     handles = []
     labels = []
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4), tight_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
 
     handles.append(ax.plot([], [], color="black")[0])
     labels.append("Regression Curve")
     handles.append(ax.plot([], [], color="green")[0])
-    labels.append("Utilitiy Score")
+    labels.append("Utility Score")
     handles.append(ax.scatter([], [], marker=".", color="lightblue", s=100))
     labels.append("Unlabeled Sample")
     handles.append(ax.scatter([], [], marker=".", color="orange", s=100))
@@ -1723,7 +1735,7 @@ def generate_regression_legend(path):
 def generate_multi_annotator_pool_legend(path):
     handles = []
     labels = []
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4), tight_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
     handles.append(plt.Rectangle((0, 0), 1, 1, color="grey"))
     labels.append("Requested Labels (Total)")
     handles.append(
@@ -1795,7 +1807,7 @@ def generate_multi_annotator_pool_legend(path):
     )
     labels.append("Correct majority vote for class 1")
 
-    export_legend(handles, labels, ax, path=path, ncol=3)
+    export_legend(handles, labels, ax, path=path, ncol=1)
 
 
 def generate_switcher(

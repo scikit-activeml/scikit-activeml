@@ -20,37 +20,63 @@
     overflow-wrap: anywhere;
 }
 
-/* Tutorials index: on phones, show each tutorial as a block instead of a
-   four-column table that scrolls sideways. */
+/* Tutorials index and landing page: on phones, show each tutorial as a
+   block instead of a table that scrolls sideways. */
 @media (max-width: 575.98px) {
-    table.tutorial-table thead {
+    table.tutorial-table thead,
+    table.tutorial-summary-table thead {
         display: none;
     }
 
     table.tutorial-table,
     table.tutorial-table tbody,
     table.tutorial-table tr,
-    table.tutorial-table td {
+    table.tutorial-table td,
+    table.tutorial-summary-table,
+    table.tutorial-summary-table tbody,
+    table.tutorial-summary-table tr,
+    table.tutorial-summary-table td {
         display: block;
         width: 100%;
     }
 
-    table.tutorial-table tr {
+    table.tutorial-table tr,
+    table.tutorial-summary-table tr {
         padding: 0.5rem 0;
         border-bottom: 1px solid var(--pst-color-border);
     }
 
-    table.tutorial-table td {
+    table.tutorial-table td,
+    table.tutorial-summary-table td {
         padding: 0.125rem 0.5rem;
         border: 0;
     }
 
-    table.tutorial-table td:nth-child(2) > p:first-child::before {
+    table.tutorial-table td:nth-child(2) > p:first-child::before,
+    table.tutorial-summary-table td:nth-child(4) > p:first-child::before {
         content: "Data: ";
         font-weight: 600;
     }
 
-    table.tutorial-table td:nth-child(3) ul {
+    table.tutorial-summary-table td:nth-child(2) > p:first-child::before {
+        content: "Scenario: ";
+        font-weight: 600;
+    }
+
+    table.tutorial-summary-table td:nth-child(3) > p:first-child::before {
+        content: "Task: ";
+        font-weight: 600;
+    }
+
+    table.tutorial-table td:nth-child(3) ul,
+    table.tutorial-summary-table td:nth-child(5) ul {
         margin: 0;
+    }
+
+    /* All pages: let long inline code break instead of running past the
+       screen edge. */
+    .bd-article code.literal span.pre {
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 }

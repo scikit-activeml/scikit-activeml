@@ -240,6 +240,11 @@ html_theme_options = {
         "version_match": release,
     },
     "check_switcher": False,
+    # The logo's wordmark is dark gray. Dark mode shows a light variant.
+    "logo": {
+        "image_light": "logos/scikit-activeml-logo.png",
+        "image_dark": "logos/scikit-activeml-logo-dark.png",
+    },
     "navbar_start": ["navbar-logo", "version-switcher"],
     # Keep the header on one line at any viewport width. The remaining
     # links stay reachable through the "More" dropdown.
