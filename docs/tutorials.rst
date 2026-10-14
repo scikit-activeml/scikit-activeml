@@ -83,7 +83,7 @@ Classification
 
 .. list-table::
    :header-rows: 1
-   :class: no-tag-filter
+   :class: tutorial-table
 
    * - Tutorial
      - Data
@@ -148,7 +148,7 @@ Regression
 
 .. list-table::
    :header-rows: 1
-   :class: no-tag-filter
+   :class: tutorial-table
 
    * - Tutorial
      - Data
@@ -184,7 +184,7 @@ Classification
 
 .. list-table::
    :header-rows: 1
-   :class: no-tag-filter
+   :class: tutorial-table
 
    * - Tutorial
      - Data

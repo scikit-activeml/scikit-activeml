@@ -19,3 +19,38 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* Tutorials index: on phones, show each tutorial as a block instead of a
+   four-column table that scrolls sideways. */
+@media (max-width: 575.98px) {
+    table.tutorial-table thead {
+        display: none;
+    }
+
+    table.tutorial-table,
+    table.tutorial-table tbody,
+    table.tutorial-table tr,
+    table.tutorial-table td {
+        display: block;
+        width: 100%;
+    }
+
+    table.tutorial-table tr {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--pst-color-border);
+    }
+
+    table.tutorial-table td {
+        padding: 0.125rem 0.5rem;
+        border: 0;
+    }
+
+    table.tutorial-table td:nth-child(2) > p:first-child::before {
+        content: "Data: ";
+        font-weight: 600;
+    }
+
+    table.tutorial-table td:nth-child(3) ul {
+        margin: 0;
+    }
+}
