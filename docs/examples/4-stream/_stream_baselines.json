@@ -18,8 +18,7 @@
     "import_misc" : "from skactiveml.stream import StreamRandomSampling",
     "init_qs" : "StreamRandomSampling(budget=0.2)",
     "query_params" : "candidates=X_cand",
-    "update_params" : "candidates=X_cand, queried_indices=sampled_indices",
-    "plot_possible_queries": "X=X_train, y=y_train"
+    "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   },
   {
     "class" : "PeriodicSampling",
@@ -40,7 +39,6 @@
     "import_misc" : "from skactiveml.stream import PeriodicSampling",
     "init_qs" : "PeriodicSampling(budget=0.2)",
     "query_params" : "candidates=X_cand",
-    "update_params" : "candidates=X_cand, queried_indices=sampled_indices",
-    "plot_possible_queries": "X=X_train, y=y_train"
+    "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   }
 ]

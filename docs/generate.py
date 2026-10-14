@@ -235,6 +235,85 @@ def _example_setup(data):
     return f"{scenario}-{setup}"
 
 
+EXAMPLE_SETUP_VALUES = {
+    "task": ("classification", "regression"),
+    "target_type": ("single-output", "multi-label"),
+    "annotation_type": ("single-annotator", "multi-annotator"),
+    "selection": tuple(OVERVIEW_BATCH_LABELS),
+}
+
+# The visualization group each shared template shows. Templates written for
+# one strategy, such as ``template_DUAL.py``, are not listed.
+EXAMPLE_TEMPLATE_GROUPS = {
+    "template_pool.py": "pool-classification",
+    "template_pool_batch.py": "pool-classification-batch",
+    "template_pool_multilabel.py": "pool-multilabel",
+    "template_pool_regression.py": "pool-regression",
+    "template_pool_regression_batch.py": "pool-regression",
+    "template_pool_multi_annotator.py": "pool-multi-annotator",
+    "template_stream.py": "stream-classification",
+}
+
+
+def check_example_setup(data):
+    """Check that an example entry can show the setup it describes."""
+    method = data["method"]
+    scenario = data["package"].split(".")[0]
+    keys = [
+        key
+        for key in EXAMPLE_SETUP_VALUES
+        if scenario == "pool" or key != "selection"
+    ]
+    setup = data.get("example_setup")
+    if not isinstance(setup, dict) or sorted(setup) != sorted(keys):
+        raise ValueError(
+            f"Give the example_setup of {method!r} exactly the keys "
+            f"{', '.join(keys)}."
+        )
+    for key, value in setup.items():
+        if value not in EXAMPLE_SETUP_VALUES[key]:
+            raise ValueError(
+                f"Unknown {key} {value!r} in the example_setup of {method!r}."
+            )
+    metadata = get_strategy_metadata(data)
+    shown = (setup["task"], setup["target_type"], setup["annotation_type"])
+    if shown not in metadata["capabilities"]:
+        raise ValueError(
+            f"The example_setup of {method!r} is not among its supported "
+            f"setups."
+        )
+    if scenario == "stream":
+        if "batch_size" in data:
+            raise ValueError(f"Remove the batch_size of {method!r}.")
+    else:
+        if setup["selection"] not in metadata["batch"]:
+            raise ValueError(
+                f"The selection of {method!r} is not one of its batch tags."
+            )
+        batch_size = data.get("batch_size")
+        if not (
+            isinstance(batch_size, str)
+            and batch_size.isdigit()
+            and int(batch_size) > 0
+        ):
+            raise ValueError(
+                f"Give {method!r} a batch_size string with a positive "
+                f'integer, such as "1".'
+            )
+        if setup["selection"] == "single-sample" and batch_size != "1":
+            raise ValueError(f'Give single-sample {method!r} batch_size "1".')
+    template = Path(data["template"]).name
+    group = EXAMPLE_TEMPLATE_GROUPS.get(template)
+    if group is not None and group != _example_setup(data):
+        raise ValueError(
+            f"{template} cannot show the example_setup of {method!r}."
+        )
+    if group == "pool-classification-batch" and data["batch_size"] != "4":
+        raise ValueError(
+            f'{template} shows batches of 4. Give {method!r} batch_size "4".'
+        )
+
+
 def generate_visualizations_rst(gen_path, json_data, examples_path):
     """Write a gallery landing page grouped by the demonstrated setup.
 
@@ -1036,6 +1115,7 @@ def generate_example_script(
     # Validation of 'data'.
     if data["class"] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
+    check_example_setup(data)
 
     google_colab_link = check_google_colab_link(google_colab_link, version)
 

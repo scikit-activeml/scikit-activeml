@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from docs.generate import (
     OVERVIEW_SCENARIOS,
+    check_example_setup,
     generate_examples,
     generate_strategy_overview_rst,
     generate_visualizations_rst,
@@ -116,7 +117,8 @@ class TestExamples(unittest.TestCase):
                         f"add an example in\n"
                         f"{self.json_path}.\n"
                         f"For information how to create one, see the "
-                        f"Developers Guide. If {item} is not an "
+                        f"Examples section of docs/contributing.rst. If "
+                        f"{item} is not an "
                         f'AL-strategy, add "{item}" to the '
                         f'"exceptions" list in this test class.',
                     )
@@ -607,6 +609,92 @@ class TestExamples(unittest.TestCase):
                     {"4-stream": {"data": [data]}},
                     examples_path="generated/examples",
                 )
+
+    def test_examples_reject_invalid_setups(self):
+        for root, _, files in os.walk(self.json_path):
+            for filename in files:
+                if filename.endswith(".json"):
+                    with open(path.join(root, filename)) as file:
+                        for data in json.load(file):
+                            check_example_setup(data)
+
+        setup = {
+            "task": "classification",
+            "target_type": "single-output",
+            "annotation_type": "single-annotator",
+            "selection": "random-batch",
+        }
+        cases = [
+            ({"example_setup": {}}, "exactly the keys"),
+            (
+                {"example_setup": {**setup, "annotation_type": "multi"}},
+                "Unknown annotation_type",
+            ),
+            (
+                {"example_setup": {**setup, "task": "regression"}},
+                "supported setups",
+            ),
+            (
+                {"example_setup": {**setup, "selection": "top-k-batch"}},
+                "batch tags",
+            ),
+            ({"batch_size": 1}, "positive integer"),
+            ({"batch_size": "0"}, "positive integer"),
+            ({"batch_size": "2"}, "cannot show"),
+            (
+                {
+                    "template": "examples/template_pool_batch.py",
+                    "batch_size": "2",
+                },
+                "batches of 4",
+            ),
+        ]
+        for changes, message in cases:
+            with self.subTest(message=message):
+                data = self._overview_example(
+                    "RandomSampling", "Random", "Baseline"
+                )
+                data.update(
+                    template="examples/template_pool.py",
+                    example_setup=setup,
+                    batch_size="1",
+                )
+                data.update(changes)
+                with self.assertRaisesRegex(ValueError, message):
+                    check_example_setup(data)
+
+        data = self._overview_example(
+            "RandomSampling",
+            "Random",
+            "Baseline",
+            tags=[
+                "pool",
+                "classification",
+                "single-annotator",
+                "single-sample",
+            ],
+        )
+        data.update(
+            template="examples/template_pool.py",
+            example_setup={**setup, "selection": "single-sample"},
+            batch_size="4",
+        )
+        with self.assertRaisesRegex(ValueError, "single-sample"):
+            check_example_setup(data)
+
+        data = self._overview_example(
+            "StreamRandomSampling", "Random", "Baseline", package="stream"
+        )
+        data.update(
+            template="examples/template_stream.py",
+            example_setup={**setup, "selection": "top-k-batch"},
+        )
+        with self.assertRaisesRegex(ValueError, "exactly the keys"):
+            check_example_setup(data)
+        data["example_setup"].pop("selection")
+        data["batch_size"] = "1"
+        with self.assertRaisesRegex(ValueError, "Remove the batch_size"):
+            check_example_setup(data)
 
     def test_documentation_readme_links_keep_build_version(self):
         readme = path.join(self.skaml_path, "README.rst")

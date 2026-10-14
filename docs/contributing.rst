@@ -1181,149 +1181,217 @@ Examples
 
 Two of our main goals are to make active learning more understandable and
 improve our framework's usability. Therefore, we require an example for each
-query strategy. Add a JSON file to an existing example directory under
-``docs/examples/``. Each directory must contain a ``README.rst``.
-The documentation generator recursively scans these directories and creates
-the example pages, notebooks, and strategy overview. Existing directory names
-are retained for stable published paths. Reader-facing groups use Pool or
-Stream, then Classification or Regression.
+query strategy. An example is an entry in a JSON file in one of the
+directories under ``docs/examples/``. Each directory has a ``README.rst`` with
+its introduction. The documentation build turns each entry into an example
+page with an animation and a notebook. It also adds a card to the
+Visualizations page and a row to the Strategy Overview. Keep the directory
+names and the ``method`` values, because the example URLs contain them.
 
-Each JSON file contains a list of example entries with the following fields:
+Each JSON file holds a list of entries. This is ``_badge.json`` in
+``docs/examples/1-pool-classification/``, with a shortened ``text_0``:
 
-+------------------+----------------------------------------------------------+
-| Entry            | Description                                              |
-+==================+==========================================================+
-| ``class``        | Query strategy's class name.                             |
-+------------------+----------------------------------------------------------+
-| ``package``      | Name of the sub-package (e.g., pool).                    |
-+------------------+----------------------------------------------------------+
-| ``method``       | Query strategy's official name.                          |
-+------------------+----------------------------------------------------------+
-| ``category``     | The strategy's methodological category. Examples are     |
-|                  | Informativeness, Representativeness, Hybrid, Baseline,   |
-|                  | and Wrapper.                                             |
-+------------------+----------------------------------------------------------+
-| ``template``     | Selects the rendering code for the example.              |
-|                  | Supported templates include:                             |
-|                  | ``examples/template_pool.py``,                           |
-|                  | ``examples/template_pool_multilabel.py``,                |
-|                  | ``examples/template_pool_regression.py``,                |
-|                  | ``examples/template_stream.py``, and                     |
-|                  | ``examples/template_pool_batch.py``.                     |
-+------------------+----------------------------------------------------------+
-| ``tags``         | Supported setups and batching behavior for the           |
-|                  | documented method variant. Tags include ``pool``,        |
-|                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
-|                  | ``classification``, ``multi-label``, and ``regression``. |
-+------------------+----------------------------------------------------------+
-| ``example_setup``| The task, target type, and annotation type shown.        |
-|                  | Pool examples also specify the demonstrated selection    |
-|                  | rule. See the field values below.                        |
-+------------------+----------------------------------------------------------+
-| ``batch_size``   | Pool query batch size, stored as a string, e.g., ``"3"``.|
-|                  | Shared by the executable example and its batch caption.  |
-|                  | Omit for native stream examples.                         |
-+------------------+----------------------------------------------------------+
-| ``title``        | Title of the example, usually named after the query      |
-|                  | strategy.                                                |
-+------------------+----------------------------------------------------------+
-| ``text_0``       | Placeholder for additional explanations.                 |
-+------------------+----------------------------------------------------------+
-| ``refs``         | References (BibTeX keys) to the paper(s) describing      |
-|                  | the query strategy.                                      |
-+------------------+----------------------------------------------------------+
-| ``sequence``     | Order in which content is displayed, usually             |
-|                  | ``["title", "text_0", "plot", "refs"]``.                 |
-+------------------+----------------------------------------------------------+
-| ``import_misc``  | Python code for imports (e.g.,                           |
-|                  | ``from skactiveml.pool import RandomSampling``).         |
-+------------------+----------------------------------------------------------+
-| ``n_samples``    | Number of samples in the example dataset.                |
-+------------------+----------------------------------------------------------+
-| ``init_qs``      | Python code to initialize the query strategy object,     |
-|                  | e.g., ``RandomSampling()``.                              |
-+------------------+----------------------------------------------------------+
-| ``query_params`` | Python code for parameters passed to the query method,   |
-|                  | e.g., ``X=X, y=y``.                                      |
-+------------------+----------------------------------------------------------+
-| ``preproc``      | Python code for preprocessing before executing the AL    |
-|                  | cycle, e.g., ``X = (X-X.min())/(X.max()-X.min())``.      |
-+------------------+----------------------------------------------------------+
-| ``n_cycles``     | Number of active learning cycles.                        |
-+------------------+----------------------------------------------------------+
-| ``init_clf``     | Python code to initialize the classifier object, e.g.,   |
-|                  | ``ParzenWindowClassifier(classes=[0, 1])``. (Only        |
-|                  | supported for certain templates.)                        |
-+------------------+----------------------------------------------------------+
-| ``init_reg``     | Python code to initialize the regressor object, e.g.,    |
-|                  | ``NICKernelRegressor()``. (Only supported for the        |
-|                  | regression template.)                                    |
-+------------------+----------------------------------------------------------+
+.. code-block:: json
 
-The strategy overview obtains complete task, target type, and annotation type
-combinations from ``_target_capabilities``. The ``tags`` restrict these to the
-documented method variant. They describe supported use cases. The ``template``
-field selects the rendering code, and ``example_setup`` describes the setup
-actually illustrated by the demonstration. For variants whose constructor
-parameters change their capabilities, add ``capability_params``
-with those parameters as a JSON object, for example
-``{"method": "expected_average_precision"}``. These parameters are used for
-capability inspection, independently of the example code in ``init_qs``.
+   [
+     {
+       "class": "Badge",
+       "package": "pool",
+       "method": "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
+       "category": "Hybrid",
+       "template": "examples/template_pool_batch.py",
+       "tags": ["pool", "classification", "single-annotator", "multi-label",
+                "diverse-batch"],
+       "example_setup": {
+         "task": "classification",
+         "target_type": "single-output",
+         "annotation_type": "single-annotator",
+         "selection": "diverse-batch"
+       },
+       "batch_size": "4",
+       "title": "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
+       "refs": ["ash2020deep"],
+       "sequence": ["title", "text_0", "plot", "refs"],
+       "text_0": "**Idea**: BADGE selects a batch by running k-means++ ...",
+       "import_misc": "from skactiveml.pool import Badge",
+       "init_qs": "Badge()",
+       "query_params": "X=X, y=y, clf=clf"
+     }
+   ]
 
-Each ``example_setup`` is a small JSON object using these fields:
+Every entry needs these fields:
+
+``class``
+   The query strategy's class name. It must be in the ``__all__`` list of
+   its package.
+
+``package``
+   The subpackage: ``pool``, ``pool.multiannotator``, or ``stream``.
+
+``method``
+   The method's name in the Strategy Overview. The example's URL contains
+   it.
+
+``category``
+   ``Informativeness``, ``Representativeness``, ``Hybrid``, ``Baseline``, or
+   ``Wrapper``.
+
+``template``
+   The template that renders the example, as a path relative to ``docs/``,
+   such as ``examples/template_pool.py``. See `Templates`_.
+
+``tags``
+   The scenario, the setups that the documented variant supports, and the
+   batch selection of a pool strategy. See `Tags and Example Setup`_.
+
+``example_setup``
+   The setup that the example shows. See `Tags and Example Setup`_.
+
+``batch_size``
+   Pool entries only. The number of samples that each cycle acquires, as a
+   string such as ``"4"``. With multiple annotators, it counts
+   sample–annotator pairs.
+
+``title``
+   The title of the example page, usually the method's name.
+
+``refs``
+   BibTeX keys from ``docs/refs.bib``.
+
+``sequence``
+   The order of the page's parts, usually
+   ``["title", "text_0", "plot", "refs"]``.
+
+``text_0``
+   The explanation above the animation.
+
+``import_misc``
+   Python code that imports the query strategy, such as
+   ``from skactiveml.pool import Badge``.
+
+``init_qs``
+   Python code that creates the query strategy, such as ``Badge()``.
+
+``query_params``
+   Python code for the arguments of ``query``, such as ``X=X, y=y, clf=clf``.
+
+``update_params``
+   Stream entries only. Python code for the arguments of ``update``, usually
+   ``candidates=X_cand, queried_indices=sampled_indices``.
+
+A template written for one strategy may need fewer fields. These fields are
+optional:
+
+``import_clf``, ``init_clf``
+   Python code that imports and creates the classifier. The default is a
+   ``ParzenWindowClassifier``.
+
+``import_reg``, ``init_reg``
+   Python code that imports and creates the regressor. The default is a
+   ``NICKernelRegressor``.
+
+``preproc``
+   Python code that runs before the cycle, as a string or a list of lines.
+
+``plot_utility_params``
+   Python code for more arguments of ``plot_utilities``, such as
+   ``candidates=X``. Only ``template_pool.py`` uses it.
+
+``capability_params``
+   A JSON object with the constructor parameters that change the strategy's
+   capabilities, such as ``{"method": "expected_average_precision"}``. The
+   Strategy Overview creates the strategy with them. The example code does
+   not use them.
+
+``batch_note``
+   A short note that the Strategy Overview shows next to the batch
+   selection, such as ``"Random selection within tree leaves"``.
+
+Check new or changed entries with:
+
+.. code:: bash
+
+   python -m pytest --no-cov skactiveml/tests/test_examples.py
+
+These tests run every example. They also require an example for each query
+strategy in ``skactiveml.pool`` and ``skactiveml.stream``.
+
+Templates
+~~~~~~~~~
+
+A template is a Python script with placeholders, such as ``"$init_qs"`` or
+``"$n_cycles|20"``. The build replaces each placeholder with the entry's field
+of the same name, or with the default after ``|``. Each value goes into the
+script as Python code, which is why ``batch_size`` is a string. These templates
+in ``docs/examples/`` are shared:
+
+* ``template_pool.py``: pool classification, one sample per cycle.
+* ``template_pool_batch.py``: pool classification, batches of four samples.
+* ``template_pool_multilabel.py``: pool multi-label classification.
+* ``template_pool_multi_annotator.py``: pool classification with multiple
+  annotators.
+* ``template_pool_regression.py``: pool regression, one sample per cycle.
+* ``template_pool_regression_batch.py``: pool regression with batches.
+* ``template_stream.py``: stream classification.
+
+A strategy that needs a different animation can have its own template in its
+directory, such as ``template_DUAL.py`` in
+``docs/examples/1-pool-classification/``. The file name must start with
+``template``, so that the build does not copy the template as an example.
+
+Tags and Example Setup
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``tags`` describe what the documented variant supports. The
+``example_setup`` describes what its example shows.
+
+The tags name the scenario (``pool`` or ``stream``), the tasks
+(``classification``, ``regression``), the target type ``multi-label``, and the
+annotation types (``single-annotator``, ``multi-annotator``). Single-output
+support needs no tag. The strategy's ``_target_capabilities`` list the
+complete combinations it supports. The tags can only restrict these
+combinations. The Strategy Overview shows the combinations that remain. For a
+variant whose constructor parameters change its capabilities, add
+``capability_params``.
+
+The tags of a pool entry also name its batch selection: ``top-k-batch``,
+``diverse-batch``, or ``random-batch``. Use ``single-sample`` alone for a
+strategy that selects one sample per cycle. Stream entries have no batch tags.
+
+The ``example_setup`` has these fields:
 
 * ``task``: ``"classification"`` or ``"regression"``.
 * ``target_type``: ``"single-output"`` or ``"multi-label"``.
 * ``annotation_type``: ``"single-annotator"`` or ``"multi-annotator"``.
-* ``selection`` for pool examples: ``"top-k-batch"``, ``"diverse-batch"``,
-  ``"random-batch"``, or ``"single-sample"`` for the strategy's batch
-  selection rule. Omit this field for native stream examples.
+* ``selection``, for pool entries only: the batch selection that the example
+  uses.
 
-For example, a pool demonstration of diverse multi-label selection uses:
+The build stops with an error that names the method if an entry breaks one of
+these rules:
 
-.. code-block:: json
+* ``example_setup`` has exactly these fields, with these values.
+* The documented variant supports the setup.
+* The selection is one of the entry's batch tags.
+* ``batch_size`` is a positive whole number in a string. A ``single-sample``
+  entry uses ``"1"``.
+* A shared template matches the setup and the batch size. For example,
+  ``template_pool.py`` shows one sample per cycle, and
+  ``template_pool_batch.py`` shows batches of four.
 
-   {
-       "example_setup": {
-           "task": "classification",
-           "target_type": "multi-label",
-           "annotation_type": "single-annotator",
-           "selection": "diverse-batch"
-       },
-       "batch_size": "1"
-   }
+The Visualizations page groups the examples by their ``example_setup``, not by
+their tags. An example with ``"target_type": "single-output"`` stays a
+single-output example, even if its strategy also supports multi-label
+classification. A batch caption, such as "Diverse batch of 4 samples", comes
+from ``selection`` and ``batch_size``. Cards are sorted by title within each
+group. The pages come from ``visualizations.rst.jinja`` and
+``visualization_section.rst.jinja`` in ``docs/_templates/``, which share the
+macros in ``visualization_macros.rst.jinja``.
 
-Keep these values consistent with the template, estimator, and query arguments.
-The pool ``batch_size`` is used for execution and, if it is larger than one,
-for the card caption. Do not maintain a separate caption count. It counts
-selected samples for a single annotator, including complete multi-label
-vectors, or sample–annotator
-pairs for multiple annotators. If a demonstration collects stream arrivals
-before querying a pool strategy, distinguish its arrival batch size from the
-number of acquired samples. Native stream examples describe their budget and
-update workflow and omit pool selection and batch-size metadata.
-Choose a count compatible with the selected template's plotting layout.
-For example, the ordinary and multi-label pool templates show one acquisition
-per cycle, while the classification batch template shows four.
-
-Pool entries must specify their batching behavior using ``top-k-batch``,
-``diverse-batch``, or ``random-batch``. Use ``single-sample`` for an entry
-restricted to one sample per cycle. It cannot be combined with batch tags.
-Stream entries do not carry pool batching tags. An optional ``batch_note``
-explains qualifications such as random selection within tree leaves.
-The overview shows that generic pool wrappers' target types depend on the
-wrapped strategy. The sub-sampling wrapper also inherits its batching rule.
-
-The visualization landing page groups examples using ``example_setup``,
-independently of the capabilities listed in ``tags``. An example with
-``"target_type": "single-output"`` remains a single-output demonstration even
-if its strategy also supports the multi-label target type. The strategy
-overview describes
-supported capabilities and links to the API class page, whose gallery lists
-every associated demonstration. The layout lives in
-``docs/_templates/visualizations.rst.jinja``. Its mini-galleries use the
-existing generated scripts and keep example URLs stable. Cards are sorted
-alphabetically by their displayed example titles within each task block.
+The Strategy Overview notes that the target types of ``SubSamplingWrapper`` and
+``ParallelUtilityEstimationWrapper`` depend on the wrapped strategy. The batch
+selection of ``SubSamplingWrapper`` does too. ``get_strategy_metadata`` and
+``json_data_to_strategy_table`` in ``docs/generate.py`` name these wrappers.
+Add a new generic wrapper there.
 
 Testing and Code Coverage
 -------------------------
