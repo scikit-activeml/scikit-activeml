@@ -85,3 +85,43 @@
 .visualization-card:hover {
     border-color: var(--pst-color-primary);
 }
+
+/* Phones show each card as a list row: thumbnail left, title and caption right. */
+@media (max-width: 575.98px) {
+    .visualization-cards {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .visualization-card.docutils.container {
+        display: grid;
+        grid-template-columns: 7.5rem minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+        column-gap: 0.75rem;
+        align-items: start;
+        padding: 0.5rem;
+    }
+
+    .visualization-card .sphx-glr-thumbnails,
+    .visualization-card .sphx-glr-thumbcontainer {
+        display: contents;
+    }
+
+    .visualization-card .sphx-glr-thumbcontainer img {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        max-width: 100%;
+        max-height: none;
+    }
+
+    .visualization-card .sphx-glr-thumbnail-title,
+    .visualization-card-caption {
+        grid-column: 2;
+        text-align: left;
+    }
+
+    .visualization-card-caption {
+        margin-top: 0;
+        padding-top: 0.25rem;
+    }
+}

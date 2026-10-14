@@ -1,4 +1,4 @@
-{% from "visualization_macros.rst.jinja" import pool_classification, pool_regression, stream_classification %}
+{% from "visualization_macros.rst.jinja" import anchor, pool_classification, pool_regression, stream_classification %}
 {{ intro }}
 
 .. _pool-based-active-learning:
@@ -7,15 +7,10 @@ Pool-based Active Learning
 --------------------------
 
 The strategy chooses which samples to label from an available pool.
-Classification and regression describe the prediction task. Target types,
-annotators, and acquisition batches describe the demonstrated setup.
 
-.. _pool-classification:
+{{ pool_classification(examples, "~", true) }}
 
-Classification
-~~~~~~~~~~~~~~
-
-{{ pool_classification(examples, "^", true) }}
+{{ anchor("pool-based-al-strategies-for-regression") }}
 
 .. _regression:
 .. _pool-based-active-learning-regression:
@@ -25,21 +20,16 @@ Regression
 
 {{ pool_regression(examples) }}
 
+{{ anchor("stream-based-al-strategies") }}
+
 .. _stream-based-active-learning:
 .. _stream-based-active-learning-classification:
+.. _stream-classification:
 
 Stream-based Active Learning
 ----------------------------
 
-Samples arrive over time. The current streaming animations demonstrate
-classification with single-output targets and one annotator.
-
-.. _stream-classification:
-
-Classification
-~~~~~~~~~~~~~~
-
-{{ stream_classification(examples, "^") }}
+{{ stream_classification(examples) }}
 
 .. toctree::
    :hidden:

@@ -3,6 +3,12 @@
 {{ marker * (title | length) }}
 {%- endmacro %}
 
+{% macro anchor(id) -%}
+.. raw:: html
+
+   <span id="{{ id }}"></span>
+{%- endmacro %}
+
 {% macro gallery(items) -%}
 .. container:: visualization-cards
 
@@ -23,17 +29,20 @@
 {%- endmacro %}
 
 {% macro multiple_annotators(examples, marker, legacy_aliases=false) -%}
+{% if marker %}
 {% if legacy_aliases %}
+{{ anchor("pool-based-al-strategies-for-mulitple-annotators") }}
+
 .. _classification-with-multiple-annotators:
 .. _pool-based-active-learning-multi-annotator-learning:
 
 {% endif %}
 {{ heading("Single-output Classification with Multiple Annotators", marker) }}
 
-Each sample has one class label to predict. Several annotators can provide
-annotations for it, and the strategy selects sample–annotator pairs.
-The animation combines classification utilities and decision boundaries
-with a chart of requests per annotator.
+{% endif %}
+Each sample has one class label to predict. Several annotators can label it,
+and the strategy selects sample–annotator pairs. The animation combines
+utilities and decision boundaries with a chart of requests per annotator.
 
 .. image:: /examples/pool_multi_annotator_legend.png
    :alt: Legend for class labels, annotator correctness, decision boundaries, and utility scores.
@@ -42,33 +51,32 @@ with a chart of requests per annotator.
 {%- endmacro %}
 
 {% macro pool_classification(examples, marker, legacy_aliases=false) -%}
-{% set query_marker = "~" if marker == "-" else '"' %}
 {% if legacy_aliases %}
+{{ anchor("pool-based-al-strategies") }}
+
+.. _pool-classification:
 .. _single-output-classification:
 .. _pool-based-active-learning-classification:
 
 {% endif %}
 {{ heading("Single-output Classification", marker) }}
 
-One annotator supplies one class label per selected sample. The following
-groups distinguish one sample per cycle from batches with several samples.
+One annotator gives one class label per selected sample, and each cycle
+acquires one sample. A single plot shows the utilities and the classifier's
+decision boundary.
 
 .. image:: /examples/pool_classification_legend.png
    :alt: Legend for class labels, decision boundaries, labeled samples, and utility scores.
 
-{{ heading("Single-sample Queries", query_marker) }}
-
-Each cycle acquires one sample. The animation shows acquisition utilities
-and the classifier's decision boundary in one feature-space plot.
-
 {{ gallery(examples["pool-classification"]) }}
 
-{{ heading("Batch Queries", query_marker) }}
+{{ heading("Single-output Classification with Batch Queries", marker) }}
 
-One annotator supplies one class label per selected sample. These animations
-acquire several samples per cycle. The grid shows the utilities used for
-successive selections within the batch; the same classifier and observed
-labels apply to every panel.
+Each cycle acquires four samples. Panel *i* shows the utilities for the
+*i*-th selection in the batch. All panels use the same classifier and labels.
+
+.. image:: /examples/pool_classification_legend.png
+   :alt: Legend for class labels, decision boundaries, labeled samples, and utility scores.
 
 {{ gallery(examples["pool-classification-batch"]) }}
 
@@ -78,11 +86,11 @@ labels apply to every panel.
 {% endif %}
 {{ heading("Multi-label Classification", marker) }}
 
-One annotator supplies a complete vector of binary labels for each selected
+One annotator gives a complete vector of binary labels for each selected
 sample. These examples acquire one vector per cycle. The three panels share
-acquisition utilities and show a separate decision boundary for each label.
-In each panel, class 0 means that the label is absent and class 1 means that
-it is present. Gray markers identify samples whose label vectors have been
+the utilities and show a separate decision boundary for each label. In each
+panel, class 0 means that the label is absent and class 1 means that it is
+present. Gray markers identify samples whose label vectors have been
 acquired.
 
 .. image:: /examples/pool_classification_legend.png
@@ -94,10 +102,9 @@ acquired.
 {%- endmacro %}
 
 {% macro pool_regression(examples) -%}
-One annotator supplies a continuous target value for each selected sample.
-The two plots show the fitted regression curve and acquisition utilities.
-Some examples acquire one sample per cycle; others acquire a batch. Both
-use the same two plots for prediction and utilities.
+One annotator gives a continuous label for each selected sample. Two plots
+show the fitted regression curve and the utilities. Examples acquire one
+sample per cycle unless their caption names a batch.
 
 .. image:: /examples/pool_regression_legend.png
    :alt: Legend for the regression curve, utility scores, and labeled and unlabeled samples.
@@ -105,13 +112,11 @@ use the same two plots for prediction and utilities.
 {{ gallery(examples["pool-regression"]) }}
 {%- endmacro %}
 
-{% macro stream_classification(examples, marker) -%}
-{{ heading("Single-output Classification", marker) }}
-
-One annotator supplies one class label for each queried sample. Samples
-arrive in sequence, and the strategy decides whether to request each
-sample's label within its budget. The animation shows arriving samples and
-the evolving decision boundary over time.
+{% macro stream_classification(examples) -%}
+One annotator gives one class label per queried sample. Samples arrive in
+sequence, and the strategy decides within its budget whether to request each
+sample's label. The animation shows arriving samples and the evolving
+decision boundary.
 
 .. image:: /examples/stream_classification_legend.png
    :alt: Legend for class labels, unlabeled and current samples, and the decision boundary.
