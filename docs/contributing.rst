@@ -660,14 +660,14 @@ All query strategies are stored in
 
 The class must implement the following methods:
 
-+------------+----------------------------------------------------------------+
-| Method     | Description                                                    |
-+============+================================================================+
++--------------+--------------------------------------------------------------+
+| Method       | Description                                                  |
++==============+==============================================================+
 | ``__init__`` | Method for initialization.                                   |
-+------------+----------------------------------------------------------------+
-| ``query``  | Select the annotator-sample pairs to decide which sample's     |
-|            | class label is to be queried from which annotator.             |
-+------------+----------------------------------------------------------------+
++--------------+--------------------------------------------------------------+
+| ``query``    | Select the annotator-sample pairs to decide which sample's   |
+|              | class label is to be queried from which annotator.           |
++--------------+--------------------------------------------------------------+
 
 .. _query-method-3:
 
@@ -1417,24 +1417,60 @@ annotation session, and annotator for the person who provides labels. Use
 Python identifiers and package names such as ``multilabel`` and
 ``multiannotator``.
 
-Use Sphinx ``:doc:`` and ``:ref:`` links within the documentation so readers
-stay in the version they are browsing. Notebook links to project
-documentation use relative document-source paths, such as
-``../../target_semantics.rst``. Sphinx renders them as HTML links; Colab copies
-resolve them to HTML URLs for their documentation version. Preserve public page
-paths, notebook/example filenames, and section fragments. When changing a heading,
-retain its previous fragment using an explicit target. Tutorials keep a direct
-hidden toctree for their notebooks, and example navigation retains its existing
-generated URLs.
+Links
+~~~~~
 
-In-depth Tutorial Design
-~~~~~~~~~~~~~~~~~~~~~~~~
+Use Sphinx ``:doc:`` and ``:ref:`` links within the documentation, so that
+readers stay in the version they are browsing. Notebooks link to
+documentation pages with relative source paths, such as
+``../../target_semantics.rst``. Sphinx turns them into links, and the Colab
+copies get links to the same documentation version.
+
+Once a page is published for the latest release or the development version,
+links to it should keep working:
+
+* Keep page paths and the file names of notebooks and examples. A removed or
+  moved page gets a redirect page at its old path in ``docs/_extra/``, which
+  the build copies to the website as it is. For an example, see
+  ``22_river_classifier.html`` in ``docs/_extra/generated/tutorials/``.
+* RST pages keep their section anchors. When you rename a heading, put a
+  label with the old anchor above it:
+
+  .. code-block:: rst
+
+     .. _old-heading:
+
+     New Heading
+     -----------
+
+  The Strategy Overview keeps old anchors through ``OVERVIEW_LEGACY_IDS`` in
+  ``docs/generate.py``. The Visualizations pages keep them through the
+  ``anchor()`` macro in ``visualization_macros.rst.jinja``.
+* Notebook pages do not keep section anchors. A link to a renamed notebook
+  heading opens the top of the page.
+
+Tutorials
+~~~~~~~~~
 
 Tutorial notebooks help a machine learning audience design experiments and
 annotation workflows with scikit-activeml. They demonstrate the framework's
 capabilities through concise, adaptable code. Assume familiarity with Python,
 NumPy, supervised learning, and the scikit-learn estimator interface. Explain
 active learning concepts where they help readers use the framework.
+
+A new tutorial needs these parts:
+
+* A notebook ``tutorials/NN_name.ipynb``. The first digit of ``NN`` groups
+  the scenario: 0 for pool-based, 1 for multiple annotators, 2 for
+  stream-based, and 3 for multi-label tutorials.
+* A title cell, followed by the Colab badge. Copy the badge cell from an
+  existing tutorial. The build replaces its placeholder ``<colab_link>`` with
+  the notebook's link for the documentation version.
+* A code cell with the installation command as a comment, such as
+  ``# !pip install scikit-activeml tqdm``. The Colab copy uncomments it.
+* A row in the matching table of ``docs/tutorials.rst`` and an entry in its
+  hidden toctree. If the tutorial serves one of the goals at the top of that
+  page, add it there too.
 
 Use a flexible layout suited to one scenario or study question:
 
@@ -1450,53 +1486,43 @@ Use a flexible layout suited to one scenario or study question:
 * **Outlook:** briefly suggest useful adaptations and selected next steps.
 
 Results should serve the notebook's goal. A workflow demonstration may use
-qualitative outputs; a comparative study needs appropriate evidence and a
-brief explanation of its particular evaluation protocol. Interpret results
-within that experiment's scope. Equations, reference sections, quantitative
-comparisons, and summary tables are not required elements.
+qualitative outputs. A comparative study needs appropriate evidence and a
+brief explanation of its evaluation protocol. Interpret results within that
+experiment's scope. Equations, reference sections, quantitative comparisons,
+and summary tables are not required.
 
-For published studies, save the reference outputs with the configuration
-that produced them. Expensive notebooks default to ``QUICK_RUN=False`` and
-offer cheaper execution through ``QUICK_RUN=True``. Keep their strategy lists
-visible so readers can comment out methods. Simpler notebooks use ordinary
-editable settings. Preserve each substantive comparison and interface
-variation in the saved results, and explain that changed settings produce
-different outputs. Keep installation guidance short. Activate cuML before
-estimator imports where used. Use throttled progress displays, with elapsed
-time confined to those displays. Keep environment inventories, stage timings,
-and validation code outside the notebook. Saved outputs show no warnings.
-Fix the cause of a warning that signals a mistake, such as a mismatched
-``missing_label``. Filter an expected, informational warning individually
-by its message, with a comment that gives the reason. Do not hide all
-warnings or disable logging.
+Expensive notebooks default to ``QUICK_RUN = False`` and offer a cheaper run
+through ``QUICK_RUN = True``. Keep their strategy lists visible, so that
+readers can shorten them. Simpler notebooks use ordinary editable settings.
+Keep installation guidance short. A notebook that uses cuML activates it
+before it imports estimators. Show progress with throttled ``tqdm`` bars,
+such as ``mininterval=20``. Runtimes appear only in these bars, not in the
+text. Keep environment inventories, stage timings, and validation code
+outside the notebook.
 
 Use small, self-contained plotting settings: 11-point axes and ticks,
 12-point titles, and 10-point legends. Where colors identify query strategies,
 use gray for random sampling and blue for uncertainty sampling. Use complete
-legends and layouts suited to the scenario and documentation width. Keep class
-colors consistent across scatter plots. Let metric-axis limits follow the
-displayed curves and bands with modest padding. For repeated learning curves,
-use light bands showing one sample standard deviation (``ddof=1``); single
-runs need no variation bands. Numerical legend summaries can replace separate
-score tables. State what those values average and avoid repeating them in
-printed output. Label counts according to what was acquired, distinguishing
-samples, multi-label rows, repeated labels, and stream arrivals. Explain
-whether initial labels are included. Inspect the published rendering for
-clipping and overlap.
+legends and layouts that fit the documentation width. Keep class colors
+consistent across scatter plots. Let metric-axis limits follow the displayed
+curves and bands with modest padding. For repeated learning curves, use light
+bands that show one sample standard deviation (``ddof=1``). Single runs need
+no bands. Numerical legend summaries can replace separate score tables. State
+what those values average, and do not repeat them in printed output. Label
+counts by what was acquired, and distinguish samples, multi-label rows,
+repeated labels, and stream arrivals. Say whether initial labels are
+included.
 
-Save annotation widget state when it reliably renders in the built HTML.
-Check it in a clean browser without a kernel, including refresh, model/output
-buffers, assets, and rendering errors. If embedding fails, capture an accurate
-screenshot of the current interface. Caption the actual recorded state and
-explain that callbacks require a live notebook. Check callback behavior
-separately from unattended execution.
-
-Before publishing executable changes that affect results or saved outputs,
-run the published configuration from a fresh kernel. Check notebook validity,
-code/output consistency, and rendered figures outside the tutorial. Use
-smaller configurations during development and proportionate checks for prose
-changes. Sphinx builds display saved tutorial outputs; they do not execute
-these notebooks.
+Sphinx shows the saved outputs and does not run the notebooks. So commit a
+tutorial with the outputs of a complete run with its published settings.
+Saved outputs show no warnings. Fix the cause of a warning that signals a
+mistake, such as a mismatched ``missing_label``. Filter an expected,
+informational warning individually by its message, with a comment that gives
+the reason. Do not hide all warnings or disable logging. A notebook with
+widgets also saves the widget state, so that the website can show the
+widgets. In JupyterLab, turn on *Save Widget State Automatically* in the
+*Settings* menu. The notebook's text says that the widgets respond only in a
+running notebook.
 
 Building the Documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
