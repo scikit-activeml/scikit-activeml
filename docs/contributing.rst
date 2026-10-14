@@ -1186,8 +1186,7 @@ query strategy. Add a JSON file to an existing example directory under
 The documentation generator recursively scans these directories and creates
 the example pages, notebooks, and strategy overview. Existing directory names
 are retained for stable published paths. Reader-facing groups use Pool or
-Stream, then Classification or Regression. Target types and annotation types
-are described separately for each demonstrated setup.
+Stream, then Classification or Regression.
 
 Each JSON file contains a list of example entries with the following fields:
 

@@ -40,7 +40,10 @@ for the most informative samples, achieving high performance with fewer labeled 
 With this goal in mind, **scikit-activeml** has been developed as a Python library for active
 learning on top of `scikit-learn <https://scikit-learn.org/stable/>`_. As a
 result, it natively supports **deep active learning** via
-`skorch <https://skorch.readthedocs.io/en/stable/>`__. Illustrations for pool-based and stream-based active learning with code
+`skorch <https://skorch.readthedocs.io/en/stable/>`__. To learn the basic cycle, read the
+`Core Workflow <https://scikit-activeml.github.io/latest/core_workflow.html>`_ page and the tutorial
+`Pool-based Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/00_pool_getting_started.html>`_.
+Illustrations for pool-based and stream-based active learning with code
 snippets are given below:
 
 

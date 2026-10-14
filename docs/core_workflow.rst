@@ -5,7 +5,7 @@ Core Workflow
 =============
 
 Labels can cost expert time, money, or a laboratory experiment. Active learning
-selects which labels to acquire within that budget. A query strategy chooses
+selects which labels to acquire within a budget. A query strategy chooses
 samples whose labels are expected to help train the model. You then request
 those labels from an *oracle*, such as a domain expert.
 
@@ -13,19 +13,8 @@ scikit-activeml builds on
 `scikit-learn <https://scikit-learn.org/stable/>`_. You pass the data and known
 labels to an estimator, use a query strategy to select samples, and add the
 requested labels to the data. The examples below show this cycle for
-classification and regression, with variations in targets, annotators, and
-sample availability.
-
-The documentation uses Pool and Stream to describe how samples become
-available, and Classification and Regression for the prediction task.
-Single-output and multi-label describe the targets; single-annotator and
-multi-annotator describe who provides labels. These dimensions are separate:
-a multi-annotator workflow still has a prediction task and a target type.
-The :doc:`Tutorials <tutorials>` and
-:doc:`Visualizations <generated/sphinx_gallery_examples/index>` organize
-demonstrations by Pool or Stream, then by prediction task. The
-:doc:`Strategy Overview <generated/strategy_overview>` filters show the setups
-each strategy supports.
+classification, then vary the task, the target type, the annotation type, and
+how samples become available.
 
 
 The Active Learning Cycle
@@ -47,21 +36,44 @@ The following terms are used throughout the documentation.
    * - Oracle
      - A source of labels, for example a domain expert, a
        crowdsourcing platform, or a costly experiment.
+   * - Annotator
+     - A person who acts as an oracle. Annotators can make mistakes and
+       disagree with each other.
    * - Estimator
      - The classifier (``clf``) or regressor (``reg``) trained on the labels
        acquired so far.
    * - Query strategy
      - The object (``qs``) that decides which samples are labeled next.
+   * - Utility
+     - The score a query strategy assigns to a candidate. The strategy prefers
+       candidates with higher utilities. A utility is not the estimator's
+       confidence.
    * - Candidates
      - The samples the query strategy is allowed to select from.
    * - Batch
-     - The annotation requests selected in one pool cycle. ``batch_size``
-       counts samples or complete multi-label vectors with a single
-       annotator, and sample–annotator pairs with multiple annotators.
+     - The annotation requests selected in one pool cycle. With a single
+       annotator, ``batch_size`` counts samples, each supplying one label or a
+       complete multi-label vector. With multiple annotators, it counts
+       sample–annotator pairs.
    * - Budget
-     - The annotation requests that can be afforded, which usually determine
-       when the cycle stops. State whether a request acquires one target,
-       a complete label vector, or one annotator's answer.
+     - The number of annotation requests you can afford. In a pool, it usually
+       determines when the cycle stops. Stream strategies take it as a rate,
+       the fraction of arriving samples whose labels may be requested, such as
+       ``budget=0.2``.
+   * - Pool and stream
+     - In a pool, the query strategy selects from a fixed set of samples. In a
+       stream, samples arrive over time, and the strategy decides for each
+       arriving sample whether to request its label.
+   * - Task
+     - Classification (class labels) or regression (continuous labels).
+   * - Target type
+     - Single-output: one label per sample. Multi-label: a vector of binary
+       labels per sample, one per class. No current component supports
+       other multi-output labels.
+   * - Annotation type
+     - Single-annotator: one oracle provides all labels. Multi-annotator: the
+       strategy selects sample–annotator pairs, and ``y`` has one column per
+       annotator.
 
 One classification cycle has three steps:
 
@@ -70,7 +82,7 @@ One classification cycle has three steps:
     ┌──► clf.fit(X, y)
     │       Train the estimator on the labels known so far.
     │
-    │    query_idx = qs.query(X=X, y=y, clf=clf)
+    │    query_idx = qs.query(X=X, y=y, clf=clf, fit_clf=False)
     │       Select samples to label.
     │
     │    y[query_idx] = ...
@@ -84,7 +96,7 @@ In the third step, request labels from a labeling service, a domain expert, or
 a measurement. The examples simulate this request by reading the selected
 labels from a ground-truth array, ``y_true``. They also use ``y_true`` to set up
 initial labels and report scores. Pass only the acquired labels in ``y`` to
-``fit()`` and ``query()``; passing ``y_true`` would expose labels that are
+``fit()`` and ``query()``. Passing ``y_true`` would expose labels that are
 unavailable during a real query.
 
 
@@ -197,13 +209,14 @@ observed.
 
 In this example, the classifier predicts the pool labels correctly after two
 initial labels and ten queried labels. The score measures accuracy on this
-pool. Each query fills entries in ``y``; the rows of ``X`` stay in place.
+pool. Each query fills entries in ``y``, and the rows of ``X`` stay in place.
 
 Model-based query strategies fit the estimator by default. The example fits
 ``clf`` before querying, so it passes ``fit_clf=False`` to reuse the fitted
-estimator. Regression strategies use ``fit_reg`` for the same purpose. Set
-these flags to ``False`` when you have already fitted the estimator to avoid
-fitting it twice for the same query.
+estimator. Regression strategies use ``fit_reg`` for the same purpose, and
+strategies that take an ``ensemble`` use ``fit_ensemble``. Set these flags to
+``False`` when you have already fitted the estimator to avoid fitting it twice
+for the same query.
 
 
 Candidates, Batches, and Utilities
@@ -230,10 +243,9 @@ be selected and how the returned indices are interpreted.
      - Positions in ``candidates``
 
 Support for separate feature arrays depends on the strategy. ``batch_size``
-sets how many samples are selected in one single-annotator pool cycle.
-For multi-label targets, each selected sample supplies a complete label vector.
-With multiple annotators, ``batch_size`` instead counts sample–annotator pairs;
-several requests can refer to the same sample.
+sets how many annotation requests one cycle selects, as defined in the Batch
+row above. With multiple annotators, several requests can refer to the same
+sample.
 
 With ``return_utilities=True``, the strategy also returns the scores used to
 select samples. The utilities have one row per selection in the batch, with
@@ -252,25 +264,26 @@ select samples. The utilities have one row per selection in the batch, with
    >>> bool(np.all(np.isnan(utilities[0, labeled_indices(y)])))
    True
 
-See each strategy's :meth:`query() <skactiveml.base.QueryStrategy.query>`
-documentation for the accepted inputs and utility shapes.
+Each strategy's ``query()`` documentation, such as
+:meth:`UncertaintySampling.query()
+<skactiveml.pool.UncertaintySampling.query>`, lists the accepted inputs and
+utility shapes.
 
 
 Workflow Variations
 ===================
 
 The following examples change the estimator, the label representation, or the
-query interface. Regression changes the prediction task, multi-label
-classification changes the target type, multiple annotators change the
-annotation setting, and streaming changes how samples become available.
+query interface.
 
 
 Regression
 ----------
 
 Regression uses continuous labels and a regression query strategy.
-:class:`~skactiveml.pool.GreedySamplingTarget` selects the samples whose
-predicted labels differ most from the labels acquired so far.
+:class:`~skactiveml.pool.GreedySamplingTarget` selects the samples farthest
+from the labeled ones. By default, it multiplies the distance in the feature
+space by the distance between predicted and acquired labels.
 
 .. doctest::
 
@@ -302,8 +315,6 @@ In multi-label classification, ``y`` has one column per binary label output.
 Declare ``target_type="multi-label"`` explicitly on both the classifier and
 the query strategy. Each query requests a complete label vector. Every row of
 ``y`` must be fully labeled or fully missing.
-With a single annotator, ``batch_size`` counts these complete vectors, which
-is also the number of selected samples.
 
 .. doctest::
 
@@ -348,7 +359,7 @@ A multi-annotator strategy selects both a sample and an annotator, returning
 ``i`` is the sample index and ``j`` is the annotator index.
 
 The example simulates two annotators for the clusters used above. The first
-returns the true label; the second flips it with probability 0.3.
+returns the true label, and the second flips it with probability 0.3.
 :func:`~skactiveml.utils.majority_vote` combines their labels into one vector
 for fitting a classifier.
 
@@ -397,18 +408,20 @@ Stream-based Active Learning
 
 In stream-based active learning, samples arrive in sequence. For each sample,
 decide whether to acquire its label before seeing future samples. Pass the
-current sample as ``candidates``. ``query()`` proposes a selection; call
-``update()`` to record the decision and advance the strategy's budget and
-state. Call it after every decision, including when nothing was queried.
+current sample as ``candidates``. ``query()`` proposes a selection, and
+``update()`` records the decision and advances the strategy's budget and
+state. Call ``update()`` after every decision, including when nothing was
+queried. For :class:`~skactiveml.stream.StreamProbabilisticAL`, also pass the
+utilities from ``query(..., return_utilities=True)`` as
+``budget_manager_param_dict={"utilities": utilities}``.
 
 The example uses :class:`~skactiveml.stream.PeriodicSampling` to query labels
-at a fixed rate for single-output classification with a single annotator.
-An arrival batch counts incoming samples; the acquired query batch counts
-only those chosen for annotation. They can have different sizes. Native
-stream strategies use their budget and update state to decide which arrivals
-to label. The :doc:`batch-stream tutorial
-<generated/tutorials/21_stream_batch_with_pool_al>` demonstrates collecting
-arrivals before querying a pool strategy.
+at a fixed rate, one arrival at a time (single-output classification, one
+annotator). Native stream strategies decide with their budget and the state
+that ``update()`` records. The :doc:`batch-stream tutorial
+<generated/tutorials/21_stream_batch_with_pool_al>` instead collects an
+arrival batch, from which a pool strategy selects a possibly smaller query
+batch.
 
 .. doctest::
 
@@ -454,7 +467,8 @@ Common Pitfalls
      - Model-based strategies fit the estimator inside ``query()`` by default,
        so an additional explicit ``fit()`` trains the same model twice per
        cycle. Either drop the explicit call or pass ``fit_clf=False``
-       (``fit_reg=False`` for regression).
+       (``fit_reg=False`` for regression, ``fit_ensemble=False`` for
+       strategies that take an ``ensemble``).
    * - Writing ``MISSING_LABEL`` into an integer ``y``
      - ``np.nan`` cannot be stored in an integer array, so the assignment
        raises ``ValueError: cannot convert float NaN to integer``. Use a
@@ -491,15 +505,17 @@ Where to Go Next
      - Documentation
    * - Build a complete pool-based classification experiment
      - :doc:`Pool-based Active Learning: Getting Started <generated/tutorials/00_pool_getting_started>`
+   * - Evaluate a method
+     - :doc:`Pool-based Active Learning: A Simple Evaluation Study <generated/tutorials/04_pool_simple_evaluation_study>`
    * - Use deep models and learned representations
-     - :doc:`Deep Active Learning by Fine-tuning DINOv2 <generated/tutorials/01_deep_pool_al_with_skorch>`
+     - :doc:`Deep Active Learning with a Frozen Vision Transformer <generated/tutorials/05_pool_al_with_self_supervised_learning>`
    * - Work with continuous labels
      - :doc:`Pool-based Active Learning for Regression: Getting Started <generated/tutorials/02_pool_regression_getting_started>`
    * - Query labels from several annotators
      - :doc:`Multi-annotator Pool-based Active Learning: Getting Started <generated/tutorials/10_multiple_annotators_getting_started>`
    * - Process a data stream
      - :doc:`Stream-based Active Learning with scikit-learn, River, and CapyMOA <generated/tutorials/20_stream_getting_started>`
-   * - Query complete label vectors
+   * - Use several binary labels per sample
      - :doc:`Pool-based Multi-label Active Learning: Getting Started <generated/tutorials/30_pool_multilabel_getting_started>`
    * - Select a query strategy
      - :doc:`Strategy Overview <generated/strategy_overview>`

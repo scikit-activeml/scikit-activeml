@@ -10,17 +10,10 @@ Target resolution combines these properties in a
 checks whether it supports that specification. A specification can be valid
 even when a component does not support it.
 
-Pool and Stream describe how samples become available, independently of these
-label semantics. Classification and Regression are prediction tasks;
-single-output and multi-label describe target types; single-annotator and
-multi-annotator describe the annotation setting. For example, classification
-with multiple annotators is a classification task with single-output targets
-and a multi-annotator setting. The
-:doc:`Tutorials <tutorials>` and
-:doc:`Visualizations <generated/sphinx_gallery_examples/index>` use Pool or
-Stream, then the task, to organize their demonstrated setups. The
-:doc:`Strategy Overview <generated/strategy_overview>` filters describe
-supported combinations.
+These semantics apply to pool and stream workflows alike. The
+:doc:`Core Workflow <core_workflow>` defines each property, and the
+:doc:`Strategy Overview <generated/strategy_overview>` filters strategies by
+them.
 
 Public API
 ==========
