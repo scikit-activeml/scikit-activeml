@@ -1396,8 +1396,11 @@ variation in the saved results, and explain that changed settings produce
 different outputs. Keep installation guidance short. Activate cuML before
 estimator imports where used. Use throttled progress displays, with elapsed
 time confined to those displays. Keep environment inventories, stage timings,
-and validation code outside the notebook. Use a simple setup warning filter
-to keep example output focused.
+and validation code outside the notebook. Saved outputs show no warnings.
+Fix the cause of a warning that signals a mistake, such as a mismatched
+``missing_label``. Filter an expected, informational warning individually
+by its message, with a comment that gives the reason. Do not hide all
+warnings or disable logging.
 
 Use small, self-contained plotting settings: 11-point axes and ticks,
 12-point titles, and 10-point legends. Where colors identify query strategies,
