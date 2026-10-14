@@ -251,6 +251,10 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
+# Files copied to the output root as they are, such as redirects for removed
+# pages.
+html_extra_path = ["_extra"]
+
 html_css_files = ["strategy_filters.css", "notebooks.css", "visualizations.css"]
 
 html_js_files = [

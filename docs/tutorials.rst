@@ -68,8 +68,6 @@ Run a Tutorial
   label the papers yourself.
 
 
-.. _pool:
-
 Pool-based Active Learning
 --------------------------
 
@@ -165,8 +163,6 @@ Regression
        - Random forest
      - Distinguish model comparisons from query-strategy comparisons, and keep evaluation data separate from acquired labels.
 
-
-.. _stream:
 
 Stream-based Active Learning
 ----------------------------

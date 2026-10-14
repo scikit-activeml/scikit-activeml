@@ -82,6 +82,26 @@ OVERVIEW_SCENARIOS = OrderedDict(
     ]
 )
 
+# Earlier versions of this page had one section per scenario, task, or
+# category. These spans keep their named ids, so old links open the matching
+# table.
+OVERVIEW_LEGACY_IDS = {
+    "pool": [
+        "pool-based-al-strategies",
+        "classification",
+        "baseline",
+        "hybrid",
+        "informativeness",
+        "representativeness",
+        "wrapper",
+        "regression",
+        "pool-based-al-strategies-for-regression",
+        "multi-annotator-learning",
+        "pool-based-al-strategies-for-mulitple-annotators",
+    ],
+    "stream": ["stream-based-al-strategies"],
+}
+
 OVERVIEW_FILTERS = [
     (
         "task",
@@ -634,6 +654,10 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
         for scenario, table in strategy_table.items():
             title = OVERVIEW_SCENARIOS[scenario]
+            file.write(".. raw:: html\n\n")
+            for legacy_id in OVERVIEW_LEGACY_IDS[scenario]:
+                file.write(f'   <span id="{legacy_id}"></span>\n')
+            file.write("\n")
             file.write(f"{title}\n")
             file.write("-" * column_width(title) + "\n\n")
             file.write(
