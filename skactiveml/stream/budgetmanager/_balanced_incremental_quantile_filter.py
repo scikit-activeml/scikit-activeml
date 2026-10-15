@@ -60,7 +60,7 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         """
         utilities = self._validate_data(utilities)
 

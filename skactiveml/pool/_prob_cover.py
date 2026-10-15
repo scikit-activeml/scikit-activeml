@@ -54,7 +54,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         value satisfying a sample coverage >= `alpha`. If no value in
         `deltas` satisfies this constraint, a warning is raised where
         the minimum `delta` value is used. If `deltas=None`, the values
-        `np.arange(0.1, 2.1, 0.1)` are used.
+        `np.arange(0.2, 2.2, 0.2)` are used.
     alpha : float in (0, 1), alpha=0.95
         Minimum coverage as a constraint for the `delta` selection.
     cluster_algo : ClusterMixin.__class__, default=sklearn.cluster.KMeans

@@ -143,7 +143,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -214,8 +214,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`. If supplied, `utilities`
-            must be a one-dimensional array with one value per candidate.
+            Kwargs for `budget_manager`. The default budget manager
+            `BalancedIncrementalQuantileFilter` requires `utilities`, a
+            one-dimensional array with one value per candidate as returned by
+            `query` with `return_utilities=True`.
 
         Returns
         -------

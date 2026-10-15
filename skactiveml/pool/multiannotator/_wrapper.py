@@ -101,8 +101,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            that `y[i, j]` contains the label annotated by annotator `j` for
+            sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             See parameter `annotators`.

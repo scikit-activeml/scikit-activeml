@@ -814,8 +814,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            that `y[i, j]` contains the label annotated by annotator `j` for
+            sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             See parameter `annotators`.
@@ -849,7 +849,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               considered as candidate annotator-sample pairs.
         batch_size : int or str, default=1
             The number of annotators-sample pairs to be selected in one AL
-            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+            cycle. Some strategies, e.g., `IntervalEstimationThreshold`, also
+            accept `batch_size='adaptive'`.
         return_utilities : bool, default=False
             If True, also return the utilities based on the query strategy.
 
@@ -914,7 +915,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by `self.missing_label`),
             meaning that `y[i, j]` contains the label annotated by annotator
-            `i` for sample `j`.
+            `j` for sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features),
             See annotators.
@@ -945,9 +946,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               n_annotators)` the annotator-sample-pairs, for which the sample
               is a candidate sample and the boolean matrix has entry `True` are
               considered as candidate annotator-sample pairs.
-        batch_size : int or string,
+        batch_size : int
             The number of annotators sample pairs to be selected in one AL
-            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+            cycle.
         return_utilities : bool
             If true, also return the utilities based on the query strategy.
         reset : bool, default=True
@@ -1204,7 +1205,7 @@ class BudgetManager(ABC, BaseEstimator):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         """
         raise NotImplementedError
 
@@ -1365,7 +1366,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -1397,6 +1398,8 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         budget_manager_param_dict : dict, default=None
             Optional kwargs for `budget_manager`. If supplied, `utilities`
             must be a one-dimensional array with one value per candidate.
+            Some budget managers, e.g., `BalancedIncrementalQuantileFilter`,
+            require `utilities`.
 
         Returns
         -------

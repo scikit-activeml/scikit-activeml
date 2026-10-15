@@ -114,7 +114,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
