@@ -53,8 +53,9 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         List of deltas (ball radii) to be tested for finding the maximum
         value satisfying a purity >= `alpha`. If no value in
         `deltas` satisfies this constraint, a warning is raised where
-        the minimum `delta` value is used. If `deltas=None`, the values
-        `np.arange(0.2, 2.2, 0.2)` are used.
+        the minimum `delta` value is used. A single value is used as a fixed
+        radius. If `deltas=None`, the values `np.arange(0.2, 2.2, 0.2)` are
+        used.
     alpha : float in (0, 1), default=0.95
         Minimum purity as a constraint for the `delta` selection, i.e., the
         fraction of samples whose `delta`-ball contains only samples of their
@@ -230,8 +231,15 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         else:
             deltas = column_or_1d(self.deltas, dtype=float)
             deltas = np.sort(deltas)
-            if (deltas < 0).any():
-                raise ValueError("`deltas` must contain non-negative floats.")
+            if (
+                len(deltas) == 0
+                or not np.all(np.isfinite(deltas))
+                or (deltas < 0).any()
+            ):
+                raise ValueError(
+                    "`deltas` must contain at least one finite, non-negative "
+                    "float."
+                )
         check_scalar(
             self.alpha,
             "alpha",
@@ -288,14 +296,14 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                         break
                     self.delta_max_ = delta
 
-            # Check whether condition defined by `alpha` was satisfied.
-            if max_purity < self.alpha:
-                warnings.warn(
-                    f"The maximum purity was {max_purity} being smaller "
-                    f"than the required value `alpha={self.alpha}`. You must"
-                    f"provide smaller values in `deltas` to avoid "
-                    f"this warning."
-                )
+                # Check whether condition defined by `alpha` was satisfied.
+                if max_purity < self.alpha:
+                    warnings.warn(
+                        f"The maximum purity was {max_purity} being smaller "
+                        f"than the required value `alpha={self.alpha}`. You "
+                        f"must provide smaller values in `deltas` to avoid "
+                        f"this warning."
+                    )
 
         # Compute edges of the graph with the samples as vertices.
         edges = _radius_graph(self.distances_, self.delta_max_)
