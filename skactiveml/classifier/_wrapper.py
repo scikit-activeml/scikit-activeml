@@ -864,13 +864,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         P, n_samples=n_samples
                     )
                 elif is_collapsed_binary_output:
-                    if len(estimator_classes) == 1 and P_array.shape[1] == 2:
-                        self._check_estimator_probas_are_valid(
-                            P_array, is_multilabel=False
-                        )
-                        # Both native columns belong to the sole learned
-                        # class; dropping either loses probability mass.
-                        P_array = P_array.sum(axis=1, keepdims=True)
                     P_list = self._normalize_multilabel_proba_list(
                         [P_array], n_samples=n_samples
                     )
@@ -1482,6 +1475,30 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._check_estimator_probas_are_valid(P_ml, is_multilabel=True)
         return P_ml
 
+    def _merge_sole_class_columns(self, P, learned_classes):
+        """Merge the two columns of an estimator that learned one class.
+
+        Some estimators, e.g., `MLPClassifier`, return two probability
+        columns although they observed only one class. Both columns belong
+        to this class, which therefore has probability one.
+
+        Parameters
+        ----------
+        P : numpy.ndarray of shape (n_samples, n_columns)
+            Probabilities returned by the wrapped estimator.
+        learned_classes : array-like of shape (n_learned_classes,)
+            The class labels the estimator learned.
+
+        Returns
+        -------
+        P : numpy.ndarray of shape (n_samples, n_columns) or (n_samples, 1)
+            The probabilities with one column for a sole learned class.
+        """
+        if len(learned_classes) == 1 and P.shape[1] == 2:
+            self._check_estimator_probas_are_valid(P, is_multilabel=False)
+            P = np.where(np.isnan(P).any(axis=1, keepdims=True), np.nan, 1.0)
+        return P
+
     @staticmethod
     def _check_estimator_probas_are_valid(P, is_multilabel):
         """Validate estimator probabilities while preserving NaN fallback.
@@ -1553,7 +1570,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     f"return probabilities for all declared classes."
                 )
         else:
-            P = _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+            est_classes = np.asarray(est_classes)
+            P = self._merge_sole_class_columns(P, est_classes)
+            P = _map_proba_columns(P, est_classes, self.classes_)
         self._check_estimator_probas_are_valid(P, is_multilabel=False)
         return P
 
@@ -1622,11 +1641,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     )
                 P_j_normalized = P_j
             else:
+                est_classes_j = np.asarray(est_classes_j)
+                P_j = self._merge_sole_class_columns(P_j, est_classes_j)
                 P_j_normalized = _map_proba_columns(
-                    P_j,
-                    np.asarray(est_classes_j),
-                    classes_j,
-                    output_idx=j,
+                    P_j, est_classes_j, classes_j, output_idx=j
                 )
             self._check_estimator_probas_are_valid(
                 P_j_normalized, is_multilabel=False

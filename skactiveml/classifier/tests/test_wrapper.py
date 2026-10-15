@@ -15,7 +15,11 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
+from sklearn.ensemble import (
+    BaggingClassifier,
+    HistGradientBoostingClassifier,
+    RandomForestClassifier,
+)
 from sklearn.gaussian_process import (
     GaussianProcessClassifier,
 )
@@ -1222,6 +1226,55 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                             P[0], np.column_stack([1 - y[:, 0], y[:, 0]])
                         )
 
+    def test_estimators_that_learned_one_class_predict_it(self):
+        X = np.linspace(-2, 2, 6, dtype=np.float32).reshape(-1, 1)
+        y = np.array([1, 1, -1, -1, -1, -1])
+        estimators = {
+            "MLPClassifier": MLPClassifier(max_iter=5, random_state=0),
+            "HistGradientBoostingClassifier": (
+                HistGradientBoostingClassifier(max_iter=2)
+            ),
+            "RandomForestClassifier": RandomForestClassifier(
+                n_estimators=2, random_state=0
+            ),
+        }
+        for (name, estimator), classes in product(
+            estimators.items(), [[0, 1], [0, 1, 2]]
+        ):
+            with self.subTest(estimator=name, classes=classes):
+                clf = SklearnClassifier(
+                    estimator, classes=classes, missing_label=-1
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    clf.fit(X, y)
+                expected = np.zeros((len(X), len(classes)))
+                expected[:, 1] = 1
+                np.testing.assert_array_equal(clf.predict_proba(X), expected)
+
+        clf = SklearnClassifier(
+            MultiOutputClassifier(MLPClassifier(max_iter=5, random_state=0)),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format="array",
+        )
+        y_ml = np.array([[1, 0], [1, 1], *[[-1, -1]] * 4])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            clf.fit(X, y_ml)
+        np.testing.assert_array_equal(clf.predict_proba(X)[:, 0], 1)
+
+        n_samples = len(self.X_ml)
+        clf = self._prefit_single_output_clf(
+            proba=np.tile(
+                np.float32([0.81723994, 0.18276007]), (n_samples, 1)
+            ),
+            classes_=np.array([1]),
+        )
+        np.testing.assert_array_equal(
+            clf.predict_proba(self.X_ml), np.tile([0.0, 1.0], (n_samples, 1))
+        )
+
     def test_no_labeled_data_falls_back_to_prior_without_fitting(self):
         estimator = self._CallRecordingEstimator()
         clf = SklearnClassifier(
@@ -2132,7 +2185,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
     def test_invalid_single_output_probabilities_are_rejected(self):
         invalid_rows = [[np.inf, 0.0], [-0.1, 1.1], [0.4, 0.4], [np.nan, 1.1]]
         for classes_, invalid_row in product(
-            [np.array([0, 1]), None], invalid_rows
+            [np.array([0, 1]), np.array([1]), None], invalid_rows
         ):
             with self.subTest(classes_=classes_, invalid_row=invalid_row):
                 proba = np.full((len(self.X_ml), 2), 0.5)
@@ -2149,7 +2202,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 )
 
     def test_single_output_nan_probabilities_keep_prior_fallback(self):
-        for classes_ in [np.array([0, 1]), None]:
+        for classes_ in [np.array([0, 1]), np.array([1]), None]:
             with self.subTest(classes_=classes_):
                 proba = np.full((len(self.X_ml), 2), 0.5)
                 proba[0] = [np.nan, 0.5]
