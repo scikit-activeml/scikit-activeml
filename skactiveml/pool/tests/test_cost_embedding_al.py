@@ -71,6 +71,13 @@ class TestCostEmbeddingAL(
                 - np.eye(len(self.classes)),
                 None,
             ),
+            (
+                (
+                    np.ones((len(self.classes), len(self.classes)))
+                    - np.eye(len(self.classes))
+                ).tolist(),
+                None,
+            ),
         ]
         self._test_param("init", "cost_matrix", test_cases)
 

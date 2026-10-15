@@ -276,6 +276,8 @@ def _alce(
     check_classifier_params(classes, missing_label, cost_matrix)
     if cost_matrix is None:
         cost_matrix = 1 - np.eye(len(classes))
+    else:
+        cost_matrix = np.asarray(cost_matrix, dtype=float)
 
     if np.count_nonzero(cost_matrix) == 0:
         raise ValueError(

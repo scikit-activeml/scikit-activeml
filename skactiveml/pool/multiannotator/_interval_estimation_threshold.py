@@ -7,6 +7,7 @@ from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
 )
+from ...utils._label_dtype import _as_label_array
 from ...utils._target import _check_target_spec_capability
 from ...pool._uncertainty_sampling import uncertainty_scores
 from ...utils import (
@@ -123,7 +124,7 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         self : IntervalEstimationAnnotModel object
             The fitted annotator model.
         """
-        y_array = np.asarray(y)
+        y_array = _as_label_array(y)
         check_missing_label(
             self.missing_label, target_type=y_array.dtype, name="y"
         )
@@ -163,12 +164,12 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         )
 
         # Number of annotators.
-        self.n_annotators_ = y.shape[1]
+        self.n_annotators_ = y_array.shape[1]
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         self.A_perf_ = np.zeros((self.n_annotators_, 3))
         for a_idx in range(self.n_annotators_):
             is_correct = np.equal(
-                y_mv[is_lbld[:, a_idx]], y[is_lbld[:, a_idx], a_idx]
+                y_mv[is_lbld[:, a_idx]], y_array[is_lbld[:, a_idx], a_idx]
             )
             is_correct = np.concatenate((is_correct, [0, 1]))
             mean = np.mean(is_correct)
