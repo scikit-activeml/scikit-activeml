@@ -1192,6 +1192,7 @@ class TestFeatureSpace(unittest.TestCase):
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
+            queried_indices=self.queried_indices,
             ax=2,
         )
         _, axes = plt.subplots(1, 2)
@@ -1202,8 +1203,42 @@ class TestFeatureSpace(unittest.TestCase):
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
+            queried_indices=self.queried_indices,
             ax=axes,
         )
+
+    def test_plot_stream_training_data_rejects_mismatched_masks(self):
+        n_samples = len(self.y_stream)
+        for n_queried in [n_samples - 1, n_samples + 1]:
+            with self.subTest(n_queried=n_queried):
+                _, ax = plt.subplots()
+                self.assertRaises(
+                    ValueError,
+                    plot_stream_training_data,
+                    ax=ax,
+                    classes=np.unique(self.y_stream),
+                    feature_bound=self.stream_bound,
+                    X=self.X_stream,
+                    queried_indices=[True] * n_queried,
+                    y=self.y_stream,
+                )
+                self.assertEqual(len(ax.lines), 0)
+
+    def test_plot_contour_for_samples_accepts_list_X(self):
+        values = self.utilities.copy()
+        values[:10] = np.nan
+        levels = []
+        for X in [self.X, self.X.tolist()]:
+            _, ax = plt.subplots()
+            plot_contour_for_samples(X, values, replace_nan=None, ax=ax)
+            levels.append(ax.collections[-1].levels)
+        np.testing.assert_array_equal(levels[0], levels[1])
+
+    def test_plot_utilities_propagates_keyboard_interrupt(self):
+        qs = InterruptingStrategy()
+        with self.assertRaises(KeyboardInterrupt):
+            plot_utilities(qs, self.X, self.y)
+        self.assertEqual(qs.n_calls, 1)
 
     def test_plot_contour_for_samples_param_X(self):
         for X in [None, 1, np.arange(10)]:
@@ -1591,6 +1626,22 @@ class MappingOnlyMultiAnnotatorStrategy(MultiAnnotatorPoolQueryStrategy):
         if return_utilities:
             return query_indices, utilities
         return query_indices
+
+
+class InterruptingStrategy(SingleAnnotatorPoolQueryStrategy):
+    n_calls = 0
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def query(
+        self, X, y, candidates=None, batch_size=1, return_utilities=False
+    ):
+        self.n_calls += 1
+        raise KeyboardInterrupt
 
 
 class MappingOnlyRegressionStrategy(SingleAnnotatorPoolQueryStrategy):

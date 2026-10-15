@@ -450,7 +450,7 @@ def plot_contour_for_samples(
     ax : matplotlib.axes.Axes
         The axis on which the utility was plotted.
     """
-    check_array(X, ensure_2d=True)
+    X = check_array(X, ensure_2d=True)
     values = check_array(
         values, ensure_2d=False, ensure_all_finite=False, copy=True
     )
@@ -529,7 +529,7 @@ def plot_stream_training_data(
     """
     column_or_1d(X)
     check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
-    check_consistent_length(X, y)
+    check_consistent_length(X, y, queried_indices)
     check_array(queried_indices, ensure_2d=False)
     check_array(classes, ensure_2d=False)
     check_type(unlabeled_color, "unlabeled_color", str)
@@ -814,7 +814,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
 
         except MappingError:
             pass
-        except BaseException as err:
+        except Exception as err:
             warnings.warn(
                 f"Unable to create utility plot with mesh because "
                 f"of the following error. Trying plotting over "
