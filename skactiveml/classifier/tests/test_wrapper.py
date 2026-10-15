@@ -4999,6 +4999,19 @@ if successful_river_import:
                 clf.predict_proba(X), expected_probabilities
             )
 
+        def test_transform_data_to_dict_converts_numeric_samples(self):
+            clf = RiverClassifier(river.tree.HoeffdingTreeClassifier())
+            for x, value_type in [
+                (np.array([0.5, 1.5], dtype=np.float32), float),
+                (np.array([1, 2]), int),
+                (np.array([True, False]), np.bool_),
+            ]:
+                with self.subTest(dtype=x.dtype):
+                    x_dict = clf.transform_data_to_dict(x)
+                    self.assertEqual(list(x_dict), ["0", "1"])
+                    for value in x_dict.values():
+                        self.assertIs(type(value), value_type)
+
         def test_partial_fit(self):
             self._test_fit("partial_fit")
             clfs = {

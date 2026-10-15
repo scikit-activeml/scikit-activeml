@@ -3643,7 +3643,10 @@ if successful_river_import:
             return self
 
         def transform_data_to_dict(self, data):
-            return {str(i): x for i, x in enumerate(data.T)}
+            values = data.T
+            if data.ndim == 1 and data.dtype.kind in "iuf":
+                values = data.tolist()
+            return {str(i): x for i, x in enumerate(values)}
 
         def __sklearn_is_fitted__(self):
             if hasattr(self, "is_fitted_"):
