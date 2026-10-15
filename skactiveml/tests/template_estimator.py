@@ -979,6 +979,8 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             ([], ValueError),
             ([0, 1], None),
             ([0], ValueError),
+            (np.inf, ValueError),
+            ([0, np.inf], ValueError),
         ]
         replace_init_params = {
             "classes": ["tokyo", "paris"],
@@ -995,6 +997,12 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+        if self._has_multilabel_defaults():
+            init_params, fit_params, _ = self._get_multilabel_params()
+            init_params["class_prior"] = np.inf
+            estimator = self.estimator_class(**init_params)
+            with self.assertRaises(ValueError):
+                self._call_with_target(estimator, "fit", fit_params)
 
     def test_param_test_availability(self):
         not_test = ["self"]

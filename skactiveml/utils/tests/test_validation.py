@@ -338,6 +338,7 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_class_prior, 1, None)
         self.assertRaises(ValueError, check_class_prior, 1, 0)
         self.assertRaises(ValueError, check_class_prior, -2, 2)
+        self.assertRaises(ValueError, check_class_prior, np.inf, 2)
         self.assertRaises(ValueError, check_class_prior, [0, 1, -1], 3)
         self.assertRaises(ValueError, check_class_prior, [1, 2, 3], 2)
         np.testing.assert_array_equal(check_class_prior(1, 3), [1, 1, 1])

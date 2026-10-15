@@ -326,6 +326,33 @@ class TestParzenWindowClassifier(
                 ):
                     pwc.predict_proba(x)
 
+    def test_predict_freq_rejects_nonfinite_kernel_values(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="precomputed").fit(
+            np.eye(2), [0, 1]
+        )
+        for K in ([[np.nan, 1.0]], [[np.inf, 1.0]], [[-np.inf, 1.0]]):
+            for method in (pwc.predict_freq, pwc.predict_proba, pwc.predict):
+                with self.subTest(K=K, method=method.__name__):
+                    with self.assertRaisesRegex(
+                        ValueError, "non-finite class frequency"
+                    ):
+                        method(np.array(K))
+
+        pwc = ParzenWindowClassifier(
+            classes=[0, 1], metric=lambda x, y: np.nan
+        ).fit([[0.0], [1.0]], [0, 1])
+        with self.assertRaisesRegex(ValueError, "non-finite class frequency"):
+            pwc.predict_freq([[0.5]])
+
+    def test_predict_freq_ignores_kernels_of_unlabeled_samples(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="precomputed").fit(
+            np.eye(3), [0, 1, np.nan]
+        )
+        np.testing.assert_allclose(
+            pwc.predict_proba(np.array([[0.5, 1.0, np.nan]])),
+            [[1 / 3, 2 / 3]],
+        )
+
     def test_predict_freq_uses_contributing_samples_only(self):
         n_kernel_calls = 0
 

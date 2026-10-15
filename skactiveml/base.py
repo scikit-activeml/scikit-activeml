@@ -1965,8 +1965,14 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Raises
         ------
         ValueError
-            If any estimate is negative.
+            If any estimate is negative or not finite.
         """
+        if not np.all(np.isfinite(F)):
+            raise ValueError(
+                f"`{name}` returned a non-finite class frequency. Check the "
+                "inputs and parameters this estimator derives its "
+                "frequencies from, which must be finite."
+            )
         if np.any(np.asarray(F) < 0):
             raise ValueError(
                 f"`{name}` returned a negative class frequency, the smallest "
@@ -2154,6 +2160,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
                     name="class_prior",
                     target_type=(int, float),
                     min_val=0,
+                    max_val=np.inf,
+                    max_inclusive=False,
                 )
                 self.class_prior_ = np.full((n_outputs, 2), self.class_prior)
             else:

@@ -581,6 +581,8 @@ def check_class_prior(class_prior, n_classes):
             name="class_prior",
             target_type=(int, float),
             min_val=0,
+            max_val=np.inf,
+            max_inclusive=False,
         )
         class_prior = np.array([class_prior] * n_classes)
     else:
