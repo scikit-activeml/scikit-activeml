@@ -13,6 +13,7 @@ from sklearn.datasets import make_blobs
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
     MISSING_LABEL,
+    is_labeled,
 )
 
 
@@ -741,6 +742,32 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 replace_fit_params=replace_fit_params,
             )
 
+    def test_fit_with_one_observed_class(self):
+        init_params = deepcopy(self.init_default_params)
+        fit_params = deepcopy(self.fit_default_params)
+        y = np.asarray(fit_params["y"])
+        is_lbld = is_labeled(y, missing_label=init_params["missing_label"])
+        if init_params.get("classes") is None:
+            init_params["classes"] = np.unique(y[is_lbld]).tolist()
+        classes = init_params["classes"]
+        fit_params["y"] = np.where(is_lbld, classes[-1], y)
+        X = self.predict_default_params["X"]
+        for method in ["fit", "partial_fit"]:
+            estimator = self.estimator_class(**deepcopy(init_params))
+            if not hasattr(estimator, method):
+                continue
+            with self.subTest(method=method):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self._call_with_target(estimator, method, fit_params)
+                    P = np.asarray(estimator.predict_proba(X))
+                    y_pred = estimator.predict(X)
+                self.assertEqual(P.shape, (len(X), len(classes)))
+                self.assertTrue(np.isfinite(P).all())
+                self.assertTrue((P >= 0).all())
+                np.testing.assert_allclose(P.sum(axis=1), 1, rtol=1e-6)
+                self.assertTrue(np.isin(y_pred, classes).all())
+
     def test_param_test_availability(self):
         not_test = ["self"]
         check_test_param_test_availability(
@@ -770,6 +797,33 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         fit_params["y"] = y_invalid
         with self.assertRaises(ValueError):
             self._call_with_target(estimator, "fit", fit_params)
+
+    def test_fit_multilabel_with_constant_outputs(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        y = np.asarray(fit_params["y"])
+        is_lbld = is_labeled(
+            y,
+            missing_label=init_params["missing_label"],
+            target_type="multi-label",
+        )
+        fit_params["y"] = np.where(is_lbld[:, None], y[is_lbld][0], y)
+        X = predict_params["X"]
+        for method in ["fit", "partial_fit"]:
+            estimator = self.estimator_class(**deepcopy(init_params))
+            if not hasattr(estimator, method):
+                continue
+            with self.subTest(method=method):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self._call_with_target(estimator, method, fit_params)
+                    P = np.asarray(estimator.predict_proba(X))
+                    y_pred = estimator.predict(X)
+                self.assertEqual(P.shape, (len(X), len(estimator.classes_)))
+                self.assertTrue(((P >= 0) & (P <= 1)).all())
+                self._assert_multilabel_predictions(y_pred, estimator.classes_)
 
     def test_fit_param_sample_weight_multilabel(self):
         if not self._has_multilabel_defaults():
@@ -893,6 +947,27 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
             unsupported.fit(**fit_params)
         self.assertFalse(hasattr(unsupported, "target_spec_"))
         self.assertFalse(hasattr(unsupported, "classes_"))
+
+    def test_fit_with_one_observed_class(self):
+        estimator = self.target_contract_estimator_factory()
+        fit_params = deepcopy(self.target_contract_fit_params)
+        y = np.asarray(fit_params["y"])
+        is_lbld = is_labeled(y, missing_label=estimator.missing_label)
+        if estimator.classes is None:
+            estimator.set_params(classes=np.unique(y[is_lbld]).tolist())
+        classes = estimator.classes
+        fit_params["y"] = np.where(is_lbld, classes[-1], y)
+        X = fit_params["X"]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            estimator.fit(**fit_params)
+            P = np.asarray(estimator.predict_proba(X))
+            y_pred = estimator.predict(X)
+        self.assertEqual(P.shape, (len(X), len(classes)))
+        self.assertTrue(np.isfinite(P).all())
+        self.assertTrue((P >= 0).all())
+        np.testing.assert_allclose(P.sum(axis=1), 1, rtol=1e-6)
+        self.assertTrue(np.isin(y_pred, classes).all())
 
 
 class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
