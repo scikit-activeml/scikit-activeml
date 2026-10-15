@@ -80,8 +80,9 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         surface because the query strategy returns one utility per sample.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
-        - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`.
+        - If `candidates` is `None`, the utilities are plotted on a mesh
+          over `feature_bound`. If the query strategy cannot evaluate the
+          mesh samples, the unlabeled samples from `(X,y)` are used.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -101,9 +102,8 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
             default=None
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+        Determines the plotted area. If `None`, the bound is determined based
+        on `candidates` if they are given as samples, and on `X` otherwise.
     ax : matplotlib.axes.Axes, default=None
         The axis on which the utility is plotted.
     res : int, default=21
@@ -140,10 +140,11 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
         indicated by `qs.missing_label`).
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
-        - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`. For a two-dimensional
-          `y`, a sample is unlabeled as soon as at least one annotator
-          has not labeled it.
+        - If `candidates` is `None`, the utilities are plotted on a mesh
+          over `feature_bound`. If the query strategy cannot evaluate the
+          mesh samples, the unlabeled samples from `(X,y)` are used. For a
+          two-dimensional `y`, a sample is unlabeled as soon as at least
+          one annotator has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -163,9 +164,8 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
             default=None
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+        Determines the plotted area. If `None`, the bound is determined based
+        on `candidates` if they are given as samples, and on `X` otherwise.
     axes : array-like of matplotlib.axes.Axes, default=None
         The axes on which the utilities for the annotators are plotted. Only
         supported for y.ndim = 2 corresponding to a setting with multiple
@@ -420,7 +420,7 @@ def plot_contour_for_samples(
     res=21,
     contour_dict=None,
 ):
-    """Plot the utility for the given query strategy.
+    """Plot a contour of the values given for the samples `X`.
 
     Parameters
     ----------
@@ -433,10 +433,10 @@ def plot_contour_for_samples(
     replace_nan : numeric or None, default=0.0
         If numeric, nan-values in `values` will be replaced by this number.
         If None, these samples will be ignored.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]], \
+            default=None
+        Determines the plotted area. If `None`, the bound is determined based
+        on `X`.
     ax : matplotlib.axes.Axes, default=None
         The axis on which the utility is plotted. If no axis is given, the
         current axis (`plt.gca()`) will be used instead.
@@ -493,13 +493,12 @@ def plot_stream_training_data(
     linewidth=3,
     plot_cand_highlight=True,
 ):
-    """Plot the utility for the given query strategy.
+    """Plot the samples of a data stream over time, colored by their labels.
 
     Parameters
     ----------
     ax : matplotlib.axes.Axes
-        The axis on which the utility is plotted. Only if y.ndim = 1 (single
-        annotator).
+        The axis on which the samples are plotted.
     X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
@@ -509,14 +508,13 @@ def plot_stream_training_data(
         Indicates which samples in `X` have been queried.
     classes : array-like of shape (n_classes,)
         Holds the label for each class.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+    feature_bound : array-like of shape [[t_min, t_max], [x_min, x_max]]
+        Time and feature ranges of the plot. Only `t_max` is used, as the end
+        of the current candidate's highlight.
     unlabeled_color : str or matplotlib.colors.Colormap, default='grey'
         The color for the unlabeled samples.
-    cmap : str or matplotlib.colors.Colormap, default='coolwarm_r'
-        The colormap for the confidence levels.
+    cmap : str or matplotlib.colors.Colormap, default='coolwarm'
+        The colormap for the class labels.
     alpha : scalar, default=0.2
         Set the alpha value used for blending - not supported on all backends.
     linewidth : float, default=3
@@ -526,8 +524,8 @@ def plot_stream_training_data(
 
     Returns
     -------
-     axes : array-like of shape (n_annotators_to_plot,)
-         The axes on which the utilities were plotted.
+    data_lines : list of matplotlib.lines.Line2D
+        The lines added to `ax`.
     """
     column_or_1d(X)
     check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
@@ -590,9 +588,8 @@ def plot_stream_decision_boundary(
 
     Parameters
     ----------
-    ax : matplotlib.axes.Axes or List
-        The axis on which the decision boundary is plotted. If ax is a List,
-        each entry has to be an `matplotlib.axes.Axes`.
+    ax : matplotlib.axes.Axes
+        The axis on which the decision boundary is plotted.
     t_x : int
         The position of the newest instance for the x axies.
     plot_step : int
@@ -602,8 +599,9 @@ def plot_stream_decision_boundary(
     X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    pred_list : array-like of shape (n_samples,)
-        The list containing classifier prediction for the last steps.
+    pred_list : list
+        The classifier's predictions at the previous plotting steps. The
+        predictions of the current step are appended to it.
     color : str or matplotlib.colors.Colormap, default='k'
         The color for the decision boundary.
     res : int, default=25
@@ -611,11 +609,10 @@ def plot_stream_decision_boundary(
 
     Returns
     -------
-    ax : matplotlib.axes.Axes or List
-        The axis on which the boundary was plotted or the list of axis if ax
-        was a list.
-    pred_list : array-like of shape (n_samples,)
-        The list containing classifier prediction for the last steps.
+    ax : matplotlib.axes.Axes
+        The axis on which the boundary was plotted.
+    pred_list : list
+        The predictions including those of the current step.
     """
     X = column_or_1d(X)
     check_array(pred_list, ensure_2d=False, ensure_min_samples=0)
@@ -659,10 +656,11 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         represent annotators and produce one surface per selected annotator.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
-        - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`. For a multi-annotator
-          strategy with a two-dimensional `y`, a sample is unlabeled as
-          soon as at least one annotator has not labeled it.
+        - If `candidates` is `None`, the utilities are plotted on a mesh
+          over `feature_bound`. If the query strategy cannot evaluate the
+          mesh samples, the unlabeled samples from `(X,y)` are used. For a
+          multi-annotator strategy with a two-dimensional `y`, a sample is
+          unlabeled as soon as at least one annotator has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -682,9 +680,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
             default=None
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+        Determines the plotted area. If `None`, the bound is determined based
+        on `candidates` if they are given as samples, and on `X` otherwise.
     ax : matplotlib.axes.Axes, default=None
         The axis on which the utility of a single-annotator strategy is
         plotted.

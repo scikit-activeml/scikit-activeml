@@ -387,8 +387,8 @@ class FixedUncertainty(UncertaintyZliobaite):
     The FixedUncertainty (Fixed Uncertainty Strategy in [1]_) query strategy
     queries samples based on the classifiers uncertainty that is assessed
     based on the classifier's predictions. The sample is queried when the
-    probability of the most likely class exceeds a threshold calculated based
-    on the budget and the number of classes. See also
+    probability of the most likely class does not exceed a threshold
+    calculated based on the budget and the number of classes. See also
     :class:`.budgetmanager.FixedUncertaintyBudgetManager`
 
     Parameters
@@ -465,8 +465,9 @@ class VariableUncertainty(UncertaintyZliobaite):
     The VariableUncertainty query strategy (Variable Uncertainty Strategy in
     [1]_) queries labels based on the classifiers uncertainty assessed based on
     the classifier's predictions. The sample is queried when the probability
-    of the most likely class exceeds a time-dependent threshold calculated
-    based on the budget, number of observed and acquired samples. See also
+    of the most likely class is lower than a time-dependent threshold
+    calculated based on the budget, number of observed and acquired samples.
+    See also
     :class:`.budgetmanager.VariableUncertaintyBudgetManager`
 
     Parameters
@@ -516,7 +517,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
     The RandomVariableUncertainty (Uncertainty Strategy With Randomization in
     [1]_) query strategy samples samples based on the classifier's
     uncertainty assessed based on the classifier's predictions. The sample is
-    queried when the probability of the most likely class exceeds a
+    queried when the probability of the most likely class is lower than a
     time-dependent threshold calculated based on the budget, and the number of
     observed and acquired samples. The threshold is randomized by being
     multiplied with a random number sampled from N(1,delta). See also
@@ -568,10 +569,10 @@ class Split(UncertaintyZliobaite):
 
     The Split query strategy (Split Strategy in [1]_) queries labels based on
     the classifiers uncertainty assessed based on the classifier's predictions.
-    The sample is queried when the probability of the most likely class
-    exceeds a time-dependent threshold calculated based on the budget, number
-    of observed and acquired samples. It is a hybrid strategy that combines
-    `VariableUncertainty` with randomly sampling samples with a given
+    The sample is queried when the probability of the most likely class is
+    lower than a time-dependent threshold calculated based on the budget,
+    number of observed and acquired samples. It is a hybrid strategy that
+    combines `VariableUncertainty` with randomly sampling samples with a given
     probability. See also
     :class:`.budgetmanager.SplitBudgetManager`
 

@@ -12,21 +12,21 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
     This budget manager is an adaptation of
     :class:`.RandomVariableUncertaintyBudgetManager` for DBALStream [1]_. It
-    mainly differs in how the available budget ist estimated. Instead of the
+    mainly differs in how the available budget is estimated. Instead of the
     estimated budget proposed by Žliobaitė et. al. [2]_, this budget manager
-    counts the number of queried and seen instance, such that the number of
-    available queries is given as `n_seen_samples-n_queried_samples*budget`.
+    counts the number of queried and seen instances, such that the number of
+    available queries is given as `n_seen_samples*budget-n_queried_samples`.
 
     Parameters
     ----------
     theta : float, default=1.0
         Specifies the initial value for `theta_` that is used for calculating
         the threshold.
-    s : float, default=0.1
-        Specifies the relative increase or decrease of the threshold if an
+    s : float, default=0.01
+        Specifies the relative decrease or increase of the threshold if a
         sample is queried or not, respectively.
     delta : float, default=1.0
-        Specifies the standart deviation of the normal distribution used for
+        Specifies the standard deviation of the normal distribution used for
         randomization of the threshold.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the budget manager.

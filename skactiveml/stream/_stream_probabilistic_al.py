@@ -45,7 +45,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     prior : float, default=1.0e-3
         The prior value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
-    m_max : float, default=2
+    m_max : int > 0, default=2
         The m_max value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
     budget_manager : BudgetManager, default=None
@@ -133,8 +133,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         fit_clf : bool, default=False
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        utility_weight : array-like of shape (n_candidate_samples),
-        default=None
+        utility_weight : array-like of shape (n_candidates,), default=None
             Densities for each sample in `candidates`.
         return_utilities : bool, default=False
             If `True`, also return the `utilities` based on the query strategy.

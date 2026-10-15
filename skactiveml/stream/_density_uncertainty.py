@@ -94,8 +94,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `DensityBasedBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
+        `DensityBasedSplitBudgetManager` will be used by default. The
+        budget manager will be initialized based on the following
+        conditions:
 
         - If only a `budget` is given, the default budget manager is
           initialized with the given budget.
@@ -591,8 +592,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `DensityBasedBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
+        `RandomVariableUncertaintyBudgetManager` will be used by default. The
+        budget manager will be initialized based on the following
+        conditions:
 
         - If only a `budget` is given, the default budget manager is
           initialized with the given budget.
@@ -616,8 +618,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         RandomBudgetManager.
     CognitiveDualQueryStrategyFixUn : CognitiveDualQueryStrategy using the
         FixedUncertaintyBudgetManager.
-    CognitiveDualQueryStrategyVarUn : VariableUncertaintyBudgetManager using
-        the VariableUncertaintyBudgetManager.
+    CognitiveDualQueryStrategyVarUn : CognitiveDualQueryStrategy using the
+        VariableUncertaintyBudgetManager.
     CognitiveDualQueryStrategyRanVarUn : CognitiveDualQueryStrategy using the
         RandomVariableUncertaintyBudgetManager.
 
@@ -1188,20 +1190,6 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `RandomBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1290,20 +1278,6 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `FixedUncertaintyBudgetManager` will be used by default. The budget
-        manager will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1404,20 +1378,6 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `VariableUncertaintyBudgetManager` will be used by default. The budget
-        manager will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1427,7 +1387,8 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.VariableUncertaintyBudgetManager : The default budget
+        manager.
     .CognitiveDualQueryStrategy : The base class for this
         strategy.
 
@@ -1505,20 +1466,6 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `RandomBudgetManager` will be used by default.  The budget manager will
-        be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1528,7 +1475,8 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.RandomVariableUncertaintyBudgetManager : The default
+        budget manager.
     .CognitiveDualQueryStrategy : The base class for this
         strategy.
 
