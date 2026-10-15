@@ -292,12 +292,21 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`.)
+        reg : skactiveml.base.SkactivemlRegressor
+            Regressor predicting the labels of the candidates.
+        fit_reg : bool, default=True
+            Defines whether the regressor should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates, ) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from

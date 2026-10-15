@@ -46,6 +46,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
 
     Parameters
     ----------
+    n_annotators : int >= 1 or None, default=None
+        Number of annotators. If `None`, it is inferred from `y` during
+        fitting.
     tol : float, default=0.0001
         Threshold for stopping the EM-Algorithm and the optimization of
         the logistic regression weights. If the change of the respective value
@@ -70,7 +73,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         prior distribution for every weight vector
         (i.e., `Gamma=weights_prior * np.eye(n_features)`).
         As default, the identity matrix is used for each weight vector.
-    solver : str or callable, default='L-BFGS-B'
+    solver : str or callable, default='Newton-CG'
         Type of solver.  Should be 'Nelder-Mead', 'Powell', 'CG',
         'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'COBYLA', 'SLSQP',
         'trust-constr', 'dogleg', 'trust-ncg', 'trust-exact', 'trust-krylov',
@@ -585,9 +588,10 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             Class predictions of the test samples.
         *extras : numpy.ndarray, optional
             Only returned if `extra_outputs` is not `None`. In that
-            case, the method returns a tuple whose first element is `P`
-            and whose remaining elements correspond to the requested
-            forward outputs in the order given by `extra_outputs`.
+            case, the method returns a tuple whose first element is
+            `y_pred` and whose remaining elements correspond to the
+            requested forward outputs in the order given by
+            `extra_outputs`.
             Potential outputs are:
 
             - `L_class` : `np.ndarray` of shape `(n_samples, n_classes)`,
@@ -661,7 +665,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
               `(n_samples, n_annotators, n_classes)`, where
               `P_annot[n, m, c]` refers to the probability that annotator
               `m` provides the class label `c` for sample `X[n]`.
-              Only returned, if `return_annotator_class=True`.
         """
         # Check extra outputs format.
         if extra_outputs is None:

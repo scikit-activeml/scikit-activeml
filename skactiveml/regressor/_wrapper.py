@@ -1090,10 +1090,8 @@ if successful_skorch_torch_import:
                 work.
             criterion : torch.nn.Module.__class__
                 The uninitialized criterion (loss) used to optimize the module.
-            predict_nonlinearity : Callable
-                The nonlinearity to be applied to the prediction.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """

@@ -1688,9 +1688,12 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Returns
         -------
-        P : numpy.ndarray of shape (n_samples, classes)
-            The class probabilities of the test samples. Classes are ordered
-            according to `self.classes_`.
+        P : numpy.ndarray of shape (n_samples, n_classes) or \
+                (n_samples, n_outputs)
+            The class probabilities of the test samples. For single-output
+            classification, classes are ordered according to `self.classes_`.
+            For multi-label classification, `P` holds the positive-class
+            probability of each output.
         """
         raise NotImplementedError
 
@@ -1704,7 +1707,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Returns
         -------
-        y : numpy.ndarray of shape (n_samples,)
+        y : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
             Predicted class labels of the test samples `X`.
         """
         # Extract primary output.
@@ -1733,7 +1736,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         ----------
         X : array-like of shape (n_samples, ...)
             Test samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             True class labels of the test samples `X`.
         sample_weight : array-like of shape (n_samples,), default=None
             Sample weights of the test sample `X`.
@@ -1741,7 +1744,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         Returns
         -------
         score : float
-            Mean accuracy of `self.predict(X)` regarding `y`.
+            Mean accuracy of `self.predict(X)` regarding `y`. For multi-label
+            classification, this is the subset accuracy, i.e., a sample counts
+            as correct only if all of its labels are predicted correctly.
         """
         y_pred = self.predict(X)
         y_pred = self._le.transform(y_pred)
@@ -1926,12 +1931,12 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Parameters
         ----------
-        X: array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             Test samples whose class frequencies are to be estimated.
 
         Returns
         -------
-        F: array-like of shape (n_samples, n_classes) or \
+        F : array-like of shape (n_samples, n_classes) or \
                 (n_samples, n_outputs, 2)
             The class frequency estimates of the test samples `X`. For
             multi-label targets, the final axis follows each output's
@@ -2257,10 +2262,9 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         ----------
         X : matrix-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_targets)
-            It contains the labels of the training samples.
-            The number of numerical labels may be variable for the samples,
-            where missing labels are represented as `missing_label_`.
+        y : array-like of shape (n_samples,) or (n_samples, 1)
+            It contains the labels of the training samples, where missing
+            labels are represented as `missing_label_`.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -2280,6 +2284,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         ----------
         X :  array-like of shape (n_samples, n_features)
             Input samples.
+
         Returns
         -------
         y : numpy.ndarray of shape (n_samples,)
@@ -2410,7 +2415,7 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         ----------
         X :  array-like of shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
-        n_samples: int, default=1
+        n_samples : int, default=1
             Number of random samples to be drawn.
         random_state : int or RandomState instance or None, default=None
             Determines random number generation to randomly draw samples. Pass
@@ -2461,12 +2466,9 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            self : SkorchMixin
-                Returned when no input data was supplied
-                (both `X` and `y` are `None`).
-            X_out, y_out : tuple of nd.array, optional
-                Validated `X` and `y` as a tuple, returned when
-                `enforce_check_X_y=True`.
+            self : SkorchMixin or tuple
+                The initialized wrapper, or the tuple `(self, X, y)` with the
+                validated `X` and `y` if `enforce_check_X_y=True`.
             """
             has_data = (X is not None) or (y is not None)
             vd_kwargs = self._validate_data_kwargs()
@@ -2546,8 +2548,7 @@ if successful_skorch_torch_import:
             optionally requested extra outputs as NumPy arrays.
 
             The primary output is defined as the first entry of
-            `forward_outputs` (after applying its transform, if any), or the
-            sole output of `module.forward` if `forward_outputs` is `None`.
+            `forward_outputs` (after applying its transform, if any).
             Primary and extra outputs are always returned after applying their
             configured transforms.
 
@@ -2569,9 +2570,9 @@ if successful_skorch_torch_import:
                   raw tensor; otherwise the raw tensor is used.
             extra_outputs : None or str or sequence of str, default=None
                 Names of additional outputs to return next to the primary
-                output. Must be a subset of `forward_outputs.keys()` if
-                `forward_outputs` is not `None`. The first key in
-                `forward_outputs` (the primary output) is not allowed here.
+                output. Must be a subset of `forward_outputs.keys()`. The
+                first key in `forward_outputs` (the primary output) is not
+                allowed here.
                 Duplicate entries are not allowed.
 
             Returns
@@ -2729,7 +2730,7 @@ if successful_skorch_torch_import:
             criterion : torch.nn.Module.__class__
                 The criterion (loss) used to optimize the module.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """

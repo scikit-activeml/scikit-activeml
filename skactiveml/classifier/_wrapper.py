@@ -1734,7 +1734,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     Parameters
     ----------
-    estimator : sklearn.base.SkactivemlClassifier
+    estimator : skactiveml.base.SkactivemlClassifier
         The classifier to be wrapped. If this classifier already implements a
         `partial_fit`, this method will be overwritten by this wrapper using
         the sliding window approach.
@@ -1858,9 +1858,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     @match_signature("estimator", "fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
-        """Partially fitting the model using `X` as training data and `y` as
-        class labels. If `base_estimator` has no `partial_fit` function use
-        `fit` with the sliding window for X, y and sample_weight.
+        """Add `X` and `y` to the sliding window and refit the estimator on
+        the samples in the window.
 
         Parameters
         ----------
@@ -2427,13 +2426,11 @@ if successful_skorch_torch_import:
               label.
         classes : array-like of shape (n_classes,) or a list of such \
             array-likes, default=None
-        - If `classes` is not nested (`None` or one-dimensional), a single task
-          problem is assumed such that `y` can be shape `(n_samples,)` or
-          `(n_samples, n_annotators)`.
-        - If `classes` is nested (list of array-like objects), multilabel
-          classification is assumed in this wrapper and `y` must be shape
-          `(n_samples, n_tasks)` with `n_tasks == len(classes)`. Each task
-          must be binary.
+            Holds the label for each class. Nested binary vocabularies, one
+            per output, describe multi-label classification with `y` of shape
+            `(n_samples, n_outputs)` and `n_outputs == len(classes)`. If
+            `None`, the classes are determined during the fit and
+            `target_type` decides between single-output and multi-label.
         missing_label : scalar or str or np.nan or None, default=np.nan
             Value to represent a missing label.
         cost_matrix : array-like of shape (n_classes, n_classes), default=None
@@ -2611,7 +2608,7 @@ if successful_skorch_torch_import:
 
             By default, this method returns only the predicted class
             probabilities `P`. If `extra_outputs` is provided, a tuple is
-            returned whose first element is `y_pred` and whose remaining
+            returned whose first element is `P` and whose remaining
             elements are the requested additional forward outputs, in the
             order specified by `extra_outputs`.
 
@@ -2644,9 +2641,12 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            P : numpy.ndarray of shape (n_samples, n_classes)
-                Class probabilities of the test samples. Classes are ordered
-                according to `self.classes_`.
+            P : numpy.ndarray of shape (n_samples, n_classes) or \
+                    (n_samples, n_outputs)
+                Class probabilities of the test samples. For single-output
+                classification, classes are ordered according to
+                `self.classes_`. For multi-label classification, `P` holds
+                the positive-class probability of each output.
             *extras : numpy.ndarray, optional
                 Additional outputs. Only present if `extra_outputs` is not
                 `None`. In that case, the method returns a single tuple whose
@@ -2825,7 +2825,7 @@ if successful_skorch_torch_import:
             criterion : torch.nn.Module.__class__
                 The uninitialized criterion (loss) used to optimize the module.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """

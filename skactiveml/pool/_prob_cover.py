@@ -51,12 +51,14 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         fallback.
     deltas : None or array-like of shape (n_deltas,), default=None
         List of deltas (ball radii) to be tested for finding the maximum
-        value satisfying a sample coverage >= `alpha`. If no value in
+        value satisfying a purity >= `alpha`. If no value in
         `deltas` satisfies this constraint, a warning is raised where
         the minimum `delta` value is used. If `deltas=None`, the values
         `np.arange(0.2, 2.2, 0.2)` are used.
-    alpha : float in (0, 1), alpha=0.95
-        Minimum coverage as a constraint for the `delta` selection.
+    alpha : float in (0, 1), default=0.95
+        Minimum purity as a constraint for the `delta` selection, i.e., the
+        fraction of samples whose `delta`-ball contains only samples of their
+        own cluster.
     cluster_algo : ClusterMixin.__class__, default=sklearn.cluster.KMeans
         The cluster algorithm to be used for determining the best delta value.
     cluster_algo_dict : dict, default=None
@@ -153,6 +155,10 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
+        update : bool, default=False
+            Whether to recompute the distances and the radius `delta`, which
+            are otherwise reused from the previous computation. Pass `True`
+            whenever `X` changes.
 
         Returns
         -------

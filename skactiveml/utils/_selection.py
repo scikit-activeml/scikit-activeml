@@ -26,9 +26,11 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
 
     Returns
     -------
-    index_array : ndarray of ints
-        Array of indices into the array. It has the same shape as `a.shape`
-        with the dimension along axis removed.
+    index_array : numpy.ndarray of ints
+        Indices of the selected elements. If `axis` is given, the shape is
+        `a.shape` without that dimension, but at least one-dimensional.
+        Otherwise, it holds the coordinates of one element, i.e., its shape
+        is `(a.ndim,)`.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
@@ -49,7 +51,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
     Parameters
     ----------
-     : array-like
+    a : array-like
         Indexable data-structure of whose maximum element's index is to be
         determined.
     random_state : int, RandomState instance or None, default=None
@@ -60,9 +62,11 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
     Returns
     -------
-    index_array : ndarray of ints
-        Array of indices into the array. It has the same shape as `a.shape`
-        with the dimension along axis removed.
+    index_array : numpy.ndarray of ints
+        Indices of the selected elements. If `axis` is given, the shape is
+        `a.shape` without that dimension, but at least one-dimensional.
+        Otherwise, it holds the coordinates of one element, i.e., its shape
+        is `(a.ndim,)`.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)

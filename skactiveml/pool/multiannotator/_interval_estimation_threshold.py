@@ -53,7 +53,8 @@ class IntervalEstimationAnnotModel(BaseEstimator):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     alpha : float, interval=(0, 1), default=0.05
-        Half of the confidence level for student's t-distribution.
+        Significance level of the confidence interval based on Student's
+        t-distribution, i.e., the confidence level is `1 - alpha`.
     mode : 'lower' or 'mean' or 'upper', default='upper'
         Mode of the estimated annotation performance.
     random_state : None or int or numpy.random.RandomState, default=None
@@ -65,13 +66,13 @@ class IntervalEstimationAnnotModel(BaseEstimator):
 
     Attributes
     ----------
-    n_annotators_: int
+    n_annotators_ : int
         Number of annotators.
     A_perf_ : ndarray, shape (n_annotators, 3)
         Estimated annotation performances (i.e., labeling accuracies), where
-        `A_cand[i, 0]` indicates the lower bound, `A_cand[i, 1]` indicates the
-        mean, and `A_cand[i, 2]` indicates the upper bound of the estimation
-        labeling accuracy.
+        `A_perf_[i, 0]` indicates the lower bound, `A_perf_[i, 1]` indicates
+        the mean, and `A_perf_[i, 2]` indicates the upper bound of the
+        estimated labeling accuracy.
     target_spec_ : skactiveml.utils.TargetSpec
         Resolved target semantics established during fitting.
 
@@ -235,9 +236,12 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         Parameter for specifying the adaptive threshold used for annotator
         selection.
     alpha : float, interval=(0, 1), default=0.05
-        Half of the confidence level for student's t-distribution.
+        Significance level of the confidence interval based on Student's
+        t-distribution, i.e., the confidence level is `1 - alpha`.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     target_type : "auto" or "single-output", default="auto"
         Declared target type. This strategy supports only single-output
         classification with multiple annotators.

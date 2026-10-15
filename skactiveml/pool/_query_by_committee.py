@@ -45,9 +45,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     - Variation ratios (classification). One minus the fraction of votes for
       the modal class measures lack of consensus, and higher values are
       preferred.
-    - Empirical variance (regression). The variance of the committee's
-      real-valued predictions quantifies disagreement, and higher variance is
-      preferred.
+    - Empirical standard deviation (regression). The standard deviation of
+      the committee's real-valued predictions quantifies disagreement, and
+      higher values are preferred.
 
     Parameters
     ----------
@@ -56,7 +56,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         The method to calculate the disagreement in the case of classification.
         'KL_divergence', 'vote_entropy', and 'variation_ratios' are possible.
         In the case of regression, this parameter is ignored and the empirical
-        variance is used.
+        standard deviation is used.
     eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities (only
         relevant for `method='KL_divergence'`).
@@ -75,7 +75,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         - If `sample_predictions_method_name` is not `None` and in the
           case of regression, the method is expected to take samples of the
           shape `(n_samples, ...)` as input and to output numerical values of
-          the shape `(n_members, n_samples)`, e.g., `sample_y` in
+          the shape `(n_samples, n_members)`, e.g., `sample_y` in
           `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
@@ -185,7 +185,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
