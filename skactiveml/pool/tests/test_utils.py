@@ -1,5 +1,6 @@
 import itertools
 import unittest
+import warnings
 from itertools import product
 
 import numpy as np
@@ -1109,7 +1110,9 @@ class TestApproximation(unittest.TestCase):
 
     def test_reshape_distribution(self):
         dist = norm(loc=np.array([0, 0]))
-        _reshape_scipy_dist(dist, shape=(2, 1))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            _reshape_scipy_dist(dist, shape=(2, 1))
         self.assertEqual(dist.kwds["loc"].shape, (2, 1))
         self.assertRaises(TypeError, _reshape_scipy_dist, dist, "illegal")
         self.assertRaises(TypeError, _reshape_scipy_dist, "illegal", (2, 1))

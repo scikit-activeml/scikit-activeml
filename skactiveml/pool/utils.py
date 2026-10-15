@@ -915,7 +915,7 @@ def _reshape_scipy_dist(dist, shape):
     for argument in ["loc", "scale", "df"]:
         if argument in dist.kwds:
             # check if shapes are compatible
-            dist.kwds[argument].shape = shape
+            dist.kwds[argument] = dist.kwds[argument].reshape(shape)
 
     return dist
 
