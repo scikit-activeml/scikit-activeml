@@ -3108,7 +3108,8 @@ if successful_capymoa_import:
                     )
                     p_i = self.estimator_.predict_proba(x_instance)
                     # if estimator_ fails, it returns None. In this case, we
-                    # use a uniform distribution as fallback
+                    # use the label distribution or, without labels, a
+                    # uniform distribution as fallback
                     if p_i is None:
                         p_i = np.ones(n_classes) / n_classes
                         if sum(self._label_counts) > 0:
@@ -3227,10 +3228,13 @@ if successful_capymoa_import:
             if had_established_target_spec and not np.any(is_included):
                 return self
 
-            self._label_counts = [
+            label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
+            if fit_function == "partial_fit" and hasattr(self, "estimator_"):
+                label_counts = list(np.add(self._label_counts, label_counts))
+            self._label_counts = label_counts
             if hasattr(self, "estimator_"):
                 if fit_function != "partial_fit":
                     self.estimator_ = self._create_estimator(X)

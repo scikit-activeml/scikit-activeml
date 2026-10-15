@@ -5533,6 +5533,22 @@ if successful_capymoa_import:
         def test_partial_fit(self):
             self._test_fit("partial_fit")
 
+        def test_partial_fit_accumulates_label_counts(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["classes"] = [0, 1, 2]
+            clf = CapyMOAClassifier(**init_params)
+            clf.partial_fit(self.X[:2], [0, 1])
+            clf.partial_fit(self.X[2:4], [1, MISSING_LABEL])
+            np.testing.assert_array_equal(clf._label_counts, [1, 2, 0])
+            with patch.object(
+                clf.estimator_, "predict_proba", return_value=None
+            ):
+                P = clf.predict_proba(self.X[:2])
+            np.testing.assert_allclose(P, np.tile([1 / 3, 2 / 3, 0], (2, 1)))
+
+            clf.fit(self.X[:2], [2, 2])
+            np.testing.assert_array_equal(clf._label_counts, [0, 0, 2])
+
         def test_predict(self):
             from capymoa.classifier import (
                 AdaptiveRandomForestClassifier,
