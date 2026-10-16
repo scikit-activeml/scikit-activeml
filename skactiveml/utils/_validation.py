@@ -692,11 +692,11 @@ def check_X_y(
 ):
     """Input validation for standard estimators. Adjusted from `sklearn` [1]_.
 
-    Checks X and y for consistent length, enforces `X` to be at least 2D and
-    `y` 1D. By default, `X` is checked to be non-empty and containing only
-    finite values. Standard input checks are also applied to `y`, such as
-    checking that `y` does not have `np.nan` or `np.inf` targets.
-    For multi-label `y`, set `target_type="multi-label"`.
+    Checks X and y for consistent length and enforces `X` to be at least 2D.
+    Targets are one-dimensional unless a multi-label or multi-output
+    `target_type` is specified. By default, `X` is checked to be non-empty and
+    containing only finite values. NaN admission in targets is controlled by
+    `allow_nan`.
     If the dtype of `X` is object, attempt converting to float, raising on
     failure.
 
@@ -709,8 +709,11 @@ def check_X_y(
     X_cand : nd-array or list or sparse matrix, default=None
         Unlabeled input data. If `X` is provided, all dimensions after the
         sample axis must match those of `X`.
-    sample_weight : array-like of shape (n_samples,), default=None
-            Sample weights.
+    sample_weight : array-like of shape (n_samples,) or \
+            (n_samples, n_outputs), default=None
+        One weight per sample or, for two-dimensional targets, one weight per
+        target entry. If None, unit weights with the same shape as `y` are
+        returned. Supplied weights retain their dimensionality.
     sample_weight_cand : array-like of shape (n_candidates,), default=None
             Sample weights of the candidates.
     accept_sparse : string or boolean or list of string, default=False
@@ -748,7 +751,7 @@ def check_X_y(
         Whether to allow X.ndim > 2.
     target_type : "single-output" or "multi-label" or "multi-output", \
             default="single-output"
-        Resolved target type controlling target-array validation.
+        Resolved target type controlling target-array dimensionality.
     multi_output : boolean, default="deprecated"
         Deprecated. Use `target_type` instead: `multi_output=True` maps to
         `target_type="multi-label"` and `multi_output=False` to
@@ -757,7 +760,9 @@ def check_X_y(
         Note that `target_type="multi-label"` requires a two-dimensional `y`,
         whereas `multi_output=True` also accepted a one-dimensional one.
     allow_nan : boolean, default=None
-        Whether to allow np.nan in y.
+        Whether to allow np.nan in y. If None, NaN is allowed when
+        `missing_label` is NaN. This does not change the configured
+        `missing_label`.
     ensure_min_samples : int, default=1
         Make sure that X has a minimum number of samples in its first
         axis (rows for a 2D array).
@@ -847,7 +852,7 @@ def check_X_y(
             y = check_array(
                 y,
                 accept_sparse="csr",
-                ensure_all_finite=True,
+                ensure_all_finite="allow-nan" if allow_nan else True,
                 ensure_2d=False,
                 dtype=None,
             )
@@ -872,13 +877,11 @@ def check_X_y(
             sample_weight = np.ones(y.shape)
         sample_weight = check_array(sample_weight, ensure_2d=False)
         check_consistent_length(y, sample_weight)
-        if (
-            y.ndim > 1
-            and y.shape[1] > 1
-            or sample_weight.ndim > 1
-            and sample_weight.shape[1] > 1
-        ):
-            check_consistent_length(y.T, sample_weight.T)
+        if sample_weight.ndim == 2 and sample_weight.shape != y.shape:
+            raise ValueError(
+                "`sample_weight` must have shape `(n_samples,)` or, for "
+                "two-dimensional targets, the same shape as `y`."
+            )
 
     if X_cand is not None:
         X_cand = check_array(

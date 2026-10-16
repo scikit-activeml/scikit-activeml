@@ -16,8 +16,9 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
         Class labels, which may contain also missing labels.
     w : array-like, shape (n_samples) or (n_samples, n_annotators) or None,\
             default=None
-        Class label weights. If the weights are None, weights are assumed to be
-        equal for every sample.
+        Class label weights. One-dimensional weights apply to every annotation
+        of the corresponding sample. Two-dimensional weights specify one weight
+        per annotation. If None, every annotation has unit weight.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
     missing_label : scalar or string or np.nan orNone, default=np.nan
@@ -37,17 +38,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     y[is_unlabeled_y] = 0
     y = y.astype(int)
 
-    w = (
-        np.ones_like(y)
-        if w is None
-        else check_array(
-            w, ensure_2d=False, ensure_all_finite=False, dtype=float, copy=True
-        )
-    )
-    w = w if w.ndim == 2 else w.reshape((-1, 1))
-    check_consistent_length(y, w)
-    check_consistent_length(y.T, w.T)
-    w[is_unlabeled_y] = 1
+    w = _check_vote_weights(y, w)
 
     # count class labels per class and weight by confidence scores
     w[np.logical_or(np.isnan(w), is_unlabeled_y)] = 0
@@ -76,8 +67,9 @@ def majority_vote(
         Class labels, which may contain also missing labels.
     w : array-like, shape (n_samples) or (n_samples, n_annotators) or None,\
             default=None
-        Class label weights. If the weights are None, weights are assumed to be
-        equal for every sample.
+        Class label weights. One-dimensional weights apply to every annotation
+        of the corresponding sample. Two-dimensional weights specify one weight
+        per annotation. If None, every annotation has unit weight.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
     missing_label : scalar or string or np.nan or None, default=np.nan
@@ -100,13 +92,7 @@ def majority_vote(
     )
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     n_samples = y.shape[0]
-    w = (
-        np.ones_like(y)
-        if w is None
-        else check_array(
-            w, ensure_2d=False, ensure_all_finite=False, dtype=None, copy=True
-        )
-    )
+    w = _check_vote_weights(y, w)
 
     # extract labeled samples
     is_labeled_y = np.any(is_labeled(y, missing_label), axis=1)
@@ -136,3 +122,20 @@ def majority_vote(
     y_aggregated[is_labeled_y] = y_labeled_inverse_transformed
 
     return y_aggregated
+
+
+def _check_vote_weights(y, w):
+    """Validate weights against a two-dimensional annotation matrix."""
+    if w is None:
+        return np.ones(y.shape)
+    w = check_array(
+        w, ensure_2d=False, ensure_all_finite=False, dtype=float, copy=True
+    )
+    check_consistent_length(y, w)
+    if w.ndim == 1:
+        w = np.repeat(w[:, np.newaxis], y.shape[1], axis=1)
+    elif w.shape != y.shape:
+        raise ValueError(
+            "`w` must have shape `(n_samples,)` or the same shape as `y`."
+        )
+    return w

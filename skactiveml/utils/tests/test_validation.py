@@ -2,6 +2,7 @@ import unittest
 import warnings
 
 import numpy as np
+from scipy.sparse import csr_matrix, issparse
 
 from skactiveml.stream.budgetmanager import SplitBudgetManager
 from skactiveml.utils import (
@@ -441,15 +442,81 @@ class TestValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "feature shape"):
             check_X_y(X, y, X_cand_false, sample_weight)
         y = np.array([[1, 0, 1], [2, 0, 1]])
-        self.assertRaises(
-            ValueError,
-            check_X_y,
+        _, _, _, checked_weight, _ = check_X_y(
             X,
             y,
             X_cand,
             sample_weight,
             target_type="multi-label",
         )
+        np.testing.assert_array_equal(checked_weight, sample_weight)
+
+        X = np.ones((3, 2))
+        y = np.array([[0, 1], [1, 0], [0, 1]])
+        for target_type in ("multi-label", "multi-output"):
+            for w in (None, [1, 2, 3], [[1, 2], [3, 4], [5, 6]]):
+                with self.subTest(target_type=target_type, weights=w):
+                    _, checked_y, checked_weight = check_X_y(
+                        X, y, sample_weight=w, target_type=target_type
+                    )
+                    np.testing.assert_array_equal(checked_y, y)
+                    np.testing.assert_array_equal(
+                        checked_weight, np.ones(y.shape) if w is None else w
+                    )
+            for w in ([1, 2], np.ones((3, 1)), np.ones((3, 3))):
+                with self.subTest(target_type=target_type, shape=np.shape(w)):
+                    with self.assertRaises(ValueError):
+                        check_X_y(
+                            X, y, sample_weight=w, target_type=target_type
+                        )
+
+            missing_y = y.astype(float)
+            missing_y[1] = np.nan
+            for allow_nan in (None, True, False):
+                with self.subTest(
+                    target_type=target_type, allow_nan=allow_nan
+                ):
+                    if allow_nan is False:
+                        with self.assertRaises(ValueError):
+                            check_X_y(
+                                X,
+                                missing_y,
+                                target_type=target_type,
+                                allow_nan=allow_nan,
+                            )
+                    else:
+                        _, checked_y, _ = check_X_y(
+                            X,
+                            missing_y,
+                            target_type=target_type,
+                            allow_nan=allow_nan,
+                        )
+                        np.testing.assert_array_equal(checked_y, missing_y)
+            missing_y[1] = np.inf
+            with self.assertRaises(ValueError):
+                check_X_y(
+                    X, missing_y, target_type=target_type, allow_nan=True
+                )
+
+        y = [[0.5, 1.5], [np.nan, 0.5], [1.5, 0.5]]
+        for params in (
+            {"target_type": "multi-label"},
+            {"target_type": "multi-output"},
+            {"target_type": "multi-label", "missing_label": -1},
+        ):
+            with self.subTest(params=params):
+                _, checked_y, _ = check_X_y(X, y, allow_nan=True, **params)
+                np.testing.assert_array_equal(checked_y, y)
+
+        for target_type in ("multi-label", "multi-output"):
+            y = csr_matrix([[0, 1.5], [np.nan, np.nan], [1.5, 0]])
+            with self.subTest(target_type=target_type, sparse=True):
+                _, checked_y, checked_weight = check_X_y(
+                    X, y, sample_weight=[1, 2, 3], target_type=target_type
+                )
+                self.assertTrue(issparse(checked_y))
+                np.testing.assert_array_equal(checked_y.toarray(), y.toarray())
+                np.testing.assert_array_equal(checked_weight, [1, 2, 3])
 
         cases = [
             ([1, 2], [3, 4, 5], {"ensure_2d": False}),

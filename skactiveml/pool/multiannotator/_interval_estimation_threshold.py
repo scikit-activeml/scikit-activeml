@@ -139,6 +139,13 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
+        if (
+            sample_weight is not None
+            and np.shape(sample_weight) != y_array.shape
+        ):
+            raise ValueError(
+                "`sample_weight` must have the same shape as `y`."
+            )
         # Check whether alpha is float in (0, 1).
         check_scalar(
             x=self.alpha,
