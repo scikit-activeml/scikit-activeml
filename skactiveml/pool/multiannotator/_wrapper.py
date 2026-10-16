@@ -153,7 +153,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
               with a different distribution for each sample.
         return_utilities : bool, default=False
             If `True`, also returns the utilities based on the query strategy.
-        n_annotators_per_sample : int or array-like, default=1
+        n_annotators_per_sample : int or array-like of int, default=1
             - If `n_annotators_per_sample` is an int, the value indicates
               the number of annotators that are preferably assigned to a
               candidate sample, selected by the query_strategy.
@@ -328,11 +328,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         batch_size_sq = min(batch_size, X_cand.shape[0])
 
         # check n_annotators_per_sample and set pref_n_annotators
-        if isinstance(n_annotators_per_sample, (int, np.int_)):
+        if isinstance(n_annotators_per_sample, (int, np.integer)):
             check_scalar(
                 n_annotators_per_sample,
                 name="n_annotators_per_sample",
-                target_type=int,
+                target_type=(int, np.integer),
                 min_val=1,
             )
             pref_n_annotators = n_annotators_per_sample * np.ones(
@@ -340,7 +340,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
         elif _is_arraylike(n_annotators_per_sample):
             pref_n_annotators = check_array(
-                n_annotators_per_sample, ensure_2d=False
+                n_annotators_per_sample, ensure_2d=False, dtype=None
             )
 
             if pref_n_annotators.ndim != 1:
@@ -349,6 +349,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                     f"1 but, it is of dim {pref_n_annotators.ndim}"
                 )
             else:
+                for i, preference in enumerate(pref_n_annotators.tolist()):
+                    check_scalar(
+                        preference,
+                        name=f"n_annotators_per_sample[{i}]",
+                        target_type=(int, np.integer),
+                        min_val=1,
+                    )
                 pref_length = pref_n_annotators.shape[0]
                 if pref_length > batch_size_sq:
                     pref_n_annotators = pref_n_annotators[:batch_size_sq]
