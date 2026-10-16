@@ -892,15 +892,19 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
 
 
 def _reshape_scipy_dist(dist, shape):
-    """Reshapes the parameters `loc`, `scale`, `df` of a distribution, if they
-    exist.
+    """Return a new frozen distribution with reshaped broadcast parameters.
+
+    Positional and keyword parameters are broadcast together before reshaping.
+    The original distribution is unchanged.
 
     Parameters
     ----------
     dist : scipy.stats._distn_infrastructure.rv_frozen
         The distribution.
     shape : tuple
-        The new shape.
+        The new shape of the distribution's parameter grid. A scalar or
+        singleton grid is broadcast to an explicit shape; otherwise the
+        number of distributions must remain unchanged.
 
     Returns
     -------
@@ -912,12 +916,21 @@ def _reshape_scipy_dist(dist, shape):
     for idx, item in enumerate(shape):
         check_type(item, f"shape[{idx}]", int)
 
-    for argument in ["loc", "scale", "df"]:
-        if argument in dist.kwds:
-            # check if shapes are compatible
-            dist.kwds[argument] = dist.kwds[argument].reshape(shape)
+    kwds = dist.kwds.copy()
+    if not dist.args and not kwds:
+        kwds["loc"] = 0
+    parameters = np.broadcast_arrays(*dist.args, *kwds.values())
+    reshaped = []
+    for parameter in parameters:
+        if parameter.size == 1 and all(dim >= 0 for dim in shape):
+            parameter = np.broadcast_to(parameter.reshape(()), shape)
+        else:
+            parameter = parameter.reshape(shape)
+        reshaped.append(parameter)
 
-    return dist
+    args = reshaped[: len(dist.args)]
+    kwds = dict(zip(kwds, reshaped[len(dist.args) :]))
+    return dist.dist(*args, **kwds)
 
 
 def expected_target_val(X, target_func, reg, **kwargs):
@@ -1169,7 +1182,7 @@ def conditional_expect(
                 n_integration_samples + 1
             )
             cond_dist = _reshape_scipy_dist(
-                reg.predict_target_distribution(X), shape=(-1, 1)
+                reg.predict_target_distribution(X), shape=(len(X), 1)
             )
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
@@ -1202,7 +1215,7 @@ def conditional_expect(
 
             def fixed_quad_function_wrapper(inner_eval_points):
                 inner_cond_dist = _reshape_scipy_dist(
-                    reg.predict_target_distribution(X), shape=(-1, 1)
+                    reg.predict_target_distribution(X), shape=(len(X), 1)
                 )
                 inner_potential_y = inner_cond_dist.ppf(
                     inner_eval_points.reshape(1, -1)

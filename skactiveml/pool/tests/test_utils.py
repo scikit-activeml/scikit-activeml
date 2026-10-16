@@ -2,10 +2,11 @@ import itertools
 import unittest
 import warnings
 from itertools import product
+from unittest.mock import patch
 
 import numpy as np
 from scipy.integrate import quad
-from scipy.stats import norm
+from scipy.stats import lognorm, norm, t
 from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -970,6 +971,29 @@ class TestApproximation(unittest.TestCase):
                 )
                 np.testing.assert_allclose(result, np.full(len(X), 2.5))
 
+    def test_expected_target_val_with_scalar_scale(self):
+        X = np.arange(3).reshape(-1, 1)
+        reg = NICKernelRegressor().fit(X, np.arange(3))
+        loc = np.array([-1.0, 0.5, 2.0])
+        dist = norm(loc=loc, scale=1.5)
+
+        with patch.object(
+            reg, "predict_target_distribution", return_value=dist
+        ):
+            for quantile_method in ("trapezoid", "quadrature"):
+                with self.subTest(quantile_method=quantile_method):
+                    result = expected_target_val(
+                        X,
+                        lambda y: y,
+                        reg,
+                        method="quantile",
+                        quantile_method=quantile_method,
+                        n_integration_samples=9,
+                    )
+                    np.testing.assert_allclose(result, loc, atol=1e-12)
+                    np.testing.assert_array_equal(dist.kwds["loc"], loc)
+                    self.assertEqual(dist.kwds["scale"], 1.5)
+
     def test_conditional_expectation_recovers_the_target_mean(self):
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
@@ -1124,11 +1148,55 @@ class TestApproximation(unittest.TestCase):
             )
 
     def test_reshape_distribution(self):
-        dist = norm(loc=np.array([0, 0]))
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
-            _reshape_scipy_dist(dist, shape=(2, 1))
-        self.assertEqual(dist.kwds["loc"].shape, (2, 1))
+        loc = np.array([-1.0, 0.5, 2.0])
+        distributions = [
+            norm(),
+            norm(loc=loc),
+            norm(loc=loc, scale=1.5),
+            norm(loc=loc, scale=np.array([0.5, 1.0, 1.5])),
+            norm(loc=0.5, scale=1.5),
+            norm(loc, 1.5),
+            norm(loc, scale=1.5),
+            t(5, loc=loc, scale=1.5),
+            t(df=np.array([3, 5, 7]), loc=loc, scale=1.5),
+            t(5, loc, 1.5),
+            lognorm(s=np.array([0.5, 1.0, 1.5]), loc=loc, scale=1.5),
+        ]
+        quantiles = np.array([0.25, 0.75])
+        for idx, dist in enumerate(distributions):
+            with self.subTest(distribution=idx):
+                original_args = [
+                    np.array(value, copy=True) for value in dist.args
+                ]
+                original_kwds = {
+                    name: np.array(value, copy=True)
+                    for name, value in dist.kwds.items()
+                }
+                expected = np.column_stack(
+                    [
+                        np.broadcast_to(dist.ppf(q), (len(loc),))
+                        for q in quantiles
+                    ]
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", DeprecationWarning)
+                    reshaped = _reshape_scipy_dist(dist, shape=(len(loc), 1))
+                self.assertIsNot(reshaped, dist)
+                np.testing.assert_allclose(reshaped.ppf(quantiles), expected)
+                for original, value in zip(original_args, dist.args):
+                    np.testing.assert_array_equal(value, original)
+                self.assertEqual(dist.kwds.keys(), original_kwds.keys())
+                for name, original in original_kwds.items():
+                    np.testing.assert_array_equal(dist.kwds[name], original)
+
+        dist = norm(loc=loc[:, np.newaxis], scale=np.array([0.5, 1.0, 1.5]))
+        expected = dist.ppf(0.75).reshape(9, 1)
+        reshaped = _reshape_scipy_dist(dist, shape=(-1, 1))
+        np.testing.assert_allclose(reshaped.ppf(0.75), expected)
+        with self.assertRaises(ValueError):
+            _reshape_scipy_dist(dist, shape=(3, 1))
+        with self.assertRaises(ValueError):
+            _reshape_scipy_dist(norm(loc=[0, 1]), shape=(3, 1))
         self.assertRaises(TypeError, _reshape_scipy_dist, dist, "illegal")
         self.assertRaises(TypeError, _reshape_scipy_dist, "illegal", (2, 1))
 
@@ -1418,6 +1486,28 @@ class TestFunctions(unittest.TestCase):
             integration_dict={"method": "dynamic_quad"},
         )
         np.testing.assert_allclose(result, expected, rtol=1e-9, atol=1e-11)
+
+        true_loc = np.array([0.0, 1.0, 2.0])
+        true_scale = np.array([0.5, 1.0, 1.5])
+        other_loc = np.array([-1.0, 0.5, 3.0])
+        other_scale = 2.0
+        true_dist = norm(loc=true_loc, scale=true_scale)
+        other_dist = norm(loc=other_loc, scale=other_scale)
+        with (
+            patch.object(
+                reg_1, "predict_target_distribution", return_value=true_dist
+            ),
+            patch.object(
+                reg_2, "predict_target_distribution", return_value=other_dist
+            ),
+        ):
+            result = _cross_entropy(X_1, reg_1, reg_2)
+        expected = np.log(other_scale * np.sqrt(2 * np.pi)) + (
+            true_scale**2 + (true_loc - other_loc) ** 2
+        ) / (2 * other_scale**2)
+        np.testing.assert_allclose(result, expected)
+        np.testing.assert_array_equal(other_dist.kwds["loc"], other_loc)
+        self.assertEqual(other_dist.kwds["scale"], other_scale)
 
         for name, val in [
             ("X_eval", "illegal"),
