@@ -1049,15 +1049,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if had_established_target_spec and not np.any(is_included):
             return self
 
-        if hasattr(self, "estimator_"):
-            if fit_function != "partial_fit":
-                self.estimator_ = deepcopy(self.estimator)
-        else:
+        had_estimator = hasattr(self, "estimator_")
+        if not is_incremental or not had_estimator:
             self.estimator_ = deepcopy(self.estimator)
 
         # Count labels per class.
         if self._is_multilabel_target():
-            self._label_counts = [
+            label_counts = [
                 np.array(
                     [
                         np.sum(y[is_included, j] == class_idx)
@@ -1068,10 +1066,18 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 for j, classes_j in enumerate(self._le.classes_)
             ]
         else:
-            self._label_counts = [
+            label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
+        if is_incremental and had_estimator:
+            label_counts = [
+                np.add(previous_counts, batch_counts)
+                for previous_counts, batch_counts in zip(
+                    self._label_counts, label_counts
+                )
+            ]
+        self._label_counts = label_counts
 
         X_train = X[is_included]
         y_train = y[is_included].astype(np.int64)
@@ -3253,10 +3259,9 @@ if successful_capymoa_import:
             if fit_function == "partial_fit" and hasattr(self, "estimator_"):
                 label_counts = list(np.add(self._label_counts, label_counts))
             self._label_counts = label_counts
-            if hasattr(self, "estimator_"):
-                if fit_function != "partial_fit":
-                    self.estimator_ = self._create_estimator(X)
-            else:
+            if fit_function != "partial_fit" or not hasattr(
+                self, "estimator_"
+            ):
                 self.estimator_ = self._create_estimator(X)
             if self.estimator_ is None:
                 self.is_fitted_ = False
@@ -3588,16 +3593,18 @@ if successful_river_import:
             if had_established_target_spec and not np.any(is_included):
                 return self
 
-            if hasattr(self, "estimator_"):
-                if fit_function != "partial_fit":
-                    self.estimator_ = deepcopy(self.estimator)
-            else:
-                self.estimator_ = deepcopy(self.estimator)
             # count labels per class
-            self._label_counts = [
+            label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
+            if fit_function == "partial_fit" and hasattr(self, "estimator_"):
+                label_counts = list(np.add(self._label_counts, label_counts))
+            self._label_counts = label_counts
+            if fit_function != "partial_fit" or not hasattr(
+                self, "estimator_"
+            ):
+                self.estimator_ = deepcopy(self.estimator)
             try:
                 X_train = X[is_included]
                 y_train = y[is_included].astype(np.int64)

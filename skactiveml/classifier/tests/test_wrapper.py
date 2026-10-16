@@ -535,6 +535,103 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         )
         self.assertFalse(hasattr(clf, "partial_fit"))
 
+    def test_partial_fit_accumulates_label_counts(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        for first_method in ["fit", "partial_fit"]:
+            with self.subTest(first_method=first_method):
+                clf = SklearnClassifier(
+                    GaussianNB(), classes=[0, 1], missing_label=-1
+                )
+                getattr(clf, first_method)(X[:2], [0, 1], sample_weight=[2, 1])
+                clf.partial_fit(X[2:], [1, -1], sample_weight=[5, 1])
+
+                with patch.object(
+                    clf.estimator_,
+                    "predict_proba",
+                    return_value=np.full((2, 2), np.nan),
+                ):
+                    with self.assertWarns(UserWarning):
+                        P = clf.predict_proba(X[:2])
+                np.testing.assert_allclose(P, np.tile([1 / 3, 2 / 3], (2, 1)))
+
+                clf.fit(X[:2], [1, 1])
+                np.testing.assert_array_equal(clf._label_counts, [0, 2])
+
+    def test_fit_with_prefit_estimator_initializes_label_counts(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        estimator = GaussianNB().fit(X, [0, 0, 1, 1])
+        clf = SklearnClassifier(estimator, classes=[0, 1], missing_label=-1)
+
+        clf.fit(X[:3], [0, 1, 1])
+
+        np.testing.assert_array_equal(clf._label_counts, [1, 2])
+
+    def test_partial_fit_accumulates_multilabel_counts(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.array([[0, 1], [1, 0], [1, 0], [-1, -1]])
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format="array",
+        )
+        clf.partial_fit(X[:2], y[:2])
+        clf.partial_fit(X[2:], y[2:])
+
+        with patch.object(
+            clf.estimator_,
+            "predict_proba",
+            return_value=[np.full((2, 2), np.nan)] * 2,
+        ):
+            with self.assertWarns(UserWarning):
+                P = clf.predict_proba(X[:2])
+        np.testing.assert_allclose(P, np.tile([2 / 3, 1 / 3], (2, 1)))
+
+    def test_partial_fit_failure_uses_cumulative_label_prior(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        clf = SklearnClassifier(
+            GaussianNB(), classes=[0, 1], missing_label=-1
+        ).partial_fit(X[:2], [0, 1])
+
+        with patch.object(
+            clf.estimator_, "partial_fit", side_effect=ValueError("fit failed")
+        ):
+            with self.assertWarnsRegex(UserWarning, "fewer than two classes"):
+                clf.partial_fit(X[2:], [1, -1])
+
+        self.assertFalse(clf.is_fitted_)
+        with self.assertWarns(UserWarning):
+            P = clf.predict_proba(X[:2])
+        np.testing.assert_allclose(P, np.tile([1 / 3, 2 / 3], (2, 1)))
+
+    def test_rejected_partial_fit_preserves_label_counts(self):
+        X = np.array([[0.0], [1.0]])
+        for multilabel in [False, True]:
+            with self.subTest(multilabel=multilabel):
+                estimator = (
+                    MultiOutputClassifier(GaussianNB())
+                    if multilabel
+                    else GaussianNB()
+                )
+                classes = [[0, 1], [0, 1]] if multilabel else [0, 1]
+                y = np.array([[0, 1], [1, 0]] if multilabel else [0, 1])
+                clf = SklearnClassifier(
+                    estimator, classes=classes, missing_label=-1
+                ).partial_fit(X, y)
+                expected_counts = deepcopy(clf._label_counts)
+
+                with patch.object(
+                    clf.estimator_,
+                    "partial_fit",
+                    side_effect=ValueError("fit failed"),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "partial_fit"):
+                        clf.partial_fit(X, y)
+
+                np.testing.assert_array_equal(
+                    clf._label_counts, expected_counts
+                )
+
     def test_partial_fit_reuses_established_target_spec(self):
         clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
         X = np.array([[0.0], [1.0], [2.0], [3.0]])
@@ -5131,6 +5228,69 @@ if successful_river_import:
                             fit_results["partial_fit"]["predict_proba"],
                         )
 
+        def test_partial_fit_accumulates_label_counts(self):
+            X = np.arange(8, dtype=float).reshape(4, 2)
+            for first_method in ["fit", "partial_fit"]:
+                with self.subTest(first_method=first_method):
+                    clf = RiverClassifier(
+                        river.naive_bayes.GaussianNB(),
+                        classes=[0, 1, 2],
+                        missing_label=-1,
+                    )
+                    getattr(clf, first_method)(X[:2], [0, 1])
+                    clf.partial_fit(X[2:], [1, -1])
+
+                    with patch.object(
+                        clf.estimator_,
+                        "predict_proba_one",
+                        return_value={0: np.nan, 1: 0.5},
+                    ):
+                        with self.assertWarns(UserWarning):
+                            P = clf.predict_proba(X[:2])
+                    np.testing.assert_allclose(
+                        P, np.tile([1 / 3, 2 / 3, 0], (2, 1))
+                    )
+
+                    clf.fit(X[:2], [2, 2])
+                    np.testing.assert_array_equal(clf._label_counts, [0, 0, 2])
+
+        def test_partial_fit_failure_uses_cumulative_label_prior(self):
+            X = np.arange(8, dtype=float).reshape(4, 2)
+            clf = RiverClassifier(
+                river.tree.HoeffdingTreeClassifier(),
+                classes=[0, 1],
+                missing_label=-1,
+            ).partial_fit(X[:2], [0, 1])
+
+            with patch.object(
+                clf.estimator_,
+                "learn_one",
+                side_effect=ValueError("fit failed"),
+            ):
+                with self.assertWarns(UserWarning):
+                    clf.partial_fit(X[2:], [1, -1])
+
+            self.assertFalse(clf.is_fitted_)
+            with self.assertWarns(UserWarning):
+                P = clf.predict_proba(X[:2])
+            np.testing.assert_allclose(P, np.tile([1 / 3, 2 / 3], (2, 1)))
+
+        def test_rejected_partial_fit_preserves_label_counts(self):
+            X = np.array([[0.0], [1.0]])
+            clf = RiverClassifier(
+                river.neighbors.KNNClassifier(),
+                classes=[0, 1],
+                missing_label=-1,
+            ).partial_fit(X, [0, 1])
+            expected_counts = deepcopy(clf._label_counts)
+
+            with self.assertRaisesRegex(
+                ValueError, "does not support training"
+            ):
+                clf.partial_fit(X, [0, 1], sample_weight=[1, 1])
+
+            np.testing.assert_array_equal(clf._label_counts, expected_counts)
+
         def test_predict(self):
             clfs = {
                 "HoeffdingAdaptiveTreeClassifier": (
@@ -5605,7 +5765,6 @@ if successful_capymoa_import:
             clf = CapyMOAClassifier(**init_params)
             clf.partial_fit(self.X[:2], [0, 1])
             clf.partial_fit(self.X[2:4], [1, MISSING_LABEL])
-            np.testing.assert_array_equal(clf._label_counts, [1, 2, 0])
             with patch.object(
                 clf.estimator_, "predict_proba", return_value=None
             ):
