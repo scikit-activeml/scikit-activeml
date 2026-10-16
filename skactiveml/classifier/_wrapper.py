@@ -3149,10 +3149,10 @@ if successful_capymoa_import:
                     return P
 
             warnings.warn(
-                f"Since the 'base_estimator' could not be fitted when"
-                f" calling the `fit` method, the class label "
-                f"distribution`_label_counts={self._label_counts}` is used to "
-                f"make the predictions."
+                f"The underlying estimator cannot provide valid class "
+                f"probabilities. The class label distribution "
+                f"`_label_counts={self._label_counts}` is used to make "
+                f"predictions."
             )
             # fallback if clf could not be fitted (i.e., no labeled data)
             if sum(self._label_counts) == 0:
@@ -3289,7 +3289,7 @@ if successful_capymoa_import:
             except Exception as e:
                 self.is_fitted_ = False
                 warnings.warn(
-                    "The 'base_estimator' could not be fitted because of"
+                    "The underlying estimator could not be fitted because of"
                     " '{}'. Therefore, the class labels of the samples "
                     "are counted and will be used to make predictions. "
                     "The class label distribution is "
@@ -3505,10 +3505,10 @@ if successful_river_import:
                     return P
 
             warnings.warn(
-                f"Since the 'base_estimator' could not be fitted when"
-                f" calling the `fit` method, the class label "
-                f"distribution`_label_counts={self._label_counts}` is used to "
-                f"make the predictions."
+                f"The underlying estimator cannot provide valid class "
+                f"probabilities. The class label distribution "
+                f"`_label_counts={self._label_counts}` is used to make "
+                f"predictions."
             )
             # fallback if clf could not be fitted (i.e., no labeled data)
             if sum(self._label_counts) == 0:
@@ -3659,11 +3659,11 @@ if successful_river_import:
                 else:
                     self.is_fitted_ = False
                     warnings.warn(
-                        "The 'estimator' could not be fitted because of"
-                        " '{}'. Therefore, the number of classes  are counted"
-                        "and will be used to make predictions. The class"
-                        "labels are assumed to be uniformly "
-                        "distributed.".format(e)
+                        "The underlying estimator could not be fitted "
+                        "because of '{}'. Therefore, the class labels of "
+                        "the samples are counted and will be used to make "
+                        "predictions. The class label distribution is "
+                        "`_label_counts={}`.".format(e, self._label_counts)
                     )
             return self
 
