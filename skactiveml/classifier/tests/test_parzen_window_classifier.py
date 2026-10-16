@@ -109,6 +109,25 @@ class TestParzenWindowClassifier(
         after_metric_dict = deepcopy(pwc.metric_dict)
         self.assertEqual(before_metric_dict, after_metric_dict)
 
+    def test_mean_gamma_supports_empty_training_data(self):
+        X = np.array([[0.0, 0.0], [1.0, 1.0]])
+        y = [0, 1]
+        params = {
+            "classes": [0, 1],
+            "class_prior": [1, 3],
+            "metric_dict": {"gamma": "mean"},
+        }
+        expected = ParzenWindowClassifier(**params).fit(X, y).predict_proba(X)
+        for X_empty in [[], np.empty((0, 0)), np.empty((0, X.shape[1]))]:
+            with self.subTest(shape=np.shape(X_empty)):
+                pwc = ParzenWindowClassifier(**params).fit(X_empty, [])
+                np.testing.assert_allclose(
+                    pwc.predict_proba(X), np.tile([0.25, 0.75], (len(X), 1))
+                )
+
+                pwc.fit(X, y)
+                np.testing.assert_allclose(pwc.predict_proba(X), expected)
+
     def test_multilabel_capability_and_target_metadata(self):
         pwc = ParzenWindowClassifier(
             classes=[["no", "yes"], ["off", "on"]],

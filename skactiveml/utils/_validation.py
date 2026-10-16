@@ -1288,6 +1288,7 @@ def check_budget_manager(
     if default_budget_manager_dict is None:
         default_budget_manager_dict = {}
     elif not uses_rand:
+        default_budget_manager_dict = default_budget_manager_dict.copy()
         default_budget_manager_dict.pop("random_state", None)
     if budget_manager is None:
         budget_manager_ = default_budget_manager_class(

@@ -708,13 +708,22 @@ class TestValidation(unittest.TestCase):
             def __init__(self, budget):
                 self.budget = budget
 
-        budget_manager = check_budget_manager(
-            0.1,
-            None,
-            DummyBudgetManager,
-            {"random_state": 0},
-        )
-        self.assertEqual(budget_manager.budget, 0.1)
+        for existing_manager in [None, DummyBudgetManager(budget=0.1)]:
+            with self.subTest(existing_manager=existing_manager):
+                default_params = {"random_state": 0}
+                budget_manager = check_budget_manager(
+                    0.1,
+                    existing_manager,
+                    DummyBudgetManager,
+                    default_params,
+                )
+                self.assertEqual(budget_manager.budget, 0.1)
+                self.assertEqual(default_params, {"random_state": 0})
+
+                randomized_manager = check_budget_manager(
+                    0.1, None, SplitBudgetManager, default_params
+                )
+                self.assertEqual(randomized_manager.random_state, 0)
 
     def test_check_n_features(self):
 

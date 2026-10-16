@@ -89,6 +89,21 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         )
         self.assertEqual({"gamma": 0.5}, iclf.pwc_metric_dict_)
 
+    def test_mean_gamma_empty_fit_supports_precompute(self):
+        X = np.column_stack((self.X, self.X**2))
+        indices = np.arange(len(X))
+        expected = pairwise_kernels(X, metric="rbf")
+        for X_empty in [[], np.empty((0, 0)), np.empty((0, X.shape[1]))]:
+            with self.subTest(shape=np.shape(X_empty)):
+                clf = ParzenWindowClassifier(
+                    classes=[0, 1], metric_dict={"gamma": "mean"}
+                ).fit(X_empty, [])
+                iclf = IndexClassifierWrapper(
+                    clf, X, self.y, use_speed_up=True
+                )
+                iclf.precompute(indices, indices)
+                np.testing.assert_allclose(iclf.pwc_K_, expected)
+
     def test_dtype_error(self):
         X, y = make_blobs(
             n_samples=2000, centers=[(-2, 2), (2, -2)], n_features=2
