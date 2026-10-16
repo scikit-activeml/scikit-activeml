@@ -438,7 +438,7 @@ class TestValidation(unittest.TestCase):
             X, y, X_cand, sample_weight, y_numeric=True
         )
         X_cand_false = [[5]]
-        with self.assertRaisesRegex(ValueError, "number of features"):
+        with self.assertRaisesRegex(ValueError, "feature shape"):
             check_X_y(X, y, X_cand_false, sample_weight)
         y = np.array([[1, 0, 1], [2, 0, 1]])
         self.assertRaises(
@@ -450,6 +450,43 @@ class TestValidation(unittest.TestCase):
             sample_weight,
             target_type="multi-label",
         )
+
+        cases = [
+            ([1, 2], [3, 4, 5], {"ensure_2d": False}),
+            (
+                np.zeros((2, 3, 4)),
+                np.ones((3, 3, 4)),
+                {"allow_nd": True},
+            ),
+        ]
+        for X, X_cand, params in cases:
+            with self.subTest(shape=np.shape(X)[1:]):
+                X_out, _, candidates_out, weights, candidate_weights = (
+                    check_X_y(X=X, y=[0, 1], X_cand=X_cand, **params)
+                )
+                np.testing.assert_array_equal(X_out, X)
+                np.testing.assert_array_equal(candidates_out, X_cand)
+                np.testing.assert_array_equal(weights, np.ones(len(X)))
+                np.testing.assert_array_equal(
+                    candidate_weights, np.ones(len(X_cand))
+                )
+
+        cases = [
+            ([1, 2], [[3], [4]]),
+            ([[1], [2]], [3, 4]),
+            (np.zeros((2, 3, 4)), np.ones((3, 3, 5))),
+            (np.zeros((2, 3, 4)), np.ones((3, 3))),
+        ]
+        for X, X_cand in cases:
+            with self.subTest(X=np.shape(X), X_cand=np.shape(X_cand)):
+                with self.assertRaisesRegex(ValueError, "feature shape"):
+                    check_X_y(
+                        X=X,
+                        y=[0, 1],
+                        X_cand=X_cand,
+                        ensure_2d=False,
+                        allow_nd=True,
+                    )
 
     def test_check_X_y_accepts_numpy_floating_nan_sentinels(self):
         X = [[1], [2]]

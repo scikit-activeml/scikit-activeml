@@ -707,7 +707,8 @@ def check_X_y(
     y : nd-array or list or sparse matrix, default=None
         Labels for X.
     X_cand : nd-array or list or sparse matrix, default=None
-        Unlabeled input data
+        Unlabeled input data. If `X` is provided, all dimensions after the
+        sample axis must match those of `X`.
     sample_weight : array-like of shape (n_samples,), default=None
             Sample weights.
     sample_weight_cand : array-like of shape (n_candidates,), default=None
@@ -894,10 +895,10 @@ def check_X_y(
             ensure_min_features=ensure_min_features,
             estimator=estimator,
         )
-        if X is not None and X_cand.shape[1] != X.shape[1]:
+        if X is not None and X_cand.shape[1:] != X.shape[1:]:
             raise ValueError(
-                "The number of features of candidates does not match "
-                "the number of features of `X`."
+                "The feature shape of candidates does not match "
+                "the feature shape of `X`."
             )
 
         if sample_weight_cand is None:
