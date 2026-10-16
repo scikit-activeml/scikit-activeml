@@ -291,10 +291,11 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         tmp_queried_samples = self.queried_samples_
         for i, x in enumerate(candidates):
             tmp_observed_samples += 1
-            remaining_budget = (
-                tmp_observed_samples * self.budget_ - tmp_queried_samples
+            # Include exact boundaries that round one ULP below the limit.
+            budget_limit = np.nextafter(
+                tmp_observed_samples * self.budget_, np.inf
             )
-            queried[i] = remaining_budget >= 1
+            queried[i] = tmp_queried_samples + 1 <= budget_limit
             if queried[i]:
                 utilities[i] = 1
             tmp_queried_samples += queried[i]

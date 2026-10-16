@@ -95,3 +95,18 @@ class TestPeriodicSampling(
             candidates=candidates,
             queried_indices=queried_indices,
         )
+
+    def test_query_respects_exact_budget_boundaries(self):
+        cases = [
+            (0.7, 89, 62, [0]),
+            (0.29, 99, 28, [0]),
+            (np.nextafter(0.7, 0), 89, 62, [1]),
+        ]
+        for budget, n_observed, n_queried, expected in cases:
+            with self.subTest(budget=budget):
+                qs = PeriodicSampling(budget=budget)
+                qs.update(np.zeros((n_observed, 1)), np.arange(n_queried))
+
+                np.testing.assert_array_equal(
+                    qs.query(np.zeros((2, 1))), expected
+                )
