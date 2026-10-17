@@ -325,14 +325,6 @@ class TestParzenWindowClassifier(
         with self.assertRaisesRegex(ValueError, "negative class frequency"):
             pwc.predict_proba(np.array([[-0.5, 1.0]]))
 
-    def test_predict_freq_rejects_negative_sample_weights(self):
-        pwc = ParzenWindowClassifier(classes=[0, 1]).fit(
-            [[0.0], [1.0]], [0, 1], sample_weight=[-1.0, 2.0]
-        )
-
-        with self.assertRaisesRegex(ValueError, "negative class frequency"):
-            pwc.predict_freq([[0.0]])
-
     def test_predict_freq_rejects_negative_frequencies_for_multi_label(self):
         pwc = ParzenWindowClassifier(
             classes=[[0, 1], [0, 1]], metric="linear"

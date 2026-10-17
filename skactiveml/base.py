@@ -1868,6 +1868,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     Extends `scikit-activeml` classifiers to estimators that are able to
     estimate class frequencies for given samples (by calling `predict_freq`).
+    Sample weights represent non-negative amounts of class evidence.
 
     Parameters
     ----------
@@ -2150,6 +2151,11 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             reset=reset,
             target_spec=target_spec,
         )
+
+        if sample_weight is not None and np.any(
+            np.asarray(sample_weight, dtype=float) < 0
+        ):
+            raise ValueError("`sample_weight` must be non-negative.")
 
         # Check class prior.
         if self.target_spec_.target_type == "multi-label":

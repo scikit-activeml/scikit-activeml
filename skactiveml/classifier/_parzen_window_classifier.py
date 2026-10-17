@@ -149,7 +149,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             It contains the class labels of the training samples.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            It contains the weights of the training samples' class labels.
+            Non-negative weights of the training samples' class labels.
             One weight per sample or one weight per target entry can be
             provided.
 

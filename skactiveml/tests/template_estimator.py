@@ -971,6 +971,52 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
 
 
 class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
+    def test_fit_param_sample_weight(
+        self,
+        test_cases=None,
+        replace_init_params=None,
+        replace_fit_params=None,
+    ):
+        n_samples = len(self.fit_default_params["y"])
+        mixed_weights = np.ones(n_samples)
+        mixed_weights[0] = -1
+        cancelling_weights = np.zeros(n_samples)
+        cancelling_weights[0], cancelling_weights[-1] = -1, 1
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (-np.ones(n_samples), ValueError),
+            (mixed_weights, ValueError),
+            (cancelling_weights, ValueError),
+            (np.zeros(n_samples), None),
+        ]
+        super().test_fit_param_sample_weight(
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+    def test_fit_param_sample_weight_multilabel(self):
+        super().test_fit_param_sample_weight_multilabel()
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, _ = self._get_multilabel_params()
+        y = np.asarray(fit_params["y"])
+        for shape in [(len(y),), y.shape]:
+            with self.subTest(sample_weight_shape=shape):
+                weights = np.zeros(shape)
+                estimator = self.estimator_class(**init_params)
+                self._call_with_target(
+                    estimator, "fit", fit_params, sample_weight=weights
+                )
+                weights.flat[-1] = -1
+                with self.assertRaisesRegex(
+                    ValueError, "sample_weight.*non-negative"
+                ):
+                    self._call_with_target(
+                        estimator, "fit", fit_params, sample_weight=weights
+                    )
+
     def test_init_param_class_prior(self):
         test_cases = []
         test_cases += [
