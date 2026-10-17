@@ -92,34 +92,40 @@ def simple_batch(
     return_utilities=False,
     method="max",
 ):
-    """Generates a batch by selecting the highest values in the `utilities`.
-    If `utilities` is an ND-array, the returned utilities will be an
-    (N+1)D-array, with the shape `batch_size` x `len(utilities)`, filled the
-    given `utilities` but set the n-th highest values in the n-th row to
-    `np.nan`.
+    """Select a batch of entries from the given utilities without replacement.
+
+    Each entry represents one action. For example, a utility matrix can
+    represent sample-annotator pairs. Selection is global over all entries,
+    and only selected entries are excluded from subsequent batch steps.
 
     Parameters
     ----------
     utilities : np.ndarray
-        The utilities to be used to create the batch.
+        The utilities of the actions. `np.nan` excludes an entry. For
+        proportional selection, utilities must be nonnegative, with at least
+        `batch_size` positive entries after reducing the batch size to the
+        number of available entries. If no entries are available, the result
+        is empty.
     random_state : int, RandomState instance or None, default=None
         The random state to use.
     batch_size : int, default=1
-        The number of samples to be selected in one AL cycle.
+        The number of entries to select. If larger than the number of
+        available entries, it is reduced with a warning.
     return_utilities : bool, default=False
         If True, the utilities are returned.
     method : str, default='max'
-        Determines how to select 'best_indices'. 'max' selects the indices with
-        the maximum utilities. 'proportional' randomly choose the
-        'best_indices' with the probabilities proportional to 'utilities'.
+        'max' selects the largest utilities. 'proportional' samples entries
+        with probabilities proportional to their utilities.
 
     Returns
     -------
     best_indices : np.ndarray of shape (batch_size,) if utilities.ndim == 1 \
             else (batch_size, utilities.ndim)
-        The indices of the batch samples.
-    batch_utilities : np.ndarray of shape (batch_size, len(utilities))
-        The `utilities` of the batch (if `return_utilities=True`).
+        The indices of the selected entries, using one coordinate per utility
+        dimension for multidimensional input.
+    batch_utilities : np.ndarray of shape (batch_size, *utilities.shape)
+        Utilities before each batch selection, with previously selected
+        entries set to `np.nan` (if `return_utilities=True`).
 
     """
     # validation
@@ -154,18 +160,30 @@ def simple_batch(
             utilities[tuple(best_indices[i])] = np.nan
     elif method == "proportional":
         random_state = check_random_state(random_state)
-        p = utilities / np.nansum(utilities)
-        p[np.isnan(p)] = 0
-        best_indices = random_state.choice(
-            len(utilities),
-            size=batch_size,
-            p=p,
-            replace=False,
-        )
+        p = np.nan_to_num(utilities.ravel(), nan=0.0)
+        if np.any(p < 0):
+            raise ValueError(
+                "`utilities` must be nonnegative for proportional selection."
+            )
+        if np.count_nonzero(p) < batch_size:
+            raise ValueError(
+                "Proportional selection requires at least `batch_size` "
+                "positive utilities."
+            )
+        if batch_size > 0:
+            # Scale before summing to avoid overflow for finite weights.
+            p /= p.max()
+            p /= p.sum()
+            flat_indices = random_state.choice(
+                p.size, size=batch_size, p=p, replace=False
+            )
+            best_indices = np.column_stack(
+                np.unravel_index(flat_indices, utilities.shape)
+            )
 
         batch_utilities = np.repeat([utilities], batch_size, axis=0)
         for i in range(batch_size):
-            batch_utilities[i, best_indices[:i]] = np.nan
+            batch_utilities[(i,) + tuple(best_indices[:i].T)] = np.nan
     else:
         raise ValueError(
             f'"method" has to be either "max" or "proportional" '

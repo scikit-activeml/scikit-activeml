@@ -139,6 +139,7 @@ class TestSelection(unittest.TestCase):
             random_state=42,
             batch_size=1,
             return_utilities=True,
+            method="proportional",
         )
         np.testing.assert_equal((0, 2), indices.shape)
         np.testing.assert_array_equal((0, 2, 2), batches.shape)
@@ -166,6 +167,51 @@ class TestSelection(unittest.TestCase):
             np.testing.assert_array_equal(
                 np.argwhere(np.isnan(utils[i])).flatten(), np.sort(idx[:i])
             )
+
+        weights = np.array([4, np.nan, 0, 2, 1, 3])
+        expected_indices = np.array([3, 5, 4])
+        for shape in ((6,), (2, 3), (1, 2, 3)):
+            with self.subTest(shape=shape):
+                utilities = weights.reshape(shape).copy()
+                indices, batches = simple_batch(
+                    utilities,
+                    random_state=0,
+                    batch_size=3,
+                    return_utilities=True,
+                    method="proportional",
+                )
+                np.testing.assert_array_equal(
+                    np.ravel_multi_index(indices.reshape(3, -1).T, shape),
+                    expected_indices,
+                )
+                self.assertEqual(batches.shape, (3,) + shape)
+                expected_utilities = weights.copy()
+                for i, batch in enumerate(batches):
+                    np.testing.assert_array_equal(
+                        batch, expected_utilities.reshape(shape)
+                    )
+                    expected_utilities[expected_indices[i]] = np.nan
+                np.testing.assert_array_equal(
+                    utilities, weights.reshape(shape)
+                )
+
+        for weights, batch_size, message in (
+            ([-1, -2], 1, "nonnegative"),
+            ([0, 0], 1, "positive utilities"),
+            ([1, 0], 2, "positive utilities"),
+        ):
+            with self.subTest(weights=weights, batch_size=batch_size):
+                with self.assertRaisesRegex(ValueError, message):
+                    simple_batch(
+                        weights,
+                        batch_size=batch_size,
+                        method="proportional",
+                    )
+        with np.errstate(over="raise", invalid="raise"):
+            indices = simple_batch(
+                [1e308, 1e308], batch_size=2, method="proportional"
+            )
+        np.testing.assert_array_equal(np.sort(indices), [0, 1])
 
         # test proportional method
         N = 1000
