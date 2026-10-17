@@ -39,6 +39,21 @@ class TestSelection(unittest.TestCase):
         )
         np.testing.assert_array_equal([1], rand_argmin(self.e))
 
+        for axis, keepdims, expected in (
+            (1, False, [1, 0]),
+            (1, True, [[1], [0]]),
+            (None, False, [0, 1]),
+            (None, True, [[1]]),
+        ):
+            with self.subTest(axis=axis, keepdims=keepdims):
+                expected_out = np.argmin(self.b, axis=axis, keepdims=keepdims)
+                out = np.empty_like(expected_out)
+                actual = rand_argmin(
+                    self.b, axis=axis, keepdims=keepdims, out=out
+                )
+                np.testing.assert_array_equal(actual, expected)
+                np.testing.assert_array_equal(out, expected_out)
+
     def test_rand_argmax(self):
         np.testing.assert_array_equal([2], rand_argmax(self.a))
         np.testing.assert_array_equal([0, 1], rand_argmax(self.b, axis=1))
@@ -62,6 +77,21 @@ class TestSelection(unittest.TestCase):
             [0, 0], rand_argmax(self.d, random_state=10)
         )
         np.testing.assert_array_equal([1], rand_argmax(self.e))
+
+        for axis, keepdims, expected in (
+            (1, False, [0, 1]),
+            (1, True, [[0], [1]]),
+            (None, False, [1, 1]),
+            (None, True, [[3]]),
+        ):
+            with self.subTest(axis=axis, keepdims=keepdims):
+                expected_out = np.argmax(self.b, axis=axis, keepdims=keepdims)
+                out = np.empty_like(expected_out)
+                actual = rand_argmax(
+                    self.b, axis=axis, keepdims=keepdims, out=out
+                )
+                np.testing.assert_array_equal(actual, expected)
+                np.testing.assert_array_equal(out, expected_out)
 
     def test_simple_batch(self):
         utils = np.array([4, 2, 5, 3, 1, 0], dtype=float)

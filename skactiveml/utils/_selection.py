@@ -27,19 +27,21 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
     Returns
     -------
     index_array : numpy.ndarray of ints
-        Indices of the selected elements. If `axis` is given, the shape is
-        `a.shape` without that dimension, but at least one-dimensional.
-        Otherwise, it holds the coordinates of one element, i.e., its shape
-        is `(a.ndim,)`.
+        Indices of the selected elements, always at least one-dimensional.
+        For multi-dimensional `a`, `axis=None` and `keepdims=False` return
+        coordinates of one element, with shape `(a.ndim,)`. Otherwise, the
+        shape follows `numpy.argmin`, including `keepdims`. With `axis=None`
+        and `keepdims=True`, the index refers to the flattened array.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
+    axis = argmin_kwargs.get("axis")
     index_array = np.argmax(
         random_state.random(a.shape)
-        * (a == np.nanmin(a, **argmin_kwargs, keepdims=True)),
+        * (a == np.nanmin(a, axis=axis, keepdims=True)),
         **argmin_kwargs,
     )
-    if np.isscalar(index_array) and a.ndim > 1:
+    if np.ndim(index_array) == 0 and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
     index_array = np.atleast_1d(index_array)
     return index_array
@@ -63,19 +65,21 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
     Returns
     -------
     index_array : numpy.ndarray of ints
-        Indices of the selected elements. If `axis` is given, the shape is
-        `a.shape` without that dimension, but at least one-dimensional.
-        Otherwise, it holds the coordinates of one element, i.e., its shape
-        is `(a.ndim,)`.
+        Indices of the selected elements, always at least one-dimensional.
+        For multi-dimensional `a`, `axis=None` and `keepdims=False` return
+        coordinates of one element, with shape `(a.ndim,)`. Otherwise, the
+        shape follows `numpy.argmax`, including `keepdims`. With `axis=None`
+        and `keepdims=True`, the index refers to the flattened array.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
+    axis = argmax_kwargs.get("axis")
     index_array = np.argmax(
         random_state.random(a.shape)
-        * (a == np.nanmax(a, **argmax_kwargs, keepdims=True)),
+        * (a == np.nanmax(a, axis=axis, keepdims=True)),
         **argmax_kwargs,
     )
-    if np.isscalar(index_array) and a.ndim > 1:
+    if np.ndim(index_array) == 0 and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
     index_array = np.atleast_1d(index_array)
     return index_array
