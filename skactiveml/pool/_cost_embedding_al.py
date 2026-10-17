@@ -342,10 +342,6 @@ def _alce(
     dissimilarities[:n_classes, n_classes:] = cost_matrix
     dissimilarities[n_classes:, :n_classes] = cost_matrix.T
 
-    W = np.zeros((2 * n_classes, 2 * n_classes))
-    W[:n_classes, n_classes:] = 1
-    W[n_classes:, :n_classes] = 1
-
     mds = MDSP(**mds_params)
     embedding = mds.fit(dissimilarities).embedding_
     class_embed = embedding[:n_classes, :]
