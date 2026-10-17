@@ -193,9 +193,12 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             min_val=1,
         )
 
-        # Fallback to random sampling if no sample is labeled.
+        # Fallback to random sampling if fewer than two samples are labeled.
         if len(labeled_idxs) <= 1:
-            warnings.warn("No sample is labeled. Fallback to random sampling.")
+            warnings.warn(
+                "Fewer than two samples are labeled. Fallback to random "
+                "sampling."
+            )
             if mapping is None:
                 utilities = np.ones(len(X_cand))
             else:
@@ -456,9 +459,10 @@ def _calc_acquisitions_per_leaf(
     v_k[np.isnan(v_k)] = 0
     if 0 in v_k[np.unique(leaf_labeled)]:
         warnings.warn(
-            "There are leaves with less than two labeled samples, "
-            "which causes a variance of zero. To avoid this, set "
-            "parameter `min_samples_leaf` of `reg` to >= 2."
+            "Some leaves have zero label variance (identical labels or fewer "
+            "than two labeled samples). If all remaining acquisition weights "
+            "are zero, acquisitions are allocated uniformly among leaves with "
+            "remaining candidates."
         )
 
     if X_cand is None:

@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 import numpy as np
 from sklearn.metrics import pairwise_distances_argmin
@@ -330,6 +331,36 @@ class TestRegressionTreeBasedAL(
         self.assertTrue((n_k_discrete != n_k_discrete_new).any())
 
     def test_query(self):
+        for targets, message in [
+            (
+                [np.nan] * 4,
+                "Fewer than two samples are labeled.*random sampling",
+            ),
+            (
+                [1, np.nan, np.nan, np.nan],
+                "Fewer than two samples are labeled",
+            ),
+            (
+                [1, 1, np.nan, np.nan],
+                "zero label variance.*identical labels.*uniformly",
+            ),
+            ([1, 2, np.nan, np.nan], None),
+        ]:
+            with self.subTest(targets=targets):
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    self.qs_class(random_state=0).query(
+                        np.arange(4).reshape(-1, 1),
+                        targets,
+                        self.reg,
+                        batch_size=2,
+                    )
+                if message is None:
+                    self.assertEqual(caught, [])
+                else:
+                    self.assertEqual(len(caught), 1)
+                    self.assertRegex(str(caught[0].message), message)
+
         X = np.linspace(-2, 2, 100).reshape(-1, 1)
         y = np.sin(X.ravel())
         y[30:70] = MISSING_LABEL
