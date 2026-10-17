@@ -108,7 +108,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -169,7 +169,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -180,10 +180,10 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -272,7 +272,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
@@ -400,7 +400,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -497,7 +497,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -528,7 +528,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,)
             Weights of training samples in `X`.
         Returns
@@ -606,7 +606,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -686,7 +686,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -697,10 +697,10 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -792,7 +792,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
@@ -963,7 +963,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -1092,7 +1092,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -1132,7 +1132,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,)
             Weights of training samples in `X`.
         Returns
@@ -1192,7 +1192,7 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
         Determines the size of the cognition window.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1280,7 +1280,7 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         Determines the size of the cognition window.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1380,7 +1380,7 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
         Determines the size of the cognition window.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1468,7 +1468,7 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
         Determines the size of the cognition window.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.

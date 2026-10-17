@@ -52,8 +52,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         as the average number of queries will be within the budget. If `False`,
         queries are not allowed if the budget is exhausted.
     budget : float, default=None
-        The budget which models the budgeting constraint used in the
-        stream-based active learning setting.
+        Specifies the ratio of samples which may be queried, with
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -91,7 +92,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -147,7 +148,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -237,8 +238,9 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     Parameters
     ----------
     budget : float, default=None
-        The budget which models the budgeting constraint used in the
-        stream-based active learning setting.
+        Specifies the ratio of samples which may be queried, with
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -273,7 +275,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -320,7 +322,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted only
             if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried, with
             `0 <= queried_indices < n_candidates`.
 

@@ -32,7 +32,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         Controls the randomness of the budget manager.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -66,16 +66,16 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices < n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -119,7 +119,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -148,13 +148,13 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)

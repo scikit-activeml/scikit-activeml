@@ -1176,7 +1176,7 @@ class BudgetManager(ABC, BaseEstimator):
     ----------
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     """
 
@@ -1196,16 +1196,16 @@ class BudgetManager(ABC, BaseEstimator):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices < n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         raise NotImplementedError
 
@@ -1222,7 +1222,7 @@ class BudgetManager(ABC, BaseEstimator):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -1244,13 +1244,13 @@ class BudgetManager(ABC, BaseEstimator):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         # Check if utilities is set
@@ -1274,9 +1274,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    budget : float
+    budget : float or None
         Specifies the ratio of labels which are allowed to be queried, with
-        `0 <= budget <= 1`.
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -1364,10 +1365,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -1392,7 +1393,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None

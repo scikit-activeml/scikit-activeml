@@ -2187,7 +2187,8 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
             # Test if all query strategy outputs and utilities are the same
             np.testing.assert_almost_equal(expected_utilities, utilities)
-            self.assertFalse(isinstance(list, type(qs_output)))
+            self.assertIsInstance(qs_output, (list, np.ndarray))
+            self.assertEqual(np.ndim(qs_output), 1)
             if len(expected_output) == 0:
                 self.assertEqual(len(expected_output), len(qs_output))
                 self.assertEqual(len(qs_output2), len(qs_output))
