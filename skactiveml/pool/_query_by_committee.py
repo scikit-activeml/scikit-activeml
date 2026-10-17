@@ -476,6 +476,9 @@ def _check_ensemble(
     )
 
     # Check if the parameter `ensemble` is valid.
+    if isinstance(ensemble, (list, tuple)) and len(ensemble) == 0:
+        raise ValueError("`ensemble` must contain at least one estimator.")
+
     for estimator_type in estimator_types:
         if isinstance(ensemble, estimator_type):
             check_equal_missing_label(ensemble.missing_label, missing_label)

@@ -254,6 +254,15 @@ class TestQueryByCommittee(
         )
 
     def test_query_param_ensemble(self):
+        for ensemble in ([], ()):
+            query_params = dict(
+                self.query_default_params_clf, ensemble=ensemble
+            )
+            with self.assertRaisesRegex(
+                ValueError, "`ensemble`.*at least one"
+            ):
+                self.qs_class().query(**query_params)
+
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
             ("pwc2", ParzenWindowClassifier()),
