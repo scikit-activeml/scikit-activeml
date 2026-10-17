@@ -670,6 +670,72 @@ class TestValidation(unittest.TestCase):
             indicator_funcs=[is_prime],
         )
 
+        def should_not_run(value):
+            raise RuntimeError("Unnecessary indicator call.")
+
+        cases = [
+            (np.array([1, 2]), (np.ndarray,), ["auto"]),
+            (10, (int,), []),
+            ("auto", (), ["auto"]),
+            (np.array(["auto"]), (), ["auto"]),
+        ]
+        for obj, types, values in cases:
+            with self.subTest(obj=obj, types=types):
+                check_type(
+                    obj,
+                    "value",
+                    *types,
+                    target_vals=values,
+                    indicator_funcs=[should_not_run],
+                )
+
+        for obj in (np.array([]), np.array([1, 2])):
+            with self.subTest(predicate_array=obj):
+                check_type(
+                    obj,
+                    "value",
+                    target_vals=["auto"],
+                    indicator_funcs=[
+                        lambda value: isinstance(value, np.ndarray),
+                        should_not_run,
+                    ],
+                )
+
+        for obj in (float("nan"), np.array([1, 2])):
+            with self.subTest(identity=obj):
+                check_type(
+                    obj,
+                    "value",
+                    target_vals=[obj],
+                    indicator_funcs=[should_not_run],
+                )
+
+        for obj in (
+            np.array([]),
+            np.array(["auto", "other"]),
+            np.array(["auto", "auto"]),
+        ):
+            with self.subTest(invalid_array=obj):
+                with self.assertRaisesRegex(TypeError, "`value`"):
+                    check_type(obj, "value", str, target_vals=["auto"])
+
+        with self.assertRaisesRegex(RuntimeError, "Unnecessary indicator"):
+            check_type(10, "value", indicator_funcs=[should_not_run])
+
+        class RaisingEquality:
+            def __eq__(self, other):
+                raise ValueError("Comparison failed.")
+
+        class AcceptingEquality:
+            def __eq__(self, other):
+                return True
+
+        check_type(
+            RaisingEquality(), "value", target_vals=[AcceptingEquality()]
+        )
+        with self.assertRaisesRegex(ValueError, "Comparison failed"):
+            check_type(10, "value", target_vals=[RaisingEquality()])
+
     def test_check_callable(self):
         self.assertRaises(
             ValueError,

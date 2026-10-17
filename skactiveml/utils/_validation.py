@@ -1078,6 +1078,9 @@ def check_type(
 ):
     """Check whether an object satisfies type, value, or indicator rules.
 
+    Checks are evaluated in type, value, and indicator order and stop at the
+    first match.
+
     Parameters
     ----------
     obj : object
@@ -1088,6 +1091,8 @@ def check_type(
         The possible types.
     target_vals : iterable, default=None
         Possible further values that the object is allowed to equal.
+        NumPy array comparisons with zero or multiple elements do not count
+        as value matches.
     indicator_funcs : iterable, default=None
         Possible further custom indicator (boolean) functions that accept
         the object by returning `True` if the object is passed as a parameter.
@@ -1101,11 +1106,18 @@ def check_type(
     target_vals = target_vals if target_vals is not None else []
     indicator_funcs = indicator_funcs if indicator_funcs is not None else []
 
-    wrong_type = not isinstance(obj, target_types)
-    wrong_value = obj not in target_vals
-    wrong_index = all(not i_func(obj) for i_func in indicator_funcs)
+    if isinstance(obj, target_types):
+        return
+    for value in target_vals:
+        if obj is value:
+            return
+        equal = value == obj
+        if isinstance(equal, np.ndarray) and equal.size != 1:
+            continue
+        if equal:
+            return
 
-    if wrong_type and wrong_value and wrong_index:
+    if not any(i_func(obj) for i_func in indicator_funcs):
         error_str = f"`{name}` "
         if len(target_types) == 0 and len(target_vals) == 0:
             error_str += " must"
