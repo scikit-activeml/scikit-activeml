@@ -503,7 +503,7 @@ def plot_stream_training_data(
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
     y : array-like of shape (n_samples,)
-        Labels of the training data set (possibly including unlabeled ones).
+        Labels of the training data set.
     queried_indices : array-like of shape (n_samples,)
         Indicates which samples in `X` have been queried.
     classes : array-like of shape (n_classes,)
@@ -527,21 +527,30 @@ def plot_stream_training_data(
     data_lines : list of matplotlib.lines.Line2D
         The lines added to `ax`.
     """
-    column_or_1d(X)
-    check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
+    X = column_or_1d(X)
+    y = column_or_1d(_as_label_array(y))
     check_consistent_length(X, y, queried_indices)
-    check_array(queried_indices, ensure_2d=False)
-    check_array(classes, ensure_2d=False)
+    queried_indices = column_or_1d(
+        check_array(queried_indices, ensure_2d=False)
+    ).astype(bool)
+    classes = column_or_1d(
+        check_array(_as_label_array(classes), dtype=None, ensure_2d=False)
+    )
     check_type(unlabeled_color, "unlabeled_color", str)
     check_type(plot_cand_highlight, "plot_cand_highlight", bool)
     check_type(ax, "ax", Axes)
 
     data_lines = []
     cmap = _get_cmap(cmap)
-    norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
+    encoded_y = np.full(len(y), -1)
+    for class_idx, class_label in enumerate(classes):
+        encoded_y[queried_indices & (y == class_label)] = class_idx
+    if np.any(queried_indices & (encoded_y == -1)):
+        raise ValueError("Queried labels must be present in `classes`.")
+    norm = plt.Normalize(vmin=0, vmax=len(classes) - 1)
 
     highlight_color = (
-        cmap(norm(y[-1])) if queried_indices[-1] else unlabeled_color
+        cmap(norm(encoded_y[-1])) if queried_indices[-1] else unlabeled_color
     )
 
     if plot_cand_highlight:
@@ -555,7 +564,7 @@ def plot_stream_training_data(
             )
         )
 
-    for t, (x_t, a, y_t) in enumerate(zip(X, queried_indices, y)):
+    for t, (x_t, a, y_t) in enumerate(zip(X, queried_indices, encoded_y)):
         line_color = cmap(norm(y_t)) if a else unlabeled_color
         zorder = 3 if a else 2
         alpha_tmp = alpha * 2 if a else alpha
@@ -584,7 +593,7 @@ def plot_stream_decision_boundary(
     color="k",
     res=25,
 ):
-    """Plot the decision boundary of the given classifier.
+    """Plot categorical decision boundaries of a classifier over time.
 
     Parameters
     ----------
@@ -615,7 +624,12 @@ def plot_stream_decision_boundary(
         The predictions including those of the current step.
     """
     X = column_or_1d(X)
-    check_array(pred_list, ensure_2d=False, ensure_min_samples=0)
+    check_array(
+        _as_label_array(pred_list),
+        dtype=None,
+        ensure_2d=False,
+        ensure_min_samples=0,
+    )
     check_scalar(t_x, "t_x", int, min_val=0)
     check_scalar(plot_step, "plot_step", int, min_val=1)
     check_type(ax, "ax", Axes)
@@ -623,17 +637,25 @@ def plot_stream_decision_boundary(
     x_vec = np.linspace(np.min(X), np.max(X), res)
     t_vec = np.arange(1, t_x // plot_step + 1) * plot_step
     t_mesh, x_mesh = np.meshgrid(t_vec, x_vec)
-    predictions = np.array([clf.predict(x_vec.reshape([-1, 1]))])
-    pred_list.extend(predictions)
+    predictions = column_or_1d(
+        _as_label_array(clf.predict(x_vec.reshape([-1, 1])))
+    )
+    pred_list.append(predictions.copy())
 
-    if len(pred_list) > 2 and np.sum(pred_list) > 0:
-        ax.contour(
-            t_mesh,
-            x_mesh,
-            np.array(pred_list[1:]).T,
-            levels=[0.5],
-            colors=color,
-        )
+    if len(pred_list) > 2:
+        predictions = _as_label_array(pred_list[1:])
+        _, first_indices = np.unique(predictions, return_index=True)
+        classes = predictions.ravel()[np.sort(first_indices)]
+        # Draw one binary mask, choosing by first appearance.
+        boundary_classes = classes[1:] if len(classes) <= 2 else classes
+        for class_label in boundary_classes:
+            ax.contour(
+                t_mesh,
+                x_mesh,
+                (predictions == class_label).T,
+                levels=[0.5],
+                colors=color,
+            )
     return ax, pred_list
 
 

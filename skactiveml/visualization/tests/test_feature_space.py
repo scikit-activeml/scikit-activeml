@@ -934,6 +934,38 @@ class TestFeatureSpace(unittest.TestCase):
             plot_utilities(qs, self.X, y, plot_annotators=[0])
 
     # Tests for plot_stream_decision_boundary function
+    def test_stream_labels(self):
+        for classes in ([-2, -1], ["b", "a"]):
+            with self.subTest(classes=classes):
+                fig, ax = plt.subplots()
+                clf = RelabeledPredictOnlyClassifier(classes)
+                pred_list = []
+                for t_x in range(3):
+                    plot_stream_decision_boundary(
+                        ax, t_x, 1, clf, [[-1], [1]], pred_list, res=5
+                    )
+
+                vertices = ax.collections[0].get_paths()[0].vertices
+                np.testing.assert_allclose(
+                    vertices[np.argsort(vertices[:, 0])],
+                    [[1, -0.25], [2, -0.25]],
+                )
+
+                data_lines = plot_stream_training_data(
+                    ax,
+                    [[-1], [0], [1]],
+                    [classes[0], np.nan, classes[1]],
+                    queried_indices=[True, False, True],
+                    classes=classes,
+                    feature_bound=[[0, 2], [-1, 1]],
+                )
+                self.assertEqual(data_lines[2].get_color(), "grey")
+                np.testing.assert_allclose(
+                    [data_lines[1].get_color(), data_lines[3].get_color()],
+                    plt.get_cmap("coolwarm")([0.0, 1.0]),
+                )
+                plt.close(fig)
+
     def test_plot_stream_decision_boundary_param_ax(self):
         self.assertRaises(
             TypeError,
@@ -1068,7 +1100,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=np.ones([len(self.X), 3]),
@@ -1081,7 +1113,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=self.X_stream,
@@ -1094,7 +1126,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=True,
@@ -1113,6 +1145,16 @@ class TestFeatureSpace(unittest.TestCase):
             queried_indices=self.queried_indices,
             y=self.y_stream,
         )
+        with self.assertRaisesRegex(ValueError, "Queried labels.*classes"):
+            plot_stream_training_data(
+                ax,
+                [[0], [1]],
+                ["known", "unknown"],
+                queried_indices=[True, True],
+                classes=["known"],
+                feature_bound=[[0, 1], [0, 1]],
+            )
+        self.assertEqual(len(ax.lines), 0)
 
     def test_plot_stream_training_data_unlabeled_color(self):
         _, ax = plt.subplots()
@@ -1120,7 +1162,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1134,7 +1176,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1148,7 +1190,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1162,7 +1204,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1176,7 +1218,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1188,7 +1230,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertRaises(
             TypeError,
             plot_stream_training_data,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
@@ -1199,7 +1241,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertRaises(
             TypeError,
             plot_stream_training_data,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
@@ -1544,7 +1586,7 @@ class TestFeatureSpace(unittest.TestCase):
             self.X_stream,
             self.y_stream,
             queried_indices=queried_indices,
-            classes=np.unique(self.y_train),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
         )
 
