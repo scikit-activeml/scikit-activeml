@@ -289,7 +289,7 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
                 if candidates is not None:
                     self.assertTrue(np.isnan(utilities_plus[0, :10]).all())
                     self.assertTrue(np.isnan(utilities_plus[0, 30:]).all())
-                    self.assertTrue((utilities_plus[30:50] <= 0).all())
+                    self.assertTrue((utilities_plus[0, candidates] <= 0).all())
                 else:
                     self.assertTrue((utilities_plus <= 0).all())
 

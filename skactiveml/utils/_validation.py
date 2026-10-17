@@ -1281,7 +1281,7 @@ def check_budget_manager(
     ----------
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be queried, with
-        0 <= budget <= 1. See Also :class:`skactiveml.base.BudgetManager`.
+        0 < budget <= 1. See Also :class:`skactiveml.base.BudgetManager`.
     budget_manager : BudgetManager, default=None
         Budget manager to be checked. If `budget_manager` is `None`, a new
         budget manager using the class `default_budget_manager_class` is

@@ -72,8 +72,8 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             **query_params,
             return_utilities=True,
         )
-        self.assertEqual(0, np.sum(utilities[:, is_unlbld] < 0))
-        self.assertEqual(0, np.sum(utilities[:, is_unlbld] > 1))
+        self.assertTrue((utilities[:, is_unlbld] >= 0).all())
+        self.assertTrue((utilities[:, is_unlbld] <= 1).all())
         init_params["lmbda"] = 0
         query_params["y"] = np.full_like(query_params["y"], np.nan)
         query_params["batch_size"] = 10
@@ -82,8 +82,11 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             **query_params,
             return_utilities=True,
         )
-        self.assertEqual(0, np.sum(utilities < 0))
-        self.assertEqual(0, np.sum(utilities > 1))
+        for i, row in enumerate(utilities):
+            is_remaining = np.ones(len(row), dtype=bool)
+            is_remaining[query_indices[:i]] = False
+            self.assertTrue((row[is_remaining] >= 0).all())
+            self.assertTrue((row[is_remaining] <= 1).all())
 
     def test_query_single_class(self):
         X = np.arange(6, dtype=float).reshape(-1, 1)
