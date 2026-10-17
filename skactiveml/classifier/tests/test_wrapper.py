@@ -4628,7 +4628,7 @@ assert np.isfinite(estimator.predict_proba(X)).all()
             self.assertTrue((P_class > 0).all())
             np.testing.assert_array_equal(L_class.shape, (len(self.X), 2))
             self.assertTrue((L_class < 0).any())
-            self.assertTrue(X_embed.shape[1], 1)
+            self.assertEqual(X_embed.shape, (len(self.X), 1))
 
             clf = SkorchClassifier(**self.init_default_params)
             self.assertRaises(ValueError, clf.predict_proba, self.X)
