@@ -288,6 +288,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         queried = _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
@@ -810,6 +811,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         self : CognitiveDualQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         queried = _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )

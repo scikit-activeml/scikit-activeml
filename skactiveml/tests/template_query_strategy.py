@@ -1787,7 +1787,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             query_default_params_reg=query_default_params_reg,
         )
         self.update_params = {
-            "candidates": [[]],
+            "candidates": [[0]],
             "queried_indices": [],
         }
 
@@ -2391,7 +2391,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
     def test_update_param_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(Dummy, TypeError), ([[]], None), ([[0]], None)]
+        test_cases += [
+            (Dummy, ValueError),
+            ([], ValueError),
+            (np.empty((0, 1)), ValueError),
+            ([[]], ValueError),
+            ([[0]], None),
+        ]
         self._test_param("update", "candidates", test_cases)
 
     def test_update_param_queried_indices(self, test_cases=None):
@@ -2471,9 +2477,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
                     qs = self.qs_class(**init_params)
                     if test_func == "update":
-                        check_state = err is not None and test_param in (
-                            "queried_indices",
-                            "budget_manager_param_dict",
+                        check_state = err is not None and (
+                            test_param
+                            in ("queried_indices", "budget_manager_param_dict")
+                            or (
+                                test_param == "candidates"
+                                and not replace_init_params
+                            )
                         )
                         before = deepcopy(qs) if check_state else None
                         self._check_update_param(qs, update_params, err)

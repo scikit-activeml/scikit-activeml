@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.utils import check_array
 
 from ..base import SingleAnnotatorStreamQueryStrategy
 from ..utils import check_scalar
@@ -157,6 +158,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         queried = _validate_budget_update(candidates, queried_indices)
         check_scalar(
             self.allow_exceeding_budget, "allow_exceeding_budget", bool
@@ -331,6 +333,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         queried = _validate_budget_update(candidates, queried_indices)
         _validate_update_state(self)
         self.observed_samples_ += len(queried)

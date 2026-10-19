@@ -224,6 +224,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
