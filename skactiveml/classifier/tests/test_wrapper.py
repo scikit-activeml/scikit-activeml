@@ -2838,9 +2838,16 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
     def test_prefitted_costs_follow_declared_class_order(self):
         X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
-        for classes in ([2, 1], ["z", "a"]):
+        for classes in (
+            [2, 1],
+            ["z", "a"],
+            [np.uint64(2**53 + 1), np.int64(2**53)],
+        ):
             with self.subTest(classes=classes):
-                y = [classes[1], classes[1], classes[0], classes[0]]
+                y = np.array(
+                    [classes[1], classes[1], classes[0], classes[0]],
+                    dtype=type(classes[0]),
+                )
                 costs = [[0, 10], [1, 0]]
                 params = dict(
                     classes=classes, cost_matrix=costs, missing_label=None

@@ -19,7 +19,11 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError, _ExhaustedCandidatePool
-from .utils._label_dtype import _as_label_array, _lossless_decode_dtype
+from .utils._label_dtype import (
+    _as_class_vocabulary_array,
+    _as_label_array,
+    _lossless_decode_dtype,
+)
 from .utils._target import (
     _check_target_capability,
     _has_no_class_evidence,
@@ -1855,7 +1859,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 self.cost_matrix_, len(self.classes_)
             )
             if self.classes is not None:
-                class_indices = np.argsort(self.classes)
+                class_indices = np.argsort(
+                    _as_class_vocabulary_array(self.classes)
+                )
                 self.cost_matrix_ = self.cost_matrix_[class_indices]
                 self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 

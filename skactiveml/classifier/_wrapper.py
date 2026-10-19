@@ -24,7 +24,7 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
-from ..utils._label_dtype import _as_label_array
+from ..utils._label_dtype import _as_class_vocabulary_array, _as_label_array
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
@@ -1313,7 +1313,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 else self.cost_matrix
             )
             if self.classes is not None:
-                class_indices = np.argsort(self.classes)
+                class_indices = np.argsort(
+                    _as_class_vocabulary_array(self.classes)
+                )
                 cost_matrix = np.asarray(cost_matrix)[
                     np.ix_(class_indices, class_indices)
                 ]
