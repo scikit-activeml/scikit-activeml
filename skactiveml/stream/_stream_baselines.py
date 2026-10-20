@@ -112,7 +112,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         # when assessing the corresponding utilities
         queried = np.full(len(utilities), False)
 
-        # keep the internal state to reset it later if simulate is true
+        # Track counts locally without advancing acquisition state.
         tmp_observed_samples = self.observed_samples_
         tmp_queried_samples = self.queried_samples_
         # check for each sample separately if budget is left and the utility is
@@ -131,8 +131,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
-
-        # queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
@@ -166,8 +164,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         _validate_update_state(self)
         self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
-        # update the random state assuming, that query(..., simulate=True) was
-        # used
+        # Advance the draws consumed by query.
         self.random_state_.random_sample(len(candidates))
         return self
 
@@ -306,8 +303,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
-
-        # queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities

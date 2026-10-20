@@ -17,7 +17,7 @@ Central changes made by the scikit-activeml developers:
   instead of log probabilities. They are checked for dimensionality and
   finite values, then clipped to `[eps, 1]` before taking logarithms.
 - Sampling uses NumPy's `RandomState`. Ties inside `batch_bald` are broken
-  with `rand_argmax` using the fixed seed 0.
+  with `rand_argmax` using the supplied random state.
 - The utilities of every batch step are returned, where candidates
   selected earlier in the batch are marked as NaN.
 - Only the parts needed for `BatchBALD` are kept.

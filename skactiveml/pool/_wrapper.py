@@ -30,27 +30,11 @@ _CANDIDATE_ALIGNED_KWARGS = ["sample_weight_candidates", "utility_weight"]
 def _subset_query_kwargs(
     query_kwargs, names, indices, n_aligned, n_aligned_name
 ):
-    """Subset the keyword arguments in `names` by `indices`.
+    """Subset the sample-aligned arguments in `names` by `indices`.
 
-    Parameters
-    ----------
-    query_kwargs : dict-like
-        Keyword arguments to be passed to the wrapped query strategy.
-    names : list of str
-        Names of the keyword arguments being aligned to the sample set that is
-        subset by `indices`.
-    indices : array-like of shape (n_subset_samples,)
-        Indices of the samples of this sample set being kept.
-    n_aligned : int
-        Number of samples of this sample set before subsetting.
-    n_aligned_name : str
-        Name of `n_aligned` being used for the error message.
-
-    Returns
-    -------
-    query_kwargs : dict-like
-        Keyword arguments whose aligned entries are subset, leaving the arrays
-        of the caller unchanged.
+    Check lengths against `n_aligned`, using `n_aligned_name` in errors.
+    Return a new dictionary without changing caller arrays. Scalars are
+    forwarded for validation by the wrapped strategy.
     """
     query_kwargs = dict(query_kwargs)
     for name in names:
@@ -550,21 +534,7 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             return new_queried_indices
 
     def _embed_query_kwargs(self, query_kwargs, names):
-        """Embed the sample sets given by the keyword arguments in `names`.
-
-        Parameters
-        ----------
-        query_kwargs : dict-like
-            Keyword arguments to be passed to the wrapped query strategy.
-        names : list of str
-            Names of the keyword arguments holding a sample set of their own.
-
-        Returns
-        -------
-        query_kwargs : dict-like
-            Keyword arguments whose sample sets are embedded, leaving the
-            arrays of the caller unchanged.
-        """
+        """Embed the sample sets in `names` in a copy of `query_kwargs`."""
         query_kwargs = dict(query_kwargs)
         for name in names:
             value = query_kwargs.get(name)
