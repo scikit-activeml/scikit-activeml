@@ -23,6 +23,7 @@ from ..utils import (
     check_equal_missing_label,
     check_scalar,
 )
+from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
 from ._target import _resolve_estimator_target_spec
 
 
@@ -278,7 +279,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:
                 if sample_func is None:
-                    votes = np.array(
+                    votes = _as_label_array(
                         [est.predict(X_cand) for est in est_arr]
                     ).T
                 else:
@@ -327,7 +328,11 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             number of distinct classes across all members.
         """
         member_classes = [np.asarray(est.classes_) for est in est_arr]
-        classes = np.unique(np.concatenate(member_classes))
+        classes = np.unique(
+            np.concatenate(
+                member_classes, dtype=_lossless_decode_dtype(member_classes)
+            )
+        )
         probas = np.zeros((len(est_arr), len(X_cand), len(classes)))
         for i, (est, est_classes) in enumerate(zip(est_arr, member_classes)):
             columns = np.searchsorted(classes, est_classes)

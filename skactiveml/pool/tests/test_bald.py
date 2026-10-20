@@ -31,6 +31,7 @@ from skactiveml.regressor import NICKernelRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_committee_label_invariance
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -241,6 +242,13 @@ class TestGeneralBALD(
                 for other_indices, other_utilities in results[1:]:
                     np.testing.assert_array_equal(other_indices, indices)
                     np.testing.assert_allclose(other_utilities, utilities)
+
+    def test_query_preserves_mixed_integer_class_labels(self):
+        for strategy_class in (GreedyBALD, BatchBALD):
+            with self.subTest(strategy=strategy_class.__name__):
+                assert_committee_label_invariance(
+                    self, strategy_class(random_state=0)
+                )
 
     def test_init_param_greedy_selection(self):
         test_cases = [
