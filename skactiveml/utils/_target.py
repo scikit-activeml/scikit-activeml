@@ -11,6 +11,8 @@ from ._label_dtype import (
     _as_class_vocabulary_array,
     _as_label_array,
     _check_compatible_kinds,
+    _lossless_decode_dtype,
+    _python_scalar,
 )
 from ._validation import (
     _has_nested_classes,
@@ -568,8 +570,19 @@ def _check_target_capability(component, capability, capabilities):
 
 def _normalize_class_vocabulary(declared, observed, name):
     classes_array = _as_class_vocabulary_array(declared, name=name.strip("`"))
-    normalized = tuple(LabelEncoder().fit(classes_array).classes_)
+    classes_array = LabelEncoder().fit(classes_array).classes_
+    normalized = tuple(classes_array)
     _check_compatible_kinds(observed, normalized, name=name)
-    if not np.isin(observed, normalized).all():
+    observed = np.asarray(observed)
+    comparison_dtype = _lossless_decode_dtype([observed, classes_array])
+    if comparison_dtype.kind == "O":
+        known = tuple(_python_scalar(value) for value in normalized)
+        all_known = all(_python_scalar(value) in known for value in observed)
+    else:
+        all_known = np.isin(
+            observed.astype(comparison_dtype, copy=False),
+            classes_array.astype(comparison_dtype, copy=False),
+        ).all()
+    if not all_known:
         raise ValueError(f"`y` contains labels outside {name}.")
     return normalized

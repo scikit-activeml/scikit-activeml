@@ -469,6 +469,71 @@ class TestResolveTargetSpec(unittest.TestCase):
                 missing_label=None,
             )
 
+    def test_declared_numeric_membership_is_lossless(self):
+        for classes, value, accepted in (
+            ([0, 1], 0.0, True),
+            ([0, 1], 0.5, False),
+            ([2**53, 2**53 + 1], float(2**53), True),
+            ([2**53 + 1, 2**53 + 2], float(2**53), False),
+            ([float(2**53), float(2**53 + 2)], np.int64(2**53 + 1), False),
+            ([-(2**63), -(2**63) + 1], float(-(2**63)), True),
+            ([2**63 - 2, 2**63 - 1], float(2**63), False),
+            ([2**64 - 2, 2**64 - 1], float(2**64), False),
+            ([2**64 - 2, 2**64 - 1], np.uint64(2**64 - 1), True),
+        ):
+            for target_type in (
+                "single-output",
+                "multi-label",
+                "multi-output",
+            ):
+                if target_type == "single-output":
+                    labels, declared = [value], classes
+                else:
+                    labels, declared = [[value, value]], [classes, classes]
+                for y in (
+                    labels,
+                    np.asarray(labels),
+                    np.asarray(labels, dtype=object),
+                ):
+                    with self.subTest(
+                        classes=classes,
+                        value=value,
+                        target_type=target_type,
+                        container=type(y).__name__,
+                        dtype=getattr(y, "dtype", None),
+                    ):
+                        params = dict(
+                            task="classification",
+                            target_type=target_type,
+                            classes=declared,
+                            missing_label=None,
+                        )
+                        if accepted:
+                            resolve_target_spec(y, **params)
+                        else:
+                            with self.assertRaisesRegex(ValueError, "outside"):
+                                resolve_target_spec(y, **params)
+
+    def test_membership_accepts_unhashable_scalar_subclasses(self):
+        class UnhashableInt(int):
+            __hash__ = None
+
+        class UnhashableStr(str):
+            __hash__ = None
+
+        for classes, value in (
+            ([0, 1], UnhashableInt(0)),
+            (["a", "b"], UnhashableStr("a")),
+        ):
+            with self.subTest(value=value, scalar_type=type(value).__name__):
+                target_spec = resolve_target_spec(
+                    np.array([value], dtype=object),
+                    task="classification",
+                    classes=classes,
+                    missing_label=None,
+                )
+                self.assertEqual(target_spec.classes, tuple(classes))
+
     def test_auto_classification_rejects_bare_two_dimensional_targets(self):
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             resolve_target_spec(
