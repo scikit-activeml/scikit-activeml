@@ -123,7 +123,7 @@ def simple_batch(
             else (batch_size, utilities.ndim)
         The indices of the selected entries, using one coordinate per utility
         dimension for multidimensional input.
-    batch_utilities : np.ndarray of shape (batch_size, *utilities.shape)
+    batch_utilities : np.ndarray of shape ``(batch_size, *utilities.shape)``
         Utilities before each batch selection, with previously selected
         entries set to `np.nan` (if `return_utilities=True`).
 
