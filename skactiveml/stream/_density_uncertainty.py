@@ -22,6 +22,7 @@ from skactiveml.utils import (
     call_func,
     check_budget_manager,
 )
+from skactiveml.utils._label_dtype import _as_label_array
 from skactiveml.utils._validation import _validate_budget_update
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
@@ -94,8 +95,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `DensityBasedBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
+        `DensityBasedSplitBudgetManager` will be used by default. The
+        budget manager will be initialized based on the following
+        conditions:
 
         - If only a `budget` is given, the default budget manager is
           initialized with the given budget.
@@ -107,7 +109,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -168,7 +170,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -179,10 +181,10 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -271,7 +273,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
@@ -287,6 +289,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         queried = _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
@@ -399,7 +402,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -496,7 +499,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -527,7 +530,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,)
             Weights of training samples in `X`.
         Returns
@@ -543,7 +546,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
             X = check_array(X)
-            y = np.array(y)
+            y = _as_label_array(y)
             check_consistent_length(X, y)
         return X, y, sample_weight
 
@@ -591,8 +594,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `DensityBasedBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
+        `RandomVariableUncertaintyBudgetManager` will be used by default. The
+        budget manager will be initialized based on the following
+        conditions:
 
         - If only a `budget` is given, the default budget manager is
           initialized with the given budget.
@@ -604,7 +608,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -616,8 +620,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         RandomBudgetManager.
     CognitiveDualQueryStrategyFixUn : CognitiveDualQueryStrategy using the
         FixedUncertaintyBudgetManager.
-    CognitiveDualQueryStrategyVarUn : VariableUncertaintyBudgetManager using
-        the VariableUncertaintyBudgetManager.
+    CognitiveDualQueryStrategyVarUn : CognitiveDualQueryStrategy using the
+        VariableUncertaintyBudgetManager.
     CognitiveDualQueryStrategyRanVarUn : CognitiveDualQueryStrategy using the
         RandomVariableUncertaintyBudgetManager.
 
@@ -684,7 +688,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -695,10 +699,10 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -790,7 +794,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
@@ -808,6 +812,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         self : CognitiveDualQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         queried = _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
@@ -961,7 +966,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -1090,7 +1095,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -1130,7 +1135,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,)
             Weights of training samples in `X`.
         Returns
@@ -1146,7 +1151,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
             X = check_array(X)
-            y = np.array(y)
+            y = _as_label_array(y)
             check_consistent_length(X, y)
         return X, y, sample_weight
 
@@ -1188,23 +1193,9 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `RandomBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1290,23 +1281,9 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `FixedUncertaintyBudgetManager` will be used by default. The budget
-        manager will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1404,30 +1381,17 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `VariableUncertaintyBudgetManager` will be used by default. The budget
-        manager will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.VariableUncertaintyBudgetManager : The default budget
+        manager.
     .CognitiveDualQueryStrategy : The base class for this
         strategy.
 
@@ -1505,30 +1469,17 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `RandomBudgetManager` will be used by default.  The budget manager will
-        be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.RandomVariableUncertaintyBudgetManager : The default
+        budget manager.
     .CognitiveDualQueryStrategy : The base class for this
         strategy.
 

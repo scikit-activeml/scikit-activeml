@@ -1,29 +1,3 @@
-"""The label and missing-value contract, component by component.
-
-Every case below mirrors one row of the tables in the contract section of
-`docs/target_semantics.rst`, in their order, and asserts that every component
-consuming labels reaches the same verdict for it. A rule that only held for
-some containers or some components would not be part of the contract, so each
-row runs for a Python list, the equivalent NumPy array, and an object array,
-and against every component the row's verdict can be reached by.
-
-A row is scoped by the evidence its verdict needs. `LABELS` rows follow from
-`y` and `missing_label` alone, so even a component without a class vocabulary
-must reach them. `CLASSES` rows need a class vocabulary, so only the
-components resolving one are asked; a strategy such as `RandomSampling`
-never learns which classes exist and therefore has nothing to reject.
-
-`TestDocumentedOutcomeTables` locks that correspondence in the other
-direction: a row added to one of the outcome tables without a case here, or
-a case dropped from here, fails.
-
-The tables say which inputs are accepted and which are rejected. The closing
-`TestClassIdentityRoundTrip` covers the other half of the promise: that an
-accepted class label comes back as the value it was declared as. Asserting
-that needs an estimator whose probabilities are analytically known rather
-than a sweep over components, so it names its vehicle instead of hiding it.
-"""
-
 import re
 import unittest
 import warnings
@@ -608,19 +582,9 @@ class TestMissingLabelContract(_ContractCase):
 class TestClassIdentityRoundTrip(_ContractCase):
     """Exact class identity across the encode-fit-predict round trip.
 
-    The contract promises that a declared class label is returned as the
-    same value it was declared as, however wide it is. The guarantee is
-    owned by shared code, not by any one estimator: `_as_label_array` keeps
-    exact integers out of a lossy float array, `_lossless_decode_dtype`
-    chooses the storage dtype, `ExtLabelEncoder` maps classes to codes, and
-    `SkactivemlClassifier._decode_class_labels` narrows predictions back to
-    the declared class dtype.
-
-    `ParzenWindowClassifier` is the vehicle rather than the subject. Its
-    `predict_proba` on well-separated samples is analytically `np.eye(2)`,
-    which is what allows an exact assertion on the predicted values instead
-    of the dtype-only check the estimator templates can make. It stays the
-    only estimator exercised here, wrapped where a wrapper is on the path.
+    Well-separated Parzen samples have known class probabilities, allowing
+    exact comparisons with the original labels. Exercise both direct and
+    wrapped classifiers.
     """
 
     LARGE_LABELS = [2**53, 2**53 + 1]

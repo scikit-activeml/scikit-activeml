@@ -892,15 +892,19 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
 
 
 def _reshape_scipy_dist(dist, shape):
-    """Reshapes the parameters `loc`, `scale`, `df` of a distribution, if they
-    exist.
+    """Return a new frozen distribution with reshaped broadcast parameters.
+
+    Positional and keyword parameters are broadcast together before reshaping.
+    The original distribution is unchanged.
 
     Parameters
     ----------
     dist : scipy.stats._distn_infrastructure.rv_frozen
         The distribution.
     shape : tuple
-        The new shape.
+        The new shape of the distribution's parameter grid. A scalar or
+        singleton grid is broadcast to an explicit shape; otherwise the
+        number of distributions must remain unchanged.
 
     Returns
     -------
@@ -912,12 +916,21 @@ def _reshape_scipy_dist(dist, shape):
     for idx, item in enumerate(shape):
         check_type(item, f"shape[{idx}]", int)
 
-    for argument in ["loc", "scale", "df"]:
-        if argument in dist.kwds:
-            # check if shapes are compatible
-            dist.kwds[argument].shape = shape
+    kwds = dist.kwds.copy()
+    if not dist.args and not kwds:
+        kwds["loc"] = 0
+    parameters = np.broadcast_arrays(*dist.args, *kwds.values())
+    reshaped = []
+    for parameter in parameters:
+        if parameter.size == 1 and all(dim >= 0 for dim in shape):
+            parameter = np.broadcast_to(parameter.reshape(()), shape)
+        else:
+            parameter = parameter.reshape(shape)
+        reshaped.append(parameter)
 
-    return dist
+    args = reshaped[: len(dist.args)]
+    kwds = dict(zip(kwds, reshaped[len(dist.args) :]))
+    return dist.dist(*args, **kwds)
 
 
 def expected_target_val(X, target_func, reg, **kwargs):
@@ -1014,10 +1027,10 @@ def conditional_expect(
     random_state=None,
     vector_func=False,
 ):
-    """Calculates the conditional expectation of a function depending on the
-    target value the corresponding feature value and an index for each sample
-    in `X`, i.e. E[func(Y, x, idx)|X=x], where
-    Y | X=x ~ reg.predict_target_distribution, for x in `X`.
+    """Calculates the conditional expectation of a function depending on an
+    index, the feature value, and the label for each sample in `X`, i.e.,
+    E[func(idx, x, Y)|X=x], where Y | X=x ~ reg.predict_target_distribution,
+    for x in `X`.
 
     Parameters
     ----------
@@ -1025,12 +1038,12 @@ def conditional_expect(
         The samples where the expectation should be evaluated.
     func : callable
         The function that transforms the random variable. The signature of the
-        function must be of the form `func(y, x, idx)`, where `y` is the target
-        value, `x` is the feature value and `idx` is such that `X[idx] = x`.
-    reg: ProbabilisticRegressor
+        function must be of the form `func(idx, x, y)`, where `idx` is such
+        that `X[idx] = x`, `x` is the feature value, and `y` is the label.
+    reg : ProbabilisticRegressor
         Predicts the target distribution over which the expectation is
         calculated.
-    method: string, optional, default='gauss_hermite'
+    method : string, optional, default='gauss_hermite'
         The method by which the expectation is computed.
 
         - 'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval])
@@ -1074,12 +1087,12 @@ def conditional_expect(
     random_state : int or np.random.RandomState or None,default=None
         Random state for fixing the number generation.
     vector_func : bool or str, default=False
-        If `vector_func` is `True`, the integration values are passes
+        If `vector_func` is `True`, the integration values are passed
         in vectorized form to `func`. If `vector_func` is 'both', the
         integration values might or might not be passed in vectorized form,
         depending on what is more efficient. The integration values
         are passed in vectorized form, means that in a call like
-        `func(y, x, idx)` `y` is of the form `(n_samples,
+        `func(idx, x, y)` `y` is of the form `(n_samples,
         n_integration_samples)`, `x` equals `X` and `idx` is an index map of
         `X`.
 
@@ -1170,7 +1183,7 @@ def conditional_expect(
                 n_integration_samples + 1
             )
             cond_dist = _reshape_scipy_dist(
-                reg.predict_target_distribution(X), shape=(-1, 1)
+                reg.predict_target_distribution(X), shape=(len(X), 1)
             )
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
@@ -1203,7 +1216,7 @@ def conditional_expect(
 
             def fixed_quad_function_wrapper(inner_eval_points):
                 inner_cond_dist = _reshape_scipy_dist(
-                    reg.predict_target_distribution(X), shape=(-1, 1)
+                    reg.predict_target_distribution(X), shape=(len(X), 1)
                 )
                 inner_potential_y = inner_cond_dist.ppf(
                     inner_eval_points.reshape(1, -1)

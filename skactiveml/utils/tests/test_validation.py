@@ -2,6 +2,7 @@ import unittest
 import warnings
 
 import numpy as np
+from scipy.sparse import csr_matrix, issparse
 
 from skactiveml.stream.budgetmanager import SplitBudgetManager
 from skactiveml.utils import (
@@ -338,6 +339,7 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_class_prior, 1, None)
         self.assertRaises(ValueError, check_class_prior, 1, 0)
         self.assertRaises(ValueError, check_class_prior, -2, 2)
+        self.assertRaises(ValueError, check_class_prior, np.inf, 2)
         self.assertRaises(ValueError, check_class_prior, [0, 1, -1], 3)
         self.assertRaises(ValueError, check_class_prior, [1, 2, 3], 2)
         np.testing.assert_array_equal(check_class_prior(1, 3), [1, 1, 1])
@@ -437,18 +439,121 @@ class TestValidation(unittest.TestCase):
             X, y, X_cand, sample_weight, y_numeric=True
         )
         X_cand_false = [[5]]
-        with self.assertRaisesRegex(ValueError, "number of features"):
+        with self.assertRaisesRegex(ValueError, "feature shape"):
             check_X_y(X, y, X_cand_false, sample_weight)
         y = np.array([[1, 0, 1], [2, 0, 1]])
-        self.assertRaises(
-            ValueError,
-            check_X_y,
+        _, _, _, checked_weight, _ = check_X_y(
             X,
             y,
             X_cand,
             sample_weight,
             target_type="multi-label",
         )
+        np.testing.assert_array_equal(checked_weight, sample_weight)
+
+        X = np.ones((3, 2))
+        y = np.array([[0, 1], [1, 0], [0, 1]])
+        for target_type in ("multi-label", "multi-output"):
+            for w in (None, [1, 2, 3], [[1, 2], [3, 4], [5, 6]]):
+                with self.subTest(target_type=target_type, weights=w):
+                    _, checked_y, checked_weight = check_X_y(
+                        X, y, sample_weight=w, target_type=target_type
+                    )
+                    np.testing.assert_array_equal(checked_y, y)
+                    np.testing.assert_array_equal(
+                        checked_weight, np.ones(y.shape) if w is None else w
+                    )
+            for w in ([1, 2], np.ones((3, 1)), np.ones((3, 3))):
+                with self.subTest(target_type=target_type, shape=np.shape(w)):
+                    with self.assertRaises(ValueError):
+                        check_X_y(
+                            X, y, sample_weight=w, target_type=target_type
+                        )
+
+            missing_y = y.astype(float)
+            missing_y[1] = np.nan
+            for allow_nan in (None, True, False):
+                with self.subTest(
+                    target_type=target_type, allow_nan=allow_nan
+                ):
+                    if allow_nan is False:
+                        with self.assertRaises(ValueError):
+                            check_X_y(
+                                X,
+                                missing_y,
+                                target_type=target_type,
+                                allow_nan=allow_nan,
+                            )
+                    else:
+                        _, checked_y, _ = check_X_y(
+                            X,
+                            missing_y,
+                            target_type=target_type,
+                            allow_nan=allow_nan,
+                        )
+                        np.testing.assert_array_equal(checked_y, missing_y)
+            missing_y[1] = np.inf
+            with self.assertRaises(ValueError):
+                check_X_y(
+                    X, missing_y, target_type=target_type, allow_nan=True
+                )
+
+        y = [[0.5, 1.5], [np.nan, 0.5], [1.5, 0.5]]
+        for params in (
+            {"target_type": "multi-label"},
+            {"target_type": "multi-output"},
+            {"target_type": "multi-label", "missing_label": -1},
+        ):
+            with self.subTest(params=params):
+                _, checked_y, _ = check_X_y(X, y, allow_nan=True, **params)
+                np.testing.assert_array_equal(checked_y, y)
+
+        for target_type in ("multi-label", "multi-output"):
+            y = csr_matrix([[0, 1.5], [np.nan, np.nan], [1.5, 0]])
+            with self.subTest(target_type=target_type, sparse=True):
+                _, checked_y, checked_weight = check_X_y(
+                    X, y, sample_weight=[1, 2, 3], target_type=target_type
+                )
+                self.assertTrue(issparse(checked_y))
+                np.testing.assert_array_equal(checked_y.toarray(), y.toarray())
+                np.testing.assert_array_equal(checked_weight, [1, 2, 3])
+
+        cases = [
+            ([1, 2], [3, 4, 5], {"ensure_2d": False}),
+            (
+                np.zeros((2, 3, 4)),
+                np.ones((3, 3, 4)),
+                {"allow_nd": True},
+            ),
+        ]
+        for X, X_cand, params in cases:
+            with self.subTest(shape=np.shape(X)[1:]):
+                X_out, _, candidates_out, weights, candidate_weights = (
+                    check_X_y(X=X, y=[0, 1], X_cand=X_cand, **params)
+                )
+                np.testing.assert_array_equal(X_out, X)
+                np.testing.assert_array_equal(candidates_out, X_cand)
+                np.testing.assert_array_equal(weights, np.ones(len(X)))
+                np.testing.assert_array_equal(
+                    candidate_weights, np.ones(len(X_cand))
+                )
+
+        cases = [
+            ([1, 2], [[3], [4]]),
+            ([[1], [2]], [3, 4]),
+            (np.zeros((2, 3, 4)), np.ones((3, 3, 5))),
+            (np.zeros((2, 3, 4)), np.ones((3, 3))),
+        ]
+        for X, X_cand in cases:
+            with self.subTest(X=np.shape(X), X_cand=np.shape(X_cand)):
+                with self.assertRaisesRegex(ValueError, "feature shape"):
+                    check_X_y(
+                        X=X,
+                        y=[0, 1],
+                        X_cand=X_cand,
+                        ensure_2d=False,
+                        allow_nd=True,
+                    )
 
     def test_check_X_y_accepts_numpy_floating_nan_sentinels(self):
         X = [[1], [2]]
@@ -564,6 +669,72 @@ class TestValidation(unittest.TestCase):
             target_vals=["undefined"],
             indicator_funcs=[is_prime],
         )
+
+        def should_not_run(value):
+            raise RuntimeError("Unnecessary indicator call.")
+
+        cases = [
+            (np.array([1, 2]), (np.ndarray,), ["auto"]),
+            (10, (int,), []),
+            ("auto", (), ["auto"]),
+            (np.array(["auto"]), (), ["auto"]),
+        ]
+        for obj, types, values in cases:
+            with self.subTest(obj=obj, types=types):
+                check_type(
+                    obj,
+                    "value",
+                    *types,
+                    target_vals=values,
+                    indicator_funcs=[should_not_run],
+                )
+
+        for obj in (np.array([]), np.array([1, 2])):
+            with self.subTest(predicate_array=obj):
+                check_type(
+                    obj,
+                    "value",
+                    target_vals=["auto"],
+                    indicator_funcs=[
+                        lambda value: isinstance(value, np.ndarray),
+                        should_not_run,
+                    ],
+                )
+
+        for obj in (float("nan"), np.array([1, 2])):
+            with self.subTest(identity=obj):
+                check_type(
+                    obj,
+                    "value",
+                    target_vals=[obj],
+                    indicator_funcs=[should_not_run],
+                )
+
+        for obj in (
+            np.array([]),
+            np.array(["auto", "other"]),
+            np.array(["auto", "auto"]),
+        ):
+            with self.subTest(invalid_array=obj):
+                with self.assertRaisesRegex(TypeError, "`value`"):
+                    check_type(obj, "value", str, target_vals=["auto"])
+
+        with self.assertRaisesRegex(RuntimeError, "Unnecessary indicator"):
+            check_type(10, "value", indicator_funcs=[should_not_run])
+
+        class RaisingEquality:
+            def __eq__(self, other):
+                raise ValueError("Comparison failed.")
+
+        class AcceptingEquality:
+            def __eq__(self, other):
+                return True
+
+        check_type(
+            RaisingEquality(), "value", target_vals=[AcceptingEquality()]
+        )
+        with self.assertRaisesRegex(ValueError, "Comparison failed"):
+            check_type(10, "value", target_vals=[RaisingEquality()])
 
     def test_check_callable(self):
         self.assertRaises(
@@ -707,13 +878,22 @@ class TestValidation(unittest.TestCase):
             def __init__(self, budget):
                 self.budget = budget
 
-        budget_manager = check_budget_manager(
-            0.1,
-            None,
-            DummyBudgetManager,
-            {"random_state": 0},
-        )
-        self.assertEqual(budget_manager.budget, 0.1)
+        for existing_manager in [None, DummyBudgetManager(budget=0.1)]:
+            with self.subTest(existing_manager=existing_manager):
+                default_params = {"random_state": 0}
+                budget_manager = check_budget_manager(
+                    0.1,
+                    existing_manager,
+                    DummyBudgetManager,
+                    default_params,
+                )
+                self.assertEqual(budget_manager.budget, 0.1)
+                self.assertEqual(default_params, {"random_state": 0})
+
+                randomized_manager = check_budget_manager(
+                    0.1, None, SplitBudgetManager, default_params
+                )
+                self.assertEqual(randomized_manager.random_state, 0)
 
     def test_check_n_features(self):
 

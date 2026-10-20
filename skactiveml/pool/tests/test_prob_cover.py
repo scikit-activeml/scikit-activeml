@@ -1,4 +1,5 @@
 import unittest
+import warnings
 from unittest.mock import Mock
 
 import numpy as np
@@ -211,11 +212,33 @@ class TestProbCover(
             ([500], None),
             (np.array([0.0, 1.0, 2.0]), None),
             ([-1], ValueError),
+            ([], ValueError),
+            ([np.nan], ValueError),
+            ([0.5, np.inf], ValueError),
             (0.5, ValueError),
             (-1, ValueError),
             ("string", ValueError),
         ]
         self._test_param("init", "deltas", test_cases)
+
+    def test_query_warns_only_for_impure_radius_grids(self):
+        X, y_true = make_blobs(n_samples=30, centers=3, random_state=0)
+        y = np.full(len(X), MISSING_LABEL)
+        y[:3] = y_true[:3]
+        with warnings.catch_warnings(record=True) as records:
+            warnings.simplefilter("always")
+            ProbCover(deltas=[0.5], random_state=0).query(X, y)
+        self.assertFalse(
+            any("purity" in str(record.message) for record in records)
+        )
+
+        qs = ProbCover(
+            deltas=[100.0, 200.0],
+            cluster_algo_dict={"random_state": 0},
+            random_state=0,
+        )
+        with self.assertWarnsRegex(UserWarning, "maximum purity"):
+            qs.query(X, y)
 
     def test_init_param_alpha(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

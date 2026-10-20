@@ -24,7 +24,7 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
-from ..utils._label_dtype import _as_label_array
+from ..utils._label_dtype import _as_class_vocabulary_array, _as_label_array
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
@@ -864,13 +864,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         P, n_samples=n_samples
                     )
                 elif is_collapsed_binary_output:
-                    if len(estimator_classes) == 1 and P_array.shape[1] == 2:
-                        self._check_estimator_probas_are_valid(
-                            P_array, is_multilabel=False
-                        )
-                        # Both native columns belong to the sole learned
-                        # class; dropping either loses probability mass.
-                        P_array = P_array.sum(axis=1, keepdims=True)
                     P_list = self._normalize_multilabel_proba_list(
                         [P_array], n_samples=n_samples
                     )
@@ -1056,15 +1049,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if had_established_target_spec and not np.any(is_included):
             return self
 
-        if hasattr(self, "estimator_"):
-            if fit_function != "partial_fit":
-                self.estimator_ = deepcopy(self.estimator)
-        else:
+        had_estimator = hasattr(self, "estimator_")
+        if not is_incremental or not had_estimator:
             self.estimator_ = deepcopy(self.estimator)
 
         # Count labels per class.
         if self._is_multilabel_target():
-            self._label_counts = [
+            label_counts = [
                 np.array(
                     [
                         np.sum(y[is_included, j] == class_idx)
@@ -1075,10 +1066,18 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 for j, classes_j in enumerate(self._le.classes_)
             ]
         else:
-            self._label_counts = [
+            label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
+        if is_incremental and had_estimator:
+            label_counts = [
+                np.add(previous_counts, batch_counts)
+                for previous_counts, batch_counts in zip(
+                    self._label_counts, label_counts
+                )
+            ]
+        self._label_counts = label_counts
 
         X_train = X[is_included]
         y_train = y[is_included].astype(np.int64)
@@ -1314,7 +1313,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 else self.cost_matrix
             )
             if self.classes is not None:
-                class_indices = np.argsort(self.classes)
+                class_indices = np.argsort(
+                    _as_class_vocabulary_array(self.classes)
+                )
                 cost_matrix = np.asarray(cost_matrix)[
                     np.ix_(class_indices, class_indices)
                 ]
@@ -1482,6 +1483,30 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._check_estimator_probas_are_valid(P_ml, is_multilabel=True)
         return P_ml
 
+    def _merge_sole_class_columns(self, P, learned_classes):
+        """Merge the two columns of an estimator that learned one class.
+
+        Some estimators, e.g., `MLPClassifier`, return two probability
+        columns although they observed only one class. Both columns belong
+        to this class, which therefore has probability one.
+
+        Parameters
+        ----------
+        P : numpy.ndarray of shape (n_samples, n_columns)
+            Probabilities returned by the wrapped estimator.
+        learned_classes : array-like of shape (n_learned_classes,)
+            The class labels the estimator learned.
+
+        Returns
+        -------
+        P : numpy.ndarray of shape (n_samples, n_columns) or (n_samples, 1)
+            The probabilities with one column for a sole learned class.
+        """
+        if len(learned_classes) == 1 and P.shape[1] == 2:
+            self._check_estimator_probas_are_valid(P, is_multilabel=False)
+            P = np.where(np.isnan(P).any(axis=1, keepdims=True), np.nan, 1.0)
+        return P
+
     @staticmethod
     def _check_estimator_probas_are_valid(P, is_multilabel):
         """Validate estimator probabilities while preserving NaN fallback.
@@ -1553,7 +1578,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     f"return probabilities for all declared classes."
                 )
         else:
-            P = _map_proba_columns(P, np.asarray(est_classes), self.classes_)
+            est_classes = np.asarray(est_classes)
+            P = self._merge_sole_class_columns(P, est_classes)
+            P = _map_proba_columns(P, est_classes, self.classes_)
         self._check_estimator_probas_are_valid(P, is_multilabel=False)
         return P
 
@@ -1622,11 +1649,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     )
                 P_j_normalized = P_j
             else:
+                est_classes_j = np.asarray(est_classes_j)
+                P_j = self._merge_sole_class_columns(P_j, est_classes_j)
                 P_j_normalized = _map_proba_columns(
-                    P_j,
-                    np.asarray(est_classes_j),
-                    classes_j,
-                    output_idx=j,
+                    P_j, est_classes_j, classes_j, output_idx=j
                 )
             self._check_estimator_probas_are_valid(
                 P_j_normalized, is_multilabel=False
@@ -1716,7 +1742,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     Parameters
     ----------
-    estimator : sklearn.base.SkactivemlClassifier
+    estimator : skactiveml.base.SkactivemlClassifier
         The classifier to be wrapped. If this classifier already implements a
         `partial_fit`, this method will be overwritten by this wrapper using
         the sliding window approach.
@@ -1840,9 +1866,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     @match_signature("estimator", "fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
-        """Partially fitting the model using `X` as training data and `y` as
-        class labels. If `base_estimator` has no `partial_fit` function use
-        `fit` with the sliding window for X, y and sample_weight.
+        """Add `X` and `y` to the sliding window and refit the estimator on
+        the samples in the window.
 
         Parameters
         ----------
@@ -2409,13 +2434,11 @@ if successful_skorch_torch_import:
               label.
         classes : array-like of shape (n_classes,) or a list of such \
             array-likes, default=None
-        - If `classes` is not nested (`None` or one-dimensional), a single task
-          problem is assumed such that `y` can be shape `(n_samples,)` or
-          `(n_samples, n_annotators)`.
-        - If `classes` is nested (list of array-like objects), multilabel
-          classification is assumed in this wrapper and `y` must be shape
-          `(n_samples, n_tasks)` with `n_tasks == len(classes)`. Each task
-          must be binary.
+            Holds the label for each class. Nested binary vocabularies, one
+            per output, describe multi-label classification with `y` of shape
+            `(n_samples, n_outputs)` and `n_outputs == len(classes)`. If
+            `None`, the classes are determined during the fit and
+            `target_type` decides between single-output and multi-label.
         missing_label : scalar or str or np.nan or None, default=np.nan
             Value to represent a missing label.
         cost_matrix : array-like of shape (n_classes, n_classes), default=None
@@ -2593,7 +2616,7 @@ if successful_skorch_torch_import:
 
             By default, this method returns only the predicted class
             probabilities `P`. If `extra_outputs` is provided, a tuple is
-            returned whose first element is `y_pred` and whose remaining
+            returned whose first element is `P` and whose remaining
             elements are the requested additional forward outputs, in the
             order specified by `extra_outputs`.
 
@@ -2626,9 +2649,12 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            P : numpy.ndarray of shape (n_samples, n_classes)
-                Class probabilities of the test samples. Classes are ordered
-                according to `self.classes_`.
+            P : numpy.ndarray of shape (n_samples, n_classes) or \
+                    (n_samples, n_outputs)
+                Class probabilities of the test samples. For single-output
+                classification, classes are ordered according to
+                `self.classes_`. For multi-label classification, `P` holds
+                the positive-class probability of each output.
             *extras : numpy.ndarray, optional
                 Additional outputs. Only present if `extra_outputs` is not
                 `None`. In that case, the method returns a single tuple whose
@@ -2807,7 +2833,7 @@ if successful_skorch_torch_import:
             criterion : torch.nn.Module.__class__
                 The uninitialized criterion (loss) used to optimize the module.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """
@@ -3108,7 +3134,8 @@ if successful_capymoa_import:
                     )
                     p_i = self.estimator_.predict_proba(x_instance)
                     # if estimator_ fails, it returns None. In this case, we
-                    # use a uniform distribution as fallback
+                    # use the label distribution or, without labels, a
+                    # uniform distribution as fallback
                     if p_i is None:
                         p_i = np.ones(n_classes) / n_classes
                         if sum(self._label_counts) > 0:
@@ -3124,10 +3151,10 @@ if successful_capymoa_import:
                     return P
 
             warnings.warn(
-                f"Since the 'base_estimator' could not be fitted when"
-                f" calling the `fit` method, the class label "
-                f"distribution`_label_counts={self._label_counts}` is used to "
-                f"make the predictions."
+                f"The underlying estimator cannot provide valid class "
+                f"probabilities. The class label distribution "
+                f"`_label_counts={self._label_counts}` is used to make "
+                f"predictions."
             )
             # fallback if clf could not be fitted (i.e., no labeled data)
             if sum(self._label_counts) == 0:
@@ -3227,14 +3254,16 @@ if successful_capymoa_import:
             if had_established_target_spec and not np.any(is_included):
                 return self
 
-            self._label_counts = [
+            label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
-            if hasattr(self, "estimator_"):
-                if fit_function != "partial_fit":
-                    self.estimator_ = self._create_estimator(X)
-            else:
+            if fit_function == "partial_fit" and hasattr(self, "estimator_"):
+                label_counts = list(np.add(self._label_counts, label_counts))
+            self._label_counts = label_counts
+            if fit_function != "partial_fit" or not hasattr(
+                self, "estimator_"
+            ):
                 self.estimator_ = self._create_estimator(X)
             if self.estimator_ is None:
                 self.is_fitted_ = False
@@ -3262,7 +3291,7 @@ if successful_capymoa_import:
             except Exception as e:
                 self.is_fitted_ = False
                 warnings.warn(
-                    "The 'base_estimator' could not be fitted because of"
+                    "The underlying estimator could not be fitted because of"
                     " '{}'. Therefore, the class labels of the samples "
                     "are counted and will be used to make predictions. "
                     "The class label distribution is "
@@ -3478,10 +3507,10 @@ if successful_river_import:
                     return P
 
             warnings.warn(
-                f"Since the 'base_estimator' could not be fitted when"
-                f" calling the `fit` method, the class label "
-                f"distribution`_label_counts={self._label_counts}` is used to "
-                f"make the predictions."
+                f"The underlying estimator cannot provide valid class "
+                f"probabilities. The class label distribution "
+                f"`_label_counts={self._label_counts}` is used to make "
+                f"predictions."
             )
             # fallback if clf could not be fitted (i.e., no labeled data)
             if sum(self._label_counts) == 0:
@@ -3566,16 +3595,18 @@ if successful_river_import:
             if had_established_target_spec and not np.any(is_included):
                 return self
 
-            if hasattr(self, "estimator_"):
-                if fit_function != "partial_fit":
-                    self.estimator_ = deepcopy(self.estimator)
-            else:
-                self.estimator_ = deepcopy(self.estimator)
             # count labels per class
-            self._label_counts = [
+            label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
+            if fit_function == "partial_fit" and hasattr(self, "estimator_"):
+                label_counts = list(np.add(self._label_counts, label_counts))
+            self._label_counts = label_counts
+            if fit_function != "partial_fit" or not hasattr(
+                self, "estimator_"
+            ):
+                self.estimator_ = deepcopy(self.estimator)
             try:
                 X_train = X[is_included]
                 y_train = y[is_included].astype(np.int64)
@@ -3630,16 +3661,19 @@ if successful_river_import:
                 else:
                     self.is_fitted_ = False
                     warnings.warn(
-                        "The 'estimator' could not be fitted because of"
-                        " '{}'. Therefore, the number of classes  are counted"
-                        "and will be used to make predictions. The class"
-                        "labels are assumed to be uniformly "
-                        "distributed.".format(e)
+                        "The underlying estimator could not be fitted "
+                        "because of '{}'. Therefore, the class labels of "
+                        "the samples are counted and will be used to make "
+                        "predictions. The class label distribution is "
+                        "`_label_counts={}`.".format(e, self._label_counts)
                     )
             return self
 
         def transform_data_to_dict(self, data):
-            return {str(i): x for i, x in enumerate(data.T)}
+            values = data.T
+            if data.ndim == 1 and data.dtype.kind in "iuf":
+                values = data.tolist()
+            return {str(i): x for i, x in enumerate(values)}
 
         def __sklearn_is_fitted__(self):
             if hasattr(self, "is_fitted_"):

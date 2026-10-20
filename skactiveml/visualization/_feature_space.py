@@ -80,8 +80,9 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         surface because the query strategy returns one utility per sample.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
-        - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`.
+        - If `candidates` is `None`, the utilities are plotted on a mesh
+          over `feature_bound`. If the query strategy cannot evaluate the
+          mesh samples, the unlabeled samples from `(X,y)` are used.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -101,9 +102,8 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
             default=None
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+        Determines the plotted area. If `None`, the bound is determined based
+        on `candidates` if they are given as samples, and on `X` otherwise.
     ax : matplotlib.axes.Axes, default=None
         The axis on which the utility is plotted.
     res : int, default=21
@@ -140,10 +140,11 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
         indicated by `qs.missing_label`).
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
-        - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`. For a two-dimensional
-          `y`, a sample is unlabeled as soon as at least one annotator
-          has not labeled it.
+        - If `candidates` is `None`, the utilities are plotted on a mesh
+          over `feature_bound`. If the query strategy cannot evaluate the
+          mesh samples, the unlabeled samples from `(X,y)` are used. For a
+          two-dimensional `y`, a sample is unlabeled as soon as at least
+          one annotator has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -163,9 +164,8 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
             default=None
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+        Determines the plotted area. If `None`, the bound is determined based
+        on `candidates` if they are given as samples, and on `X` otherwise.
     axes : array-like of matplotlib.axes.Axes, default=None
         The axes on which the utilities for the annotators are plotted. Only
         supported for y.ndim = 2 corresponding to a setting with multiple
@@ -420,7 +420,7 @@ def plot_contour_for_samples(
     res=21,
     contour_dict=None,
 ):
-    """Plot the utility for the given query strategy.
+    """Plot a contour of the values given for the samples `X`.
 
     Parameters
     ----------
@@ -433,10 +433,10 @@ def plot_contour_for_samples(
     replace_nan : numeric or None, default=0.0
         If numeric, nan-values in `values` will be replaced by this number.
         If None, these samples will be ignored.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]], \
+            default=None
+        Determines the plotted area. If `None`, the bound is determined based
+        on `X`.
     ax : matplotlib.axes.Axes, default=None
         The axis on which the utility is plotted. If no axis is given, the
         current axis (`plt.gca()`) will be used instead.
@@ -450,7 +450,7 @@ def plot_contour_for_samples(
     ax : matplotlib.axes.Axes
         The axis on which the utility was plotted.
     """
-    check_array(X, ensure_2d=True)
+    X = check_array(X, ensure_2d=True)
     values = check_array(
         values, ensure_2d=False, ensure_all_finite=False, copy=True
     )
@@ -493,30 +493,28 @@ def plot_stream_training_data(
     linewidth=3,
     plot_cand_highlight=True,
 ):
-    """Plot the utility for the given query strategy.
+    """Plot the samples of a data stream over time, colored by their labels.
 
     Parameters
     ----------
     ax : matplotlib.axes.Axes
-        The axis on which the utility is plotted. Only if y.ndim = 1 (single
-        annotator).
+        The axis on which the samples are plotted.
     X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
     y : array-like of shape (n_samples,)
-        Labels of the training data set (possibly including unlabeled ones).
+        Labels of the training data set.
     queried_indices : array-like of shape (n_samples,)
         Indicates which samples in `X` have been queried.
     classes : array-like of shape (n_classes,)
         Holds the label for each class.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+    feature_bound : array-like of shape [[t_min, t_max], [x_min, x_max]]
+        Time and feature ranges of the plot. Only `t_max` is used, as the end
+        of the current candidate's highlight.
     unlabeled_color : str or matplotlib.colors.Colormap, default='grey'
         The color for the unlabeled samples.
-    cmap : str or matplotlib.colors.Colormap, default='coolwarm_r'
-        The colormap for the confidence levels.
+    cmap : str or matplotlib.colors.Colormap, default='coolwarm'
+        The colormap for the class labels.
     alpha : scalar, default=0.2
         Set the alpha value used for blending - not supported on all backends.
     linewidth : float, default=3
@@ -526,24 +524,33 @@ def plot_stream_training_data(
 
     Returns
     -------
-     axes : array-like of shape (n_annotators_to_plot,)
-         The axes on which the utilities were plotted.
+    data_lines : list of matplotlib.lines.Line2D
+        The lines added to `ax`.
     """
-    column_or_1d(X)
-    check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
-    check_consistent_length(X, y)
-    check_array(queried_indices, ensure_2d=False)
-    check_array(classes, ensure_2d=False)
+    X = column_or_1d(X)
+    y = column_or_1d(_as_label_array(y))
+    check_consistent_length(X, y, queried_indices)
+    queried_indices = column_or_1d(
+        check_array(queried_indices, ensure_2d=False)
+    ).astype(bool)
+    classes = column_or_1d(
+        check_array(_as_label_array(classes), dtype=None, ensure_2d=False)
+    )
     check_type(unlabeled_color, "unlabeled_color", str)
     check_type(plot_cand_highlight, "plot_cand_highlight", bool)
     check_type(ax, "ax", Axes)
 
     data_lines = []
     cmap = _get_cmap(cmap)
-    norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
+    encoded_y = np.full(len(y), -1)
+    for class_idx, class_label in enumerate(classes):
+        encoded_y[queried_indices & (y == class_label)] = class_idx
+    if np.any(queried_indices & (encoded_y == -1)):
+        raise ValueError("Queried labels must be present in `classes`.")
+    norm = plt.Normalize(vmin=0, vmax=len(classes) - 1)
 
     highlight_color = (
-        cmap(norm(y[-1])) if queried_indices[-1] else unlabeled_color
+        cmap(norm(encoded_y[-1])) if queried_indices[-1] else unlabeled_color
     )
 
     if plot_cand_highlight:
@@ -557,7 +564,7 @@ def plot_stream_training_data(
             )
         )
 
-    for t, (x_t, a, y_t) in enumerate(zip(X, queried_indices, y)):
+    for t, (x_t, a, y_t) in enumerate(zip(X, queried_indices, encoded_y)):
         line_color = cmap(norm(y_t)) if a else unlabeled_color
         zorder = 3 if a else 2
         alpha_tmp = alpha * 2 if a else alpha
@@ -586,13 +593,12 @@ def plot_stream_decision_boundary(
     color="k",
     res=25,
 ):
-    """Plot the decision boundary of the given classifier.
+    """Plot categorical decision boundaries of a classifier over time.
 
     Parameters
     ----------
-    ax : matplotlib.axes.Axes or List
-        The axis on which the decision boundary is plotted. If ax is a List,
-        each entry has to be an `matplotlib.axes.Axes`.
+    ax : matplotlib.axes.Axes
+        The axis on which the decision boundary is plotted.
     t_x : int
         The position of the newest instance for the x axies.
     plot_step : int
@@ -602,8 +608,9 @@ def plot_stream_decision_boundary(
     X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    pred_list : array-like of shape (n_samples,)
-        The list containing classifier prediction for the last steps.
+    pred_list : list
+        The classifier's predictions at the previous plotting steps. The
+        predictions of the current step are appended to it.
     color : str or matplotlib.colors.Colormap, default='k'
         The color for the decision boundary.
     res : int, default=25
@@ -611,14 +618,18 @@ def plot_stream_decision_boundary(
 
     Returns
     -------
-    ax : matplotlib.axes.Axes or List
-        The axis on which the boundary was plotted or the list of axis if ax
-        was a list.
-    pred_list : array-like of shape (n_samples,)
-        The list containing classifier prediction for the last steps.
+    ax : matplotlib.axes.Axes
+        The axis on which the boundary was plotted.
+    pred_list : list
+        The predictions including those of the current step.
     """
     X = column_or_1d(X)
-    check_array(pred_list, ensure_2d=False, ensure_min_samples=0)
+    check_array(
+        _as_label_array(pred_list),
+        dtype=None,
+        ensure_2d=False,
+        ensure_min_samples=0,
+    )
     check_scalar(t_x, "t_x", int, min_val=0)
     check_scalar(plot_step, "plot_step", int, min_val=1)
     check_type(ax, "ax", Axes)
@@ -626,17 +637,25 @@ def plot_stream_decision_boundary(
     x_vec = np.linspace(np.min(X), np.max(X), res)
     t_vec = np.arange(1, t_x // plot_step + 1) * plot_step
     t_mesh, x_mesh = np.meshgrid(t_vec, x_vec)
-    predictions = np.array([clf.predict(x_vec.reshape([-1, 1]))])
-    pred_list.extend(predictions)
+    predictions = column_or_1d(
+        _as_label_array(clf.predict(x_vec.reshape([-1, 1])))
+    )
+    pred_list.append(predictions.copy())
 
-    if len(pred_list) > 2 and np.sum(pred_list) > 0:
-        ax.contour(
-            t_mesh,
-            x_mesh,
-            np.array(pred_list[1:]).T,
-            levels=[0.5],
-            colors=color,
-        )
+    if len(pred_list) > 2:
+        predictions = _as_label_array(pred_list[1:])
+        _, first_indices = np.unique(predictions, return_index=True)
+        classes = predictions.ravel()[np.sort(first_indices)]
+        # Draw one binary mask, choosing by first appearance.
+        boundary_classes = classes[1:] if len(classes) <= 2 else classes
+        for class_label in boundary_classes:
+            ax.contour(
+                t_mesh,
+                x_mesh,
+                (predictions == class_label).T,
+                levels=[0.5],
+                colors=color,
+            )
     return ax, pred_list
 
 
@@ -659,10 +678,11 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         represent annotators and produce one surface per selected annotator.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
-        - If `candidates` is `None`, the unlabeled samples from
-          `(X,y)` are considered as `candidates`. For a multi-annotator
-          strategy with a two-dimensional `y`, a sample is unlabeled as
-          soon as at least one annotator has not labeled it.
+        - If `candidates` is `None`, the utilities are plotted on a mesh
+          over `feature_bound`. If the query strategy cannot evaluate the
+          mesh samples, the unlabeled samples from `(X,y)` are used. For a
+          multi-annotator strategy with a two-dimensional `y`, a sample is
+          unlabeled as soon as at least one annotator has not labeled it.
         - If `candidates` is of shape `(n_candidates,)` and of type
           `int`, `candidates` is considered as the indices of the
           samples in `(X,y)`.
@@ -682,9 +702,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
             default=None
-        Determines the area in which the boundary is plotted. If candidates is
-        not given, bound must not be None. Otherwise, the bound is determined
-        based on the data.
+        Determines the plotted area. If `None`, the bound is determined based
+        on `candidates` if they are given as samples, and on `X` otherwise.
     ax : matplotlib.axes.Axes, default=None
         The axis on which the utility of a single-annotator strategy is
         plotted.
@@ -817,7 +836,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
 
         except MappingError:
             pass
-        except BaseException as err:
+        except Exception as err:
             warnings.warn(
                 f"Unable to create utility plot with mesh because "
                 f"of the following error. Trying plotting over "

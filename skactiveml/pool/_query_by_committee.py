@@ -23,6 +23,7 @@ from ..utils import (
     check_equal_missing_label,
     check_scalar,
 )
+from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
 from ._target import _resolve_estimator_target_spec
 
 
@@ -45,9 +46,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     - Variation ratios (classification). One minus the fraction of votes for
       the modal class measures lack of consensus, and higher values are
       preferred.
-    - Empirical variance (regression). The variance of the committee's
-      real-valued predictions quantifies disagreement, and higher variance is
-      preferred.
+    - Empirical standard deviation (regression). The standard deviation of
+      the committee's real-valued predictions quantifies disagreement, and
+      higher values are preferred.
 
     Parameters
     ----------
@@ -56,7 +57,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         The method to calculate the disagreement in the case of classification.
         'KL_divergence', 'vote_entropy', and 'variation_ratios' are possible.
         In the case of regression, this parameter is ignored and the empirical
-        variance is used.
+        standard deviation is used.
     eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities (only
         relevant for `method='KL_divergence'`).
@@ -75,7 +76,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         - If `sample_predictions_method_name` is not `None` and in the
           case of regression, the method is expected to take samples of the
           shape `(n_samples, ...)` as input and to output numerical values of
-          the shape `(n_members, n_samples)`, e.g., `sample_y` in
+          the shape `(n_samples, n_members)`, e.g., `sample_y` in
           `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
@@ -185,7 +186,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
@@ -278,7 +279,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:
                 if sample_func is None:
-                    votes = np.array(
+                    votes = _as_label_array(
                         [est.predict(X_cand) for est in est_arr]
                     ).T
                 else:
@@ -327,7 +328,11 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             number of distinct classes across all members.
         """
         member_classes = [np.asarray(est.classes_) for est in est_arr]
-        classes = np.unique(np.concatenate(member_classes))
+        classes = np.unique(
+            np.concatenate(
+                member_classes, dtype=_lossless_decode_dtype(member_classes)
+            )
+        )
         probas = np.zeros((len(est_arr), len(X_cand), len(classes)))
         for i, (est, est_classes) in enumerate(zip(est_arr, member_classes)):
             columns = np.searchsorted(classes, est_classes)
@@ -476,6 +481,9 @@ def _check_ensemble(
     )
 
     # Check if the parameter `ensemble` is valid.
+    if isinstance(ensemble, (list, tuple)) and len(ensemble) == 0:
+        raise ValueError("`ensemble` must contain at least one estimator.")
+
     for estimator_type in estimator_types:
         if isinstance(ensemble, estimator_type):
             check_equal_missing_label(ensemble.missing_label, missing_label)

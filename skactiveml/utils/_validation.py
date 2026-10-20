@@ -581,6 +581,8 @@ def check_class_prior(class_prior, n_classes):
             name="class_prior",
             target_type=(int, float),
             min_val=0,
+            max_val=np.inf,
+            max_inclusive=False,
         )
         class_prior = np.array([class_prior] * n_classes)
     else:
@@ -690,11 +692,11 @@ def check_X_y(
 ):
     """Input validation for standard estimators. Adjusted from `sklearn` [1]_.
 
-    Checks X and y for consistent length, enforces `X` to be at least 2D and
-    `y` 1D. By default, `X` is checked to be non-empty and containing only
-    finite values. Standard input checks are also applied to `y`, such as
-    checking that `y` does not have `np.nan` or `np.inf` targets.
-    For multi-label `y`, set `target_type="multi-label"`.
+    Checks X and y for consistent length and enforces `X` to be at least 2D.
+    Targets are one-dimensional unless a multi-label or multi-output
+    `target_type` is specified. By default, `X` is checked to be non-empty and
+    containing only finite values. NaN admission in targets is controlled by
+    `allow_nan`.
     If the dtype of `X` is object, attempt converting to float, raising on
     failure.
 
@@ -705,9 +707,13 @@ def check_X_y(
     y : nd-array or list or sparse matrix, default=None
         Labels for X.
     X_cand : nd-array or list or sparse matrix, default=None
-        Unlabeled input data
-    sample_weight : array-like of shape (n_samples,), default=None
-            Sample weights.
+        Unlabeled input data. If `X` is provided, all dimensions after the
+        sample axis must match those of `X`.
+    sample_weight : array-like of shape (n_samples,) or \
+            (n_samples, n_outputs), default=None
+        One weight per sample or, for two-dimensional targets, one weight per
+        target entry. If None, unit weights with the same shape as `y` are
+        returned. Supplied weights retain their dimensionality.
     sample_weight_cand : array-like of shape (n_candidates,), default=None
             Sample weights of the candidates.
     accept_sparse : string or boolean or list of string, default=False
@@ -745,7 +751,7 @@ def check_X_y(
         Whether to allow X.ndim > 2.
     target_type : "single-output" or "multi-label" or "multi-output", \
             default="single-output"
-        Resolved target type controlling target-array validation.
+        Resolved target type controlling target-array dimensionality.
     multi_output : boolean, default="deprecated"
         Deprecated. Use `target_type` instead: `multi_output=True` maps to
         `target_type="multi-label"` and `multi_output=False` to
@@ -754,7 +760,9 @@ def check_X_y(
         Note that `target_type="multi-label"` requires a two-dimensional `y`,
         whereas `multi_output=True` also accepted a one-dimensional one.
     allow_nan : boolean, default=None
-        Whether to allow np.nan in y.
+        Whether to allow np.nan in y. If None, NaN is allowed when
+        `missing_label` is NaN. This does not change the configured
+        `missing_label`.
     ensure_min_samples : int, default=1
         Make sure that X has a minimum number of samples in its first
         axis (rows for a 2D array).
@@ -844,7 +852,7 @@ def check_X_y(
             y = check_array(
                 y,
                 accept_sparse="csr",
-                ensure_all_finite=True,
+                ensure_all_finite="allow-nan" if allow_nan else True,
                 ensure_2d=False,
                 dtype=None,
             )
@@ -869,13 +877,11 @@ def check_X_y(
             sample_weight = np.ones(y.shape)
         sample_weight = check_array(sample_weight, ensure_2d=False)
         check_consistent_length(y, sample_weight)
-        if (
-            y.ndim > 1
-            and y.shape[1] > 1
-            or sample_weight.ndim > 1
-            and sample_weight.shape[1] > 1
-        ):
-            check_consistent_length(y.T, sample_weight.T)
+        if sample_weight.ndim == 2 and sample_weight.shape != y.shape:
+            raise ValueError(
+                "`sample_weight` must have shape `(n_samples,)` or, for "
+                "two-dimensional targets, the same shape as `y`."
+            )
 
     if X_cand is not None:
         X_cand = check_array(
@@ -892,10 +898,10 @@ def check_X_y(
             ensure_min_features=ensure_min_features,
             estimator=estimator,
         )
-        if X is not None and X_cand.shape[1] != X.shape[1]:
+        if X is not None and X_cand.shape[1:] != X.shape[1:]:
             raise ValueError(
-                "The number of features of candidates does not match "
-                "the number of features of `X`."
+                "The feature shape of candidates does not match "
+                "the feature shape of `X`."
             )
 
         if sample_weight_cand is None:
@@ -1072,6 +1078,9 @@ def check_type(
 ):
     """Check whether an object satisfies type, value, or indicator rules.
 
+    Checks are evaluated in type, value, and indicator order and stop at the
+    first match.
+
     Parameters
     ----------
     obj : object
@@ -1082,6 +1091,8 @@ def check_type(
         The possible types.
     target_vals : iterable, default=None
         Possible further values that the object is allowed to equal.
+        NumPy array comparisons with zero or multiple elements do not count
+        as value matches.
     indicator_funcs : iterable, default=None
         Possible further custom indicator (boolean) functions that accept
         the object by returning `True` if the object is passed as a parameter.
@@ -1095,11 +1106,18 @@ def check_type(
     target_vals = target_vals if target_vals is not None else []
     indicator_funcs = indicator_funcs if indicator_funcs is not None else []
 
-    wrong_type = not isinstance(obj, target_types)
-    wrong_value = obj not in target_vals
-    wrong_index = all(not i_func(obj) for i_func in indicator_funcs)
+    if isinstance(obj, target_types):
+        return
+    for value in target_vals:
+        if obj is value:
+            return
+        equal = value == obj
+        if isinstance(equal, np.ndarray) and equal.size != 1:
+            continue
+        if equal:
+            return
 
-    if wrong_type and wrong_value and wrong_index:
+    if not any(i_func(obj) for i_func in indicator_funcs):
         error_str = f"`{name}` "
         if len(target_types) == 0 and len(target_vals) == 0:
             error_str += " must"
@@ -1263,7 +1281,7 @@ def check_budget_manager(
     ----------
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be queried, with
-        0 <= budget <= 1. See Also :class:`skactiveml.base.BudgetManager`.
+        0 < budget <= 1. See Also :class:`skactiveml.base.BudgetManager`.
     budget_manager : BudgetManager, default=None
         Budget manager to be checked. If `budget_manager` is `None`, a new
         budget manager using the class `default_budget_manager_class` is
@@ -1286,6 +1304,7 @@ def check_budget_manager(
     if default_budget_manager_dict is None:
         default_budget_manager_dict = {}
     elif not uses_rand:
+        default_budget_manager_dict = default_budget_manager_dict.copy()
         default_budget_manager_dict.pop("random_state", None)
     if budget_manager is None:
         budget_manager_ = default_budget_manager_class(

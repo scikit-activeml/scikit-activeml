@@ -1787,7 +1787,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             query_default_params_reg=query_default_params_reg,
         )
         self.update_params = {
-            "candidates": [[]],
+            "candidates": [[0]],
             "queried_indices": [],
         }
 
@@ -1915,6 +1915,43 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         # _model_comparison checks for the availability of the classifier
         self.query_default_params_clf["fit_clf"] = True
         self._model_comparison(test_cases=test_cases, model_type="clf")
+
+    def test_query_refitting_preserves_large_integer_labels(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+
+        X = np.arange(3.0).reshape(-1, 1)
+        query_params.update(
+            X=X,
+            candidates=[[0.0], [0.5], [1.0]],
+            return_utilities=True,
+        )
+        for labels, classes in (
+            ([2**53, 2**53 + 1], None),
+            ([2**53 + 1, 2**53 + 2], [2**53 + 1, 2**53 + 2]),
+        ):
+            with self.subTest(classes=classes):
+                y = [*labels, np.nan]
+                clf = ParzenWindowClassifier(classes=classes, random_state=0)
+                prefit = clone(clf).fit(X, y)
+                np.testing.assert_array_equal(prefit.classes_, labels)
+                init_params = deepcopy(self.init_default_params)
+                if "classes" in init_params:
+                    init_params["classes"] = labels
+                query_params.update(clf=prefit, y=y, fit_clf=False)
+                expected_indices, expected_utilities = self.qs_class(
+                    **deepcopy(init_params)
+                ).query(**query_params)
+                query_params.update(clf=clf, fit_clf=True)
+                actual_indices, actual_utilities = self.qs_class(
+                    **deepcopy(init_params)
+                ).query(**query_params)
+
+                np.testing.assert_array_equal(actual_indices, expected_indices)
+                np.testing.assert_allclose(
+                    actual_utilities, expected_utilities
+                )
 
     def test_query_param_reg(self, test_cases=None):
         # _model_comparison checks for the availability of the regressor
@@ -2187,7 +2224,8 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
             # Test if all query strategy outputs and utilities are the same
             np.testing.assert_almost_equal(expected_utilities, utilities)
-            self.assertFalse(isinstance(list, type(qs_output)))
+            self.assertIsInstance(qs_output, (list, np.ndarray))
+            self.assertEqual(np.ndim(qs_output), 1)
             if len(expected_output) == 0:
                 self.assertEqual(len(expected_output), len(qs_output))
                 self.assertEqual(len(qs_output2), len(qs_output))
@@ -2390,7 +2428,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
     def test_update_param_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(Dummy, TypeError), ([[]], None), ([[0]], None)]
+        test_cases += [
+            (Dummy, ValueError),
+            ([], ValueError),
+            (np.empty((0, 1)), ValueError),
+            ([[]], ValueError),
+            ([[0]], None),
+        ]
         self._test_param("update", "candidates", test_cases)
 
     def test_update_param_queried_indices(self, test_cases=None):
@@ -2470,9 +2514,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
                     qs = self.qs_class(**init_params)
                     if test_func == "update":
-                        check_state = err is not None and test_param in (
-                            "queried_indices",
-                            "budget_manager_param_dict",
+                        check_state = err is not None and (
+                            test_param
+                            in ("queried_indices", "budget_manager_param_dict")
+                            or (
+                                test_param == "candidates"
+                                and not replace_init_params
+                            )
                         )
                         before = deepcopy(qs) if check_state else None
                         self._check_update_param(qs, update_params, err)

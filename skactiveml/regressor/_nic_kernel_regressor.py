@@ -91,7 +91,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples. If `metric='precomputed'`, `X` contains the
             pairwise kernels between all training samples.
-        y : array-like of shape (n_samples,) or (n_samples, n_targets)
+        y : array-like of shape (n_samples,) or (n_samples, 1)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         sample_weight : array-like of shape (n_samples,)

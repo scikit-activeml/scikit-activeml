@@ -7,6 +7,7 @@ from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
 )
+from ...utils._label_dtype import _as_label_array
 from ...utils._target import _check_target_spec_capability
 from ...pool._uncertainty_sampling import uncertainty_scores
 from ...utils import (
@@ -53,7 +54,8 @@ class IntervalEstimationAnnotModel(BaseEstimator):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     alpha : float, interval=(0, 1), default=0.05
-        Half of the confidence level for student's t-distribution.
+        Significance level of the confidence interval based on Student's
+        t-distribution, i.e., the confidence level is `1 - alpha`.
     mode : 'lower' or 'mean' or 'upper', default='upper'
         Mode of the estimated annotation performance.
     random_state : None or int or numpy.random.RandomState, default=None
@@ -65,13 +67,13 @@ class IntervalEstimationAnnotModel(BaseEstimator):
 
     Attributes
     ----------
-    n_annotators_: int
+    n_annotators_ : int
         Number of annotators.
     A_perf_ : ndarray, shape (n_annotators, 3)
         Estimated annotation performances (i.e., labeling accuracies), where
-        `A_cand[i, 0]` indicates the lower bound, `A_cand[i, 1]` indicates the
-        mean, and `A_cand[i, 2]` indicates the upper bound of the estimation
-        labeling accuracy.
+        `A_perf_[i, 0]` indicates the lower bound, `A_perf_[i, 1]` indicates
+        the mean, and `A_perf_[i, 2]` indicates the upper bound of the
+        estimated labeling accuracy.
     target_spec_ : skactiveml.utils.TargetSpec
         Resolved target semantics established during fitting.
 
@@ -122,7 +124,7 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         self : IntervalEstimationAnnotModel object
             The fitted annotator model.
         """
-        y_array = np.asarray(y)
+        y_array = _as_label_array(y)
         check_missing_label(
             self.missing_label, target_type=y_array.dtype, name="y"
         )
@@ -137,6 +139,13 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
+        if (
+            sample_weight is not None
+            and np.shape(sample_weight) != y_array.shape
+        ):
+            raise ValueError(
+                "`sample_weight` must have the same shape as `y`."
+            )
         # Check whether alpha is float in (0, 1).
         check_scalar(
             x=self.alpha,
@@ -162,12 +171,12 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         )
 
         # Number of annotators.
-        self.n_annotators_ = y.shape[1]
+        self.n_annotators_ = y_array.shape[1]
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         self.A_perf_ = np.zeros((self.n_annotators_, 3))
         for a_idx in range(self.n_annotators_):
             is_correct = np.equal(
-                y_mv[is_lbld[:, a_idx]], y[is_lbld[:, a_idx], a_idx]
+                y_mv[is_lbld[:, a_idx]], y_array[is_lbld[:, a_idx], a_idx]
             )
             is_correct = np.concatenate((is_correct, [0, 1]))
             mean = np.mean(is_correct)
@@ -235,9 +244,12 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         Parameter for specifying the adaptive threshold used for annotator
         selection.
     alpha : float, interval=(0, 1), default=0.05
-        Half of the confidence level for student's t-distribution.
+        Significance level of the confidence interval based on Student's
+        t-distribution, i.e., the confidence level is `1 - alpha`.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     target_type : "auto" or "single-output", default="auto"
         Declared target type. This strategy supports only single-output
         classification with multiple annotators.

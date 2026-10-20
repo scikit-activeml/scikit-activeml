@@ -95,6 +95,9 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
+        X_eval : array-like of shape (n_eval_samples, n_features), default=None
+            Evaluation data set on which the expected variance reduction is
+            estimated. If `X_eval=None`, `X` is used.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False

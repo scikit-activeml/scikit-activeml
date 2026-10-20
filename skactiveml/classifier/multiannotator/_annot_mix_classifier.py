@@ -63,7 +63,7 @@ try:
         hidden_dropout : float, default=0.1
             Dropout probability applied in the fusion multi-layer perceptron.
             Note that this parameter has no effect for `n_hidden_layers=0`.
-        eta : float in (0, 1), default=0.9
+        eta : float in (1/n_classes, 1), default=0.9
             Prior annotator performance, i.e., the probability of obtaining a
             correct annotation from an arbitrary annotator for an arbitrary
             sample of an arbitrary class.
@@ -492,7 +492,7 @@ try:
             Number of hidden layers in the fusion multi-layer perceptron.
         hidden_dropout : float
             Dropout probability applied in the fusion multi-layer perceptron.
-        eta : float in (0, 1)
+        eta : float in (1/n_classes, 1)
             Prior annotator performance, i.e., the probability of obtaining a
             correct annotation from an arbitrary annotator for an arbitrary
             sample.

@@ -19,6 +19,7 @@ from ..utils import (
     call_func,
     check_budget_manager,
 )
+from ..utils._label_dtype import _as_label_array
 from ..utils._validation import _validate_budget_update
 
 
@@ -50,7 +51,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -101,7 +102,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -112,10 +113,11 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+            The default budget manager returns a list.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -161,7 +163,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
@@ -173,6 +175,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
@@ -238,7 +241,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -329,7 +332,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -360,7 +363,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,)
             Weights of training samples in `X`.
         Returns
@@ -376,7 +379,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
             X = check_array(X)
-            y = np.array(y)
+            y = _as_label_array(y)
             check_consistent_length(X, y)
         return X, y, sample_weight
 
@@ -387,8 +390,8 @@ class FixedUncertainty(UncertaintyZliobaite):
     The FixedUncertainty (Fixed Uncertainty Strategy in [1]_) query strategy
     queries samples based on the classifiers uncertainty that is assessed
     based on the classifier's predictions. The sample is queried when the
-    probability of the most likely class exceeds a threshold calculated based
-    on the budget and the number of classes. See also
+    probability of the most likely class does not exceed a threshold
+    calculated based on the budget and the number of classes. See also
     :class:`.budgetmanager.FixedUncertaintyBudgetManager`
 
     Parameters
@@ -411,7 +414,7 @@ class FixedUncertainty(UncertaintyZliobaite):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -465,8 +468,9 @@ class VariableUncertainty(UncertaintyZliobaite):
     The VariableUncertainty query strategy (Variable Uncertainty Strategy in
     [1]_) queries labels based on the classifiers uncertainty assessed based on
     the classifier's predictions. The sample is queried when the probability
-    of the most likely class exceeds a time-dependent threshold calculated
-    based on the budget, number of observed and acquired samples. See also
+    of the most likely class is lower than a time-dependent threshold
+    calculated based on the budget, number of observed and acquired samples.
+    See also
     :class:`.budgetmanager.VariableUncertaintyBudgetManager`
 
     Parameters
@@ -487,7 +491,7 @@ class VariableUncertainty(UncertaintyZliobaite):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -516,7 +520,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
     The RandomVariableUncertainty (Uncertainty Strategy With Randomization in
     [1]_) query strategy samples samples based on the classifier's
     uncertainty assessed based on the classifier's predictions. The sample is
-    queried when the probability of the most likely class exceeds a
+    queried when the probability of the most likely class is lower than a
     time-dependent threshold calculated based on the budget, and the number of
     observed and acquired samples. The threshold is randomized by being
     multiplied with a random number sampled from N(1,delta). See also
@@ -540,7 +544,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -568,10 +572,10 @@ class Split(UncertaintyZliobaite):
 
     The Split query strategy (Split Strategy in [1]_) queries labels based on
     the classifiers uncertainty assessed based on the classifier's predictions.
-    The sample is queried when the probability of the most likely class
-    exceeds a time-dependent threshold calculated based on the budget, number
-    of observed and acquired samples. It is a hybrid strategy that combines
-    `VariableUncertainty` with randomly sampling samples with a given
+    The sample is queried when the probability of the most likely class is
+    lower than a time-dependent threshold calculated based on the budget,
+    number of observed and acquired samples. It is a hybrid strategy that
+    combines `VariableUncertainty` with randomly sampling samples with a given
     probability. See also
     :class:`.budgetmanager.SplitBudgetManager`
 
@@ -593,7 +597,7 @@ class Split(UncertaintyZliobaite):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.

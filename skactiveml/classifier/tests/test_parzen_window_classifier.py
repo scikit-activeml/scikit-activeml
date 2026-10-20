@@ -109,6 +109,25 @@ class TestParzenWindowClassifier(
         after_metric_dict = deepcopy(pwc.metric_dict)
         self.assertEqual(before_metric_dict, after_metric_dict)
 
+    def test_mean_gamma_supports_empty_training_data(self):
+        X = np.array([[0.0, 0.0], [1.0, 1.0]])
+        y = [0, 1]
+        params = {
+            "classes": [0, 1],
+            "class_prior": [1, 3],
+            "metric_dict": {"gamma": "mean"},
+        }
+        expected = ParzenWindowClassifier(**params).fit(X, y).predict_proba(X)
+        for X_empty in [[], np.empty((0, 0)), np.empty((0, X.shape[1]))]:
+            with self.subTest(shape=np.shape(X_empty)):
+                pwc = ParzenWindowClassifier(**params).fit(X_empty, [])
+                np.testing.assert_allclose(
+                    pwc.predict_proba(X), np.tile([0.25, 0.75], (len(X), 1))
+                )
+
+                pwc.fit(X, y)
+                np.testing.assert_allclose(pwc.predict_proba(X), expected)
+
     def test_multilabel_capability_and_target_metadata(self):
         pwc = ParzenWindowClassifier(
             classes=[["no", "yes"], ["off", "on"]],
@@ -306,14 +325,6 @@ class TestParzenWindowClassifier(
         with self.assertRaisesRegex(ValueError, "negative class frequency"):
             pwc.predict_proba(np.array([[-0.5, 1.0]]))
 
-    def test_predict_freq_rejects_negative_sample_weights(self):
-        pwc = ParzenWindowClassifier(classes=[0, 1]).fit(
-            [[0.0], [1.0]], [0, 1], sample_weight=[-1.0, 2.0]
-        )
-
-        with self.assertRaisesRegex(ValueError, "negative class frequency"):
-            pwc.predict_freq([[0.0]])
-
     def test_predict_freq_rejects_negative_frequencies_for_multi_label(self):
         pwc = ParzenWindowClassifier(
             classes=[[0, 1], [0, 1]], metric="linear"
@@ -325,6 +336,33 @@ class TestParzenWindowClassifier(
                     ValueError, "negative class frequency"
                 ):
                     pwc.predict_proba(x)
+
+    def test_predict_freq_rejects_nonfinite_kernel_values(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="precomputed").fit(
+            np.eye(2), [0, 1]
+        )
+        for K in ([[np.nan, 1.0]], [[np.inf, 1.0]], [[-np.inf, 1.0]]):
+            for method in (pwc.predict_freq, pwc.predict_proba, pwc.predict):
+                with self.subTest(K=K, method=method.__name__):
+                    with self.assertRaisesRegex(
+                        ValueError, "non-finite class frequency"
+                    ):
+                        method(np.array(K))
+
+        pwc = ParzenWindowClassifier(
+            classes=[0, 1], metric=lambda x, y: np.nan
+        ).fit([[0.0], [1.0]], [0, 1])
+        with self.assertRaisesRegex(ValueError, "non-finite class frequency"):
+            pwc.predict_freq([[0.5]])
+
+    def test_predict_freq_ignores_kernels_of_unlabeled_samples(self):
+        pwc = ParzenWindowClassifier(classes=[0, 1], metric="precomputed").fit(
+            np.eye(3), [0, 1, np.nan]
+        )
+        np.testing.assert_allclose(
+            pwc.predict_proba(np.array([[0.5, 1.0, np.nan]])),
+            [[1 / 3, 2 / 3]],
+        )
 
     def test_predict_freq_uses_contributing_samples_only(self):
         n_kernel_calls = 0

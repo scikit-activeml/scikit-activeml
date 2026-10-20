@@ -934,6 +934,38 @@ class TestFeatureSpace(unittest.TestCase):
             plot_utilities(qs, self.X, y, plot_annotators=[0])
 
     # Tests for plot_stream_decision_boundary function
+    def test_stream_labels(self):
+        for classes in ([-2, -1], ["b", "a"]):
+            with self.subTest(classes=classes):
+                fig, ax = plt.subplots()
+                clf = RelabeledPredictOnlyClassifier(classes)
+                pred_list = []
+                for t_x in range(3):
+                    plot_stream_decision_boundary(
+                        ax, t_x, 1, clf, [[-1], [1]], pred_list, res=5
+                    )
+
+                vertices = ax.collections[0].get_paths()[0].vertices
+                np.testing.assert_allclose(
+                    vertices[np.argsort(vertices[:, 0])],
+                    [[1, -0.25], [2, -0.25]],
+                )
+
+                data_lines = plot_stream_training_data(
+                    ax,
+                    [[-1], [0], [1]],
+                    [classes[0], np.nan, classes[1]],
+                    queried_indices=[True, False, True],
+                    classes=classes,
+                    feature_bound=[[0, 2], [-1, 1]],
+                )
+                self.assertEqual(data_lines[2].get_color(), "grey")
+                np.testing.assert_allclose(
+                    [data_lines[1].get_color(), data_lines[3].get_color()],
+                    plt.get_cmap("coolwarm")([0.0, 1.0]),
+                )
+                plt.close(fig)
+
     def test_plot_stream_decision_boundary_param_ax(self):
         self.assertRaises(
             TypeError,
@@ -1068,7 +1100,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=np.ones([len(self.X), 3]),
@@ -1081,7 +1113,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=self.X_stream,
@@ -1094,7 +1126,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=True,
@@ -1113,6 +1145,16 @@ class TestFeatureSpace(unittest.TestCase):
             queried_indices=self.queried_indices,
             y=self.y_stream,
         )
+        with self.assertRaisesRegex(ValueError, "Queried labels.*classes"):
+            plot_stream_training_data(
+                ax,
+                [[0], [1]],
+                ["known", "unknown"],
+                queried_indices=[True, True],
+                classes=["known"],
+                feature_bound=[[0, 1], [0, 1]],
+            )
+        self.assertEqual(len(ax.lines), 0)
 
     def test_plot_stream_training_data_unlabeled_color(self):
         _, ax = plt.subplots()
@@ -1120,7 +1162,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1134,7 +1176,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1148,7 +1190,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1162,7 +1204,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1176,7 +1218,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -1188,22 +1230,57 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertRaises(
             TypeError,
             plot_stream_training_data,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
+            queried_indices=self.queried_indices,
             ax=2,
         )
         _, axes = plt.subplots(1, 2)
         self.assertRaises(
             TypeError,
             plot_stream_training_data,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
+            queried_indices=self.queried_indices,
             ax=axes,
         )
+
+    def test_plot_stream_training_data_rejects_mismatched_masks(self):
+        n_samples = len(self.y_stream)
+        for n_queried in [n_samples - 1, n_samples + 1]:
+            with self.subTest(n_queried=n_queried):
+                _, ax = plt.subplots()
+                self.assertRaises(
+                    ValueError,
+                    plot_stream_training_data,
+                    ax=ax,
+                    classes=np.unique(self.y_stream),
+                    feature_bound=self.stream_bound,
+                    X=self.X_stream,
+                    queried_indices=[True] * n_queried,
+                    y=self.y_stream,
+                )
+                self.assertEqual(len(ax.lines), 0)
+
+    def test_plot_contour_for_samples_accepts_list_X(self):
+        values = self.utilities.copy()
+        values[:10] = np.nan
+        levels = []
+        for X in [self.X, self.X.tolist()]:
+            _, ax = plt.subplots()
+            plot_contour_for_samples(X, values, replace_nan=None, ax=ax)
+            levels.append(ax.collections[-1].levels)
+        np.testing.assert_array_equal(levels[0], levels[1])
+
+    def test_plot_utilities_propagates_keyboard_interrupt(self):
+        qs = InterruptingStrategy()
+        with self.assertRaises(KeyboardInterrupt):
+            plot_utilities(qs, self.X, self.y)
+        self.assertEqual(qs.n_calls, 1)
 
     def test_plot_contour_for_samples_param_X(self):
         for X in [None, 1, np.arange(10)]:
@@ -1509,7 +1586,7 @@ class TestFeatureSpace(unittest.TestCase):
             self.X_stream,
             self.y_stream,
             queried_indices=queried_indices,
-            classes=np.unique(self.y_train),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
         )
 
@@ -1591,6 +1668,22 @@ class MappingOnlyMultiAnnotatorStrategy(MultiAnnotatorPoolQueryStrategy):
         if return_utilities:
             return query_indices, utilities
         return query_indices
+
+
+class InterruptingStrategy(SingleAnnotatorPoolQueryStrategy):
+    n_calls = 0
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def query(
+        self, X, y, candidates=None, batch_size=1, return_utilities=False
+    ):
+        self.n_calls += 1
+        raise KeyboardInterrupt
 
 
 class MappingOnlyRegressionStrategy(SingleAnnotatorPoolQueryStrategy):

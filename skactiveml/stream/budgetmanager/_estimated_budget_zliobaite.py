@@ -13,14 +13,14 @@ class EstimatedBudgetZliobaite(BudgetManager):
     """EstimatedBudgetZliobaite
 
     Budget manager which checks, whether the specified `budget` has been
-    exhausted already. If not, a sample is queried, when the utility is
-    higher than the specified `budget`.
+    exhausted already. If not, its subclasses decide whether a sample is
+    queried.
 
     This budget manager calculates the estimated budget [1]_ spent in the last
     `w` steps and compares that to the `budget`. If the ratio is smaller than
-    the specified budget, i.e., `budget - u_t / w > 0`, the budget manager
-    queries a sample when its utility is higher than the budget. `u` is the
-    estimate of how many true labels were queried within the last `w` steps.
+    the specified budget, i.e., `budget - u_t / w > 0`, budget is left for
+    querying a sample. `u` is the estimate of how many true labels were
+    queried within the last `w` steps.
     The incremental function, `u_t = u_t-1 * (w-1) / w + labeling_t`, is used
     to calculate `u` at time `t`.
 
@@ -31,7 +31,7 @@ class EstimatedBudgetZliobaite(BudgetManager):
         last `w` steps taken.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -54,7 +54,7 @@ class EstimatedBudgetZliobaite(BudgetManager):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -76,13 +76,13 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
@@ -98,11 +98,10 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     """Budget Manager for Fixed Uncertainty Strategy
 
     Budget manager which implements the budgeting for the Fixed Uncertainty
-    Strategy [1]_. If the not `budget` is not exhausted, a sample is
-    queried, when the utility is higher than the specified `budget` and the
-    probability of the most likely class exceeds a threshold calculated based
-    on the `budget` and the number of `classes`. See also
-    :class:`.EstimatedBudgetZliobaite`.
+    Strategy [1]_. If the `budget` is not exhausted, a sample is queried,
+    when the probability of its most likely class, i.e., one minus its
+    utility, does not exceed a threshold calculated based on the `budget` and
+    the number of `classes`. See also :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
@@ -113,7 +112,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         last `w` steps taken.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -133,16 +132,16 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -182,7 +181,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -199,13 +198,13 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
@@ -224,25 +223,26 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     Budget manager which implements the budgeting for the Variable Uncertainty
     Strategy [1]_. Budget manager which checks, whether the specified budget
     has been exhausted already. If not, a sample is queried, when the
-    utility is higher than `theta_`, which is a time-dependent threshold that
-    increases or decreases when samples are queried or not queried,
-    respectively. The rate for that change is controlled via `s`. See also
+    probability of its most likely class, i.e., one minus its utility, is
+    lower than `theta_`, which is a time-dependent threshold that decreases or
+    increases when samples are queried or not queried, respectively. The rate
+    for that change is controlled via `s`. See also
     :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
     theta : float, default=1.0
-        Specifies the initial value for `theta_` that is compared to
-        `utilities`.
-    s : float, default=0.1
-        Specifies the relative increase or decrease of the threshold if an
+        Specifies the initial value for `theta_`, the threshold for the
+        probability of the most likely class.
+    s : float, default=0.01
+        Specifies the relative decrease or increase of the threshold if a
         sample is queried or not, respectively.
     w : int, default=100
         Specifies the size of the memory window. Controlls the `budget` in the
         last `w` steps taken.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -263,16 +263,16 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -311,7 +311,7 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -337,13 +337,13 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
@@ -373,24 +373,26 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     Budget manager which implements the budgeting for Uncertainty Strategy With
     Randomization [1]_. Budget manager which checks, whether the specified
     budget has been exhausted already. If not, a sample is queried, when the
-    utility is higher than a randomized time-dependent threshold. The threshold
-    is rendomized by multiplying `theta_` with a random variable following a
-    normal distribution with mean 1 and standard deviation `mu`. Similarly, to
-    :class:`.VariableUncertaintyBudgetManager`, `theta_` increases or decreases
-    when samples are queried or not queried, respectively. The rate for that
-    change is controlled via `s`. See also :class:`.EstimatedBudgetZliobaite`.
+    probability of its most likely class, i.e., one minus its utility, is
+    lower than a randomized time-dependent threshold. The threshold is
+    randomized by multiplying `theta_` with a random variable following a
+    normal distribution with mean 1 and standard deviation `delta`. Similarly
+    to :class:`.VariableUncertaintyBudgetManager`, `theta_` decreases or
+    increases when samples are queried or not queried, respectively. The rate
+    for that change is controlled via `s`. See also
+    :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
 
     delta : float, default=1.0
-        Specifies the standart deviation of the normal distribution used for
+        Specifies the standard deviation of the normal distribution used for
         randomization of the threshold.
     theta : float, default=1.0
         Specifies the initial value for `theta_` that is used for calculating
         the threshold.
-    s : float, default=0.1
-        Specifies the relative increase or decrease of the threshold if an
+    s : float, default=0.01
+        Specifies the relative decrease or increase of the threshold if a
         sample is queried or not, respectively.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the budget manager.
@@ -399,7 +401,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         last `w` steps taken.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -430,16 +432,16 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -485,7 +487,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -513,13 +515,13 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
@@ -561,23 +563,25 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
     Budget manager which implements the budgeting for the Split Strategy [1]_.
     The budget manager checks, whether the specified budget has been exhausted
-    already. If not, a sample is queried, when the utility is higher than
-    `theta_`, which is a time-dependent threshold that increases or decreases
-    when samples are queried or not queried, respectively. The rate for that
-    change is controlled via `s`. Additionally, samples are queried randomly
-    with a probability of `v`. See also
+    already. If not, a sample is queried, when the probability of its most
+    likely class, i.e., one minus its utility, is lower than `theta_`, which
+    is a time-dependent threshold that decreases or increases when samples are
+    queried or not queried, respectively. The rate for that change is
+    controlled via `s`. Additionally, with a probability of `v`, a sample is
+    queried randomly with a probability of `budget` instead. See also
     :class:`.VariableUncertaintyBudgetManager` and
     :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
     v : float, default=0.1
-        Specifies the percent value of samples queried randomly.
+        Probability of querying randomly with a probability of `budget`
+        instead of comparing to `theta_`.
     theta : float, default=1.0
-        Specifies the initial value for `theta_` that is compared to
-        `utilities`.
-    s : float, default=0.1
-        Specifies the relative increase or decrease of the threshold if an
+        Specifies the initial value for `theta_`, the threshold for the
+        probability of the most likely class.
+    s : float, default=0.01
+        Specifies the relative decrease or increase of the threshold if a
         sample is queried or not, respectively.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the budget manager.
@@ -586,7 +590,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         last `w` steps taken.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -611,16 +615,16 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -672,7 +676,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -701,13 +705,13 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
@@ -755,9 +759,8 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
     """RandomBudgetManager
 
     Budget manager which checks, whether the specified budget has been
-    exhausted already. If not, a sample is queried, when the utility is
-    higher than the specified budget. If budget is available, samples are
-    queried randomly with a probability of `budget` %. See also
+    exhausted already. If not, samples are queried randomly with a
+    probability of `budget`. See also
     :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
@@ -769,7 +772,7 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         last `w` steps taken.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     """
 
@@ -783,16 +786,16 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -833,7 +836,7 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -851,13 +854,13 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)

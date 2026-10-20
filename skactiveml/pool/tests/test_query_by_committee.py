@@ -29,6 +29,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_committee_label_invariance
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -254,6 +255,15 @@ class TestQueryByCommittee(
         )
 
     def test_query_param_ensemble(self):
+        for ensemble in ([], ()):
+            query_params = dict(
+                self.query_default_params_clf, ensemble=ensemble
+            )
+            with self.assertRaisesRegex(
+                ValueError, "`ensemble`.*at least one"
+            ):
+                self.qs_class().query(**query_params)
+
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
             ("pwc2", ParzenWindowClassifier()),
@@ -499,6 +509,13 @@ class TestQueryByCommittee(
                 for other_indices, other_utilities in results[1:]:
                     np.testing.assert_array_equal(other_indices, indices)
                     np.testing.assert_allclose(other_utilities, utilities)
+
+    def test_query_preserves_mixed_integer_class_labels(self):
+        for method in ("KL_divergence", "vote_entropy", "variation_ratios"):
+            with self.subTest(method=method):
+                assert_committee_label_invariance(
+                    self, QueryByCommittee(method=method, random_state=0)
+                )
 
     def test_sampled_votes_match_votes_of_class_labels(self):
         X = np.array(

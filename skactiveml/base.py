@@ -19,7 +19,11 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError, _ExhaustedCandidatePool
-from .utils._label_dtype import _as_label_array, _lossless_decode_dtype
+from .utils._label_dtype import (
+    _as_class_vocabulary_array,
+    _as_label_array,
+    _lossless_decode_dtype,
+)
 from .utils._target import (
     _check_target_capability,
     _has_no_class_evidence,
@@ -814,8 +818,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            that `y[i, j]` contains the label annotated by annotator `j` for
+            sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             See parameter `annotators`.
@@ -849,7 +853,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               considered as candidate annotator-sample pairs.
         batch_size : int or str, default=1
             The number of annotators-sample pairs to be selected in one AL
-            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+            cycle. Some strategies, e.g., `IntervalEstimationThreshold`, also
+            accept `batch_size='adaptive'`.
         return_utilities : bool, default=False
             If True, also return the utilities based on the query strategy.
 
@@ -914,7 +919,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by `self.missing_label`),
             meaning that `y[i, j]` contains the label annotated by annotator
-            `i` for sample `j`.
+            `j` for sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features),
             See annotators.
@@ -945,9 +950,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               n_annotators)` the annotator-sample-pairs, for which the sample
               is a candidate sample and the boolean matrix has entry `True` are
               considered as candidate annotator-sample pairs.
-        batch_size : int or string,
+        batch_size : int
             The number of annotators sample pairs to be selected in one AL
-            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+            cycle.
         return_utilities : bool
             If true, also return the utilities based on the query strategy.
         reset : bool, default=True
@@ -1175,7 +1180,7 @@ class BudgetManager(ABC, BaseEstimator):
     ----------
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     """
 
@@ -1195,16 +1200,16 @@ class BudgetManager(ABC, BaseEstimator):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         raise NotImplementedError
 
@@ -1221,7 +1226,7 @@ class BudgetManager(ABC, BaseEstimator):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -1243,13 +1248,13 @@ class BudgetManager(ABC, BaseEstimator):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         # Check if utilities is set
@@ -1273,9 +1278,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    budget : float
+    budget : float or None
         Specifies the ratio of labels which are allowed to be queried, with
-        `0 <= budget <= 1`.
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -1363,10 +1369,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -1391,12 +1397,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
             Optional kwargs for `budget_manager`. If supplied, `utilities`
             must be a one-dimensional array with one value per candidate.
+            Some budget managers, e.g., `BalancedIncrementalQuantileFilter`,
+            require `utilities`.
 
         Returns
         -------
@@ -1685,9 +1693,12 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Returns
         -------
-        P : numpy.ndarray of shape (n_samples, classes)
-            The class probabilities of the test samples. Classes are ordered
-            according to `self.classes_`.
+        P : numpy.ndarray of shape (n_samples, n_classes) or \
+                (n_samples, n_outputs)
+            The class probabilities of the test samples. For single-output
+            classification, classes are ordered according to `self.classes_`.
+            For multi-label classification, `P` holds the positive-class
+            probability of each output.
         """
         raise NotImplementedError
 
@@ -1701,7 +1712,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Returns
         -------
-        y : numpy.ndarray of shape (n_samples,)
+        y : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
             Predicted class labels of the test samples `X`.
         """
         # Extract primary output.
@@ -1730,7 +1741,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         ----------
         X : array-like of shape (n_samples, ...)
             Test samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             True class labels of the test samples `X`.
         sample_weight : array-like of shape (n_samples,), default=None
             Sample weights of the test sample `X`.
@@ -1738,7 +1749,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         Returns
         -------
         score : float
-            Mean accuracy of `self.predict(X)` regarding `y`.
+            Mean accuracy of `self.predict(X)` regarding `y`. For multi-label
+            classification, this is the subset accuracy, i.e., a sample counts
+            as correct only if all of its labels are predicted correctly.
         """
         y_pred = self.predict(X)
         y_pred = self._le.transform(y_pred)
@@ -1846,7 +1859,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 self.cost_matrix_, len(self.classes_)
             )
             if self.classes is not None:
-                class_indices = np.argsort(self.classes)
+                class_indices = np.argsort(
+                    _as_class_vocabulary_array(self.classes)
+                )
                 self.cost_matrix_ = self.cost_matrix_[class_indices]
                 self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 
@@ -1860,6 +1875,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     Extends `scikit-activeml` classifiers to estimators that are able to
     estimate class frequencies for given samples (by calling `predict_freq`).
+    Sample weights represent non-negative amounts of class evidence.
 
     Parameters
     ----------
@@ -1923,12 +1939,12 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Parameters
         ----------
-        X: array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             Test samples whose class frequencies are to be estimated.
 
         Returns
         -------
-        F: array-like of shape (n_samples, n_classes) or \
+        F : array-like of shape (n_samples, n_classes) or \
                 (n_samples, n_outputs, 2)
             The class frequency estimates of the test samples `X`. For
             multi-label targets, the final axis follows each output's
@@ -1957,8 +1973,14 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Raises
         ------
         ValueError
-            If any estimate is negative.
+            If any estimate is negative or not finite.
         """
+        if not np.all(np.isfinite(F)):
+            raise ValueError(
+                f"`{name}` returned a non-finite class frequency. Check the "
+                "inputs and parameters this estimator derives its "
+                "frequencies from, which must be finite."
+            )
         if np.any(np.asarray(F) < 0):
             raise ValueError(
                 f"`{name}` returned a negative class frequency, the smallest "
@@ -2137,6 +2159,11 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             target_spec=target_spec,
         )
 
+        if sample_weight is not None and np.any(
+            np.asarray(sample_weight, dtype=float) < 0
+        ):
+            raise ValueError("`sample_weight` must be non-negative.")
+
         # Check class prior.
         if self.target_spec_.target_type == "multi-label":
             n_outputs = len(self.classes_)
@@ -2146,6 +2173,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
                     name="class_prior",
                     target_type=(int, float),
                     min_val=0,
+                    max_val=np.inf,
+                    max_inclusive=False,
                 )
                 self.class_prior_ = np.full((n_outputs, 2), self.class_prior)
             else:
@@ -2254,10 +2283,9 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         ----------
         X : matrix-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_targets)
-            It contains the labels of the training samples.
-            The number of numerical labels may be variable for the samples,
-            where missing labels are represented as `missing_label_`.
+        y : array-like of shape (n_samples,) or (n_samples, 1)
+            It contains the labels of the training samples, where missing
+            labels are represented as `missing_label_`.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -2277,6 +2305,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         ----------
         X :  array-like of shape (n_samples, n_features)
             Input samples.
+
         Returns
         -------
         y : numpy.ndarray of shape (n_samples,)
@@ -2407,7 +2436,7 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         ----------
         X :  array-like of shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
-        n_samples: int, default=1
+        n_samples : int, default=1
             Number of random samples to be drawn.
         random_state : int or RandomState instance or None, default=None
             Determines random number generation to randomly draw samples. Pass
@@ -2458,12 +2487,9 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            self : SkorchMixin
-                Returned when no input data was supplied
-                (both `X` and `y` are `None`).
-            X_out, y_out : tuple of nd.array, optional
-                Validated `X` and `y` as a tuple, returned when
-                `enforce_check_X_y=True`.
+            self : SkorchMixin or tuple
+                The initialized wrapper, or the tuple `(self, X, y)` with the
+                validated `X` and `y` if `enforce_check_X_y=True`.
             """
             has_data = (X is not None) or (y is not None)
             vd_kwargs = self._validate_data_kwargs()
@@ -2543,8 +2569,7 @@ if successful_skorch_torch_import:
             optionally requested extra outputs as NumPy arrays.
 
             The primary output is defined as the first entry of
-            `forward_outputs` (after applying its transform, if any), or the
-            sole output of `module.forward` if `forward_outputs` is `None`.
+            `forward_outputs` (after applying its transform, if any).
             Primary and extra outputs are always returned after applying their
             configured transforms.
 
@@ -2566,9 +2591,9 @@ if successful_skorch_torch_import:
                   raw tensor; otherwise the raw tensor is used.
             extra_outputs : None or str or sequence of str, default=None
                 Names of additional outputs to return next to the primary
-                output. Must be a subset of `forward_outputs.keys()` if
-                `forward_outputs` is not `None`. The first key in
-                `forward_outputs` (the primary output) is not allowed here.
+                output. Must be a subset of `forward_outputs.keys()`. The
+                first key in `forward_outputs` (the primary output) is not
+                allowed here.
                 Duplicate entries are not allowed.
 
             Returns
@@ -2726,7 +2751,7 @@ if successful_skorch_torch_import:
             criterion : torch.nn.Module.__class__
                 The criterion (loss) used to optimize the module.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """

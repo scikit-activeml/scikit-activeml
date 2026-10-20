@@ -276,6 +276,8 @@ def _alce(
     check_classifier_params(classes, missing_label, cost_matrix)
     if cost_matrix is None:
         cost_matrix = 1 - np.eye(len(classes))
+    else:
+        cost_matrix = np.asarray(cost_matrix, dtype=float)
 
     if np.count_nonzero(cost_matrix) == 0:
         raise ValueError(
@@ -339,10 +341,6 @@ def _alce(
     dissimilarities = np.zeros((2 * n_classes, 2 * n_classes))
     dissimilarities[:n_classes, n_classes:] = cost_matrix
     dissimilarities[n_classes:, :n_classes] = cost_matrix.T
-
-    W = np.zeros((2 * n_classes, 2 * n_classes))
-    W[:n_classes, n_classes:] = 1
-    W[n_classes:, :n_classes] = 1
 
     mds = MDSP(**mds_params)
     embedding = mds.fit(dissimilarities).embedding_

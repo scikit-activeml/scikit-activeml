@@ -725,6 +725,48 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             n_annotators_per_sample=n_annotators_per_sample,
         )
 
+        for preference, error in [
+            ([-1], ValueError),
+            ([0], ValueError),
+            ([0.5], TypeError),
+            ([1.0], TypeError),
+            ([1, -1], ValueError),
+        ]:
+            with self.subTest(preference=preference):
+                self.assertRaises(
+                    error,
+                    wrapper.query,
+                    self.X,
+                    self.y,
+                    candidates=self.X_cand,
+                    annotators=self.A_cand,
+                    n_annotators_per_sample=preference,
+                )
+
+    def test_query_integer_preference_types(self):
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            random_state=self.random_state,
+        )
+        query_params = dict(
+            X=self.X, y=self.y, candidates=self.X_cand, batch_size=5
+        )
+        expected = wrapper.query(**query_params, n_annotators_per_sample=2)
+        for preference in [
+            np.int32(2),
+            np.int64(2),
+            np.uint64(2),
+            [2],
+            np.array([2], dtype=np.int32),
+            np.array([2], dtype=np.uint64),
+            np.array([2], dtype=object),
+        ]:
+            with self.subTest(preference=repr(preference)):
+                actual = wrapper.query(
+                    **query_params, n_annotators_per_sample=preference
+                )
+                np.testing.assert_array_equal(actual, expected)
+
     def test_query_param_A_perf(self):
         random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(

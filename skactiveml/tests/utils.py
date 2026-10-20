@@ -3,6 +3,7 @@ import numbers
 from collections.abc import Mapping, Sequence
 
 import numpy as np
+from sklearn import clone
 
 from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
@@ -322,6 +323,49 @@ def assert_predicts_class_dtype(test_case, y_pred, classes):
         expected_dtype,
         msg="`predict` must return the declared class dtype.",
     )
+
+
+def assert_committee_label_invariance(test_case, strategy):
+    """Check committee class identity across signed and unsigned integers."""
+    X = np.array([[0.0], [1.0]])
+    candidates = np.array([[0.2], [0.7]])
+    results = []
+    for offset, dtypes in (
+        (0, (np.int64, np.int64)),
+        (2**53, (np.int64, np.int64)),
+        (2**53, (np.int64, np.uint64)),
+        (2**53, (np.uint64, np.int64)),
+    ):
+        members = []
+        for i, (dtype, gamma) in enumerate(zip(dtypes, (1, 20))):
+            classes = np.array([offset, offset + 1], dtype=dtype)
+            y = classes if i == 0 else classes[::-1]
+            members.append(
+                ParzenWindowClassifier(
+                    classes=classes,
+                    metric_dict={"gamma": gamma},
+                    random_state=0,
+                ).fit(X, y)
+            )
+        results.append(
+            clone(strategy).query(
+                X,
+                members[0].classes_,
+                ensemble=members,
+                fit_ensemble=False,
+                candidates=candidates,
+                batch_size=2,
+                return_utilities=True,
+            )
+        )
+    indices, utilities = results[0]
+    test_case.assertGreater(np.max(utilities[0]), 0)
+    for dtypes, (other_indices, other_utilities) in zip(
+        ("signed", "mixed", "reversed"), results[1:]
+    ):
+        with test_case.subTest(dtypes=dtypes):
+            np.testing.assert_array_equal(other_indices, indices)
+            np.testing.assert_allclose(other_utilities, utilities)
 
 
 def assert_attributes_unchanged(

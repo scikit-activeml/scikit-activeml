@@ -29,7 +29,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     ----------
     prior : float, default=1.0
         Prior probabilities for the Dirichlet distribution of the samples.
-    m_max : int, default=1.0
+    m_max : int, default=1
         Maximum number of hypothetically acquired labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -91,6 +91,8 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
@@ -102,7 +104,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         utility_weight : array-like, default=None
             Weight for each candidate (multiplied with utilities). Usually,

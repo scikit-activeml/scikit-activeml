@@ -149,7 +149,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             It contains the class labels of the training samples.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            It contains the weights of the training samples' class labels.
+            Non-negative weights of the training samples' class labels.
             One weight per sample or one weight per target entry can be
             provided.
 
@@ -194,27 +194,31 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             and self.metric_dict["gamma"] == "mean"
             and self.metric == "rbf"
         ):
-            is_lbld = is_labeled(
-                y,
-                missing_label=-1,
-                target_type=target_spec.target_type,
-            )
-            n_lbld = np.sum(is_lbld)
-            N = np.max([2, n_lbld])
-            # The mean criterion estimates the bandwidth from the same samples
-            # it counts in `N`, i.e., the labeled ones. Fewer than two labeled
-            # samples carry no spread, which the zero variance reports to
-            # `_calculate_mean_gamma`.
-            variance = (
-                np.var(X[is_lbld], axis=0)
-                if n_lbld >= 2
-                else np.zeros(X.shape[1])
-            )
-            n_features = X.shape[1]
-            gamma = ParzenWindowClassifier._calculate_mean_gamma(
-                N, variance, n_features
-            )
-            self.metric_dict_["gamma"] = gamma
+            if X.ndim == 1 or X.shape[1] == 0:
+                # Without observed data, use default.
+                self.metric_dict_["gamma"] = None
+            else:
+                is_lbld = is_labeled(
+                    y,
+                    missing_label=-1,
+                    target_type=target_spec.target_type,
+                )
+                n_lbld = np.sum(is_lbld)
+                N = np.max([2, n_lbld])
+                # The mean criterion estimates the bandwidth from the same
+                # samples it counts in `N`, i.e., the labeled ones. Fewer than
+                # two labeled samples carry no spread, which the zero variance
+                # reports to `_calculate_mean_gamma`.
+                variance = (
+                    np.var(X[is_lbld], axis=0)
+                    if n_lbld >= 2
+                    else np.zeros(X.shape[1])
+                )
+                n_features = X.shape[1]
+                gamma = ParzenWindowClassifier._calculate_mean_gamma(
+                    N, variance, n_features
+                )
+                self.metric_dict_["gamma"] = gamma
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 

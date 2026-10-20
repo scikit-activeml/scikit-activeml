@@ -16,6 +16,7 @@ from ..utils import (
     call_func,
     check_budget_manager,
 )
+from ..utils._label_dtype import _as_label_array
 from ..utils._validation import _validate_budget_update
 
 
@@ -45,7 +46,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     prior : float, default=1.0e-3
         The prior value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
-    m_max : float, default=2
+    m_max : int > 0, default=2
         The m_max value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
     budget_manager : BudgetManager, default=None
@@ -64,7 +65,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -127,24 +128,24 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        utility_weight : array-like of shape (n_candidate_samples),
-        default=None
+        utility_weight : array-like of shape (n_candidates,), default=None
             Densities for each sample in `candidates`.
         return_utilities : bool, default=False
             If `True`, also return the `utilities` based on the query strategy.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+            The default budget manager returns a list.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -210,18 +211,21 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`. If supplied, `utilities`
-            must be a one-dimensional array with one value per candidate.
+            Kwargs for `budget_manager`. The default budget manager
+            `BalancedIncrementalQuantileFilter` requires `utilities`, a
+            one-dimensional array with one value per candidate as returned by
+            `query` with `return_utilities=True`.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
         _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
@@ -279,7 +283,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -376,7 +380,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,)
             Weights of training samples in `X`.
         Returns
@@ -392,7 +396,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
             X = check_array(X)
-            y = np.array(y)
+            y = _as_label_array(y)
             check_consistent_length(X, y)
         return X, y, sample_weight
 
@@ -409,7 +413,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False

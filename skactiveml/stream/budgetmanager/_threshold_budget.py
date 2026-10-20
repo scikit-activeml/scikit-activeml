@@ -12,27 +12,27 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
     This budget manager is an adaptation of
     :class:`.RandomVariableUncertaintyBudgetManager` for DBALStream [1]_. It
-    mainly differs in how the available budget ist estimated. Instead of the
+    mainly differs in how the available budget is estimated. Instead of the
     estimated budget proposed by Žliobaitė et. al. [2]_, this budget manager
-    counts the number of queried and seen instance, such that the number of
-    available queries is given as `n_seen_samples-n_queried_samples*budget`.
+    counts the number of queried and seen instances, such that the number of
+    available queries is given as `n_seen_samples*budget-n_queried_samples`.
 
     Parameters
     ----------
     theta : float, default=1.0
         Specifies the initial value for `theta_` that is used for calculating
         the threshold.
-    s : float, default=0.1
-        Specifies the relative increase or decrease of the threshold if an
+    s : float, default=0.01
+        Specifies the relative decrease or increase of the threshold if a
         sample is queried or not, respectively.
     delta : float, default=1.0
-        Specifies the standart deviation of the normal distribution used for
+        Specifies the standard deviation of the normal distribution used for
         randomization of the threshold.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the budget manager.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
     References
@@ -66,16 +66,16 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -119,7 +119,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
                 (n_samples, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
 
@@ -148,13 +148,13 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
