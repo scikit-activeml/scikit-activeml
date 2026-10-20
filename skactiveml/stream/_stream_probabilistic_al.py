@@ -16,6 +16,7 @@ from ..utils import (
     call_func,
     check_budget_manager,
 )
+from ..utils._label_dtype import _as_label_array
 from ..utils._validation import _validate_budget_update
 
 
@@ -395,7 +396,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
             X = check_array(X)
-            y = np.array(y)
+            y = _as_label_array(y)
             check_consistent_length(X, y)
         return X, y, sample_weight
 
