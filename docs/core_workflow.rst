@@ -211,7 +211,7 @@ In this example, the classifier predicts the pool labels correctly after two
 initial labels and ten queried labels. The score measures accuracy on this
 pool. Each query fills entries in ``y``, and the rows of ``X`` stay in place.
 
-Model-based query strategies fit the estimator by default. The example fits
+Model-based pool query strategies fit the estimator by default. The example fits
 ``clf`` before querying, so it passes ``fit_clf=False`` to reuse the fitted
 estimator. Regression strategies use ``fit_reg`` for the same purpose, and
 strategies that take an ``ensemble`` use ``fit_ensemble``. Set these flags to
@@ -415,6 +415,11 @@ queried. For :class:`~skactiveml.stream.StreamProbabilisticAL`, also pass the
 utilities from ``query(..., return_utilities=True)`` as
 ``budget_manager_param_dict={"utilities": utilities}``.
 
+Model-based stream strategies default to ``fit_clf=False`` and use the
+supplied classifier. Fit it on the known labels and update it as labels
+arrive. To fit a clone for a query, pass ``fit_clf=True`` together with
+the training data ``X`` and ``y``.
+
 The example uses :class:`~skactiveml.stream.PeriodicSampling` to query labels
 at a fixed rate, one arrival at a time (single-output classification, one
 annotator). Native stream strategies decide with their budget and the state
@@ -464,11 +469,15 @@ Common Pitfalls
        same ``missing_label`` to every estimator, query strategy, and utility
        function.
    * - Fitting the estimator twice
-     - Model-based strategies fit the estimator inside ``query()`` by default,
-       so an additional explicit ``fit()`` trains the same model twice per
-       cycle. Either drop the explicit call or pass ``fit_clf=False``
+     - Model-based pool strategies fit the estimator inside ``query()`` by
+       default, so an additional explicit ``fit()`` trains the same model
+       twice per cycle. Either drop the explicit call or pass ``fit_clf=False``
        (``fit_reg=False`` for regression, ``fit_ensemble=False`` for
        strategies that take an ``ensemble``).
+   * - Expecting a stream query to fit the classifier
+     - Model-based stream strategies default to ``fit_clf=False``. Fit the
+       classifier explicitly, or pass ``fit_clf=True`` with ``X`` and ``y``
+       to fit a clone for that query.
    * - Writing ``MISSING_LABEL`` into an integer ``y``
      - ``np.nan`` cannot be stored in an integer array, so the assignment
        raises ``ValueError: cannot convert float NaN to integer``. Use a
