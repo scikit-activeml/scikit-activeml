@@ -185,11 +185,13 @@ subpackage that uses it. ``skactiveml/pool/_target.py`` and
 ``skactiveml/stream/_target.py`` are examples. Put exception classes in
 ``skactiveml/exceptions.py``.
 
-A query-strategy base class keeps its public contract, the methods its own
-contract methods call, and declarations with conservative defaults, such as
-``_target_capabilities``. A helper that the base class never calls and only
-some subclasses use belongs in a private file of their subpackage instead. Add
-a query-strategy base class only when it contains behavior shared by its
+A base class keeps its public contract, the methods it calls itself,
+declarations with conservative defaults such as ``_target_capabilities``,
+behavior all its subclasses share, and methods that work with the state it
+defines, such as the label state of ``SkactivemlClassifier``. Other helpers,
+e.g., those that only check passed arguments or that need attributes only some
+subclasses define, are functions placed by the rules above instead. Add a
+query-strategy base class only when it contains behavior shared by its
 subclasses. Do not add one only to share a constant or to help tests find
 strategies.
 
