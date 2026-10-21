@@ -530,8 +530,8 @@ Required Parameters:
 +-------------------------------+----------------------------------------------+
 | ``budget_manager_param_dict`` | Provides additional parameters to            |
 |                               | the ``update`` method of the                 |
-|                               | ``budget_manager`` (only include             |
-|                               | if a ``budget_manager`` is used).            |
+|                               | ``budget_manager``. Strategies without a     |
+|                               | ``budget_manager`` accept and ignore it.     |
 +-------------------------------+----------------------------------------------+
 
 .. _general-advice-3:
@@ -539,10 +539,10 @@ Required Parameters:
 General advice
 ''''''''''''''
 
-Use ``self._validate_data`` in the case the strategy is used without using
-the ``query`` method (if parameters need to be initialized before the
-update). If a ``budget_manager`` is used forward the update call to the
-``budget_manager.update`` method.
+The ``update`` method checks its own inputs, e.g., with
+``_validate_budget_update`` and ``_validate_budget_manager``, and must not set
+``n_features_in_``. If a ``budget_manager`` is used, forward the update call to
+the ``budget_manager.update`` method.
 
 .. _testing-2:
 

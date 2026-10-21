@@ -2576,19 +2576,23 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         self._test_param("update", "queried_indices", test_cases)
 
     def test_update_param_budget_manager_param_dict(self, test_cases=None):
-        if (
-            "budget_manager_param_dict"
-            not in inspect.signature(self.qs_class.update).parameters
-        ):
-            return
+        qs = self.qs_class(**deepcopy(self.init_default_params))
+        qs.update(**deepcopy(self.update_params))
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [
-            ({"utilities": []}, ValueError),
-            ({"utilities": [0.1, 0.2]}, ValueError),
-            ({"utilities": [[0.1]]}, ValueError),
-            ({"utilities": 0.1}, ValueError),
-            ({"utilities": [0.1]}, None),
-        ]
+        if hasattr(qs, "budget_manager_"):
+            test_cases += [
+                ({"utilities": []}, ValueError),
+                ({"utilities": [0.1, 0.2]}, ValueError),
+                ({"utilities": [[0.1]]}, ValueError),
+                ({"utilities": 0.1}, ValueError),
+                ({"utilities": [0.1]}, None),
+            ]
+        else:
+            test_cases += [
+                ({"utilities": []}, None),
+                ({"utilities": 0.1}, None),
+                ({"utilities": [0.1]}, None),
+            ]
         self._test_param("update", "budget_manager_param_dict", test_cases)
 
     def _test_param(

@@ -1370,7 +1370,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
             Optional kwargs for `budget_manager`. If supplied, `utilities`
             must be a one-dimensional array with one value per candidate.
             Some budget managers, e.g., `BalancedIncrementalQuantileFilter`,
-            require `utilities`.
+            require `utilities`. Strategies without a budget manager ignore it.
 
         Returns
         -------
