@@ -5,25 +5,26 @@ import warnings
 import numpy as np
 from sklearn.utils import (
     check_array,
-    check_consistent_length,
     check_scalar,
     check_random_state,
 )
-from sklearn.base import clone
 from sklearn.metrics.pairwise import pairwise_distances
 
 from skactiveml.base import (
     BudgetManager,
     SingleAnnotatorStreamQueryStrategy,
-    SkactivemlClassifier,
 )
 from skactiveml.utils import (
     check_type,
     call_func,
     check_budget_manager,
 )
-from skactiveml.utils._label_dtype import _as_label_array
 from skactiveml.utils._validation import _validate_budget_update
+from skactiveml.stream._target import _fit_and_resolve_clf_target_spec
+from skactiveml.stream._validation import (
+    _sync_default_budget_manager,
+    _validate_X_y_sample_weight,
+)
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
     DensityBasedSplitBudgetManager,
@@ -309,7 +310,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
-        self._sync_default_budget_manager()
+        _sync_default_budget_manager(self)
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -434,10 +435,12 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        X, y, sample_weight = self._validate_X_y_sample_weight(
+        X, y, sample_weight = _validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+        clf, _ = _fit_and_resolve_clf_target_spec(
+            self, clf, X, y, fit_clf=fit_clf, sample_weight=sample_weight
+        )
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
@@ -460,7 +463,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
-        self._sync_default_budget_manager()
+        _sync_default_budget_manager(self)
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -485,72 +488,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             self.min_dist_ = deque(maxlen=self.window_size)
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
-
-    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
-        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
-        sample_weight.
-
-        Parameters
-        ----------
-        clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-        X : array-like of shape (n_samples, n_features), default=None
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `clf.missing_label`).
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
-        fit_clf : bool, default=False
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        Returns
-        -------
-        clf : skactiveml.base.SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        """
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            clf = clone(clf)
-            self._check_clf_fit_capability(clf)
-            if sample_weight is None:
-                clf = clf.fit(X, y)
-            else:
-                clf = clf.fit(X, y, sample_weight)
-        self._resolve_clf_target_spec(clf, y)
-        return clf
-
-    def _validate_X_y_sample_weight(self, X, y, sample_weight):
-        """Validate if X, y and sample_weight are numeric and of equal length.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `clf.missing_label`).
-        sample_weight : array-like of shape (n_samples,)
-            Weights of training samples in `X`.
-        Returns
-        -------
-        X : array-like of shape (n_samples, n_features)
-            Checked training data set.
-        y : array-like of shape (n_samples)
-            Checked labels of the input samples `X`. Converts `y` to a numpy
-            array.
-        """
-        if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
-            check_consistent_length(sample_weight, y)
-        if X is not None and y is not None:
-            X = check_array(X)
-            y = _as_label_array(y)
-            check_consistent_length(X, y)
-        return X, y, sample_weight
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -839,7 +776,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
-        self._sync_default_budget_manager()
+        _sync_default_budget_manager(self)
         # _init_members
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -1000,10 +937,12 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        X, y, sample_weight = self._validate_X_y_sample_weight(
+        X, y, sample_weight = _validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+        clf, _ = _fit_and_resolve_clf_target_spec(
+            self, clf, X, y, fit_clf=fit_clf, sample_weight=sample_weight
+        )
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
@@ -1041,7 +980,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 default_budget_manager_kwargs,
             )
-        self._sync_default_budget_manager()
+        _sync_default_budget_manager(self)
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -1084,43 +1023,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         """
         return {}
 
-    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
-        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
-        sample_weight.
-
-        Parameters
-        ----------
-        clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-        X : array-like of shape (n_samples, n_features), default=None
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `clf.missing_label`).
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
-        fit_clf : bool, default=False
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        Returns
-        -------
-        clf : skactiveml.base.SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        """
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            clf = clone(clf)
-            self._check_clf_fit_capability(clf)
-            if sample_weight is None:
-                clf = clf.fit(X, y)
-            else:
-                clf = clf.fit(X, y, sample_weight)
-        self._resolve_clf_target_spec(clf, y)
-        return clf
-
     def _validate_force_full_budget(self):
         # check force_full_budget
         check_type(self.force_full_budget, "force_full_budget", bool)
@@ -1129,35 +1031,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 "force_full_budget is set to False. "
                 "Therefore the full budget may not be utilised."
             )
-
-    def _validate_X_y_sample_weight(self, X, y, sample_weight):
-        """Validate if X, y and sample_weight are numeric and of equal length.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `clf.missing_label`).
-        sample_weight : array-like of shape (n_samples,)
-            Weights of training samples in `X`.
-        Returns
-        -------
-        X : array-like of shape (n_samples, n_features)
-            Checked training data set.
-        y : array-like of shape (n_samples)
-            Checked labels of the input samples `X`. Converts `y` to a numpy
-            array.
-        """
-        if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
-            check_consistent_length(sample_weight, y)
-        if X is not None and y is not None:
-            X = check_array(X)
-            y = _as_label_array(y)
-            check_consistent_length(X, y)
-        return X, y, sample_weight
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
