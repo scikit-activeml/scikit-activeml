@@ -16,6 +16,7 @@ from ..utils import (
     is_unlabeled,
 )
 from ._target import _resolve_estimator_target_spec
+from ..utils._target import _check_target_spec_capability
 
 
 class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
@@ -105,7 +106,9 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             Model implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
+            `sample_weight`. Independent of this flag, EER refits the
+            classifier on hypothetical single-annotator labels, so classifiers
+            requiring multi-annotator training labels are not supported.
         ignore_partial_fit : bool, default=True
             Relevant in cases where `clf` implements `partial_fit`. If `True`,
             the `partial_fit` function is ignored and `fit` is used instead.
@@ -170,6 +173,14 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         if fit_clf:
             clf = clone(clf)
         target_spec = _resolve_estimator_target_spec(self, clf, y)
+        # EER trains on hypothetical single-annotator labels even when the
+        # initial classifier fit is skipped.
+        _check_target_spec_capability(
+            f"{type(clf).__name__} for {type(self).__name__} "
+            "internal refitting",
+            target_spec,
+            clf._target_capabilities,
+        )
 
         (
             X,

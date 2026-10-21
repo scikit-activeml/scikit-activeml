@@ -12,6 +12,7 @@ from sklearn.svm import SVC
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.pool import MaxHerding, UHerding
 from skactiveml.tests.template_query_strategy import (
     TemplateMultilabelAggregationQueryStrategy,
@@ -22,6 +23,8 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierLogitsEmbeddingTuple,
     ParzenWindowClassifierLogitsOnly,
     ParzenWindowClassifierWeirdTuple,
+    assert_no_query_state,
+    assert_state_unchanged,
 )
 from skactiveml.utils import MISSING_LABEL, TargetSpec, resolve_target_spec
 from skactiveml.utils._validation import _canonicalize_multilabel_probas
@@ -752,6 +755,79 @@ class TestUHerding(
         self.assertEqual(
             ParzenWindowClassifierLogitsEmbedding.fit_calls, fit_calls_before
         )
+
+    def test_multiannotator_calibration_rejected_before_fit_and_state(self):
+        X = self.query_default_params_clf["X"]
+        y = self.query_default_params_clf["y"]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(X, y[:, None])
+        clf_before = deepcopy(clf)
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for temperatures in [None, [0.5, 1.0]]:
+                for fit_clf in [False, True]:
+                    with self.subTest(
+                        temperatures=temperatures, fit_clf=fit_clf
+                    ):
+                        qs = UHerding(
+                            temperatures=temperatures, random_state=0
+                        )
+                        with self.assertRaisesRegex(
+                            ValueError, "does not support target capability"
+                        ):
+                            qs.query(X, y, clf=clf, fit_clf=fit_clf)
+                        assert_no_query_state(self, qs)
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
+
+    def test_multiannotator_fixed_temperature_requires_predictions_only(self):
+        X = self.query_default_params_clf["X"]
+        y = self.query_default_params_clf["y"]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(X, y[:, None])
+        clf_before = deepcopy(clf)
+        expected = UHerding(temperatures=0.5, random_state=0).query(
+            X,
+            y,
+            clf=ParzenWindowClassifier(
+                classes=self.classes, random_state=0
+            ).fit(X, y),
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for temperatures in [0.5, [0.5]]:
+                with self.subTest(temperatures=temperatures):
+                    actual = UHerding(
+                        temperatures=temperatures, random_state=0
+                    ).query(
+                        X,
+                        y,
+                        clf=clf,
+                        fit_clf=False,
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(actual[0], expected[0])
+                    np.testing.assert_allclose(actual[1], expected[1])
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
 
     def test_query_multilabel_fixed_temperature_skips_calibration_refits(self):
         DummyMultilabelLogitClassifier.reset_fit_calls()

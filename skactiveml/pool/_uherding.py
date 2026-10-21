@@ -22,6 +22,7 @@ from ..utils import (
     rand_argmax,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
+from ..utils._target import _check_target_spec_capability
 from ._target import _fit_and_resolve_estimator_target_spec
 from ._uncertainty_sampling import uncertainty_scores
 
@@ -221,7 +222,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight` before evaluating the acquisition function.
             Independent of this flag, temporary cloned classifiers may still be
-            fitted internally to select the temperature parameter.
+            fitted internally to select the temperature parameter. A fitted
+            multi-annotator classifier requires `fit_clf=False` and a fixed
+            scalar or length-one `temperatures`, which skips calibration.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
             Weights of training samples in `X`. For two-dimensional `y`, one
@@ -283,6 +286,36 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         )
         is_multilabel = target_spec.target_type == "multi-label"
 
+        if self.temperatures is None:
+            temperatures = np.logspace(-1, 1, 49)
+        elif np.isscalar(self.temperatures):
+            temperatures = float(self.temperatures)
+            if temperatures <= 0 or np.isnan(temperatures):
+                raise ValueError(
+                    "`temperatures` must contain only positive values."
+                )
+        else:
+            temperatures = column_or_1d(self.temperatures, dtype=float)
+            if len(temperatures) == 0:
+                raise ValueError(
+                    "`temperatures` must contain at least one entry."
+                )
+            if np.any(temperatures <= 0) or np.isnan(temperatures).any():
+                raise ValueError(
+                    "`temperatures` must contain only positive values."
+                )
+
+        # Calibration fits clones on the single-annotator query labels, even
+        # when the supplied classifier is already fitted. Fixed temperatures
+        # require predictions only and do not need this training capability.
+        if not np.isscalar(temperatures) and len(temperatures) > 1:
+            _check_target_spec_capability(
+                f"{type(clf).__name__} for {type(self).__name__} "
+                "temperature calibration",
+                target_spec,
+                clf._target_capabilities,
+            )
+
         # Determine candidate samples and validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -340,24 +373,6 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                 min_val=0.0,
                 max_val=1.0,
             )
-        if self.temperatures is None:
-            temperatures = np.logspace(-1, 1, 49)
-        elif np.isscalar(self.temperatures):
-            temperatures = float(self.temperatures)
-            if temperatures <= 0 or np.isnan(temperatures):
-                raise ValueError(
-                    "`temperatures` must contain only positive values."
-                )
-        else:
-            temperatures = column_or_1d(self.temperatures, dtype=float)
-            if len(temperatures) == 0:
-                raise ValueError(
-                    "`temperatures` must contain at least one entry."
-                )
-            if np.any(temperatures <= 0) or np.isnan(temperatures).any():
-                raise ValueError(
-                    "`temperatures` must contain only positive values."
-                )
 
         # Calibrate classifier by selecting a corresponding temperature.
         tau = self._select_temperature(

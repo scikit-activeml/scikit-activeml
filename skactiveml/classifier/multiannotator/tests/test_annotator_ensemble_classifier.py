@@ -1,12 +1,19 @@
+from copy import deepcopy
+import pickle
 import unittest
 
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import Perceptron
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError
 
-from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SklearnClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_estimator import (
@@ -229,6 +236,59 @@ class TestAnnotatorEnsembleClassifier(
         clf.fit(X=self.X, y=self.y)
         P = clf.predict_proba(X=self.X)
         np.testing.assert_allclose(np.ones(len(P)), P.sum(axis=1))
+
+    def test_hard_voting_preserves_member_random_states(self):
+        X = np.zeros((40, 1))
+        y = np.tile([0, 1], len(X) // 2).reshape(-1, 1)
+        members = [
+            ParzenWindowClassifier(random_state=0, missing_label=-1),
+            SlidingWindowClassifier(
+                SlidingWindowClassifier(
+                    ParzenWindowClassifier(random_state=0, missing_label=-1),
+                    random_state=1,
+                    missing_label=-1,
+                ),
+                random_state=2,
+                missing_label=-1,
+            ),
+            SklearnClassifier(
+                DummyClassifier(strategy="prior"),
+                classes=[0, 1],
+                cost_matrix=[[0, 1], [1, 0]],
+                random_state=0,
+                missing_label=-1,
+            ),
+        ]
+        for member in members:
+            with self.subTest(member=member):
+                clf = AnnotatorEnsembleClassifier(
+                    [("member", member)],
+                    classes=[0, 1],
+                    random_state=0,
+                    missing_label=-1,
+                ).fit(X, y)
+                member_state = pickle.dumps(clf.estimators_)
+                expected = deepcopy(clf.estimators_[0][1]).predict(X)
+                # Ties still select both classes; they are not rounded to one.
+                np.testing.assert_array_equal(np.unique(expected), [0, 1])
+                expected = np.eye(2)[expected]
+                for _ in range(2):
+                    np.testing.assert_array_equal(
+                        clf.predict_proba(X), expected
+                    )
+                    self.assertEqual(
+                        pickle.dumps(clf.estimators_), member_state
+                    )
+
+    def test_hard_voting_preserves_predict_only_member_semantics(self):
+        clf = AnnotatorEnsembleClassifier(
+            [("perceptron", SklearnClassifier(Perceptron(random_state=0)))],
+            random_state=0,
+        ).fit(self.X, self.y[:, :1])
+        expected = clf.estimators_[0][1].predict(self.X)
+        np.testing.assert_array_equal(
+            clf.predict_proba(self.X), np.eye(len(clf.classes_))[expected]
+        )
 
     def test_predict(self):
         pwc = ParzenWindowClassifier(random_state=0)

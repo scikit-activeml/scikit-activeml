@@ -1,6 +1,7 @@
 import unittest
 from copy import deepcopy
 from itertools import product
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.naive_bayes import GaussianNB
@@ -8,6 +9,7 @@ from sklearn.svm import SVC
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
@@ -80,6 +82,31 @@ class TemplateTestExpectedErrorReduction(
 
     def test_fitted_multilabel_classifier_rejected_before_state(self):
         self._test_fitted_multilabel_classifier_rejection()
+
+    def test_multiannotator_classifier_rejected_before_fit_and_state(self):
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(self.X, np.asarray(self.y)[:, None])
+        clf_before = deepcopy(clf)
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for fit_clf in [False, True]:
+                with self.subTest(fit_clf=fit_clf):
+                    qs = self.qs_class(random_state=0)
+                    with self.assertRaisesRegex(
+                        ValueError, "does not support target capability"
+                    ):
+                        qs.query(self.X, self.y, clf=clf, fit_clf=fit_clf)
+                    assert_no_query_state(self, qs)
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
 
     def test_init_param_cost_matrix(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

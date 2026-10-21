@@ -5,10 +5,15 @@ from unittest.mock import PropertyMock, patch
 
 import numpy as np
 from sklearn import clone
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.exceptions import DataConversionWarning, NotFittedError
 
 from skactiveml.base import SkactivemlClassifier
-from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SklearnClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.classifier.multiannotator import (
     AnnotatorEnsembleClassifier,
     AnnotatorLogisticRegression,
@@ -16,6 +21,7 @@ from skactiveml.classifier.multiannotator import (
 from skactiveml.pool import (
     Badge,
     BatchBALD,
+    DropQuery,
     Falcun,
     GreedyBALD,
     ParallelUtilityEstimationWrapper,
@@ -121,6 +127,42 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                 self.X, self.y[:, None], self.multi_clf, fit_clf=False
             )
         np.testing.assert_array_equal(actual, expected)
+
+    def test_hard_voting_queries_preserve_fitted_classifier_state(self):
+        X = np.random.RandomState(0).normal(size=(20, 2))
+        X[:2] = 0
+        y = np.full(len(X), -1)
+        y[:2] = [0, 1]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[
+                (
+                    str(i),
+                    ParzenWindowClassifier(missing_label=-1, random_state=i),
+                )
+                for i in range(2)
+            ],
+            classes=[0, 1],
+            missing_label=-1,
+            random_state=0,
+        ).fit(X, np.column_stack([y, y]))
+        original_state = deepcopy(clf)
+        for strategy_cls in (UncertaintySampling, DropQuery):
+            with self.subTest(strategy=strategy_cls.__name__):
+                results = [
+                    strategy_cls(missing_label=-1, random_state=0).query(
+                        X,
+                        y,
+                        clf=clf,
+                        fit_clf=False,
+                        batch_size=3,
+                        return_utilities=True,
+                    )
+                    for _ in range(3)
+                ]
+                for actual in results[1:]:
+                    np.testing.assert_array_equal(actual[0], results[0][0])
+                    np.testing.assert_allclose(actual[1], results[0][1])
+                assert_state_unchanged(self, clf, original_state)
 
     def test_wrapper_prediction_equivalence(self):
         strategy = UncertaintySampling(missing_label=-1, random_state=0)
@@ -231,6 +273,116 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                 strategy.query(self.X, self.y, self.multi_clf, fit_clf=False)
             assert_no_query_state(self, strategy)
 
+    def test_committee_refitting_rejected_before_any_fit(self):
+        annotator_ensemble = AnnotatorEnsembleClassifier(
+            estimators=[("pwc", ParzenWindowClassifier(missing_label=-1))],
+            classes=[0, 1, 2],
+            missing_label=-1,
+            random_state=0,
+        ).fit(self.X, self.y[:, None])
+        annotator_clf = AnnotatorLogisticRegression(
+            classes=[0, 1, 2], missing_label=-1, random_state=0
+        ).fit(self.X, self.y_matrix)
+        ensembles = {
+            "annotator ensemble": annotator_ensemble,
+            "multiannotator members": [annotator_clf, annotator_clf],
+            "multiannotator first": [self.multi_clf, self.single_clf],
+            "multiannotator last": [self.single_clf, self.multi_clf],
+            "tuple members": (self.single_clf, self.multi_clf),
+        }
+        strategies = [QueryByCommittee, BatchBALD, GreedyBALD]
+        for strategy_cls, fitted, column_y, (name, ensemble) in product(
+            strategies, (False, True), (False, True), ensembles.items()
+        ):
+            with self.subTest(
+                strategy=strategy_cls.__name__,
+                fitted=fitted,
+                column_y=column_y,
+                ensemble=name,
+            ):
+                ensemble = deepcopy(ensemble) if fitted else clone(ensemble)
+                original_state = deepcopy(ensemble)
+                strategy = strategy_cls(missing_label=-1, random_state=0)
+                with (
+                    patch.object(
+                        _PredictionClassifier,
+                        "fit",
+                        side_effect=AssertionError("refit"),
+                    ),
+                    patch.object(
+                        AnnotatorEnsembleClassifier,
+                        "fit",
+                        side_effect=AssertionError("refit"),
+                    ),
+                    patch.object(
+                        AnnotatorLogisticRegression,
+                        "fit",
+                        side_effect=AssertionError("refit"),
+                    ),
+                    self.assertRaisesRegex(ValueError, "does not support"),
+                ):
+                    strategy.query(
+                        self.X,
+                        self.y[:, None] if column_y else self.y,
+                        ensemble,
+                        fit_ensemble=True,
+                    )
+                assert_no_query_state(self, strategy)
+                if isinstance(ensemble, (list, tuple)):
+                    for member, original in zip(ensemble, original_state):
+                        assert_state_unchanged(self, member, original)
+                else:
+                    assert_state_unchanged(self, ensemble, original_state)
+
+    def test_committee_refitting_preserves_nested_class_declarations(self):
+        y = np.full_like(self.y, -1)
+        members = [
+            SlidingWindowClassifier(
+                ParzenWindowClassifier(
+                    classes=[0, 1, 2], missing_label=-1, random_state=i
+                ),
+                missing_label=-1,
+                random_state=i,
+            )
+            for i in range(2)
+        ]
+        forest = SlidingWindowClassifier(
+            SklearnClassifier(
+                RandomForestClassifier(n_estimators=2, random_state=0),
+                classes=[0, 1, 2],
+                missing_label=-1,
+                random_state=0,
+            ),
+            missing_label=-1,
+            random_state=0,
+        )
+        for strategy_cls, ensemble in product(
+            (QueryByCommittee, BatchBALD, GreedyBALD), (members, forest)
+        ):
+            with self.subTest(
+                strategy=strategy_cls.__name__, ensemble=ensemble
+            ):
+                fitted_ensemble = (
+                    [clone(member).fit(self.X, y) for member in ensemble]
+                    if isinstance(ensemble, list)
+                    else clone(ensemble).fit(self.X, y)
+                )
+                results = [
+                    strategy_cls(missing_label=-1, random_state=0).query(
+                        self.X,
+                        y,
+                        supplied_ensemble,
+                        fit_ensemble=fit_ensemble,
+                        return_utilities=True,
+                    )
+                    for supplied_ensemble, fit_ensemble in (
+                        (ensemble, True),
+                        (fitted_ensemble, False),
+                    )
+                ]
+                np.testing.assert_array_equal(results[0][0], results[1][0])
+                np.testing.assert_allclose(results[0][1], results[1][1])
+
     def test_mixed_fitted_authorities_share_prediction_target(self):
         strategy = SubSamplingWrapper(
             QueryByCommittee(missing_label=-1, random_state=0),
@@ -333,8 +485,15 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
             BatchBALD(missing_label=-1, random_state=0),
             GreedyBALD(missing_label=-1, random_state=0),
         ]
-        for strategy in strategies:
-            with self.subTest(strategy=strategy):
+        for strategy, pair_type in product(strategies, (tuple, list)):
+            with self.subTest(strategy=strategy, pair_type=pair_type):
+                named_ensemble = (
+                    clone(clf)
+                    .set_params(
+                        estimators=[pair_type(pair) for pair in clf.estimators]
+                    )
+                    .fit(self.X, y_matrix)
+                )
                 results = [
                     clone(strategy).query(
                         self.X,
@@ -343,7 +502,7 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                         fit_ensemble=False,
                         return_utilities=True,
                     )
-                    for ensemble in (members, clf)
+                    for ensemble in (members, named_ensemble)
                 ]
                 np.testing.assert_array_equal(results[0][0], results[1][0])
                 np.testing.assert_allclose(results[0][1], results[1][1])

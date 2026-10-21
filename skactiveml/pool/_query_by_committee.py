@@ -24,6 +24,7 @@ from ..utils import (
     check_scalar,
 )
 from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
+from ..utils._target import _check_target_capability
 from ._target import _resolve_estimator_target_spec
 
 
@@ -489,6 +490,7 @@ def _check_ensemble(
             check_equal_missing_label(ensemble.missing_label, missing_label)
             # Fit the ensemble.
             if fit_ensemble:
+                _check_committee_training_capability(ensemble)
                 if sample_weight is None:
                     ensemble = clone(ensemble).fit(X, y)
                 else:
@@ -529,10 +531,12 @@ def _check_ensemble(
                 # Named members, e.g., of `AnnotatorEnsembleClassifier`, are
                 # unpacked to their fitted estimators.
                 est_arr = [
-                    est[1] if isinstance(est, tuple) else est
+                    est[1] if isinstance(est, (tuple, list)) else est
                     for est in ensemble.estimators_
                 ]
                 if not fit_ensemble:
+                    # Predicting votes can advance a member's random state;
+                    # isolate fitted members to preserve the caller's state.
                     est_arr = copy.deepcopy(est_arr)
                 for i, est in enumerate(est_arr):
                     check_is_fitted(
@@ -567,13 +571,16 @@ def _check_ensemble(
                     "is array-like."
                 )
             est_arr = copy.deepcopy(list(ensemble))
+            # Check every member before fitting any of them. Training requires
+            # single-annotator capabilities even when a previous fit provides
+            # compatible predictions.
+            for i, est in enumerate(est_arr):
+                check_type(est, f"ensemble[{i}]", estimator_type)
+                check_equal_missing_label(est.missing_label, missing_label)
+                if fit_ensemble:
+                    _check_committee_training_capability(est)
+
             for i in range(len(est_arr)):
-                check_type(
-                    est_arr[i], f"ensemble[{i}]", estimator_type
-                )  # better error message
-                check_equal_missing_label(
-                    est_arr[i].missing_label, missing_label
-                )
                 # Fit the ensemble.
                 if fit_ensemble:
                     if sample_weight is None:
@@ -596,3 +603,17 @@ def _check_ensemble(
             return ensemble, est_arr, cls, None, None
 
     raise TypeError(error_msg)
+
+
+def _check_committee_training_capability(estimator):
+    """Require compatibility with the single-output labels used in queries."""
+    task = (
+        "classification"
+        if isinstance(estimator, SkactivemlClassifier)
+        else "regression"
+    )
+    _check_target_capability(
+        type(estimator).__name__,
+        (task, "single-output", "single-annotator"),
+        estimator._target_capabilities,
+    )

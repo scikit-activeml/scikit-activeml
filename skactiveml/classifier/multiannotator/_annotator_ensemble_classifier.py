@@ -2,7 +2,7 @@
 Classifier Ensemble for Multiple Annotators
 """
 
-from copy import deepcopy
+from copy import copy, deepcopy
 
 import numpy as np
 from sklearn.base import MetaEstimatorMixin
@@ -36,6 +36,8 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
         Else if 'soft', predicts the class label based on the argmax of
         the sums of the predicted probabilities, which is recommended for
         an ensemble of well-calibrated classifiers.
+        Ties in hard-voting member predictions use copies of the members'
+        random states, leaving their fitted random states unchanged.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -195,7 +197,10 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             return np.ones((len(X), len(self.classes_))) / len(self.classes_)
         elif self.voting == "hard":
             y_pred = np.array(
-                [est.predict(X) for _, est in self.estimators_]
+                [
+                    _copy_prediction_random_state(est).predict(X)
+                    for _, est in self.estimators_
+                ]
             ).T
             V = compute_vote_vectors(
                 y=y_pred,
@@ -270,3 +275,16 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
                 )
             ):
                 raise ValueError(error_msg)
+
+
+def _copy_prediction_random_state(estimator):
+    """Isolate tie-breaking RNGs while sharing the fitted model data."""
+    estimator = copy(estimator)
+    if hasattr(estimator, "random_state_"):
+        estimator.random_state_ = deepcopy(estimator.random_state_)
+    # Wrappers such as SlidingWindowClassifier delegate predict to estimator_.
+    # Copy those wrappers too, since changing only their own RNG has no effect.
+    wrapped_estimator = vars(estimator).get("estimator_")
+    if isinstance(wrapped_estimator, SkactivemlClassifier):
+        estimator.estimator_ = _copy_prediction_random_state(wrapped_estimator)
+    return estimator
