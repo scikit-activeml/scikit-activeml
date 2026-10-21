@@ -10,20 +10,16 @@ from sklearn.utils import (
 )
 from sklearn.metrics.pairwise import pairwise_distances
 
-from skactiveml.base import (
-    BudgetManager,
-    SingleAnnotatorStreamQueryStrategy,
-)
+from skactiveml.base import SingleAnnotatorStreamQueryStrategy
 from skactiveml.utils import (
     check_type,
     call_func,
-    check_budget_manager,
 )
 from skactiveml.utils._validation import _validate_budget_update
 from skactiveml.stream._target import _fit_and_resolve_clf_target_spec
 from skactiveml.stream._validation import (
-    _sync_default_budget_manager,
     _validate_X_y_sample_weight,
+    _validate_budget_manager,
 )
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
@@ -294,23 +290,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         queried = _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                {"random_state": random_seed},
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(self, self._get_default_budget_manager())
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -448,22 +428,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             **check_candidates_params,
         )
 
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                {"random_state": random_seed},
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(self, self._get_default_budget_manager())
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -756,27 +721,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             candidates, queried_indices, budget_manager_param_dict
         )
         self._validate_force_full_budget()
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            default_budget_manager_kwargs = (
-                self._get_default_budget_manager_kwargs()
-            )
-            default_budget_manager_kwargs["random_state"] = random_seed
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                default_budget_manager_kwargs,
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(
+            self,
+            self._get_default_budget_manager(),
+            self._get_default_budget_manager_kwargs(),
+        )
         # _init_members
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -961,26 +910,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         self._validate_force_full_budget()
 
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            default_budget_manager_kwargs = (
-                self._get_default_budget_manager_kwargs()
-            )
-            default_budget_manager_kwargs["random_state"] = random_seed
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                default_budget_manager_kwargs,
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(
+            self,
+            self._get_default_budget_manager(),
+            self._get_default_budget_manager_kwargs(),
+        )
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances

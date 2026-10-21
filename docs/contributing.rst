@@ -506,7 +506,7 @@ optional attributes need to be implemented. Use ``self._validate_data`` method
 a strategy using a classifier, call ``_validate_X_y_sample_weight`` from
 ``skactiveml/stream/_validation.py`` and then
 ``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``
-before ``super()._validate_data`` and before creating ``budget_manager_``, so
+before ``super()._validate_data`` and before ``_validate_budget_manager``, so
 that invalid inputs fail before any query state is set. The latter returns the
 classifier to use, i.e., a fitted clone if ``fit_clf`` is ``True``, with the
 resolved target specification.
@@ -648,10 +648,9 @@ strategy needs to be adapted accordingly:
 -  If both are given and the budget differs from
    ``budget_manager.budget`` warn and use the ``budget_manager`` as is
 
-Create ``budget_manager_`` only if it does not exist yet, but call
-``_sync_default_budget_manager`` from ``skactiveml/stream/_validation.py`` in
-every ``_validate_data`` and ``update`` call, so that a default
-``budget_manager_`` follows changes of ``budget``.
+Call ``_validate_budget_manager`` from ``skactiveml/stream/_validation.py`` in
+every ``_validate_data`` and ``update`` call. It creates ``budget_manager_`` on
+first use and applies changes of ``budget`` to a default ``budget_manager_``.
 
 .. _testing-3:
 

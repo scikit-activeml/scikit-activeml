@@ -4,20 +4,15 @@ from sklearn.utils import check_array, check_consistent_length
 from ..classifier import ParzenWindowClassifier
 from ._target import _fit_and_resolve_clf_target_spec
 from ._validation import (
-    _sync_default_budget_manager,
     _validate_X_y_sample_weight,
+    _validate_budget_manager,
 )
 from .budgetmanager import BalancedIncrementalQuantileFilter
-from ..base import (
-    SingleAnnotatorStreamQueryStrategy,
-    BudgetManager,
-)
+from ..base import SingleAnnotatorStreamQueryStrategy
 from ..pool import cost_reduction
 from ..utils import (
-    check_type,
     check_scalar,
     call_func,
-    check_budget_manager,
 )
 from ..utils._validation import _validate_budget_update
 
@@ -231,20 +226,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
-        # check if a budgetmanager is set
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                BalancedIncrementalQuantileFilter,
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(
+            self, BalancedIncrementalQuantileFilter, seeded=False
+        )
         budget_manager_param_dict = (
             {}
             if budget_manager_param_dict is None
@@ -336,21 +320,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             reset=reset,
             **check_candidates_params,
         )
-        # check if a budgetmanager is set
-
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                BalancedIncrementalQuantileFilter,
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(
+            self, BalancedIncrementalQuantileFilter, seeded=False
+        )
 
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates

@@ -1,11 +1,10 @@
 import numpy as np
 from sklearn.utils import check_array
-from copy import deepcopy
 
 from ._target import _fit_and_resolve_clf_target_spec
 from ._validation import (
-    _sync_default_budget_manager,
     _validate_X_y_sample_weight,
+    _validate_budget_manager,
 )
 from .budgetmanager import (
     FixedUncertaintyBudgetManager,
@@ -13,15 +12,8 @@ from .budgetmanager import (
     SplitBudgetManager,
     RandomVariableUncertaintyBudgetManager,
 )
-from ..base import (
-    BudgetManager,
-    SingleAnnotatorStreamQueryStrategy,
-)
-from ..utils import (
-    check_type,
-    call_func,
-    check_budget_manager,
-)
+from ..base import SingleAnnotatorStreamQueryStrategy
+from ..utils import call_func
 from ..utils._validation import _validate_budget_update
 
 
@@ -181,27 +173,11 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         _validate_budget_update(
             candidates, queried_indices, budget_manager_param_dict
         )
-        # check if a budgetmanager is set
-        if not hasattr(self, "budget_manager_"):
-            self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            default_budget_manager_kwargs = (
-                self._get_default_budget_manager_kwargs()
-            )
-            default_budget_manager_kwargs["random_state"] = random_seed
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                default_budget_manager_kwargs,
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(
+            self,
+            self._get_default_budget_manager(),
+            self._get_default_budget_manager_kwargs(),
+        )
 
         budget_manager_param_dict = (
             {}
@@ -289,26 +265,11 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         )
         self._validate_random_state()
 
-        # check if a budgetmanager is set
-        if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            default_budget_manager_kwargs = (
-                self._get_default_budget_manager_kwargs()
-            )
-            default_budget_manager_kwargs["random_state"] = random_seed
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                default_budget_manager_kwargs,
-            )
-        _sync_default_budget_manager(self)
+        _validate_budget_manager(
+            self,
+            self._get_default_budget_manager(),
+            self._get_default_budget_manager_kwargs(),
+        )
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
 

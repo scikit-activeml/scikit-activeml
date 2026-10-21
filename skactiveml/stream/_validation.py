@@ -1,8 +1,12 @@
 """Shared validation and budget-manager helpers for stream query strategies."""
 
+from copy import deepcopy
+
 import numpy as np
 from sklearn.utils import check_array, check_consistent_length
 
+from ..base import BudgetManager
+from ..utils import check_budget_manager, check_type
 from ..utils._label_dtype import _as_label_array
 
 
@@ -38,16 +42,46 @@ def _validate_X_y_sample_weight(X, y, sample_weight):
     return X, y, sample_weight
 
 
-def _sync_default_budget_manager(strategy):
-    """Apply `budget` to `budget_manager_` if it is the default one.
+def _validate_budget_manager(
+    strategy, default_budget_manager_class, default_kwargs=None, *, seeded=True
+):
+    """Create `budget_manager_` once and apply `budget` to a default one.
 
-    Its other parameters keep the values it was created with.
+    A default budget manager keeps the other parameters it was created with.
 
     Parameters
     ----------
     strategy : skactiveml.base.SingleAnnotatorStreamQueryStrategy
         The query strategy owning `budget_manager_`.
+    default_budget_manager_class : type
+        The budget manager class used if `strategy.budget_manager` is `None`.
+    default_kwargs : dict or None, default=None
+        Parameters of the default budget manager.
+    seeded : bool, default=True
+        Whether to validate the strategy's `random_state_` and pass a seed
+        drawn from a copy of it to the default budget manager, if its class
+        accepts `random_state`.
     """
+    if not hasattr(strategy, "budget_manager_"):
+        if seeded:
+            strategy._validate_random_state()
+            random_seed = deepcopy(strategy.random_state_).randint(2**31 - 1)
+            default_kwargs = {
+                **(default_kwargs or {}),
+                "random_state": random_seed,
+            }
+        check_type(
+            strategy.budget_manager,
+            "budget_manager_",
+            BudgetManager,
+            type(None),
+        )
+        strategy.budget_manager_ = check_budget_manager(
+            strategy.budget,
+            strategy.budget_manager,
+            default_budget_manager_class,
+            default_kwargs,
+        )
     if strategy.budget_manager is None:
         strategy._validate_budget()
         if strategy.budget_manager_.budget != strategy.budget:
