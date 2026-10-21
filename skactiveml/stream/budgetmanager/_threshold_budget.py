@@ -1,10 +1,12 @@
 import numpy as np
-from copy import deepcopy
 
 from skactiveml.base import BudgetManager
 
-from skactiveml.utils import check_scalar, check_random_state
-from skactiveml.utils._validation import _validate_budget_update
+from skactiveml.utils import check_scalar
+from skactiveml.utils._validation import (
+    _ensure_random_state,
+    _validate_budget_update,
+)
 
 
 class DensityBasedSplitBudgetManager(BudgetManager):
@@ -173,7 +175,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
             self.u_ = 0
         if not hasattr(self, "t_"):
             self.t_ = 0
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
 
@@ -183,12 +185,3 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)

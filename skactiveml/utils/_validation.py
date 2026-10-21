@@ -949,6 +949,19 @@ def check_random_state(random_state, seed_multiplier=None):
     return np.random.RandomState(seed)
 
 
+def _ensure_random_state(estimator):
+    """Copy `random_state` to `random_state_` once, then validate it.
+
+    Parameters
+    ----------
+    estimator : object
+        An object with the attribute `random_state`.
+    """
+    if not hasattr(estimator, "random_state_"):
+        estimator.random_state_ = copy.deepcopy(estimator.random_state)
+    estimator.random_state_ = check_random_state(estimator.random_state_)
+
+
 def check_indices(indices, A, dim="adaptive", unique=True):
     """Check if indices fit to array.
 

@@ -30,6 +30,7 @@ from .utils._target import (
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
+from .utils._validation import _ensure_random_state
 from .utils import (
     MISSING_LABEL,
     is_labeled,
@@ -1383,9 +1384,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         np.random_state. If not create a new random state. See also
         :func:`~sklearn.utils.check_random_state`
         """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
+        _ensure_random_state(self)
 
     def _validate_budget(self):
         """Validate `budget` and store it as `budget_`, which is

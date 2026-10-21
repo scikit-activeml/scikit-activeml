@@ -1,12 +1,13 @@
-from copy import deepcopy
-
 import numpy as np
 
 from ...base import BudgetManager
-from ...utils import check_random_state, check_scalar
+from ...utils import check_scalar
 from skactiveml.utils import check_classes
 from skactiveml.utils._target import _check_class_vocabulary_structure
-from skactiveml.utils._validation import _validate_budget_update
+from skactiveml.utils._validation import (
+    _ensure_random_state,
+    _validate_budget_update,
+)
 
 
 class EstimatedBudgetZliobaite(BudgetManager):
@@ -537,7 +538,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         check_scalar(
             self.delta, "delta", float, min_val=0, min_inclusive=False
         )
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
 
@@ -547,15 +548,6 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
 
 
 class SplitBudgetManager(EstimatedBudgetZliobaite):
@@ -734,7 +726,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
             max_val=1,
         )
         # Check random_state
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
 
@@ -744,15 +736,6 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
 
 
 class RandomBudgetManager(EstimatedBudgetZliobaite):
@@ -865,15 +848,6 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         """
         utilities = super()._validate_data(utilities)
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
