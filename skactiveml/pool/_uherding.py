@@ -222,9 +222,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight` before evaluating the acquisition function.
             Independent of this flag, temporary cloned classifiers may still be
-            fitted internally to select the temperature parameter. A fitted
-            multi-annotator classifier requires `fit_clf=False` and a fixed
-            scalar or length-one `temperatures`, which skips calibration.
+            fitted internally to select the temperature parameter.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
             Weights of training samples in `X`. For two-dimensional `y`, one

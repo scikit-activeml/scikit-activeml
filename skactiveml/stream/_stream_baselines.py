@@ -232,8 +232,8 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     that period is determined by the `budget`. For instance, a `budget` of 0.25
     would result in querying every fourth sample. The main idea behind this
     query strategy is to exhaust a given budget as soon as it is available.
-    samples are queried regardless of their position in the feature space and
-    disregards any information about the sample. Thus, it should only be used
+    Samples are queried regardless of their position in the feature space and
+    without using information about the sample. Thus, it should only be used
     as a baseline strategy. Neither labels nor a model are consumed, so the
     strategy is task-agnostic and supports single-output and multi-label
     classification as well as regression.

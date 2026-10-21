@@ -475,8 +475,8 @@ def _check_ensemble(
     sample_predictions_dict=None,
 ):
     error_msg = (
-        f"`ensemble` must either be a `{estimator_types} "
-        f"with the attribute `n_ensembles` or `estimators_` or an array-like "
+        f"`ensemble` must either be a `{estimator_types}` "
+        f"with the attribute `n_estimators` or `estimators_` or an array-like "
         f"of {estimator_types} objects or implement a method with the name "
         f"`{sample_predictions_method_name}`."
     )

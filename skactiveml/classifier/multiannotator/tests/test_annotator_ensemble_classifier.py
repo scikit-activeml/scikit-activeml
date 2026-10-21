@@ -269,7 +269,6 @@ class TestAnnotatorEnsembleClassifier(
                 ).fit(X, y)
                 member_state = pickle.dumps(clf.estimators_)
                 expected = deepcopy(clf.estimators_[0][1]).predict(X)
-                # Ties still select both classes; they are not rounded to one.
                 np.testing.assert_array_equal(np.unique(expected), [0, 1])
                 expected = np.eye(2)[expected]
                 for _ in range(2):

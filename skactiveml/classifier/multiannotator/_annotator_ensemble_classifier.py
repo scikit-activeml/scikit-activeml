@@ -36,8 +36,6 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
         Else if 'soft', predicts the class label based on the argmax of
         the sums of the predicted probabilities, which is recommended for
         an ensemble of well-calibrated classifiers.
-        Ties in hard-voting member predictions use copies of the members'
-        random states, leaving their fitted random states unchanged.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.

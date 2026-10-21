@@ -106,9 +106,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             Model implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`. Independent of this flag, EER refits the
-            classifier on hypothetical single-annotator labels, so classifiers
-            requiring multi-annotator training labels are not supported.
+            `sample_weight`.
         ignore_partial_fit : bool, default=True
             Relevant in cases where `clf` implements `partial_fit`. If `True`,
             the `partial_fit` function is ignored and `fit` is used instead.

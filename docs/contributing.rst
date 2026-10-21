@@ -686,14 +686,14 @@ All query strategies are stored in
 
 The class must implement the following methods:
 
-+------------+----------------------------------------------------------------+
-| Method     | Description                                                    |
-+============+================================================================+
++--------------+--------------------------------------------------------------+
+| Method       | Description                                                  |
++==============+==============================================================+
 | ``__init__`` | Method for initialization.                                   |
-+------------+----------------------------------------------------------------+
-| ``query``  | Select the annotator-sample pairs to decide which sample's     |
-|            | class label is to be queried from which annotator.             |
-+------------+----------------------------------------------------------------+
++--------------+--------------------------------------------------------------+
+| ``query``    | Select the annotator-sample pairs to decide which sample's   |
+|              | class label is to be queried from which annotator.           |
++--------------+--------------------------------------------------------------+
 
 .. _query-method-3:
 
