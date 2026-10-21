@@ -572,6 +572,18 @@ def _predicted_target_spec(target_spec):
     )
 
 
+def _check_target_matches_spec(y, target_spec, *, missing_label):
+    """Raise when `y` does not match a resolved target specification."""
+    resolve_target_spec(
+        y,
+        task=target_spec.task,
+        target_type=target_spec.target_type,
+        annotation_type=target_spec.annotation_type,
+        classes=target_spec.classes,
+        missing_label=missing_label,
+    )
+
+
 def _check_target_spec_capability(component, target_spec, capabilities):
     """Raise when a component does not declare an exact target capability."""
     capability = (

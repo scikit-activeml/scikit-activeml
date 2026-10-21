@@ -420,6 +420,23 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return _TARGET_AUTHORITY_QUERY_PARAMS
 
     def _resolve_query_target_type(self, y):
+        """Resolve the target type of `y` from the strategy's declarations.
+
+        The result is checked against `_target_capabilities`. Strategies that
+        do not resolve `y` through an estimator use it, and `_validate_data`
+        calls it if no `target_type` is passed.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+
+        Returns
+        -------
+        target_type : str
+            The resolved target type.
+        """
         tasks = {capability[0] for capability in self._target_capabilities}
         if len(tasks) == 1:
             task = next(iter(tasks))

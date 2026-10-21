@@ -8,7 +8,9 @@ orchestration of wrapper target reconciliation is therefore owned by each
 wrapper, i.e., by `skactiveml.pool._wrapper._TargetPreservingWrapper` and by
 `skactiveml.pool.multiannotator._wrapper.SingleAnnotatorWrapper`. Each collects
 its own declarations and authorities and then delegates the wrapper-agnostic
-resolution, comparison, and capability checks to this module.
+resolution, comparison, and capability checks to this module. The check of `y`
+against a fitted estimator, `_check_target_matches_spec` in
+`skactiveml.utils._target`, is shared with `skactiveml.stream._target`.
 """
 
 from sklearn import clone
@@ -21,6 +23,7 @@ from ..utils import (
 )
 from ..utils._label import _check_labels
 from ..utils._target import (
+    _check_target_matches_spec,
     _class_vocabulary_key,
     _predicted_target_spec,
     _resolve_task_agnostic_target_type,
@@ -61,13 +64,8 @@ def _resolve_estimator_target_spec(
     if hasattr(estimator, "target_spec_"):
         estimator_target_spec = estimator.target_spec_
         target_spec = _predicted_target_spec(estimator_target_spec)
-        resolve_target_spec(
-            y,
-            task=target_spec.task,
-            target_type=target_spec.target_type,
-            annotation_type=target_spec.annotation_type,
-            classes=target_spec.classes,
-            missing_label=strategy.missing_label,
+        _check_target_matches_spec(
+            y, target_spec, missing_label=strategy.missing_label
         )
     else:
         estimator_target_type = getattr(estimator, "target_type", "auto")
@@ -253,14 +251,7 @@ def _reconcile_target_declarations(
                 "Supplied fitted estimators have conflicting target "
                 "specifications."
             )
-        resolve_target_spec(
-            y,
-            task=target_spec.task,
-            target_type=target_spec.target_type,
-            annotation_type=target_spec.annotation_type,
-            classes=target_spec.classes,
-            missing_label=missing_label,
-        )
+        _check_target_matches_spec(y, target_spec, missing_label=missing_label)
         target_type = target_spec.target_type
     else:
         declared_target_type = _resolve_declared_target_type(

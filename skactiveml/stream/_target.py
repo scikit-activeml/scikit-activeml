@@ -2,7 +2,9 @@
 
 A stream query strategy does not resolve its labels `y` itself. The classifier
 passed to `query` is the target authority, and these helpers resolve its
-target specification for the strategy.
+target specification for the strategy. The check of `y` against a fitted
+classifier, `_check_target_matches_spec` in `skactiveml.utils._target`, is
+shared with `skactiveml.pool._target`.
 """
 
 import numpy as np
@@ -12,6 +14,7 @@ from ..base import SkactivemlClassifier
 from ..utils import check_type, resolve_target_spec
 from ..utils._target import (
     _check_target_capability,
+    _check_target_matches_spec,
     _check_target_spec_capability,
     _predicted_target_spec,
 )
@@ -63,13 +66,12 @@ def _resolve_clf_target_spec(strategy, clf, y):
     Raises
     ------
     ValueError
-        If the target specification is outside the strategy's
-        `_target_capabilities`, if `y` does not match a fitted `clf`, or if
-        an unfitted `clf` declares no `classes` and `y` provides no class
-        evidence.
+        If `clf` or the strategy does not support the target specification,
+        if `y` does not match a fitted `clf`, or if an unfitted `clf` declares
+        no `classes` and `y` provides no class evidence.
     """
-    target_spec = getattr(clf, "target_spec_", None)
-    if target_spec is None:
+    clf_target_spec = getattr(clf, "target_spec_", None)
+    if clf_target_spec is None:
         classes = clf.classes
         if y is None:
             # Only the declared vocabulary is evidence. Its nesting
@@ -91,17 +93,16 @@ def _resolve_clf_target_spec(strategy, clf, y):
             classes=classes,
             missing_label=clf.missing_label,
         )
+        clf_target_spec = target_spec
     else:
-        target_spec = _predicted_target_spec(target_spec)
+        target_spec = _predicted_target_spec(clf_target_spec)
         if y is not None:
-            resolve_target_spec(
-                y,
-                task=target_spec.task,
-                target_type=target_spec.target_type,
-                annotation_type=target_spec.annotation_type,
-                classes=target_spec.classes,
-                missing_label=clf.missing_label,
+            _check_target_matches_spec(
+                y, target_spec, missing_label=clf.missing_label
             )
+    _check_target_spec_capability(
+        type(clf).__name__, clf_target_spec, clf._target_capabilities
+    )
     _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )
