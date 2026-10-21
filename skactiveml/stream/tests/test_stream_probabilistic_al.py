@@ -2,9 +2,11 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
+from sklearn.base import clone
 from sklearn.naive_bayes import GaussianNB
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.stream import StreamProbabilisticAL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorStreamQueryStrategy,
@@ -150,6 +152,31 @@ class TestStreamProbabilisticAL(
 
         self.assertEqual(qs.budget_manager_.observed_samples_, 200)
         self.assertEqual(qs.budget_manager_.queried_samples_, 20)
+
+    def test_query_accepts_fitted_multiannotator_classifier(self):
+        X = self.query_default_params_clf["X"]
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        pwc = ParzenWindowClassifier(classes=self.classes)
+        multi_clf = AnnotatorEnsembleClassifier(
+            estimators=[("pwc_0", clone(pwc)), ("pwc_1", clone(pwc))],
+            voting="soft",
+            classes=self.classes,
+        ).fit(X, np.column_stack([y, y]))
+        self._assert_query_rejects_clf(multi_clf, y, TypeError, "predict_freq")
+
+        results = [
+            StreamProbabilisticAL(metric="rbf", random_state=0).query(
+                candidates=X,
+                clf=clf,
+                X=X,
+                y=y,
+                fit_clf=False,
+                return_utilities=True,
+            )
+            for clf in (clone(pwc).fit(X, y), multi_clf)
+        ]
+        np.testing.assert_array_equal(results[0][0], results[1][0])
+        np.testing.assert_allclose(results[0][1], results[1][1])
 
     def test_query_param_utility_weight(self):
         test_cases = []

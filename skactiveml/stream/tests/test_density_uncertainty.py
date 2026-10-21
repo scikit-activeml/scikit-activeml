@@ -824,12 +824,14 @@ class TestCognitiveDualQueryStrategyFixUn(
         ]
         self._test_param("init", "classes", test_cases)
         self._test_param("init", "classes", [([0, 1], None)])
+        y = ["0", "1", "none", "none"]
+        clf = ParzenWindowClassifier(classes=["0", "1"], missing_label="none")
         self._test_param(
             "init",
             "classes",
             [(["0", "1"], None)],
             {},
-            {"y": ["0", "1", "none", "none"]},
+            {"y": y, "clf": clf.fit(self.query_default_params_clf["X"], y)},
         )
 
 

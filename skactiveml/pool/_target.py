@@ -22,6 +22,7 @@ from ..utils import (
 from ..utils._label import _check_labels
 from ..utils._target import (
     _class_vocabulary_key,
+    _predicted_target_spec,
     _resolve_task_agnostic_target_type,
     _validate_target_semantics,
     _check_target_spec_capability,
@@ -58,7 +59,8 @@ def _resolve_estimator_target_spec(
     )
 
     if hasattr(estimator, "target_spec_"):
-        target_spec = estimator.target_spec_
+        estimator_target_spec = estimator.target_spec_
+        target_spec = _predicted_target_spec(estimator_target_spec)
         resolve_target_spec(
             y,
             task=target_spec.task,
@@ -96,10 +98,11 @@ def _resolve_estimator_target_spec(
             classes=classes,
             missing_label=strategy.missing_label,
         )
+        estimator_target_spec = target_spec
 
     _check_target_spec_capability(
         type(estimator).__name__,
-        target_spec,
+        estimator_target_spec,
         estimator._target_capabilities,
     )
 
@@ -237,7 +240,7 @@ def _reconcile_target_declarations(
     _check_declared_target_types(declarations)
 
     fitted_specs = [
-        authority.target_spec_
+        _predicted_target_spec(authority.target_spec_)
         for authority in authorities
         if hasattr(authority, "target_spec_")
     ]

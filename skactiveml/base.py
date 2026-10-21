@@ -27,6 +27,7 @@ from .utils._label_dtype import (
 from .utils._target import (
     _check_target_capability,
     _has_no_class_evidence,
+    _predicted_target_spec,
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
@@ -1297,6 +1298,29 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
             {("classification", "single-output", "single-annotator")}
         )
 
+    def _check_clf_fit_capability(self, clf):
+        """Check whether `clf` supports fitting on stream query targets.
+
+        Class vocabulary resolution remains the classifier's responsibility,
+        including wrappers that obtain classes from their inner estimator.
+
+        Parameters
+        ----------
+        clf : skactiveml.base.SkactivemlClassifier
+            The classifier that will be fitted during `query`.
+
+        Raises
+        ------
+        ValueError
+            If `clf` does not support single-output classification with
+            single-annotator targets.
+        """
+        _check_target_capability(
+            type(clf).__name__,
+            ("classification", "single-output", "single-annotator"),
+            clf._target_capabilities,
+        )
+
     def _resolve_clf_target_spec(self, clf, y):
         """Resolve the target specification `clf` is the authority for.
 
@@ -1317,8 +1341,8 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         ------
         ValueError
             If the target specification is outside `_target_capabilities`,
-            or if an unfitted `clf` declares no `classes` and `y` provides
-            no class evidence.
+            if `y` does not match a fitted `clf`, or if an unfitted `clf`
+            declares no `classes` and `y` provides no class evidence.
         """
         target_spec = getattr(clf, "target_spec_", None)
         if target_spec is None:
@@ -1343,6 +1367,17 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
                 classes=classes,
                 missing_label=clf.missing_label,
             )
+        else:
+            target_spec = _predicted_target_spec(target_spec)
+            if y is not None:
+                resolve_target_spec(
+                    y,
+                    task=target_spec.task,
+                    target_type=target_spec.target_type,
+                    annotation_type=target_spec.annotation_type,
+                    classes=target_spec.classes,
+                    missing_label=clf.missing_label,
+                )
         _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )

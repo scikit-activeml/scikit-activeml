@@ -548,6 +548,30 @@ def _resolve_multilabel(y, *, classes, missing_label):
     )
 
 
+def _predicted_target_spec(target_spec):
+    """Describe predictions independently of the training annotation type.
+
+    Parameters
+    ----------
+    target_spec : TargetSpec
+        The fitted estimator's resolved training target specification.
+
+    Returns
+    -------
+    prediction_spec : TargetSpec
+        The same task, target type, and class vocabulary with single-annotator
+        semantics.
+    """
+    if target_spec.annotation_type == "single-annotator":
+        return target_spec
+    return TargetSpec._from_normalized(
+        task=target_spec.task,
+        target_type=target_spec.target_type,
+        annotation_type="single-annotator",
+        classes=target_spec.classes,
+    )
+
+
 def _check_target_spec_capability(component, target_spec, capabilities):
     """Raise when a component does not declare an exact target capability."""
     capability = (

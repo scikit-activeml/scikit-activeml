@@ -20,13 +20,18 @@ from skactiveml.tests.utils import (
 )
 
 from skactiveml.exceptions import MappingError
-from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SklearnClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import (
     MISSING_LABEL,
     is_unlabeled,
     is_labeled,
     labeled_indices,
+    majority_vote,
     resolve_target_spec,
     unlabeled_indices,
     call_func,
@@ -1754,7 +1759,7 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
         cases = [
             (multi_output_y, multi_output_clf, "SklearnClassifier"),
             (
-                query_params["y"],
+                majority_vote(query_params["y"], random_state=0),
                 multiannotator_clf,
                 self.qs_class.__name__,
             ),
@@ -1852,27 +1857,140 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             rf"{self.qs_class.__name__} does not support target capability",
         )
 
-    def test_query_rejects_fitted_multiannotator_classifier(self):
+    def test_query_accepts_fitted_multiannotator_classifier(self):
         query_params = self._stream_clf_query_params()
         if query_params is None:
             return
         X = np.asarray(query_params["X"])
-        y = np.full((len(X), 2), MISSING_LABEL)
-        y[0], y[1] = [0, 0], [1, 1]
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0, 1
+        y_matrix = np.column_stack([y, y])
+        pwc = ParzenWindowClassifier(classes=[0, 1])
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("pwc_0", clone(pwc)), ("pwc_1", clone(pwc))],
+            voting="soft",
+            classes=[0, 1],
+        ).fit(X, y_matrix)
+        init_params = deepcopy(self.init_default_params)
+        init_params["random_state"] = 0
+        query_params.update(
+            X=X, candidates=X, fit_clf=False, return_utilities=True
+        )
+        cases = [(clone(pwc).fit(X, y), y), (clf, y), (clf, None)]
+        results = []
+        for case_clf, labels in cases:
+            query_params.update(clf=case_clf, y=labels)
+            results.append(
+                self.qs_class(**deepcopy(init_params)).query(**query_params)
+            )
+
+        for indices, utilities in results[1:]:
+            np.testing.assert_array_equal(indices, results[0][0])
+            np.testing.assert_allclose(utilities, results[0][1])
+
+    def test_query_rejects_multiannotator_label_matrix(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+        X = np.asarray(query_params["X"])
+        y_matrix = np.full((len(X), 2), MISSING_LABEL)
+        y_matrix[0], y_matrix[1] = [0, 0], [1, 1]
         clf = AnnotatorEnsembleClassifier(
             estimators=[
                 ("pwc_0", ParzenWindowClassifier(classes=[0, 1])),
                 ("pwc_1", ParzenWindowClassifier(classes=[0, 1])),
             ],
             classes=[0, 1],
-        ).fit(X, y)
-
-        self._assert_query_rejects_clf(
-            clf,
-            y,
-            ValueError,
-            rf"{self.qs_class.__name__} does not support target capability",
         )
+        query_params.update(X=X, y=y_matrix)
+        cases = [(clone(clf).fit(X, y_matrix), False), (clf, True)]
+        for case_clf, fit_clf in cases:
+            with self.subTest(fit_clf=fit_clf):
+                query_params.update(clf=case_clf, fit_clf=fit_clf)
+                strategy = self.qs_class(**deepcopy(self.init_default_params))
+                error = (
+                    "does not support target capability"
+                    if fit_clf
+                    else "one-dimensional or a column vector"
+                )
+                with self.assertRaisesRegex(ValueError, error):
+                    strategy.query(**query_params)
+                assert_no_query_state(
+                    self, strategy, attributes=STREAM_QUERY_STATE_ATTRIBUTES
+                )
+
+    def test_query_rejects_refitting_multiannotator_classifier(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+        X = np.asarray(query_params["X"])
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0, 1
+        fitted_clf = AnnotatorEnsembleClassifier(
+            estimators=[("pwc", ParzenWindowClassifier(classes=[0, 1]))],
+            classes=[0, 1],
+        ).fit(X, y[:, None])
+        query_params.update(X=X, fit_clf=True)
+        cases = product((fitted_clf, clone(fitted_clf)), (y, y[:, None]))
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("unsupported refit"),
+        ):
+            for clf, labels in cases:
+                with self.subTest(clf=clf, shape=labels.shape):
+                    original_state = deepcopy(clf)
+                    query_params.update(clf=clf, y=labels)
+                    strategy = self.qs_class(
+                        **deepcopy(self.init_default_params)
+                    )
+                    with self.assertRaisesRegex(
+                        ValueError,
+                        "AnnotatorEnsembleClassifier does not support target "
+                        "capability",
+                    ):
+                        strategy.query(**query_params)
+                    assert_no_query_state(
+                        self,
+                        strategy,
+                        attributes=STREAM_QUERY_STATE_ATTRIBUTES,
+                    )
+                    assert_state_unchanged(self, clf, original_state)
+
+    def test_query_refitting_respects_wrapped_class_vocabulary(self):
+        query_params = self._stream_clf_query_params()
+        if query_params is None:
+            return
+        X = np.asarray(query_params["X"])
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0, 1
+        unlabeled = np.full_like(y, MISSING_LABEL)
+        clf = SlidingWindowClassifier(
+            ParzenWindowClassifier(classes=[0, 1], random_state=0)
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params["random_state"] = 0
+        query_params.update(X=X, candidates=X, return_utilities=True)
+        cases = product(
+            (clf, clone(clf).fit(X, y)),
+            (y, y[:, None], unlabeled, unlabeled[:, None]),
+        )
+        for clf, labels in cases:
+            with self.subTest(clf=clf, labels=labels):
+                original_state = deepcopy(clf)
+                query_params.update(
+                    clf=clone(clf).fit(X, labels), y=labels, fit_clf=False
+                )
+                expected = self.qs_class(**deepcopy(init_params)).query(
+                    **query_params
+                )
+                query_params.update(clf=clf, fit_clf=True)
+                actual = self.qs_class(**deepcopy(init_params)).query(
+                    **query_params
+                )
+                np.testing.assert_array_equal(actual[0], expected[0])
+                np.testing.assert_allclose(actual[1], expected[1])
+                assert_state_unchanged(self, clf, original_state)
 
     def test_query_rejects_unfitted_multilabel_declaration(self):
         query_params = self._stream_clf_query_params()

@@ -526,7 +526,24 @@ def _check_ensemble(
             if sample_func is not None:
                 est_arr = None
             elif hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
+                # Named members, e.g., of `AnnotatorEnsembleClassifier`, are
+                # unpacked to their fitted estimators.
+                est_arr = [
+                    est[1] if isinstance(est, tuple) else est
+                    for est in ensemble.estimators_
+                ]
+                if not fit_ensemble:
+                    est_arr = copy.deepcopy(est_arr)
+                for i, est in enumerate(est_arr):
+                    check_is_fitted(
+                        est,
+                        msg=(
+                            f"The {i}-th member of `ensemble.estimators_` is "
+                            "not fitted. Committee queries require fitted "
+                            "members, even when the ensemble itself can "
+                            "predict."
+                        ),
+                    )
             elif hasattr(ensemble, "estimators"):
                 est_arr = [ensemble] * len(ensemble.estimators)
             elif hasattr(ensemble, "n_estimators"):

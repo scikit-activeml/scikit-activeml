@@ -428,10 +428,12 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         check_type(clf, "clf", SkactivemlClassifier)
         check_type(fit_clf, "fit_clf", bool)
         if fit_clf:
+            clf = clone(clf)
+            self._check_clf_fit_capability(clf)
             if sample_weight is None:
-                clf = clone(clf).fit(X, y)
+                clf = clf.fit(X, y)
             else:
-                clf = clone(clf).fit(X, y, sample_weight)
+                clf = clf.fit(X, y, sample_weight)
         self._resolve_clf_target_spec(clf, y)
         return clf
 

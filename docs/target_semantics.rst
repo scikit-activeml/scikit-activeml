@@ -41,10 +41,14 @@ expose the resolved ``target_spec_`` attribute.
 
 Query strategies resolve the target semantics separately for each call and do
 not store the specification from the previous query. If a fitted estimator is
-passed to a strategy, its ``target_spec_`` determines what ``y`` means for
-that query. With the default ``target_type="auto"``, the strategy adopts the
-target type of the fitted estimator. An explicit strategy ``target_type`` must
-agree with the fitted estimator; a conflicting declaration raises a
+passed to a strategy, its ``target_spec_`` determines the task, target type,
+and class vocabulary of ``y`` for that query. For single-output classification,
+single-annotator pool strategies expect one label per sample even if a fitted
+classifier was trained on multiple annotators' labels, see
+:ref:`multiple-annotators`. Multi-label queries retain one label per output
+for each sample. With the default ``target_type="auto"``, the strategy adopts
+the target type of the fitted estimator. An explicit strategy ``target_type``
+must agree with the fitted estimator; a conflicting declaration raises a
 ``ValueError`` rather than silently overriding either side.
 
 .. _label-contract:
@@ -839,9 +843,9 @@ row ``[0, NaN]`` means that one annotator supplied a label and the other did
 not.
 
 A sample may therefore contain both observed and missing annotator labels.
-Multi-annotator estimators and strategies retain the multi-annotator annotation
-type and query sample-annotator pairs, so query results identify
-``(sample, annotator)`` pairs.
+Multi-annotator estimators retain the multi-annotator annotation type in their
+fitted specification. Multi-annotator strategies query sample-annotator pairs,
+so query results identify ``(sample, annotator)`` pairs.
 
 Currently, a multi-annotator specification is always single-output. With
 ``target_type="auto"``, resolution assigns ``"single-output"`` and rejects
@@ -852,6 +856,39 @@ during capability checking, because the two-dimensional label matrix can hold
 either annotators or outputs but not both. Lifting this restriction would
 require a representation with both dimensions, see
 :ref:`recognized-future-semantics`.
+
+Compatible single-annotator pool strategies, such as
+:class:`~skactiveml.pool.UncertaintySampling`, :class:`~skactiveml.pool.Badge`,
+and :class:`~skactiveml.pool.Falcun`, can use a fitted multi-annotator
+classifier with ``fit_clf=False`` and aggregated query labels, e.g., majority
+votes. The classifier predicts one class distribution per sample. Query
+validation therefore uses a single-annotator prediction specification while
+preserving the classifier's original ``target_spec_`` and its exact class
+vocabulary. This does not enable fitting a multi-annotator classifier on
+aggregated labels with ``fit_clf=True``. Algorithm-specific classifier
+requirements still apply, including any internal refitting a strategy performs.
+
+With ``candidates=None``, aggregated labels determine which samples are
+unlabeled. Pass explicit candidates to include samples that have an aggregate
+label but still lack labels from some annotators. Alternatively,
+:class:`~skactiveml.pool.multiannotator.SingleAnnotatorWrapper` aggregates the
+label matrix and selects sample-annotator pairs; it also accepts the fitted
+classifier through ``fit_clf=False``.
+
+An :class:`~skactiveml.classifier.multiannotator.AnnotatorEnsembleClassifier`
+used as a committee in :class:`~skactiveml.pool.QueryByCommittee`,
+:class:`~skactiveml.pool.BatchBALD`, or :class:`~skactiveml.pool.GreedyBALD`
+requires fitted member classifiers. Fitting this ensemble on an empty dataset
+leaves its members unfitted, so committee queries raise a ``NotFittedError``.
+To initialize a committee without observed labels, fit it on a nonempty pool
+with an all-missing label matrix.
+
+Stream query strategies apply the same rules: they accept a fitted
+multi-annotator classifier with ``fit_clf=False`` and check labels ``y``, if
+given, against its single-annotator prediction specification. Refitting is
+validated before training and requires a classifier that supports
+single-annotator targets, including when ``y`` is a column vector. Their
+algorithm-specific requirements apply as well.
 
 Errors and Component Capabilities
 =================================
@@ -867,8 +904,11 @@ must be corrected or a different component is required.
 
 After fitting, use ``estimator.target_spec_`` rather than inferring the semantics
 again from the shape of ``y``. In particular, use its ``target_type`` and
-``annotation_type`` to choose downstream behavior and its ``classes`` as the
-canonical class vocabulary for classification.
+``annotation_type`` to interpret its training observations and its ``classes``
+as the canonical class vocabulary for classification. Single-annotator query
+strategies check their capability against the single-annotator prediction
+specification of a fitted multi-annotator classifier, see
+:ref:`multiple-annotators`.
 
 Stream Query Strategies
 -----------------------
@@ -876,14 +916,17 @@ Stream Query Strategies
 Stream query strategies declare the single-output single-annotator
 classification capability and have no ``target_type`` parameter, because they
 do not resolve the labels ``y`` themselves. The classifier passed to ``query``
-is the target authority. A fitted classifier carries its ``target_spec_``. An
-unfitted classifier declares the meaning of ``y`` through its ``classes``,
+is the target authority. A fitted classifier carries its ``target_spec_``,
+which ``y``, if given, must match as for pool query strategies. An unfitted
+classifier declares the meaning of ``y`` through its ``classes``,
 ``missing_label``, and ``target_type``, from which the specification is
 resolved together with ``y`` exactly as for pool query strategies; without
 ``y``, only these declarations count. The specification is checked against
 that capability before committing any query state such as
-``budget_manager_``. A multi-label or multi-annotator classifier is therefore
-rejected with the capability error described above.
+``budget_manager_``. A multi-label classifier is therefore rejected with the
+capability error described above, whereas a fitted multi-annotator classifier
+is checked through its single-annotator prediction specification, see
+:ref:`multiple-annotators`.
 
 The label-free baselines :class:`~skactiveml.stream.StreamRandomSampling` and
 :class:`~skactiveml.stream.PeriodicSampling` act on candidates and the budget
