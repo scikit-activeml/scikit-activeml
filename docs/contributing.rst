@@ -181,10 +181,15 @@ named private file under ``skactiveml/utils``.
 
 Do not import helper functions or constants from ``skactiveml.base``; that
 file is for base classes. If a helper must import a base class, keep it in the
-subpackage that uses it. ``skactiveml/pool/_target.py`` is an example. Put
-exception classes in ``skactiveml/exceptions.py``.
+subpackage that uses it. ``skactiveml/pool/_target.py`` and
+``skactiveml/stream/_target.py`` are examples. Put exception classes in
+``skactiveml/exceptions.py``.
 
-Add a query-strategy base class only when it contains behavior shared by its
+A query-strategy base class keeps its public contract, the methods its own
+contract methods call, and declarations with conservative defaults, such as
+``_target_capabilities``. A helper that the base class never calls and only
+some subclasses use belongs in a private file of their subpackage instead. Add
+a query-strategy base class only when it contains behavior shared by its
 subclasses. Do not add one only to share a constant or to help tests find
 strategies.
 
@@ -374,11 +379,14 @@ Use the ``self._validate_data`` method (implemented in the superclass) exactly
 once for structural validation of the query inputs ``X`` and ``y``. Target
 resolution is a separate semantic step and may intentionally precede
 ``self._validate_data`` so that invalid or unsupported target semantics fail
-before estimator fitting or query-state initialization. Fit the classifier or
-regressor if it is not yet fitted (using ``fit_if_not_fitted`` from ``utils``).
-Calculate utilities via an extra public function. Use the ``simple_batch``
-function from ``utils`` to determine the query indices and set the utilities in
-naive batch query strategies.
+before estimator fitting or query-state initialization. If the strategy takes
+one estimator that it may refit, use ``_fit_and_resolve_estimator_target_spec``
+from ``skactiveml/pool/_target.py``. It validates the estimator and returns the
+estimator to use, i.e., a fitted clone if requested, e.g., via
+``fit_clf=True``, with the resolved target specification. Calculate utilities
+via an extra public function. Use the ``simple_batch`` function from ``utils``
+to determine the query indices and set the utilities in naive batch query
+strategies.
 
 .. _testing-1:
 
@@ -449,7 +457,7 @@ Required Parameters:
 +==============================+=============================================================+
 | ``candidates``               | Set of candidate instances,                                 |
 |                              | inherited from                                              |
-|                              | ``SingleAnnotatorStreamBasedQueryStrategy``.                |
+|                              | ``SingleAnnotatorStreamQueryStrategy``.                     |
 +------------------------------+-------------------------------------------------------------+
 | ``clf``, optional            | The classifier used by the                                  |
 |                              | strategy.                                                   |
@@ -457,9 +465,9 @@ Required Parameters:
 | ``X``, optional              | Set of labeled and unlabeled                                |
 |                              | instances.                                                  |
 +------------------------------+-------------------------------------------------------------+
-| ``y``, optional              | Labels of ``X`` (it may be set to                           |
-|                              | ``MISSING_LABEL`` if ``y`` is                               |
-|                              | unknown).                                                   |
+| ``y``, optional              | Labels of ``X``, possibly including                         |
+|                              | ``clf.missing_label`` for unknown                           |
+|                              | labels.                                                     |
 +------------------------------+-------------------------------------------------------------+
 | ``sample_weight``, optional  | Weights for each instance in                                |
 |                              | ``X`` or ``None`` if all are                                |
@@ -468,7 +476,7 @@ Required Parameters:
 | ``fit_clf``, optional        | Uses ``X`` and ``y`` to fit the classifier.                 |
 +------------------------------+-------------------------------------------------------------+
 | ``return_utilities``         | Whether to return the candidates' utilities,                |
-|                              | inherited from ``SingleAnnotatorStreamBasedQueryStrategy``. |
+|                              | inherited from ``SingleAnnotatorStreamQueryStrategy``.      |
 +------------------------------+-------------------------------------------------------------+
 
 Returns:
@@ -477,7 +485,7 @@ Returns:
 | Parameter                         | Description                       |
 +===================================+===================================+
 | ``queried_indices``               | Indices of the best instances     |
-|                                   | from ``X_Cand``.                  |
+|                                   | from ``candidates``.              |
 +-----------------------------------+-----------------------------------+
 | ``utilities``                     | Utilities of all candidate        |
 |                                   | instances, only if                |
@@ -493,9 +501,15 @@ The ``query`` method must not change the internal state of the ``query``
 strategy (``budget``, ``budget_manager`` and ``random_state`` included) to allow
 for assessing multiple instances with the same state. Update the internal state
 in the ``update()`` method. If the class implements a classifier (``clf``) the
-optional attributes need to be implement. Use ``self._validate_data`` method
-(is implemented in superclass). Check the input ``X`` and ``y`` only once. Fit
-classifier if ``fit_clf`` is set to ``True``.
+optional attributes need to be implemented. Use ``self._validate_data`` method
+(is implemented in superclass). Check the input ``X`` and ``y`` only once. For
+a strategy using a classifier, call ``_validate_X_y_sample_weight`` from
+``skactiveml/stream/_validation.py`` and then
+``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``
+before ``super()._validate_data`` and before creating ``budget_manager_``, so
+that invalid inputs fail before any query state is set. The latter returns the
+classifier to use, i.e., a fitted clone if ``fit_clf`` is ``True``, with the
+resolved target specification.
 
 .. _update-1:
 
@@ -509,7 +523,7 @@ Required Parameters:
 +===============================+==============================================+
 | ``candidates``                | Set of candidate instances,                  |
 |                               | inherited from                               |
-|                               | ``SingleAnnotatorStreamBasedQueryStrategy``. |
+|                               | ``SingleAnnotatorStreamQueryStrategy``.      |
 +-------------------------------+----------------------------------------------+
 | ``queried_indices``           | Typically the return value of                |
 |                               | ``query``.                                   |
@@ -555,7 +569,7 @@ following methods:
 +===================================+===================================+
 | ``__init__``                      | Function for initialization       |
 +-----------------------------------+-----------------------------------+
-| ``query_by_utilities``            | Identify which instances to query |
+| ``query_by_utility``              | Identify which instances to query |
 |                                   | based on the assessed utility     |
 +-----------------------------------+-----------------------------------+
 | ``update``                        | Adapting the budget monitoring    |
@@ -583,18 +597,17 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``budget``                        | % of labels that the strategy is  |
-|                                   | allowed to query                  |
+| ``candidates``                    | The samples which may be queried  |
 +-----------------------------------+-----------------------------------+
-| ``random_state``                  | Integer that acts as random seed  |
-|                                   | or ``np.random.RandomState`` like |
-|                                   | sklearn                           |
+| ``queried_indices``               | The indices of samples in         |
+|                                   | ``candidates`` whose labels are   |
+|                                   | queried                           |
 +-----------------------------------+-----------------------------------+
 
 .. _query-by-utilities-1:
 
-``query_by_utilities``
-^^^^^^^^^^^^^^^^^^^^^^
+``query_by_utility``
+^^^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
 
@@ -614,7 +627,7 @@ Returns:
 | ``queried_indices``               | The indices of samples in          |
 |                                   | candidates whose labels are        |
 |                                   | queried, with                      |
-|                                   | ``0 <= queried_indices <=          |
+|                                   | ``0 <= queried_indices <           |
 |                                   | n_candidates``.                    |
 +-----------------------------------+------------------------------------+
 
@@ -633,7 +646,12 @@ strategy needs to be adapted accordingly:
 -  If both are not given use the default ``budget_manager`` with the
    default budget
 -  If both are given and the budget differs from
-   ``budget_manager.budget`` throw an error
+   ``budget_manager.budget`` warn and use the ``budget_manager`` as is
+
+Create ``budget_manager_`` only if it does not exist yet, but call
+``_sync_default_budget_manager`` from ``skactiveml/stream/_validation.py`` in
+every ``_validate_data`` and ``update`` call, so that a default
+``budget_manager_`` follows changes of ``budget``.
 
 .. _testing-3:
 
@@ -779,10 +797,9 @@ General advice
 ''''''''''''''
 
 Use ``self._validate_data`` (implemented in the superclass).
-Check the input ``X`` and ``y`` only once. Fit classifier if it is not
-yet fitted (may use ``fit_if_not_fitted`` form ``utils``). If the
-strategy combines a single annotator query strategy with a performance
-estimate:
+Check the input ``X`` and ``y`` only once. Fit a clone of the classifier if
+``fit_clf`` is ``True``. If the strategy combines a single annotator query
+strategy with a performance estimate:
 
 -  define an aggregation function,
 -  evaluate the performance for each sample-annotator pair,

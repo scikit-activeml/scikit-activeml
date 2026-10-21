@@ -880,15 +880,17 @@ used as a committee in :class:`~skactiveml.pool.QueryByCommittee`,
 :class:`~skactiveml.pool.BatchBALD`, or :class:`~skactiveml.pool.GreedyBALD`
 requires fitted member classifiers. Fitting this ensemble on an empty dataset
 leaves its members unfitted, so committee queries raise a ``NotFittedError``.
-To initialize a committee without observed labels, fit it on a nonempty pool
-with an all-missing label matrix.
+To initialize a committee without observed labels, fit it with declared
+``classes`` on a nonempty pool with an all-missing label matrix.
 
 Stream query strategies apply the same rules: they accept a fitted
 multi-annotator classifier with ``fit_clf=False`` and check labels ``y``, if
-given, against its single-annotator prediction specification. Refitting is
-validated before training and requires a classifier that supports
-single-annotator targets, including when ``y`` is a column vector. Their
-algorithm-specific requirements apply as well.
+given, against its single-annotator prediction specification. They reject an
+unfitted multi-annotator classifier, so fit it with declared ``classes`` on an
+all-missing label matrix to start without labels. Refitting is validated
+before training and requires a classifier that supports single-annotator
+targets, including when ``y`` is a column vector. Their algorithm-specific
+requirements apply as well.
 
 Errors and Component Capabilities
 =================================
@@ -920,12 +922,15 @@ is the target authority. A fitted classifier carries its ``target_spec_``,
 which ``y``, if given, must match as for pool query strategies. An unfitted
 classifier declares the meaning of ``y`` through its ``classes``,
 ``missing_label``, and ``target_type``, from which the specification is
-resolved together with ``y`` exactly as for pool query strategies; without
-``y``, only these declarations count. The specification is checked against
-that capability before committing any query state such as
-``budget_manager_``. A multi-label classifier is therefore rejected with the
-capability error described above, whereas a fitted multi-annotator classifier
-is checked through its single-annotator prediction specification, see
+resolved together with ``y``; without ``y``, only these declarations count.
+With ``fit_clf=True``, the strategy fits a clone of the classifier first and
+uses the clone's ``target_spec_``. As for pool query strategies, the
+classifier's own capabilities are checked against its ``target_spec_``, or
+against the resolved specification if it is unfitted, and the strategy's
+capability against the single-annotator prediction specification, both before
+committing any query state such as ``budget_manager_``. A multi-label
+classifier is therefore rejected with the capability error described above,
+whereas a fitted multi-annotator classifier passes both checks, see
 :ref:`multiple-annotators`.
 
 The label-free baselines :class:`~skactiveml.stream.StreamRandomSampling` and
