@@ -509,9 +509,14 @@ a strategy using a classifier, call ``_validate_X_y_sample_weight`` from
 ``skactiveml/stream/_validation.py`` and then
 ``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``
 before ``super()._validate_data`` and before ``_validate_budget_manager``, so
-that invalid inputs fail before any query state is set. The latter returns the
-classifier to use, i.e., a fitted clone if ``fit_clf`` is ``True``, with the
-resolved target specification.
+that invalid inputs fail before any query state is set.
+``_fit_and_resolve_clf_target_spec`` returns ``(clf, target_spec)``, where
+``clf`` is a fitted clone if ``fit_clf=True``.
+
+When adapting subclasses written for version 1.0.1, replace overrides of
+``_validate_clf`` and ``_validate_X_y_sample_weight`` with validation in the
+strategy's ``_validate_data`` method. These private methods have moved to
+module helpers, so the old overrides are no longer called.
 
 .. _update-1:
 
@@ -541,10 +546,12 @@ Required Parameters:
 General advice
 ''''''''''''''
 
-The ``update`` method checks its own inputs, e.g., with
-``_validate_budget_update`` and ``_validate_budget_manager``, and must not set
-``n_features_in_``. If a ``budget_manager`` is used, forward the update call to
-the ``budget_manager.update`` method.
+The ``update`` method checks ``candidates`` and ``queried_indices`` with
+``_validate_budget_update`` from ``skactiveml/utils/_validation.py`` and
+prepares ``budget_manager_`` with ``_validate_budget_manager`` from
+``skactiveml/stream/_validation.py``. It must not set ``n_features_in_``.
+If a ``budget_manager`` is used, forward the update call to the
+``budget_manager.update`` method.
 
 .. _testing-2:
 
@@ -653,6 +660,11 @@ strategy needs to be adapted accordingly:
 Call ``_validate_budget_manager`` from ``skactiveml/stream/_validation.py`` in
 every ``_validate_data`` and ``update`` call. It creates ``budget_manager_`` on
 first use and applies changes of ``budget`` to a default ``budget_manager_``.
+
+Budget-manager subclasses written for version 1.0.1 must also account for the
+removal of the private ``_validate_random_state`` methods. Random-state setup
+now uses ``_ensure_random_state`` from ``skactiveml/utils/_validation.py``;
+overrides of the removed methods are no longer called.
 
 .. _testing-3:
 

@@ -1966,7 +1966,8 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         y[0], y[1] = 0, 1
         unlabeled = np.full_like(y, MISSING_LABEL)
         clf = SlidingWindowClassifier(
-            ParzenWindowClassifier(classes=[0, 1], random_state=0)
+            ParzenWindowClassifier(classes=[0, 1], random_state=0),
+            random_state=0,
         )
         init_params = deepcopy(self.init_default_params)
         init_params["random_state"] = 0

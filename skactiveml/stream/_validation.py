@@ -17,17 +17,17 @@ def _validate_X_y_sample_weight(X, y, sample_weight):
     ----------
     X : array-like of shape (n_samples, n_features) or None
         Training data set used to fit the classifier.
-    y : array-like of shape (n_samples,) or None
-        Labels of the training data set (possibly including unlabeled ones
-        indicated by `clf.missing_label`).
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs) or None
+        Labels of the training data set, possibly including missing labels.
+        Target semantics are checked separately against the classifier.
     sample_weight : array-like of shape (n_samples,) or None
         Weights of training samples in `X`.
 
     Returns
     -------
-    X : np.ndarray of shape (n_samples, n_features) or None
+    X : array-like of shape (n_samples, n_features) or None
         Checked training data set.
-    y : np.ndarray of shape (n_samples,) or None
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs) or None
         Checked labels of the input samples `X`.
     sample_weight : np.ndarray of shape (n_samples,) or None
         Checked weights of training samples in `X`.
@@ -72,7 +72,7 @@ def _validate_budget_manager(
             }
         check_type(
             strategy.budget_manager,
-            "budget_manager_",
+            "budget_manager",
             BudgetManager,
             type(None),
         )

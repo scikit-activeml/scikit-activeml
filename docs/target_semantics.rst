@@ -868,6 +868,15 @@ vocabulary. This does not enable fitting a multi-annotator classifier on
 aggregated labels with ``fit_clf=True``. Algorithm-specific classifier
 requirements still apply, including any internal refitting a strategy performs.
 
+:class:`~skactiveml.pool.MonteCarloEER` and
+:class:`~skactiveml.pool.ValueOfInformationEER` require fitting hypothetical
+single-annotator labels and therefore reject multi-annotator classifiers even
+with ``fit_clf=False``. :class:`~skactiveml.pool.UHerding` accepts these
+classifiers with a fixed ``temperatures`` value, such as ``temperatures=1.0``
+or ``temperatures=[1.0]``. Automatic calibration, including the default
+``temperatures=None``, requires internal refitting and is rejected for these
+classifiers.
+
 With ``candidates=None``, aggregated labels determine which samples are
 unlabeled. Pass explicit candidates to include samples that have an aggregate
 label but still lack labels from some annotators. Alternatively,
@@ -876,7 +885,8 @@ label matrix and selects sample-annotator pairs; it also accepts the fitted
 classifier through ``fit_clf=False``.
 
 An :class:`~skactiveml.classifier.multiannotator.AnnotatorEnsembleClassifier`
-used as a committee in :class:`~skactiveml.pool.QueryByCommittee`,
+used with ``fit_ensemble=False`` as a committee in
+:class:`~skactiveml.pool.QueryByCommittee`,
 :class:`~skactiveml.pool.BatchBALD`, or :class:`~skactiveml.pool.GreedyBALD`
 requires fitted member classifiers. Fitting this ensemble on an empty dataset
 leaves its members unfitted, so committee queries raise a ``NotFittedError``.
@@ -889,7 +899,7 @@ given, against its single-annotator prediction specification. They reject an
 unfitted multi-annotator classifier, so fit it with declared ``classes`` on an
 all-missing label matrix to start without labels. Refitting is validated
 before training and requires a classifier that supports single-annotator
-targets, including when ``y`` is a column vector. Their algorithm-specific
+labels, including when ``y`` is a column vector. Their algorithm-specific
 requirements apply as well.
 
 Errors and Component Capabilities
@@ -918,20 +928,30 @@ Stream Query Strategies
 Stream query strategies declare the single-output single-annotator
 classification capability and have no ``target_type`` parameter, because they
 do not resolve the labels ``y`` themselves. The classifier passed to ``query``
-is the target authority. A fitted classifier carries its ``target_spec_``,
-which ``y``, if given, must match as for pool query strategies. An unfitted
-classifier declares the meaning of ``y`` through its ``classes``,
+is the target authority. If ``y`` is given, it must match the single-annotator
+prediction specification derived from a fitted classifier's ``target_spec_``,
+as for pool query strategies. An unfitted classifier declares the meaning of
+``y`` through its ``classes``,
 ``missing_label``, and ``target_type``, from which the specification is
 resolved together with ``y``; without ``y``, only these declarations count.
 With ``fit_clf=True``, the strategy fits a clone of the classifier first and
 uses the clone's ``target_spec_``. As for pool query strategies, the
 classifier's own capabilities are checked against its ``target_spec_``, or
-against the resolved specification if it is unfitted, and the strategy's
-capability against the single-annotator prediction specification, both before
-committing any query state such as ``budget_manager_``. A multi-label
+against the resolved specification if it is unfitted. The strategy's capability
+is checked against the single-annotator prediction specification. Both checks
+precede changes to query state such as ``budget_manager_``. A multi-label
 classifier is therefore rejected with the capability error described above,
 whereas a fitted multi-annotator classifier passes both checks, see
 :ref:`multiple-annotators`.
+
+Passed labels are validated even with ``fit_clf=False``. This rejects some
+calls accepted by earlier versions, including label matrices, invalid missing
+labels, and labels outside the fitted class vocabulary. For example, a
+classifier fitted on a shorter window without declared ``classes`` may not
+know every class in the supplied history. Declare the full ``classes`` before
+fitting, refit the classifier on the supplied labels, or use ``fit_clf=True``
+with a compatible classifier and class declaration. If the strategy does not
+use training labels when ``fit_clf=False``, omit the optional ``y`` argument.
 
 The label-free baselines :class:`~skactiveml.stream.StreamRandomSampling` and
 :class:`~skactiveml.stream.PeriodicSampling` act on candidates and the budget

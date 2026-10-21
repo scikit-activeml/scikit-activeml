@@ -620,5 +620,9 @@ def _normalize_class_vocabulary(declared, observed, name):
             classes_array.astype(comparison_dtype, copy=False),
         ).all()
     if not all_known:
-        raise ValueError(f"`y` contains labels outside {name}.")
+        raise ValueError(
+            f"`y` contains labels outside {name}. All observed labels must "
+            "belong to the class vocabulary, whether declared explicitly "
+            "or inferred during fitting."
+        )
     return normalized

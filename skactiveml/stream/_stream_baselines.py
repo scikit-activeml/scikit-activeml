@@ -38,13 +38,13 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     The RandomSampling strategy queries labels completely randomly. The
     probability to query a sample is dependent on `budget`. Given a budget
     of 10%, the utility exceeds 0.9 (1-0.1) with a probability of 10%.
-    samples are queried regardless of their position in the feature space
-    and disregards any information about the sample. Thus, it should only be
-    used as a baseline strategy. The
-    `allow_exceeding_budget` parameter allows to configure the strategy to
-    strictly adhere to a given budget. Neither labels nor a model are
-    consumed, so the strategy is task-agnostic and supports single-output and
-    multi-label classification as well as regression.
+    Samples are queried regardless of their position in the feature space
+    and without using information about the sample. Thus, it should only be
+    used as a baseline strategy. The `allow_exceeding_budget` parameter
+    controls whether the strategy strictly adheres to a given budget.
+    Neither labels nor a model are consumed, so the strategy is task-agnostic
+    and supports single-output and multi-label classification as well as
+    regression.
 
     Parameters
     ----------
