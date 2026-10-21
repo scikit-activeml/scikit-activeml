@@ -587,6 +587,7 @@ class TestExamples(unittest.TestCase):
         self.assertNotIn("   3-pool-multi-annotator/index", index)
         self.assertIn("Diverse batch of 4 samples", index)
         self.assertIn("batch of 3 sample–annotator pairs", index)
+        self.assertIn("Adaptive batch of sample–annotator pairs", index)
         self.assertNotIn(" of 1 sample", index)
         self.assertNotIn(
             "visualization-card-caption", section_indexes["4-stream"]
@@ -640,6 +641,7 @@ class TestExamples(unittest.TestCase):
             ),
             ({"batch_size": 1}, "positive integer"),
             ({"batch_size": "0"}, "positive integer"),
+            ({"batch_size": "adaptive"}, "positive integer"),
             ({"batch_size": "2"}, "cannot show"),
             (
                 {

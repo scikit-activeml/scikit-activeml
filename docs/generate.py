@@ -291,14 +291,23 @@ def check_example_setup(data):
                 f"The selection of {method!r} is not one of its batch tags."
             )
         batch_size = data.get("batch_size")
+        adaptive = (
+            batch_size == "adaptive"
+            and metadata["api_class"]
+            == "skactiveml.pool.multiannotator.IntervalEstimationThreshold"
+        )
         if not (
-            isinstance(batch_size, str)
-            and batch_size.isdigit()
-            and int(batch_size) > 0
+            adaptive
+            or (
+                isinstance(batch_size, str)
+                and batch_size.isdigit()
+                and int(batch_size) > 0
+            )
         ):
             raise ValueError(
                 f"Give {method!r} a batch_size string with a positive "
-                f'integer, such as "1".'
+                'integer, such as "1", or "adaptive" for '
+                "IntervalEstimationThreshold."
             )
         if setup["selection"] == "single-sample" and batch_size != "1":
             raise ValueError(f'Give single-sample {method!r} batch_size "1".')
@@ -338,8 +347,10 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
             )
             caption = ""
             if data["package"].split(".")[0] == "pool":
-                count = int(data["batch_size"])
-                if count > 1:
+                if data["batch_size"] == "adaptive":
+                    caption = "Adaptive batch of sample–annotator pairs"
+                elif int(data["batch_size"]) > 1:
+                    count = int(data["batch_size"])
                     demonstrated = data["example_setup"]
                     rule = OVERVIEW_BATCH_LABELS[demonstrated["selection"]]
                     unit = (
@@ -1306,6 +1317,8 @@ def format_plot(data, template_path):
                     new_str = new_str[0:-1]
                 else:
                     new_str = data[key]
+                    if key == "batch_size" and new_str == "adaptive":
+                        new_str = repr(new_str)
             else:
                 if len(splits) > 1:
                     new_str = splits[1]

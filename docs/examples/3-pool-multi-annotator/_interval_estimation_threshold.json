@@ -3,7 +3,7 @@
     "class" : "IntervalEstimationThreshold",
     "package" : "pool.multiannotator",
     "method" : "Interval Estimation Threshold",
-    "category" : "Baseline",
+    "category" : "Informativeness",
     "template" : "examples/template_pool_multi_annotator.py",
     "tags" : ["pool", "classification", "multi-annotator", "top-k-batch"],
     "example_setup" : {
@@ -12,13 +12,12 @@
       "annotation_type" : "multi-annotator",
       "selection" : "top-k-batch"
     },
-    "batch_size" : "3",
+    "batch_size" : "adaptive",
     "title" : "Interval Estimation Threshold",
-    "refs" : [],
+    "refs" : ["donmez2009efficiently"],
     "sequence" : ["title", "text_0", "plot", "refs"],
-    "text_0" : "**Idea:** Interval Estimation Threshold (IEThresh) selects samples based on 'Uncertainty Sampling'. The selected samples are labeled by the annotators whose estimated annotation performances are equal or greater than an adaptive threshold. The strategy requires all annotators to be available for each candidate sample and excludes samples with any unavailable annotator. By default, only fully unlabeled samples are candidates. Partially annotated samples remain usable for training, but are not selected again by default. Explicit candidates and availability masks define the query pool directly. To follow the published workflow, this pool must contain previously unqueried samples.",
-    "import_misc" : ["from skactiveml.pool.multiannotator import IntervalEstimationThreshold",
-      "from skactiveml.pool.multiannotator import IntervalEstimationAnnotModel"],
+    "text_0" : "**Idea:** Interval Estimation Threshold (IEThresh) selects samples using least-confidence uncertainty sampling and selects annotators based on upper confidence bounds of their estimated annotation performances. This example uses ``batch_size=\"adaptive\"``, so the performance threshold determines how many annotators label the selected sample in each cycle.\n\nThe strategy requires all annotators to be available for each candidate sample and excludes samples with any unavailable annotator. By default, only fully unlabeled samples are candidates. Partially annotated samples remain usable for training, but are not selected again by default. Explicit candidates and availability masks define the query pool directly. To follow the published workflow, this pool must contain previously unqueried samples.",
+    "import_misc" : ["from skactiveml.pool.multiannotator import IntervalEstimationThreshold"],
     "init_qs" : "IntervalEstimationThreshold(random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf, fit_clf=False"
   }

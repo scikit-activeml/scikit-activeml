@@ -114,8 +114,17 @@ for c in range(n_cycles):
         ax.set_ylabel("Feature 2")
         # Overlay the decision boundary.
         ax = plot_decision_boundary(clf, feature_bound, ax=ax)
-        # Set the title indicating the current batch and subplot index.
-        ax.set_title(f"Batch {c+1}, Utilities[{i}]")
+        # Capture a separate title for each animation frame.
+        panel_title = ax.text(
+            0.5,
+            1.02,
+            f"Batch {c+1}, Utilities[{i}]",
+            size=plt.rcParams["axes.titlesize"],
+            ha="center",
+            va="bottom",
+            transform=ax.transAxes,
+        )
+        artists[c].append(panel_title)
 
         # Collect new artists (plot elements) added during this cycle.
         for x in ax.collections:

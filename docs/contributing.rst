@@ -1302,7 +1302,9 @@ Every entry needs these fields:
 ``batch_size``
    Pool entries only. The number of samples that each cycle acquires, as a
    string such as ``"4"``. With multiple annotators, it counts
-   sample–annotator pairs.
+   sample–annotator pairs. ``IntervalEstimationThreshold`` also accepts
+   ``"adaptive"`` to determine the number of annotators from its performance
+   threshold.
 
 ``title``
    The title of the example page, usually the method's name.
@@ -1374,8 +1376,9 @@ Templates
 A template is a Python script with placeholders, such as ``"$init_qs"`` or
 ``"$n_cycles|20"``. The build replaces each placeholder with the entry's field
 of the same name, or with the default after ``|``. Each value goes into the
-script as Python code, which is why ``batch_size`` is a string. These templates
-in ``docs/examples/`` are shared:
+script as Python code, which is why numeric ``batch_size`` values are strings.
+The special ``batch_size`` value ``"adaptive"`` is inserted as a quoted Python
+string. These templates in ``docs/examples/`` are shared:
 
 * ``template_pool.py``: pool classification, one sample per cycle.
 * ``template_pool_batch.py``: pool classification, batches of four samples.
@@ -1424,8 +1427,8 @@ these rules:
 * ``example_setup`` has exactly these fields, with these values.
 * The documented variant supports the setup.
 * The selection is one of the entry's batch tags.
-* ``batch_size`` is a positive whole number in a string. A ``single-sample``
-  entry uses ``"1"``.
+* ``batch_size`` is a positive whole number in a string, or ``"adaptive"``
+  for ``IntervalEstimationThreshold``. A ``single-sample`` entry uses ``"1"``.
 * A shared template matches the setup and the batch size. For example,
   ``template_pool.py`` shows one sample per cycle, and
   ``template_pool_batch.py`` shows batches of four.
