@@ -43,8 +43,7 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
     )
     if np.ndim(index_array) == 0 and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
-    index_array = np.atleast_1d(index_array)
-    return index_array
+    return np.atleast_1d(index_array)
 
 
 def rand_argmax(a, random_state=None, **argmax_kwargs):
@@ -81,8 +80,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
     )
     if np.ndim(index_array) == 0 and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
-    index_array = np.atleast_1d(index_array)
-    return index_array
+    return np.atleast_1d(index_array)
 
 
 def simple_batch(
@@ -193,7 +191,6 @@ def simple_batch(
     if utilities.ndim == 1:
         best_indices = best_indices.flatten()
 
-    # Check whether utilities are to be returned.
     if return_utilities:
         return best_indices, batch_utilities
     else:

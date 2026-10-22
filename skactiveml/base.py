@@ -303,15 +303,12 @@ class PoolQueryStrategy(QueryStrategy):
         return_utilities : bool
             Checked boolean value of `return_utilities`.
         """
-        # Check samples.
         if check_X_dict is None:
             check_X_dict = {"allow_nd": True}
         X = check_array(X, **check_X_dict)
 
-        # Check number of features.
         check_n_features(self, X, reset=reset)
 
-        # Check labels
         y = check_array(
             _as_label_array(y),
             ensure_2d=False,
@@ -320,7 +317,6 @@ class PoolQueryStrategy(QueryStrategy):
         )
         check_consistent_length(X, y)
 
-        # Check missing_label
         check_missing_label(self.missing_label, target_type=y.dtype, name="y")
         self.missing_label_ = self.missing_label
 
@@ -354,13 +350,10 @@ class PoolQueryStrategy(QueryStrategy):
                 candidates = check_array(candidates, **check_candidates_dict)
                 check_n_features(self, candidates, reset=False)
 
-        # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check batch size.
         check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
 
-        # Check random state.
         self.random_state_ = check_random_state(self.random_state, seed_mult)
 
         return X, y, candidates, batch_size, return_utilities
@@ -1274,12 +1267,10 @@ class BudgetManager(ABC, BaseEstimator):
         utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
-        # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
             raise TypeError(
                 "{} is not a valid type for utilities".format(type(utilities))
             )
-        # Check budget
         self._validate_budget()
         return utilities
 
@@ -1420,19 +1411,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # Check candidate samples.
         candidates = check_array(candidates, **check_candidates_params)
 
-        # Check number of features.
         check_n_features(self, candidates, reset=reset)
 
-        # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check random state.
         self._validate_random_state()
 
-        # Check budgetmanager.
         self._validate_budget()
 
         return candidates, return_utilities
@@ -1749,7 +1735,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        # Create label encoder.
         self._le = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label,
@@ -1777,10 +1762,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         check_consistent_length(X, y)
         check_n_features(self, X, reset=reset)
 
-        # Update detected classes.
         self.classes_ = self._le.classes_
 
-        # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
             if sample_weight.ndim == 1:
@@ -1803,7 +1786,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                     "two-dimensional targets, the same shape as `y`."
                 )
 
-        # Update cost matrix.
         if target_spec.target_type == "multi-label":
             self.cost_matrix_ = None
         else:
@@ -2065,8 +2047,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         R[is_zero, sampled_class_indices] = 1.0
         P = R / R.sum(axis=-1, keepdims=True)
-        P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
-        return P
+        return P.reshape(n_samples, len(X), P.shape[-1], order="F")
 
     @staticmethod
     def _sample_dirichlet_vertices(alphas, random_state):
@@ -2121,7 +2102,6 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         ):
             raise ValueError("`sample_weight` must be non-negative.")
 
-        # Check class prior.
         if self.target_spec_.target_type == "multi-label":
             n_outputs = len(self.classes_)
             if np.isscalar(self.class_prior):
@@ -2562,7 +2542,6 @@ if successful_skorch_torch_import:
                 the requested extra outputs in the order specified by
                 `extra_outputs`.
             """
-            # Check forward_outputs configured.
             _check_forward_outputs(forward_outputs=forward_outputs)
 
             # Primary output = first configured output
@@ -2580,10 +2559,8 @@ if successful_skorch_torch_import:
                 primary_name=primary_name,
             )
 
-            # Run module forward once.
             fw_out = self.neural_net_.forward(X)
 
-            # Normalize to tuple of raw outputs.
             if isinstance(fw_out, tuple):
                 raw_outputs = fw_out
             else:
@@ -2607,10 +2584,8 @@ if successful_skorch_torch_import:
                     value = transform(value)
                 return to_numpy(value)
 
-            # Primary output (transform applied here).
             primary_np = _get_named(primary_name)
 
-            # No extra outputs.
             if not extra_names:
                 return primary_np
 
@@ -2660,7 +2635,6 @@ if successful_skorch_torch_import:
                     "All entries in `extra_outputs` must be strings."
                 )
 
-            # No duplicates
             if len(set(names)) != len(names):
                 raise ValueError(
                     "`extra_outputs` must not contain duplicate names."

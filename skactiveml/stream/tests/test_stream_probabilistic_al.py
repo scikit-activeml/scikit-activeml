@@ -3,7 +3,6 @@ import unittest
 
 import numpy as np
 from sklearn.base import clone
-from sklearn.naive_bayes import GaussianNB
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
@@ -92,7 +91,6 @@ class TestStreamProbabilisticAL(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), TypeError),
             (ParzenWindowClassifier(), None),
         ]

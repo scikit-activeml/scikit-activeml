@@ -283,12 +283,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             )
             return cross_ent - entropy_post
 
-        kl_div = conditional_expect(
+        return conditional_expect(
             X_cand,
             new_kl_divergence,
             reg,
             random_state=self.random_state_,
             **integration_dict_target_val,
         )
-
-        return kl_div

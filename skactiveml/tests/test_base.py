@@ -747,8 +747,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
     def test__validate_data(self):
         X = np.ones((10, 2))
         y = np.random.rand(10)
-        # TODO: Wait for scikit-learn update.
-        # self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
         y = np.full(10, fill_value=-1)
         self.clf.classes = None
         self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
@@ -1571,44 +1569,34 @@ if successful_skorch_torch_import:
 
             allowed = ["a", "b", "c"]
 
-            # extra_outputs is None -> returns []
             self.assertEqual(norm(None, allowed_names=allowed), [])
 
-            # extra_outputs is str -> single name list
             self.assertEqual(
                 norm("a", allowed_names=allowed, primary_name=None),
                 ["a"],
             )
 
-            # extra_outputs is sequence of str (list)
             self.assertEqual(
                 norm(["a", "c"], allowed_names=allowed, primary_name="b"),
                 ["a", "c"],
             )
 
-            # extra_outputs is sequence of str (tuple)
             self.assertEqual(
                 norm(("a",), allowed_names=allowed, primary_name=None),
                 ["a"],
             )
 
-            # extra_outputs of invalid type ->
-            # TypeError (non-str / non-sequence)
             with self.assertRaises(TypeError):
                 norm(123, allowed_names=allowed)
 
-            # extra_outputs sequence with non-str element -> TypeError
             with self.assertRaises(TypeError):
                 norm(["a", 1], allowed_names=allowed)
 
-            # duplicate names -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "a"], allowed_names=allowed)
 
-            # unknown names -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "z"], allowed_names=allowed)
 
-            # primary_name included in extras -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "b"], allowed_names=allowed, primary_name="b")

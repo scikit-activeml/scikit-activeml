@@ -108,15 +108,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         self.random_state_.set_state(prior_random_state)
 
-        # keep record if the sample is queried and if there was budget left,
-        # when assessing the corresponding utilities
         queried = np.full(len(utilities), False)
 
         # Track counts locally without advancing acquisition state.
         tmp_observed_samples = self.observed_samples_
         tmp_queried_samples = self.queried_samples_
-        # check for each sample separately if budget is left and the utility is
-        # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_samples += 1
             # Include exact boundaries that round one ULP below the limit.
@@ -129,7 +125,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             ) and (utility >= 1 - self.budget_)
             tmp_queried_samples += queried[i]
 
-        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
 
         if return_utilities:
@@ -203,7 +198,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):
@@ -288,8 +282,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         utilities = np.zeros(candidates.shape[0])
 
-        # keep record if the sample is queried and if there was budget left,
-        # when assessing the corresponding utilities
         queried = np.full(len(candidates), False)
 
         tmp_observed_samples = self.observed_samples_
@@ -305,7 +297,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
                 utilities[i] = 1
             tmp_queried_samples += queried[i]
 
-        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
 
         if return_utilities:
@@ -383,7 +374,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         self._validate_random_state()
 
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):

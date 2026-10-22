@@ -386,9 +386,7 @@ def average_kl_divergence(probas, eps=1e-7):
         scores = np.nansum(
             np.nansum(probas * np.log(probas / probas_mean), axis=2), axis=0
         )
-    scores = scores / n_estimators
-
-    return scores
+    return scores / n_estimators
 
 
 def vote_entropy(votes, classes):
@@ -456,9 +454,7 @@ def variation_ratios(votes):
 
     # Count the votes.
     vote_count = compute_vote_vectors(y=votes, missing_label=None)
-    scores = 1 - (vote_count.max(axis=-1) / n_estimators)
-
-    return scores
+    return 1 - (vote_count.max(axis=-1) / n_estimators)
 
 
 def _check_ensemble(

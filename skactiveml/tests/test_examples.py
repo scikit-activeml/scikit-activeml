@@ -58,18 +58,15 @@ class TestExamples(unittest.TestCase):
         ]
         self.working_dir = os.path.abspath(os.curdir)
 
-        # A list of all modules that should have a json file.
         self.modules = [pool, stream]
 
     def test_example_files(self):
-        # Temporary generate the examples from the json files.
         examples_path = path.join(self.skaml_path, "docs", "temp_examples")
         notebooks_path = path.join(self.skaml_path, "docs", "temp_notebooks")
         os.chdir(self.docs_path)
         generate_examples(examples_path, self.json_path, notebooks_path)
         os.chdir(self.working_dir)
 
-        # Execute the examples.
         for root, dirs, files in os.walk(examples_path, topdown=True):
             for filename in files:
                 if filename.endswith(".py"):
@@ -81,11 +78,9 @@ class TestExamples(unittest.TestCase):
                         with open(file_path, "r") as f:
                             exec(f.read(), locals())
 
-        # Remove the created examples and notebooks from disk.
         shutil.rmtree(examples_path)
 
     def test_json(self):
-        # Collect all strategies for which an example exists
         strats_with_json = []
         for root, dirs, files in os.walk(self.json_path, topdown=True):
             for filename in files:
@@ -96,7 +91,6 @@ class TestExamples(unittest.TestCase):
                         if example["class"] not in strats_with_json:
                             strats_with_json.append(example["class"])
 
-        # Test if there is a json example for every AL-strategy.
         for module in self.modules:
             for item in module.__all__:
                 with self.subTest(msg="JSON Test", qs_name=item):

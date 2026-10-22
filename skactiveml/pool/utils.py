@@ -730,7 +730,7 @@ def _cross_entropy(
         other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
     )
 
-    cross_ent = -expected_target_val(
+    return -expected_target_val(
         X_eval,
         dist.logpdf,
         reg=true_reg,
@@ -744,8 +744,6 @@ def _cross_entropy(
             else "both"
         ),
     )
-
-    return cross_ent
 
 
 def _update_reg(

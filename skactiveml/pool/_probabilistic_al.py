@@ -376,9 +376,7 @@ def _gen_l_vec_list(m_approx, n_classes):
     new_label_vec_list = []
     for labelVec in label_vec_list:
         new_label_vec_list.append(labelVec + [m_approx - sum(labelVec)])
-    label_vec_list = np.array(new_label_vec_list, int)
-
-    return label_vec_list
+    return np.array(new_label_vec_list, int)
 
 
 def _multinomial(a):

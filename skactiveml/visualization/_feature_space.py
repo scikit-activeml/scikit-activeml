@@ -271,7 +271,6 @@ def plot_decision_boundary(
         axes = np.array([ax], dtype=object)
     feature_bound = check_bound(bound=feature_bound)
 
-    # Check and convert the colormap
     cmap = _get_cmap(cmap)
 
     if confidence is not None:
@@ -285,11 +284,9 @@ def plot_decision_boundary(
             max_val=1,
         )
 
-    # Update additional arguments
     boundary_args = _get_boundary_args(boundary_dict)
     confidence_args = _get_confidence_args(confidence_dict)
 
-    # Create mesh for plotting
     X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
     if is_multilabel:
@@ -335,7 +332,6 @@ def plot_decision_boundary(
                 )
         return ax
 
-    # Calculate predictions
     if hasattr(clf, "predict_proba"):
         predictions = clf.predict_proba(mesh_samples)
         if isinstance(predictions, list):
@@ -744,7 +740,6 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     if X.shape[1] != 2:
         raise ValueError("Samples in `X` must have 2 features.")
 
-    # Check labels
     y = check_array(
         _as_label_array(y),
         dtype=None,
@@ -799,7 +794,6 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
             "annotator to be plotted (indicated by `plot_annotators`)."
         )
 
-    # ensure that utilities are returned
     kwargs["return_utilities"] = True
 
     if candidates is None:

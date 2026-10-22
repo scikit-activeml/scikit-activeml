@@ -119,12 +119,10 @@ class TestFunctions(unittest.TestCase):
                 return output
 
             def test_me_alt(self, a, c):
-                output = {"a": a, "c": c}
-                return output
+                return {"a": a, "c": c}
 
             def test_me_hint(self, a: int, c: str) -> dict:
-                output = {"a": a, "c": c}
-                return output
+                return {"a": a, "c": c}
 
             def test_me_upper(self, X, Y):
                 return {"X": X, "Y": Y}

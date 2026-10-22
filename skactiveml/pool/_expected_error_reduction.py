@@ -647,7 +647,7 @@ class MonteCarloEER(ExpectedErrorReduction):
         id_clf.precompute(idx_train, idx_cand)
         id_clf.precompute(idx_train, idx_eval)
         id_clf.precompute(idx_cand, idx_eval)
-        id_clf = super()._precompute_and_fit_clf(
+        return super()._precompute_and_fit_clf(
             id_clf,
             X_full,
             y_full,
@@ -656,7 +656,6 @@ class MonteCarloEER(ExpectedErrorReduction):
             idx_eval,
             fit_clf=fit_clf,
         )
-        return id_clf
 
 
 class ValueOfInformationEER(ExpectedErrorReduction):
@@ -916,28 +915,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             idx_train, idx_train, fit_params="all", pred_params="all"
         )
 
-        #
-        # # for cond_prob
-        # id_clf.precompute(idx_train, idx_cand,
-        #                   fit_params='labeled', pred_params='all')
-        # # for risk estimation
-        # if self.consider_labeled:
-        #     id_clf.precompute(idx_train, idx_eval,
-        #                       fit_params='labeled', pred_params='labeled')
-        #     id_clf.precompute(idx_cand, idx_eval,
-        #                       fit_params='all', pred_params='labeled')
-        #     if self.candidate_to_labeled:
-        #         # idx_train ('labeled'), idx_cand ('all') exists above
-        #         # TODO: consider only equal samples would be sufficient
-        #         id_clf.precompute(idx_cand, idx_cand,
-        #                           fit_params='all', pred_params='all')
-        # if self.consider_unlabeled:
-        #     id_clf.precompute(idx_train, idx_eval,
-        #                       fit_params='labeled', pred_params='unlabeled')
-        #     id_clf.precompute(idx_cand, idx_eval,
-        #                       fit_params='all', pred_params='unlabeled')
-
-        id_clf = super()._precompute_and_fit_clf(
+        return super()._precompute_and_fit_clf(
             id_clf,
             X_full,
             y_full,
@@ -946,5 +924,3 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             idx_eval,
             fit_clf=fit_clf,
         )
-
-        return id_clf

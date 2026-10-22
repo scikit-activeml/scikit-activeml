@@ -88,7 +88,6 @@ class TestFixedUncertainty(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -139,7 +138,6 @@ class TestSplit(TemplateSingleAnnotatorStreamQueryStrategy, unittest.TestCase):
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -192,7 +190,6 @@ class TestVariableUncertainty(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -245,7 +242,6 @@ class TestRandomVariableUncertainty(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]

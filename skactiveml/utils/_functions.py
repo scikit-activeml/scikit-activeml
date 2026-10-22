@@ -273,7 +273,6 @@ if successful_skorch_torch_import:
         if criterion_output_keys is None and forward_outputs is None:
             return criterion
 
-        # Validate forward_outputs if it is provided.
         _check_forward_outputs(forward_outputs=forward_outputs)
 
         # Resolve criterion_output_keys -> list of names.
@@ -288,7 +287,6 @@ if successful_skorch_torch_import:
                 raise ValueError(
                     "`criterion_output_keys` must not be an empty sequence."
                 )
-            # Ensure all names are strings
             for name in criterion_output_keys:
                 if not isinstance(name, str):
                     raise TypeError(

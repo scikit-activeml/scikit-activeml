@@ -46,9 +46,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     v = np.bincount(
         y_off.ravel(), minlength=y.shape[0] * n_classes, weights=w.ravel()
     )
-    v = v.reshape(-1, n_classes)
-
-    return v
+    return v.reshape(-1, n_classes)
 
 
 def majority_vote(
@@ -94,11 +92,9 @@ def majority_vote(
     n_samples = y.shape[0]
     w = _check_vote_weights(y, w)
 
-    # extract labeled samples
     is_labeled_y = np.any(is_labeled(y, missing_label), axis=1)
     y_labeled = y[is_labeled_y]
 
-    # infer encoding
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     if not np.any(is_labeled_y):
         if classes is not None:

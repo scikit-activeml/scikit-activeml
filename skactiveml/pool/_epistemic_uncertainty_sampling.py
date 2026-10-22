@@ -558,8 +558,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
                 )
             Qn, Qp = np.delete(Qn, 0), np.delete(Qp, -1)
 
-    utilities = np.min(np.array([pi0, pi1]), axis=0)
-    return utilities
+    return np.min(np.array([pi0, pi1]), axis=0)
 
 
 def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):

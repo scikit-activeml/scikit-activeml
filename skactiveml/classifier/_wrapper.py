@@ -2233,8 +2233,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             ordered according to the attribute `self.classes_`.
         """
         check_is_fitted(self)
-        proba = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-        return proba
+        return self.estimator_.predict_proba(X, **predict_proba_kwargs)
 
     @match_signature("estimator", "predict_freq")
     def predict_freq(self, X, **predict_freq_kwargs):
@@ -2252,8 +2251,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             ordered according to the attribute `self.classes_`.
         """
         check_is_fitted(self)
-        freq = self.estimator_.predict_freq(X, **predict_freq_kwargs)
-        return freq
+        return self.estimator_.predict_freq(X, **predict_freq_kwargs)
 
     def __getattr__(self, item):
         if item in self._own_fitted_attributes:

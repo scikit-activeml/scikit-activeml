@@ -501,7 +501,6 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
 
     families = check_classes(classes)
 
-    # Check whether `classes` contains one vocabulary per target label.
     has_nested_classes = _has_nested_classes(classes)
 
     # Enforce cost_matrix semantics.
@@ -1386,13 +1385,10 @@ def _check_forward_outputs(forward_outputs):
         If `forward_outputs` is empty or contains negative indices.
     """
 
-    # Check forward_outputs configured.
     check_type(forward_outputs, "forward_outputs", dict)
     if len(forward_outputs) == 0:
         raise ValueError("`forward_outputs` must contain at least one entry.")
 
-    # Validate and normalize specs into a dict:
-    # name -> (idx, transform)
     for name, spec in forward_outputs.items():
         if (
             not isinstance(spec, tuple)

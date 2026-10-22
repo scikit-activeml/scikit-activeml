@@ -841,5 +841,4 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             return None
         distances = pairwise_distances(X)
         distances = distances[np.triu_indices_from(distances, k=1)]
-        distances = distances[distances > 0]
-        return distances
+        return distances[distances > 0]

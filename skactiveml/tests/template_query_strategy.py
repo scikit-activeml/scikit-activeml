@@ -323,12 +323,10 @@ class TemplateQueryStrategy:
         fit_values = [False, True] if fit_values is None else fit_values
         query_params = inspect.signature(self.qs_class.query).parameters
         if f"fit_{model_type}" in query_params:
-            # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
             test_cases += [(np.nan, TypeError), ("state", TypeError)]
             self._test_param("query", f"fit_{model_type}", test_cases)
 
-            # check if model remains the same for both options
             for fit_type in fit_values:
                 with self.subTest(msg="Model consistency"):
                     query_params = self._default_query_params(model_type)
@@ -377,7 +375,6 @@ class TemplateQueryStrategy:
             ]
             self._test_param("query", f"{model_type}", test_cases)
 
-            # check if model remains the same
             with self.subTest(msg=f"{model_type} consistency"):
                 query_params = self._default_query_params(model_type)
                 mdl = deepcopy(query_params[f"{model_type}"])
@@ -410,7 +407,6 @@ class TemplateQueryStrategy:
     def test_param_test_availability(self):
         not_test = ["self", "kwargs"]
 
-        # Check init parameters.
         check_test_param_test_availability(
             self,
             self.qs_class.__init__,
@@ -419,7 +415,6 @@ class TemplateQueryStrategy:
             logic_test=False,
         )
 
-        # Check query parameters and check if query is being tested.
         check_test_param_test_availability(
             self, self.qs_class.query, "query", not_test
         )
@@ -735,7 +730,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
     def test_query_param_sample_weight(self, test_cases=None):
         query_params = inspect.signature(self.qs_class.query).parameters
         if "sample_weight" in query_params:
-            # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
                 (np.nan, (ValueError, TypeError)),
@@ -767,7 +761,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
     ):  # TODO more cases
         query_params_list = inspect.signature(self.qs_class.query).parameters
         if "utility_weight" in query_params_list:
-            # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
                 (0, (ValueError, TypeError)),
@@ -842,7 +835,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         self._test_param("query", "return_utilities", test_cases)
 
     def test_query_reproducibility(self):
-        # checks if the results stays the same with same random state
         init_params = deepcopy(self.init_default_params)
 
         def strip_random_state_inplace(obj):
@@ -2030,7 +2022,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         )
 
     def test_query_param_clf(self, test_cases=None):
-        # _model_comparison checks for the availability of the classifier
         self.query_default_params_clf["fit_clf"] = True
         self._model_comparison(test_cases=test_cases, model_type="clf")
 
@@ -2072,7 +2063,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 )
 
     def test_query_param_reg(self, test_cases=None):
-        # _model_comparison checks for the availability of the regressor
         query_params = inspect.signature(self.qs_class.query).parameters
         if "fit_reg" in query_params:
             self.query_default_params_reg["fit_reg"] = True
@@ -2217,7 +2207,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
     def test_query_param_sample_weight(self, test_cases=None):
         query_params = inspect.signature(self.qs_class.query).parameters
         if "sample_weight" in query_params:
-            # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
                 (np.nan, (ValueError, TypeError)),
@@ -2269,12 +2258,10 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         ]:
             if query_params is None:
                 continue
-            # initialise query stategies to compare expectes_output
             init_params = deepcopy(self.init_default_params)
             init_params["random_state"] = np.random.RandomState(0)
             qs = self.qs_class(**init_params)
             qs2 = self.qs_class(**init_params)
-            # if no candidates are given generate a dataset with a fixed seed
             if candidates is None:
                 if X is not None or y is not None:
                     raise ValueError(
@@ -2294,7 +2281,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 candidates = X_all[4:]
                 if queried_indices is None:
                     queried_indices = np.arange(0, init_train_length)
-            # add candidates as well as X and y to the default query_params
             query_default_params = deepcopy(self.query_default_params_clf)
             query_params = inspect.signature(self.qs_class.query).parameters
             if "clf" in query_params or "reg" in query_params:
@@ -2340,7 +2326,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             for i in range(3):
                 qs_output2, utilities2 = qs2.query(**query_default_params)
 
-            # Test if all query strategy outputs and utilities are the same
             np.testing.assert_almost_equal(expected_utilities, utilities)
             self.assertIsInstance(qs_output, (list, np.ndarray))
             self.assertEqual(np.ndim(qs_output), 1)
@@ -2514,7 +2499,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         self._test_param("query", "return_utilities", test_cases)
 
     def test_query_reproducibility(self):
-        # checks if the results stays the same with same random state
         init_params = deepcopy(self.init_default_params)
 
         def strip_random_state_inplace(obj):

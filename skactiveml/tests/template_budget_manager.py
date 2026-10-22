@@ -65,7 +65,6 @@ class TemplateBudgetManager:
             self._test_param("init", "random_state", test_cases)
 
     def test_init_param_budget(self, test_cases=None):
-        # budget must be defined as a float with a range of: 0 < budget <= 1
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (np.nan, ValueError),
@@ -116,7 +115,6 @@ class TemplateBudgetManager:
     def test_param_test_availability(self):
         not_test = ["self", "kwargs"]
 
-        # Check init parameters.
         check_test_param_test_availability(
             self,
             self.bm_class.__init__,
@@ -125,8 +123,6 @@ class TemplateBudgetManager:
             logic_test=False,
         )
 
-        # Check query_by_utility parameters and if the function is being
-        # tested.
         check_test_param_test_availability(
             self, self.bm_class.query_by_utility, "query_by_utility", not_test
         )

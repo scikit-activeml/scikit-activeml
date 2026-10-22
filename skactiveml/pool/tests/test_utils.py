@@ -479,7 +479,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         iclf = IndexClassifierWrapper(
             clf=ParzenWindowClassifier(), X=self.X, y=self.y
         )
-        # self.assertWarns(Warning, iclf.fit, [2, 3])
         self.assertRaises(ValueError, iclf.fit, [2, 3])
 
         base_clfs = [

@@ -681,24 +681,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
             replace_query_params=replace_query_params,
         )
 
-        # qs = self.Strategy()
-        # for swe in [
-        #     "string",
-        #     self.candidates,
-        #     None,
-        #     np.empty((len(self.X_eval) - 1)),
-        # ]:
-        #     with self.assertRaises(
-        #         ValueError, msg=f"sample_weight_eval={swe}"
-        #     ):
-        #         qs.query(
-        #             **self.kwargs,
-        #             X_eval=self.X_eval,
-        #             sample_weight=np.ones(len(self.X)),
-        #             sample_weight_candidates=np.ones(len(self.candidates)),
-        #             sample_weight_eval=swe,
-        #         )
-
     def test_query(self):
         super().test_query()
         classes = [0, 1]
@@ -708,7 +690,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
         id_cost_matrix = 1 - np.eye(2)
 
         clf = self.DummyClf(classes=classes)
-        # clf = ParzenWindowClassifier(classes=classes)
 
         params_list = [
             [
@@ -932,9 +913,6 @@ class TestValueOfInformationEER(
         y2 = [0, 0, MISSING_LABEL, 1]
         cand = [1, 2]
         cost_matrix = 1 - np.eye(2)
-        # clf_partial = SklearnClassifier(
-        #     GaussianNB(), classes=classes
-        # ).fit(X, y)
 
         params_list = [
             ["kapoor-sub", True, True, True, True, False, [[0, 0]]],

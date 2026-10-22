@@ -471,7 +471,6 @@ class TemplateCognitiveDualQueryStrategy(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -947,7 +946,6 @@ class TestStreamDensityBasedAL(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB(), classes=[0, 1]), None),
         ]

@@ -203,7 +203,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
 
-        # calculate the margin used as utillities
         predict_proba = clf.predict_proba(candidates)
         if predict_proba.shape[1] == 1:
             # The only class has probability one and the implicit second class
@@ -443,7 +442,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         if not isinstance(self.dist_func_dict_, dict):
             raise TypeError("'dist_func_dict' must be a Python dictionary.")
 
-        # check density_threshold
         check_scalar(self.window_size, "window_size", int, min_val=1)
 
         if not hasattr(self, "window_"):
@@ -628,7 +626,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
 
-        # its the margin but used as utillities
         predict_proba = clf.predict_proba(candidates)
         confidence = np.max(predict_proba, axis=1)
         utilities = 1 - confidence
@@ -726,7 +723,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             self._get_default_budget_manager(),
             self._get_default_budget_manager_kwargs(),
         )
-        # _init_members
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
         else:
@@ -899,7 +895,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             **check_candidates_params,
         )
 
-        # check density_threshold
         check_scalar(
             self.density_threshold, "density_threshold", int, min_val=0
         )
@@ -957,7 +952,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         return {}
 
     def _validate_force_full_budget(self):
-        # check force_full_budget
         check_type(self.force_full_budget, "force_full_budget", bool)
         if not hasattr(self, "budget_manager_") and not self.force_full_budget:
             warnings.warn(

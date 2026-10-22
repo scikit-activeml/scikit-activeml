@@ -82,7 +82,6 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
 
-        # intialize return parameters
         queried_indices = []
         tmp_u = self.u_
         tmp_t = self.t_
@@ -90,7 +89,6 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         prior_random_state = self.random_state_.get_state()
 
-        # get confidence
         for i, u in enumerate(confidence):
             tmp_t += 1
             budget_left = self.budget_ > tmp_u / tmp_t
@@ -100,7 +98,6 @@ class DensityBasedSplitBudgetManager(BudgetManager):
                 eta = self.random_state_.normal(1, self.delta)
                 theta_random = tmp_theta * eta
                 sample = u < theta_random
-                # get the indices samples that should be queried
                 if sample:
                     tmp_theta *= 1 - self.s
                     queried_indices.append(i)
@@ -160,17 +157,13 @@ class DensityBasedSplitBudgetManager(BudgetManager):
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
-        # Check theta
         self._validate_theta()
-        # Chack s
         check_scalar(
             self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
         )
-        # Check delta
         check_scalar(
             self.delta, "delta", float, min_val=0, min_inclusive=False
         )
-        # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_"):
             self.u_ = 0
         if not hasattr(self, "t_"):
@@ -182,6 +175,5 @@ class DensityBasedSplitBudgetManager(BudgetManager):
     def _validate_theta(self):
         """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
-        # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
