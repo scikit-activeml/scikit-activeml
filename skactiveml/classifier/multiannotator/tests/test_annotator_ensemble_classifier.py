@@ -267,7 +267,7 @@ class TestAnnotatorEnsembleClassifier(
                     random_state=0,
                     missing_label=-1,
                 ).fit(X, y)
-                member_state = pickle.dumps(clf.estimators_)
+                clf_state = pickle.dumps(clf)
                 expected = deepcopy(clf.estimators_[0][1]).predict(X)
                 np.testing.assert_array_equal(np.unique(expected), [0, 1])
                 expected = np.eye(2)[expected]
@@ -275,9 +275,7 @@ class TestAnnotatorEnsembleClassifier(
                     np.testing.assert_array_equal(
                         clf.predict_proba(X), expected
                     )
-                    self.assertEqual(
-                        pickle.dumps(clf.estimators_), member_state
-                    )
+                    self.assertEqual(pickle.dumps(clf), clf_state)
 
     def test_hard_voting_preserves_predict_only_member_semantics(self):
         clf = AnnotatorEnsembleClassifier(

@@ -263,7 +263,6 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             reset=reset,
             **check_candidates_params,
         )
-        self._validate_random_state()
 
         _validate_budget_manager(
             self,

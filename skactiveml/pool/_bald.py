@@ -159,9 +159,9 @@ class _GeneralBALD(QueryByCommittee):
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         ensemble : array-like of SkactivemlClassifier or SkactivemlClassifier
-            - If `ensemble` is a `SkactivemlClassifier` and has
-              `n_estimators` plus `estimators_` after fitting as
-              attributes, its estimators will be used as committee.
+            - If `ensemble` is a `SkactivemlClassifier` and has the attribute
+              `estimators_` after fitting, its estimators will be used as
+              committee.
             - If `ensemble` is array-like, each element of this list must be
               `SkactivemlClassifier` and will be
               used as committee member.

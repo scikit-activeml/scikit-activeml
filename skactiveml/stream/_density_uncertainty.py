@@ -898,7 +898,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             reset=reset,
             **check_candidates_params,
         )
-        self._validate_random_state()
 
         # check density_threshold
         check_scalar(

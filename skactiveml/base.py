@@ -1380,10 +1380,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
+        """Copy `random_state` to `random_state_` once, then validate it."""
         _ensure_random_state(self)
 
     def _validate_budget(self):

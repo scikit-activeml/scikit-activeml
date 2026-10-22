@@ -332,7 +332,6 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             self.prior, "prior", float, min_val=0, min_inclusive=False
         )
         check_scalar(self.m_max, "m_max", int, min_val=0, min_inclusive=False)
-        self._validate_random_state()
 
         return (
             candidates,

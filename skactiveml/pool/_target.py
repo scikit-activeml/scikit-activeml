@@ -8,9 +8,7 @@ orchestration of wrapper target reconciliation is therefore owned by each
 wrapper, i.e., by `skactiveml.pool._wrapper._TargetPreservingWrapper` and by
 `skactiveml.pool.multiannotator._wrapper.SingleAnnotatorWrapper`. Each collects
 its own declarations and authorities and then delegates the wrapper-agnostic
-resolution, comparison, and capability checks to this module. The check of `y`
-against a fitted estimator, `_check_target_matches_spec` in
-`skactiveml.utils._target`, is shared with `skactiveml.stream._target`.
+resolution, comparison, and capability checks to this module.
 """
 
 from sklearn import clone

@@ -95,39 +95,42 @@ class TestClassifierTargetParity(unittest.TestCase):
         y_multilabel = np.array(
             [[0, 1], [1, 0], [MISSING_LABEL] * 2, [MISSING_LABEL] * 2]
         )
-        fitted_classifiers = [
-            ParzenWindowClassifier(classes=[0, 1]).fit(X, y),
-            ParzenWindowClassifier(classes=[0, 1], missing_label=-1).fit(
-                X, y_int
-            ),
-            AnnotatorEnsembleClassifier(
+        fitted_classifiers = {
+            "pwc": ParzenWindowClassifier(classes=[0, 1]).fit(X, y),
+            "pwc_int": ParzenWindowClassifier(
+                classes=[0, 1], missing_label=-1
+            ).fit(X, y_int),
+            "annotator_ensemble": AnnotatorEnsembleClassifier(
                 estimators=[
                     ("pwc_0", ParzenWindowClassifier(classes=[0, 1])),
                     ("pwc_1", ParzenWindowClassifier(classes=[0, 1])),
                 ],
                 classes=[0, 1],
             ).fit(X, y_matrix),
-            SklearnClassifier(
+            "multilabel": SklearnClassifier(
                 MultiOutputClassifier(
                     SGDClassifier(loss="log_loss", random_state=0)
                 ),
                 classes=[[0, 1], [0, 1]],
                 target_type="multi-label",
             ).fit(X, y_multilabel),
-        ]
+        }
         classifiers = [
-            *((clf, True) for clf in fitted_classifiers),
-            *((clone(clf), False) for clf in fitted_classifiers),
+            *((name, clf, True) for name, clf in fitted_classifiers.items()),
+            *(
+                (name, clone(clf), False)
+                for name, clf in fitted_classifiers.items()
+            ),
         ]
-        label_cases = [
-            y,
-            y[:, None],
-            y_int,
-            y_matrix,
-            y_multilabel,
-            np.array([0, 2, MISSING_LABEL, MISSING_LABEL]),
-            np.array([0, 1, np.inf, MISSING_LABEL]),
-        ]
+        label_cases = {
+            "y": y,
+            "y_column": y[:, None],
+            "y_int": y_int,
+            "y_matrix": y_matrix,
+            "y_multilabel": y_multilabel,
+            "y_unknown_class": np.array([0, 2, MISSING_LABEL, MISSING_LABEL]),
+            "y_inf": np.array([0, 1, np.inf, MISSING_LABEL]),
+        }
         resolvers = (
             lambda clf, labels: _resolve_estimator_target_spec(
                 ContrastiveAL(missing_label=clf.missing_label), clf, labels
@@ -136,11 +139,10 @@ class TestClassifierTargetParity(unittest.TestCase):
                 VariableUncertainty(), clf, labels
             ),
         )
-        n_accepted = 0
-        for (clf, fitted), labels in product(classifiers, label_cases):
-            with self.subTest(
-                clf=type(clf).__name__, fitted=fitted, labels=labels.tolist()
-            ):
+        accepted = set()
+        cases = product(classifiers, label_cases.items())
+        for (name, clf, fitted), (label_name, labels) in cases:
+            with self.subTest(clf=name, fitted=fitted, labels=label_name):
                 outcomes = []
                 for resolve in resolvers:
                     try:
@@ -148,5 +150,18 @@ class TestClassifierTargetParity(unittest.TestCase):
                     except (TypeError, ValueError) as error:
                         outcomes.append(type(error))
                 self.assertEqual(outcomes[0], outcomes[1])
-                n_accepted += isinstance(outcomes[0], TargetSpec)
-        self.assertEqual(n_accepted, 8)
+                if isinstance(outcomes[0], TargetSpec):
+                    accepted.add((name, fitted, label_name))
+        self.assertEqual(
+            accepted,
+            {
+                ("pwc", True, "y"),
+                ("pwc", True, "y_column"),
+                ("pwc", False, "y"),
+                ("pwc", False, "y_column"),
+                ("pwc_int", True, "y_int"),
+                ("pwc_int", False, "y_int"),
+                ("annotator_ensemble", True, "y"),
+                ("annotator_ensemble", True, "y_column"),
+            },
+        )

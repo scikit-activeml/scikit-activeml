@@ -2,9 +2,7 @@
 
 A stream query strategy does not resolve its labels `y` itself. The classifier
 passed to `query` is the target authority, and these helpers resolve its
-target specification for the strategy. The check of `y` against a fitted
-classifier, `_check_target_matches_spec` in `skactiveml.utils._target`, is
-shared with `skactiveml.pool._target`.
+target specification for the strategy.
 """
 
 import numpy as np

@@ -174,9 +174,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 SkactivemlRegressor or SkactivemlClassifier or \
                 SkactivemlRegressor
             - If `ensemble` is a `SkactivemlClassifier` or a
-              `SkactivemlRegressor` and has `n_estimators` plus
-              `estimators_` after fitting as attributes, its estimators will
-              be used as committee.
+              `SkactivemlRegressor` and has the attribute `estimators_` after
+              fitting, its estimators will be used as committee.
             - If `ensemble` is array-like, each element of this list must be
               `SkactivemlClassifier` or a `SkactivemlRegressor` and will be
               used as committee member.
