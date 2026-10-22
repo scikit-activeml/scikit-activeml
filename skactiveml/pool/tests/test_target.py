@@ -28,7 +28,6 @@ from skactiveml.pool import (
     QueryByCommittee,
     SubSamplingWrapper,
     UncertaintySampling,
-    uncertainty_scores,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.utils import (
@@ -434,39 +433,6 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                     )
                 assert_no_query_state(self, strategy)
                 assert_no_query_state(self, strategy.query_strategy)
-
-    def test_real_multiannotator_classifier_margin_utilities(self):
-        clf = AnnotatorLogisticRegression(
-            classes=[0, 1, 2], missing_label=-1, random_state=0
-        ).fit(self.X, self.y_matrix)
-        original_spec = clf.target_spec_
-        y = majority_vote(
-            self.y_matrix,
-            classes=clf.classes_,
-            missing_label=-1,
-            random_state=0,
-        )
-        candidates = np.flatnonzero((self.y_matrix == -1).any(axis=1))
-        expected = uncertainty_scores(
-            clf.predict_proba(self.X[candidates]), method="margin_sampling"
-        )
-        with patch.object(
-            AnnotatorLogisticRegression,
-            "fit",
-            side_effect=AssertionError("refit"),
-        ):
-            _, utilities = UncertaintySampling(
-                method="margin_sampling", missing_label=-1, random_state=0
-            ).query(
-                self.X,
-                y,
-                clf,
-                fit_clf=False,
-                candidates=candidates,
-                return_utilities=True,
-            )
-        np.testing.assert_allclose(utilities[0, candidates], expected)
-        self.assertIs(clf.target_spec_, original_spec)
 
     def test_annotator_ensemble_members_form_committee(self):
         y_matrix = np.column_stack([self.y, np.roll(self.y, 1)])

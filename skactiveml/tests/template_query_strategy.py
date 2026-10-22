@@ -1893,69 +1893,47 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         if query_params is None:
             return
         X = np.asarray(query_params["X"])
-        y_matrix = np.full((len(X), 2), MISSING_LABEL)
-        y_matrix[0], y_matrix[1] = [0, 0], [1, 1]
-        clf = AnnotatorEnsembleClassifier(
-            estimators=[
-                ("pwc_0", ParzenWindowClassifier(classes=[0, 1])),
-                ("pwc_1", ParzenWindowClassifier(classes=[0, 1])),
-            ],
-            classes=[0, 1],
-        )
-        query_params.update(X=X, y=y_matrix)
-        cases = [(clone(clf).fit(X, y_matrix), False), (clf, True)]
-        for case_clf, fit_clf in cases:
-            with self.subTest(fit_clf=fit_clf):
-                query_params.update(clf=case_clf, fit_clf=fit_clf)
-                strategy = self.qs_class(**deepcopy(self.init_default_params))
-                error = (
-                    "does not support target capability"
-                    if fit_clf
-                    else "one-dimensional or a column vector"
-                )
-                with self.assertRaisesRegex(ValueError, error):
-                    strategy.query(**query_params)
-                assert_no_query_state(
-                    self, strategy, attributes=STREAM_QUERY_STATE_ATTRIBUTES
-                )
-
-    def test_query_rejects_refitting_multiannotator_classifier(self):
-        query_params = self._stream_clf_query_params()
-        if query_params is None:
-            return
-        X = np.asarray(query_params["X"])
         y = np.full(len(X), MISSING_LABEL)
         y[0], y[1] = 0, 1
-        fitted_clf = AnnotatorEnsembleClassifier(
-            estimators=[("pwc", ParzenWindowClassifier(classes=[0, 1]))],
+        y_matrix = np.column_stack([y, y])
+        pwc = ParzenWindowClassifier(classes=[0, 1])
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("pwc_0", clone(pwc)), ("pwc_1", clone(pwc))],
             classes=[0, 1],
-        ).fit(X, y[:, None])
-        query_params.update(X=X, fit_clf=True)
-        cases = product((fitted_clf, clone(fitted_clf)), (y, y[:, None]))
+        )
+        single = clone(clf).set_params(estimators=[("pwc", clone(pwc))])
+        refit_error = "AnnotatorEnsembleClassifier does not support target"
+        cases = [
+            (clone(clf).fit(X, y_matrix), y_matrix, False, "one-dimensional"),
+            (clf, y_matrix, True, refit_error),
+            *(
+                (ensemble, labels, True, refit_error)
+                for ensemble in (single, clone(single).fit(X, y[:, None]))
+                for labels in (y, y[:, None])
+            ),
+        ]
         with patch.object(
             AnnotatorEnsembleClassifier,
             "fit",
             side_effect=AssertionError("unsupported refit"),
         ):
-            for clf, labels in cases:
-                with self.subTest(clf=clf, shape=labels.shape):
-                    original_state = deepcopy(clf)
-                    query_params.update(clf=clf, y=labels)
+            for case_clf, labels, fit_clf, error in cases:
+                with self.subTest(clf=case_clf, shape=labels.shape):
+                    original_state = deepcopy(case_clf)
+                    query_params.update(
+                        X=X, clf=case_clf, y=labels, fit_clf=fit_clf
+                    )
                     strategy = self.qs_class(
                         **deepcopy(self.init_default_params)
                     )
-                    with self.assertRaisesRegex(
-                        ValueError,
-                        "AnnotatorEnsembleClassifier does not support target "
-                        "capability",
-                    ):
+                    with self.assertRaisesRegex(ValueError, error):
                         strategy.query(**query_params)
                     assert_no_query_state(
                         self,
                         strategy,
                         attributes=STREAM_QUERY_STATE_ATTRIBUTES,
                     )
-                    assert_state_unchanged(self, clf, original_state)
+                    assert_state_unchanged(self, case_clf, original_state)
 
     def test_query_refitting_respects_wrapped_class_vocabulary(self):
         query_params = self._stream_clf_query_params()
