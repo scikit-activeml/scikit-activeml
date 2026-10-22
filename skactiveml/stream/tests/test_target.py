@@ -29,6 +29,21 @@ from skactiveml.stream._target import (
 from skactiveml.utils import MISSING_LABEL, TargetSpec
 
 
+class _RecentWindowClassifier(SkactivemlClassifier):
+    """Publish the target specification of the most recent samples only."""
+
+    def fit(self, X, y, sample_weight=None):
+        self.pwc_ = ParzenWindowClassifier(
+            missing_label=self.missing_label
+        ).fit(X[-4:], y[-4:])
+        self.target_spec_ = self.pwc_.target_spec_
+        self.classes_ = self.pwc_.classes_
+        return self
+
+    def predict_proba(self, X):
+        return self.pwc_.predict_proba(X)
+
+
 class TestResolveClfTargetSpec(unittest.TestCase):
     def setUp(self):
         self.qs = VariableUncertainty()
@@ -217,3 +232,34 @@ class TestClassifierTargetParity(unittest.TestCase):
             np.testing.assert_allclose(
                 fitted_clf.predict_proba(X), lr.predict_proba(X)
             )
+
+    def test_refit_rejects_labels_outside_fitted_classes(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.array([2, 2, 0, 1, 0, 1, MISSING_LABEL, MISSING_LABEL])
+        clf = _RecentWindowClassifier()
+        calls = [
+            lambda: _fit_and_resolve_estimator_target_spec(
+                UncertaintySampling(),
+                clf,
+                X,
+                y,
+                fit_estimator=True,
+                sample_weight=None,
+                estimator_name="clf",
+                fit_name="fit_clf",
+                estimator_types=[SkactivemlClassifier],
+            ),
+            lambda: _fit_and_resolve_clf_target_spec(
+                VariableUncertainty(),
+                clf,
+                X,
+                y,
+                fit_clf=True,
+                sample_weight=None,
+            ),
+        ]
+        for call in calls:
+            with self.assertRaisesRegex(
+                ValueError, "labels outside `classes`"
+            ):
+                call()

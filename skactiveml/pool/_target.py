@@ -35,7 +35,12 @@ _ALLOWED_DECLARED_TARGET_TYPES = frozenset(
 
 
 def _resolve_estimator_target_spec(
-    strategy, estimator, y, *, missing_label_checked=False
+    strategy,
+    estimator,
+    y,
+    *,
+    missing_label_checked=False,
+    checked_target_spec=None,
 ):
     """Resolve one estimator-backed strategy target specification."""
     if isinstance(estimator, SkactivemlClassifier):
@@ -60,9 +65,10 @@ def _resolve_estimator_target_spec(
     if hasattr(estimator, "target_spec_"):
         estimator_target_spec = estimator.target_spec_
         target_spec = _predicted_target_spec(estimator_target_spec)
-        _check_target_matches_spec(
-            y, target_spec, missing_label=strategy.missing_label
-        )
+        if target_spec != checked_target_spec:
+            _check_target_matches_spec(
+                y, target_spec, missing_label=strategy.missing_label
+            )
     else:
         estimator_target_type = getattr(estimator, "target_type", "auto")
         _validate_target_semantics(
@@ -114,12 +120,13 @@ def _resolve_estimator_target_spec(
     _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )
-    _check_labels(
-        y,
-        strategy.missing_label,
-        target_type=target_spec.target_type,
-        task=target_spec.task,
-    )
+    if target_spec != checked_target_spec:
+        _check_labels(
+            y,
+            strategy.missing_label,
+            target_type=target_spec.target_type,
+            task=target_spec.task,
+        )
     return target_spec
 
 
@@ -155,7 +162,9 @@ def _fit_and_resolve_estimator_target_spec(
             estimator = estimator.fit(X, y)
         else:
             estimator = estimator.fit(X, y, sample_weight)
-        target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
+        target_spec = _resolve_estimator_target_spec(
+            strategy, estimator, y, checked_target_spec=target_spec
+        )
     return estimator, target_spec
 
 

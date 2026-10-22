@@ -18,7 +18,7 @@ from ..utils._target import (
 from ..utils._validation import _has_nested_classes
 
 
-def _resolve_clf_target_spec(strategy, clf, y):
+def _resolve_clf_target_spec(strategy, clf, y, *, checked_target_spec=None):
     """Resolve the target specification `clf` is the authority for.
 
     Parameters
@@ -30,6 +30,9 @@ def _resolve_clf_target_spec(strategy, clf, y):
     y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
             None
         Labels of the training data set, if any.
+    checked_target_spec : skactiveml.utils.TargetSpec or None, default=None
+        The target specification `y` was already checked against before
+        fitting `clf`.
 
     Returns
     -------
@@ -69,7 +72,7 @@ def _resolve_clf_target_spec(strategy, clf, y):
         clf_target_spec = target_spec
     else:
         target_spec = _predicted_target_spec(clf_target_spec)
-        if y is not None:
+        if y is not None and target_spec != checked_target_spec:
             _check_target_matches_spec(
                 y, target_spec, missing_label=clf.missing_label
             )
@@ -114,14 +117,17 @@ def _fit_and_resolve_clf_target_spec(
     """
     check_type(clf, "clf", SkactivemlClassifier)
     check_type(fit_clf, "fit_clf", bool)
+    checked_target_spec = None
     if fit_clf:
         # Resolving may commit lazily resolved state that would change the
         # fit, so the declarations are checked on a separate clone.
-        _resolve_clf_target_spec(strategy, clone(clf), y)
+        checked_target_spec = _resolve_clf_target_spec(strategy, clone(clf), y)
         clf = clone(clf)
         if sample_weight is None:
             clf = clf.fit(X, y)
         else:
             clf = clf.fit(X, y, sample_weight)
-    target_spec = _resolve_clf_target_spec(strategy, clf, y)
+    target_spec = _resolve_clf_target_spec(
+        strategy, clf, y, checked_target_spec=checked_target_spec
+    )
     return clf, target_spec
