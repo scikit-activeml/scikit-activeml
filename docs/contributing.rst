@@ -257,6 +257,9 @@ label helpers, or multi-annotator components. In particular:
   array shape or values alone;
 - declare the exact target combinations a component supports through its
   ``_target_capabilities``;
+- override ``_declared_classes`` in a classifier wrapper that takes its
+  ``classes`` from a wrapped estimator, as ``SlidingWindowClassifier`` does,
+  so that query strategies see this vocabulary before fitting;
 - preserve the fitted ``target_spec_`` on estimators and wrappers that retain a
   fitted target specification; query strategies resolve each query and do not
   retain a last-query specification;

@@ -178,6 +178,13 @@ class TestStreamProbabilisticAL(
         np.testing.assert_array_equal(results[0][0], results[1][0])
         np.testing.assert_allclose(results[0][1], results[1][1])
 
+    def test_query_refitting_respects_wrapped_class_vocabulary(self):
+        test = super().test_query_refitting_respects_wrapped_class_vocabulary
+        for metric in (None, "rbf"):
+            with self.subTest(metric=metric):
+                self.init_default_params["metric"] = metric
+                test()
+
     def test_query_param_utility_weight(self):
         test_cases = []
         random_state = np.random.RandomState(0)

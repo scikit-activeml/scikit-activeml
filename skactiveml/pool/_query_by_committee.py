@@ -24,7 +24,6 @@ from ..utils import (
     check_scalar,
 )
 from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
-from ..utils._target import _check_target_capability
 from ._target import _resolve_estimator_target_spec
 
 
@@ -236,7 +235,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label,
+            strategy=self,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,
@@ -468,8 +467,8 @@ def _check_ensemble(
     X,
     y,
     sample_weight,
+    strategy,
     fit_ensemble=True,
-    missing_label=MISSING_LABEL,
     sample_predictions_method_name=None,
     sample_predictions_dict=None,
 ):
@@ -486,10 +485,14 @@ def _check_ensemble(
 
     for estimator_type in estimator_types:
         if isinstance(ensemble, estimator_type):
-            check_equal_missing_label(ensemble.missing_label, missing_label)
+            check_equal_missing_label(
+                ensemble.missing_label, strategy.missing_label
+            )
             # Fit the ensemble.
             if fit_ensemble:
-                _check_committee_training_capability(ensemble)
+                _resolve_estimator_target_spec(
+                    strategy, clone(ensemble), y, missing_label_checked=True
+                )
                 if sample_weight is None:
                     ensemble = clone(ensemble).fit(X, y)
                 else:
@@ -570,14 +573,17 @@ def _check_ensemble(
                     "is array-like."
                 )
             est_arr = copy.deepcopy(list(ensemble))
-            # Check every member before fitting any of them. Training requires
-            # single-annotator capabilities even when a previous fit provides
-            # compatible predictions.
+            # Check every member before fitting any of them. A refit member
+            # resolves from its declarations, as an unfitted clone does.
             for i, est in enumerate(est_arr):
                 check_type(est, f"ensemble[{i}]", estimator_type)
-                check_equal_missing_label(est.missing_label, missing_label)
+                check_equal_missing_label(
+                    est.missing_label, strategy.missing_label
+                )
                 if fit_ensemble:
-                    _check_committee_training_capability(est)
+                    _resolve_estimator_target_spec(
+                        strategy, clone(est), y, missing_label_checked=True
+                    )
 
             for i in range(len(est_arr)):
                 # Fit the ensemble.
@@ -602,17 +608,3 @@ def _check_ensemble(
             return ensemble, est_arr, cls, None, None
 
     raise TypeError(error_msg)
-
-
-def _check_committee_training_capability(estimator):
-    """Require compatibility with the single-output labels used in queries."""
-    task = (
-        "classification"
-        if isinstance(estimator, SkactivemlClassifier)
-        else "regression"
-    )
-    _check_target_capability(
-        type(estimator).__name__,
-        (task, "single-output", "single-annotator"),
-        estimator._target_capabilities,
-    )

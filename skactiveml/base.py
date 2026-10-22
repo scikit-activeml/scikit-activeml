@@ -1497,6 +1497,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             {("classification", "single-output", "single-annotator")}
         )
 
+    @property
+    def _declared_classes(self):
+        """Class vocabulary declared before fitting."""
+        return self.classes
+
     def _resolve_target_spec(self, y, classes=None):
         annotation_type = getattr(self, "_annotation_type", "single-annotator")
         resolution_y = y

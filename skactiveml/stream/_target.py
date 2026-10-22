@@ -11,36 +11,11 @@ from sklearn.base import clone
 from ..base import SkactivemlClassifier
 from ..utils import check_type, resolve_target_spec
 from ..utils._target import (
-    _check_target_capability,
     _check_target_matches_spec,
     _check_target_spec_capability,
     _predicted_target_spec,
 )
 from ..utils._validation import _has_nested_classes
-
-
-def _check_clf_fit_capability(clf):
-    """Check whether `clf` supports fitting on stream query targets.
-
-    Class vocabulary resolution remains the classifier's responsibility,
-    including wrappers that obtain classes from their inner estimator.
-
-    Parameters
-    ----------
-    clf : skactiveml.base.SkactivemlClassifier
-        The classifier that will be fitted during `query`.
-
-    Raises
-    ------
-    ValueError
-        If `clf` does not support single-output classification with
-        single-annotator targets.
-    """
-    _check_target_capability(
-        type(clf).__name__,
-        ("classification", "single-output", "single-annotator"),
-        clf._target_capabilities,
-    )
 
 
 def _resolve_clf_target_spec(strategy, clf, y):
@@ -51,7 +26,7 @@ def _resolve_clf_target_spec(strategy, clf, y):
     strategy : skactiveml.base.SingleAnnotatorStreamQueryStrategy
         The query strategy whose capabilities are checked.
     clf : skactiveml.base.SkactivemlClassifier
-        The classifier passed to `query`.
+        The classifier passed to `query`, or a clone of it.
     y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
             None
         Labels of the training data set, if any.
@@ -70,7 +45,7 @@ def _resolve_clf_target_spec(strategy, clf, y):
     """
     clf_target_spec = getattr(clf, "target_spec_", None)
     if clf_target_spec is None:
-        classes = clf.classes
+        classes = clf._declared_classes
         if y is None:
             # Only the declared vocabulary is evidence. Its nesting
             # decides the number of label outputs of the empty labels.
@@ -140,8 +115,10 @@ def _fit_and_resolve_clf_target_spec(
     check_type(clf, "clf", SkactivemlClassifier)
     check_type(fit_clf, "fit_clf", bool)
     if fit_clf:
+        # Resolving may commit lazily resolved state that would change the
+        # fit, so the declarations are checked on a separate clone.
+        _resolve_clf_target_spec(strategy, clone(clf), y)
         clf = clone(clf)
-        _check_clf_fit_capability(clf)
         if sample_weight is None:
             clf = clf.fit(X, y)
         else:

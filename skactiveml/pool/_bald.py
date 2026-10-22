@@ -221,7 +221,7 @@ class _GeneralBALD(QueryByCommittee):
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label,
+            strategy=self,
             estimator_types=[SkactivemlClassifier],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,

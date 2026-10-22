@@ -40,10 +40,8 @@ def _resolve_estimator_target_spec(
     """Resolve one estimator-backed strategy target specification."""
     if isinstance(estimator, SkactivemlClassifier):
         task = "classification"
-        classes = getattr(estimator, "classes_", estimator.classes)
     elif isinstance(estimator, SkactivemlRegressor):
         task = "regression"
-        classes = None
     else:  # pragma: no cover - callers validate their estimator type first.
         raise TypeError("`estimator` must be a scikit-activeml estimator.")
 
@@ -91,7 +89,11 @@ def _resolve_estimator_target_spec(
                 else strategy_target_type
             ),
             annotation_type="single-annotator",
-            classes=classes,
+            classes=(
+                estimator._declared_classes
+                if task == "classification"
+                else None
+            ),
             missing_label=strategy.missing_label,
         )
         estimator_target_spec = target_spec
@@ -137,14 +139,18 @@ def _fit_and_resolve_estimator_target_spec(
     check_type(estimator, estimator_name, *estimator_types)
     check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     check_type(fit_estimator, fit_name, bool)
+    # Resolving may commit lazily resolved state that would change the fit,
+    # so the declarations of a refit are checked on a separate clone.
+    target_spec = _resolve_estimator_target_spec(
+        strategy,
+        clone(estimator) if fit_estimator else estimator,
+        y,
+        missing_label_checked=True,
+    )
     if fit_estimator:
         # A fresh fit resolves from constructor settings, including explicit
         # classes, rather than freezing the previous fit's inferred vocabulary.
         estimator = clone(estimator)
-    target_spec = _resolve_estimator_target_spec(
-        strategy, estimator, y, missing_label_checked=True
-    )
-    if fit_estimator:
         if sample_weight is None:
             estimator = estimator.fit(X, y)
         else:
@@ -350,7 +356,7 @@ def _resolve_authority_classes(authorities):
     resolved_classes = None
     resolved_key = None
     for authority in authorities:
-        classes = getattr(authority, "classes_", authority.classes)
+        classes = authority._declared_classes
         if classes is None:
             continue
         key = _class_vocabulary_key(classes)

@@ -51,6 +51,16 @@ the target type of the fitted estimator. An explicit strategy ``target_type``
 must agree with the fitted estimator; a conflicting declaration raises a
 ``ValueError`` rather than silently overriding either side.
 
+An unfitted estimator declares the target semantics through its
+``target_type``, ``missing_label``, and, for classifiers, ``classes``, which
+are resolved together with ``y``. A
+:class:`~skactiveml.classifier.SlidingWindowClassifier` without ``classes``
+declares the classes of its ``estimator``. A strategy that fits a classifier,
+e.g., with ``fit_clf=True``, resolves and checks the declarations of an
+unfitted clone before fitting and then uses the fitted classifier's
+``target_spec_``. Unsupported target specifications are therefore rejected
+before training.
+
 .. _label-contract:
 
 Label and Missing-Value Contract
@@ -934,15 +944,16 @@ as for pool query strategies. An unfitted classifier declares the meaning of
 ``y`` through its ``classes``,
 ``missing_label``, and ``target_type``, from which the specification is
 resolved together with ``y``; without ``y``, only these declarations count.
-With ``fit_clf=True``, the strategy fits a clone of the classifier first and
-uses the clone's ``target_spec_``. As for pool query strategies, the
-classifier's own capabilities are checked against its ``target_spec_``, or
-against the resolved specification if it is unfitted. The strategy's capability
-is checked against the single-annotator prediction specification. Both checks
-precede changes to query state such as ``budget_manager_``. A multi-label
-classifier is therefore rejected with the capability error described above,
-whereas a fitted multi-annotator classifier passes both checks, see
-:ref:`multiple-annotators`.
+With ``fit_clf=True``, the strategy resolves the declarations of an unfitted
+clone before fitting and then uses the fitted clone's ``target_spec_``, as
+pool query strategies do. As for pool query strategies, the classifier's own
+capabilities are checked against its ``target_spec_``, or against the resolved
+specification if it is unfitted. The strategy's capability is checked against
+the single-annotator prediction specification. Both checks precede changes to
+query state such as ``budget_manager_``, and for a clone they also precede
+training. A multi-label classifier is therefore rejected with the capability
+error described above, whereas a fitted multi-annotator classifier passes both
+checks, see :ref:`multiple-annotators`.
 
 Passed labels are validated even with ``fit_clf=False``. This rejects some
 calls accepted by earlier versions, including label matrices, invalid missing

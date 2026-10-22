@@ -1227,21 +1227,31 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         )
         init_params = deepcopy(self.init_default_params)
         init_params["missing_label"] = -1
-        strategy = self.qs_class(**init_params)
-        query_params = {
-            "X": X,
-            "y": y,
-            estimator_param: estimator,
-            fit_param: False,
-        }
+        for fit in (False, True):
+            with (
+                self.subTest(**{fit_param: fit}),
+                patch.object(
+                    SklearnClassifier,
+                    "fit",
+                    side_effect=AssertionError("refit"),
+                ),
+            ):
+                strategy = self.qs_class(**init_params)
+                query_params = {
+                    "X": X,
+                    "y": y,
+                    estimator_param: estimator,
+                    fit_param: fit,
+                }
 
-        with self.assertRaisesRegex(
-            ValueError,
-            rf"{type(strategy).__name__} does not support target capability",
-        ):
-            strategy.query(**query_params)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    rf"{type(strategy).__name__} does not support target "
+                    "capability",
+                ):
+                    strategy.query(**query_params)
 
-        assert_no_query_state(self, strategy)
+                assert_no_query_state(self, strategy)
 
     def _test_classification_target_contract(
         self,
@@ -1802,12 +1812,12 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             return None
         return deepcopy(self.query_default_params_clf)
 
-    def _assert_query_rejects_clf(self, clf, y, error, pattern):
+    def _assert_query_rejects_clf(self, clf, y, error, pattern, fit_clf=False):
         """Assert that a rejected classifier leaves no query state behind."""
         query_params = self._stream_clf_query_params()
         query_params["clf"] = clf
         query_params["y"] = y
-        query_params["fit_clf"] = False
+        query_params["fit_clf"] = fit_clf
         strategy = self.qs_class(**deepcopy(self.init_default_params))
 
         with self.assertRaisesRegex(error, pattern):
@@ -1850,12 +1860,23 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             target_type="multi-label",
         ).fit(X, y)
 
-        self._assert_query_rejects_clf(
-            clf,
-            y,
-            ValueError,
-            rf"{self.qs_class.__name__} does not support target capability",
-        )
+        for fit_clf in (False, True):
+            with (
+                self.subTest(fit_clf=fit_clf),
+                patch.object(
+                    SklearnClassifier,
+                    "fit",
+                    side_effect=AssertionError("refit"),
+                ),
+            ):
+                self._assert_query_rejects_clf(
+                    clf,
+                    y,
+                    ValueError,
+                    rf"{self.qs_class.__name__} does not support target "
+                    "capability",
+                    fit_clf=fit_clf,
+                )
 
     def test_query_accepts_fitted_multiannotator_classifier(self):
         query_params = self._stream_clf_query_params()
@@ -1905,7 +1926,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         refit_error = "AnnotatorEnsembleClassifier does not support target"
         cases = [
             (clone(clf).fit(X, y_matrix), y_matrix, False, "one-dimensional"),
-            (clf, y_matrix, True, refit_error),
+            (clf, y_matrix, True, "one-dimensional"),
             *(
                 (ensemble, labels, True, refit_error)
                 for ensemble in (single, clone(single).fit(X, y[:, None]))

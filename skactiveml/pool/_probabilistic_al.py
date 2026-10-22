@@ -211,7 +211,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
                 metric=self.metric,
                 metric_dict=metric_dict,
                 missing_label=clf.missing_label,
-                classes=clf.classes,
+                classes=target_spec.classes,
             )
             pwc.fit(X=X, y=y, sample_weight=sample_weight)
             n = pwc.predict_freq(X_cand).sum(axis=1, keepdims=True)

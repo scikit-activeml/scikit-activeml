@@ -155,6 +155,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             fit_clf,
             utility_weight,
             return_utilities,
+            target_spec,
         ) = self._validate_data(
             candidates=candidates,
             clf=clf,
@@ -175,7 +176,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 metric=self.metric,
                 metric_dict=metric_dict,
                 missing_label=clf.missing_label,
-                classes=clf.classes,
+                classes=target_spec.classes,
             )
             pwc.fit(X=X, y=y, sample_weight=sample_weight)
             n = pwc.predict_freq(candidates).sum(axis=1, keepdims=True)
@@ -304,9 +305,11 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Checked utility weights.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
+        target_spec : skactiveml.utils.TargetSpec
+            The target specification resolved through `clf`.
         """
         X, y, sample_weight = _validate_X_y_sample_weight(X, y, sample_weight)
-        clf, _ = _fit_and_resolve_clf_target_spec(
+        clf, target_spec = _fit_and_resolve_clf_target_spec(
             self, clf, X, y, fit_clf=fit_clf, sample_weight=sample_weight
         )
         if self.metric is None and not hasattr(clf, "predict_freq"):
@@ -342,6 +345,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             fit_clf,
             utility_weight,
             return_utilities,
+            target_spec,
         )
 
     def _validate_utility_weight(self, utility_weight, candidates):

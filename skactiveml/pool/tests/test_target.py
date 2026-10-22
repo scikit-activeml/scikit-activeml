@@ -25,6 +25,7 @@ from skactiveml.pool import (
     Falcun,
     GreedyBALD,
     ParallelUtilityEstimationWrapper,
+    ProbabilisticAL,
     QueryByCommittee,
     SubSamplingWrapper,
     UncertaintySampling,
@@ -548,3 +549,50 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                         strategy.query(self.X, self.y, clf, fit_ensemble=False)
                     assert_no_query_state(self, strategy)
                     assert_state_unchanged(self, clf, original_state)
+
+
+class TestWrappedClassVocabulary(unittest.TestCase):
+    def test_query_refitting_respects_wrapped_class_vocabulary(self):
+        X = np.arange(16, dtype=float).reshape(8, 2) / 4
+        y = np.array([0, 1, -1, -1, -1, -1, -1, -1])
+        unlabeled = np.full_like(y, -1)
+        clf = SlidingWindowClassifier(
+            ParzenWindowClassifier(
+                classes=[0, 1, 2], missing_label=-1, random_state=0
+            ),
+            missing_label=-1,
+            random_state=0,
+        )
+        strategy = UncertaintySampling(missing_label=-1, random_state=0)
+        wrappers = [
+            strategy,
+            ProbabilisticAL(metric="rbf", missing_label=-1, random_state=0),
+            SubSamplingWrapper(
+                strategy, max_candidates=4, missing_label=-1, random_state=0
+            ),
+            SingleAnnotatorWrapper(strategy, missing_label=-1, random_state=0),
+        ]
+        for wrapper, labels in product(wrappers, (y, unlabeled)):
+            with self.subTest(wrapper=wrapper, labels=labels):
+                query_y = (
+                    labels[:, None]
+                    if isinstance(wrapper, SingleAnnotatorWrapper)
+                    else labels
+                )
+                original_state = deepcopy(clf)
+                results = [
+                    clone(wrapper).query(
+                        X,
+                        query_y,
+                        clf=supplied_clf,
+                        fit_clf=fit_clf,
+                        return_utilities=True,
+                    )
+                    for supplied_clf, fit_clf in (
+                        (clone(clf).fit(X, labels), False),
+                        (clf, True),
+                    )
+                ]
+                np.testing.assert_array_equal(results[0][0], results[1][0])
+                np.testing.assert_allclose(results[0][1], results[1][1])
+                assert_state_unchanged(self, clf, original_state)

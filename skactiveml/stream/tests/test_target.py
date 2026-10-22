@@ -4,16 +4,28 @@ from unittest.mock import PropertyMock, patch
 
 import numpy as np
 from sklearn.base import clone
-from sklearn.linear_model import SGDClassifier
+from sklearn.frozen import FrozenEstimator
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.naive_bayes import GaussianNB
 
-from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.base import SkactivemlClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SklearnClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
-from skactiveml.pool import ContrastiveAL
-from skactiveml.pool._target import _resolve_estimator_target_spec
+from skactiveml.pool import ContrastiveAL, UncertaintySampling
+from skactiveml.pool._target import (
+    _fit_and_resolve_estimator_target_spec,
+    _resolve_estimator_target_spec,
+)
 from skactiveml.stream import VariableUncertainty
-from skactiveml.stream._target import _resolve_clf_target_spec
+from skactiveml.stream._target import (
+    _fit_and_resolve_clf_target_spec,
+    _resolve_clf_target_spec,
+)
 from skactiveml.utils import MISSING_LABEL, TargetSpec
 
 
@@ -97,6 +109,9 @@ class TestClassifierTargetParity(unittest.TestCase):
         )
         fitted_classifiers = {
             "pwc": ParzenWindowClassifier(classes=[0, 1]).fit(X, y),
+            "sliding_window": SlidingWindowClassifier(
+                ParzenWindowClassifier(classes=[0, 1])
+            ).fit(X, y),
             "pwc_int": ParzenWindowClassifier(
                 classes=[0, 1], missing_label=-1
             ).fit(X, y_int),
@@ -125,6 +140,7 @@ class TestClassifierTargetParity(unittest.TestCase):
         label_cases = {
             "y": y,
             "y_column": y[:, None],
+            "y_unlabeled": np.full(len(X), MISSING_LABEL),
             "y_int": y_int,
             "y_matrix": y_matrix,
             "y_multilabel": y_multilabel,
@@ -155,13 +171,49 @@ class TestClassifierTargetParity(unittest.TestCase):
         self.assertEqual(
             accepted,
             {
-                ("pwc", True, "y"),
-                ("pwc", True, "y_column"),
-                ("pwc", False, "y"),
-                ("pwc", False, "y_column"),
+                *(
+                    (name, fitted, label_name)
+                    for name in ("pwc", "sliding_window")
+                    for fitted in (True, False)
+                    for label_name in ("y", "y_column", "y_unlabeled")
+                ),
                 ("pwc_int", True, "y_int"),
                 ("pwc_int", False, "y_int"),
                 ("annotator_ensemble", True, "y"),
                 ("annotator_ensemble", True, "y_column"),
+                ("annotator_ensemble", True, "y_unlabeled"),
             },
         )
+
+    def test_refit_of_lazily_resolved_classifier_matches_pool(self):
+        X = np.random.RandomState(0).randn(30, 2)
+        lr = LogisticRegression().fit(X, np.arange(30) % 3)
+        y = np.full(len(X), MISSING_LABEL)
+        y[:2] = [0, 1]
+        clf = SklearnClassifier(FrozenEstimator(lr))
+        results = [
+            _fit_and_resolve_estimator_target_spec(
+                UncertaintySampling(),
+                clf,
+                X,
+                y,
+                fit_estimator=True,
+                sample_weight=None,
+                estimator_name="clf",
+                fit_name="fit_clf",
+                estimator_types=[SkactivemlClassifier],
+            ),
+            _fit_and_resolve_clf_target_spec(
+                VariableUncertainty(),
+                clf,
+                X,
+                y,
+                fit_clf=True,
+                sample_weight=None,
+            ),
+        ]
+        for fitted_clf, target_spec in results:
+            self.assertEqual(target_spec.classes, (0, 1, 2))
+            np.testing.assert_allclose(
+                fitted_clf.predict_proba(X), lr.predict_proba(X)
+            )
