@@ -199,9 +199,12 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         y_labeled_ovr = _one_versus_rest_transform(
             y[mask_l], classes_, l_rest=-1
         )
-        for i, s in enumerate(mapping):
+        unlabeled_indices = np.flatnonzero(mask_a)
+        for s in mapping:
             mask_u = mask_a.copy()
             mask_u[s] = False
+            # The inverse uses the full unlabeled pool, not candidate order.
+            i = np.searchsorted(unlabeled_indices, s)
             L_uu_inv = _del_i_inv(L_aa_inv, i, "L_aa_inv")
 
             utilities_cand[s] = L[s, s] + np.max(
