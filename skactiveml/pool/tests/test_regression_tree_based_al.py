@@ -36,6 +36,19 @@ class TestRegressionTreeBasedAL(
             query_default_params_reg=query_default_params_reg,
         )
 
+    def test_single_candidate_indices_are_one_dimensional(self):
+        params = self.query_default_params_reg.copy()
+        for method in ["random", "diversity", "representativity"]:
+            for candidates in [np.array([1]), np.array([3])]:
+                with self.subTest(method=method, candidates=candidates):
+                    indices, utilities = RegressionTreeBasedAL(
+                        method=method, random_state=0
+                    ).query(
+                        **params, candidates=candidates, return_utilities=True
+                    )
+                    np.testing.assert_array_equal(indices, candidates)
+                    self.assertEqual(utilities.shape, (1, len(params["X"])))
+
     def test_init_param_method(self, test_cases=None):
         test_cases = test_cases or []
         test_cases += [

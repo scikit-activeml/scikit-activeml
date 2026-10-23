@@ -1064,6 +1064,53 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
+    def test_query_explicit_labeled_candidate(self):
+        """An explicit labeled candidate remains eligible for relabeling."""
+        fixtures = [
+            (
+                "classification",
+                self.init_default_params,
+                self.query_default_params_clf,
+                "single-output",
+            ),
+            (
+                "regression",
+                self.init_default_params,
+                self.query_default_params_reg,
+                "single-output",
+            ),
+            (
+                "multi-label",
+                self._multilabel_init_params(),
+                self.query_default_params_clf_multilabel,
+                "multi-label",
+            ),
+        ]
+        for name, init_params, query_params, target_type in fixtures:
+            if query_params is None:
+                continue
+            with self.subTest(target=name):
+                params = deepcopy(query_params)
+                missing_label = init_params["missing_label"]
+                observed = labeled_indices(
+                    params["y"], missing_label, target_type=target_type
+                )
+                self.assertGreater(len(observed), 0)
+                candidate = observed[-1:]
+                params.update(
+                    candidates=candidate, batch_size=1, return_utilities=True
+                )
+                strategy = self.qs_class(**deepcopy(init_params))
+
+                indices, utilities = strategy.query(**params)
+
+                np.testing.assert_array_equal(indices, candidate)
+                self.assertEqual(utilities.shape, (1, len(params["X"])))
+                self.assertFalse(np.isnan(utilities[0, candidate]).any())
+                excluded = np.ones(len(params["X"]), dtype=bool)
+                excluded[candidate] = False
+                self.assertTrue(np.isnan(utilities[0, excluded]).all())
+
     def _test_fitted_multilabel_classifier_rejection(
         self,
         *,
