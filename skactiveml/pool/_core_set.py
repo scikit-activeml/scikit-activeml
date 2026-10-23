@@ -134,7 +134,6 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for samples outside the candidate set and samples
             already selected in the batch are set to `np.nan`.
-            Explicit candidate indices may include labeled samples.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in

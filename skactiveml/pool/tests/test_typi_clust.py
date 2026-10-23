@@ -187,27 +187,16 @@ class TestTypiClust(
                         )
                         self.assertEqual(len(np.unique(indices)), batch_size)
                         self.assertTrue(np.isin(indices, candidates).all())
-                        first_utilities = utilities[0][
-                            np.isfinite(utilities[0])
-                        ]
-                        expected = (
-                            np.full(2, 1 / (0.1 + 1e-7))
-                            if batch_size == 1
-                            else [1]
-                        )
-                        np.testing.assert_allclose(first_utilities, expected)
+                        expected = np.full((batch_size, len(X)), np.nan)
+                        expected[:, candidates] = 1
+                        if np.isnan(labels[1]):
+                            expected[0, candidates] = -np.inf
+                            expected[0, 1] = 1
+                            self.assertEqual(indices[0], 1)
                         for i, idx in enumerate(indices):
+                            expected[i, indices[:i]] = np.nan
                             self.assertTrue(np.isfinite(utilities[i, idx]))
-                            self.assertTrue(
-                                np.isnan(utilities[i, indices[:i]]).all()
-                            )
-                        self.assertTrue(
-                            np.isnan(
-                                utilities[
-                                    :, ~np.isin(np.arange(4), candidates)
-                                ]
-                            ).all()
-                        )
+                        np.testing.assert_allclose(utilities, expected)
 
     def test_query(self):
         # test case 1: with the same random state the init pick up
