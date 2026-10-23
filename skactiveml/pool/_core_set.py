@@ -23,13 +23,12 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     This class implements the core-set based query strategy, i.e., the
     standard greedy algorithm for the k-center problem [1]_. CoreSet
     applies a k-center (farthest-first) selection in a feature space,
-    seeded by labeled samples outside the candidate set, to minimize the
-    maximum distance of candidates to the selected samples. It is a pure
-    diversity criterion without explicit consideration of prediction
-    uncertainty. Originally, this query strategy was only proposed for
-    classification. Nevertheless, it is task-agnostic such that it can handle
-    class labels, numerical targets, and multilabel targets represented by a
-    two-dimensional `y`.
+    seeded by the labeled set, to minimize the maximum distance of candidates
+    to the labeled/selected samples. It is a pure diversity criterion without
+    explicit consideration of prediction uncertainty. Originally, this query
+    strategy was only proposed for classification. Nevertheless, it is
+    task-agnostic such that it can handle class labels, numerical targets, and
+    multilabel targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -106,8 +105,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`. Labeled candidates remain eligible and are
-              excluded from the initial centers.
+              samples in `(X,y)`. Labeled candidates remain eligible and also
+              serve as initial centers.
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
@@ -135,6 +134,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for samples outside the candidate set and samples
             already selected in the batch are set to `np.nan`.
+            Explicit candidate indices may include labeled samples.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in
@@ -246,7 +246,7 @@ def k_greedy_center(
     mapping : None or np.ndarray of shape (n_candidates,), default=None
         Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
         If `None`, the unlabeled samples are candidates. Labeled samples in
-        `mapping` remain eligible and are excluded from the initial centers.
+        `mapping` remain eligible and also serve as initial centers.
     n_new_cand : int or None, default=None
         The number of new candidates that are additionally added to `X`.
         Only used for the case, that in the query function with the shape of
@@ -336,7 +336,6 @@ def k_greedy_center(
         missing_label=missing_label,
         target_type=target_type,
     )
-    selected_samples = np.setdiff1d(selected_samples, mapping)
     query_indices = np.zeros(batch_size, dtype=int)
     for i in range(batch_size):
         if i == 0:
@@ -348,7 +347,14 @@ def k_greedy_center(
                 metric_dict=metric_dict,
             )
         else:
-            latest_dist = utilities[i - 1]
+            # With no initial centers, the first row contains initialization
+            # zeros rather than distances. Compute real distances once a
+            # first center has been selected; keep genuine zero distances.
+            latest_dist = (
+                None
+                if i == 1 and len(selected_samples) == 0
+                else utilities[i - 1]
+            )
             update_dist = _update_distances(
                 X=X,
                 cluster_centers=[query_indices[i - 1]],
@@ -362,6 +368,8 @@ def k_greedy_center(
             utilities[i] = update_dist
         else:
             utilities[i] = update_dist[mapping]
+
+        utilities[i, query_indices[:i]] = np.nan
 
         # select index
         query_indices[i] = rand_argmax(
@@ -408,8 +416,7 @@ def _update_distances(
         will be 0.
         - If there are some cluster center exist, the return will be the
         distance between each sample and its nearest center after each selected
-        sample of the batch. In the case of cluster center the value will be
-        `np.nan`.
+        sample of the batch. Eligible cluster centers retain their distance.
         - For the case, that indices aren't in `mapping`, the corresponding
         value in `result-dist` will be also `np.nan`.
     """
@@ -424,17 +431,10 @@ def _update_distances(
         )
 
     if latest_distance is not None:
-        sum_dist = np.nansum(latest_distance)
-        latest_distance_tmp = latest_distance
-        if sum_dist == 0:
-            latest_distance_tmp = latest_distance.copy()
-            latest_distance_tmp[latest_distance_tmp == 0] = np.inf
         l_distance = np.zeros(shape=X.shape[0])
-        l_distance[mapping] = latest_distance_tmp[mapping]
+        l_distance[mapping] = latest_distance[mapping]
         dist = np.minimum(l_distance, dist)
 
     result_dist = np.full(X.shape[0], np.nan)
     result_dist[mapping] = dist[mapping]
-    result_dist[cluster_centers] = np.nan
-
     return result_dist
