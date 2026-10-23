@@ -142,6 +142,60 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             X, y_7, batch_size=2, return_utilities=True
         )
 
+    def test_query_with_only_labeled_candidate(self):
+        X = np.arange(4, dtype=float).reshape(-1, 1)
+        y = np.array([0.0, 1.0, 0.0, 1.0])
+        indices, utilities = CoreSet(random_state=0).query(
+            X, y, candidates=[3], return_utilities=True
+        )
+        np.testing.assert_array_equal(indices, [3])
+        np.testing.assert_allclose(utilities, [[np.nan, np.nan, np.nan, 0]])
+
+    def test_query_geometric_candidate_utilities(self):
+        X = np.array([[0.0], [2.0], [5.0], [9.0], [10.0], [12.0]])
+        candidates = np.array([0, 1, 4, 5])
+        for observed in [True, False]:
+            for multilabel in [True, False]:
+                with self.subTest(observed=observed, multilabel=multilabel):
+                    y = np.array([0, np.nan, 1, np.nan, 0, np.nan])
+                    if not observed:
+                        y[:] = np.nan
+                    centers = np.flatnonzero(~np.isnan(y))
+                    if multilabel:
+                        y = np.column_stack((y, y))
+                    strategy = CoreSet(
+                        random_state=0,
+                        target_type=(
+                            "multi-label" if multilabel else "single-output"
+                        ),
+                    )
+                    indices, utilities = strategy.query(
+                        X,
+                        y,
+                        candidates=candidates,
+                        batch_size=len(candidates),
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(
+                        np.sort(indices), np.sort(candidates)
+                    )
+                    for step, index in enumerate(indices):
+                        expected = np.full(len(X), np.nan)
+                        if len(centers):
+                            # Independent one-dimensional nearest-center norm.
+                            expected[candidates] = np.min(
+                                np.abs(X[candidates, 0, None] - X[centers, 0]),
+                                axis=1,
+                            )
+                        else:
+                            expected[candidates] = 0
+                        expected[indices[:step]] = np.nan
+                        np.testing.assert_allclose(utilities[step], expected)
+                        self.assertEqual(
+                            utilities[step, index], np.nanmax(expected)
+                        )
+                        centers = np.append(centers, index)
+
 
 class TestKGreedyCenter(unittest.TestCase):
     def setUp(self):
