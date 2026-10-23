@@ -243,7 +243,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                         rand_argmax(
                             batch_utilities_cand[len(query_indices)],
                             random_state=self.random_state_,
-                        )
+                        )[0]
                     )
 
         elif self.method == "diversity":
@@ -274,7 +274,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                         rand_argmax(
                             batch_utilities_cand[len(query_indices)],
                             random_state=self.random_state_,
-                        )
+                        )[0]
                     )
 
         elif self.method == "representativity":

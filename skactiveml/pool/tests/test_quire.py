@@ -185,6 +185,65 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                                 indices[0], np.nanargmax(expected)
                             )
 
+    def test_labeled_candidates_match_minimized_quadratic_energy(self):
+        X = np.array([[0.0], [1.0], [2.5], [4.0], [5.5], [7.0]])
+        classes = [-2, 7]
+        partial_y = np.array([-2, 7, np.nan, -2, np.nan, np.nan])
+        complete_y = np.array([-2, 7, 7, -2, -2, 7], dtype=float)
+        kernel = pairwise_kernels(X, X, metric="rbf")
+        lmbda = 0.7
+        L = np.linalg.solve(kernel + lmbda * np.eye(len(X)), np.eye(len(X)))
+
+        for metric in ["rbf", "precomputed"]:
+            for y, candidates in [
+                (partial_y, np.array([1])),
+                (partial_y, np.array([5, 1, 4])),
+                (complete_y, np.array([3, 1])),
+            ]:
+                with self.subTest(metric=metric, candidates=candidates):
+                    expected = np.full(len(X), np.nan)
+                    for candidate in candidates:
+                        known = ~np.isnan(y)
+                        known[candidate] = False
+                        unknown = np.isnan(y)
+                        unknown[candidate] = False
+                        energies = []
+                        for label in classes:
+                            assignment = np.zeros(len(X))
+                            assignment[known] = np.where(
+                                y[known] == label, 1, -1
+                            )
+                            assignment[candidate] = 1
+                            # Minimize the complete quadratic directly instead
+                            # of reproducing Quire's block-inverse update.
+                            assignment[unknown] = np.linalg.solve(
+                                L[np.ix_(unknown, unknown)],
+                                -L[np.ix_(unknown, ~unknown)]
+                                @ assignment[~unknown],
+                            )
+                            energies.append(assignment @ L @ assignment)
+                        expected[candidate] = -max(energies)
+
+                    strategy = Quire(
+                        classes, lmbda=lmbda, metric=metric, random_state=0
+                    )
+                    indices, utilities = strategy.query(
+                        kernel if metric == "precomputed" else X,
+                        y,
+                        candidates=candidates,
+                        batch_size=min(2, len(candidates)),
+                        return_utilities=True,
+                    )
+
+                    self.assertTrue(np.isin(indices, candidates).all())
+                    self.assertEqual(len(np.unique(indices)), len(indices))
+                    for row, index in enumerate(indices):
+                        np.testing.assert_allclose(utilities[row], expected)
+                        self.assertAlmostEqual(
+                            expected[index], np.nanmax(expected)
+                        )
+                        expected[index] = np.nan
+
     def test__del_i_inv(self):
         self.assertWarns(Warning, _del_i_inv, np.tri(5), 2)
 

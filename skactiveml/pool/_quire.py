@@ -98,7 +98,9 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Already labeled candidates may be queried
+              again; their current label is replaced by a hypothetical label
+              when evaluating their utility.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -115,8 +117,8 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan. The indexing
-            refers to the samples in `X`.
+            Utilities outside the candidate set will be set to np.nan. The
+            indexing refers to the samples in `X`.
         """
         # --- Validation -----------------------------------------------------
         # Check standard parameters.
@@ -203,18 +205,30 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         for s in mapping:
             mask_u = mask_a.copy()
             mask_u[s] = False
-            # The inverse uses the full unlabeled pool, not candidate order.
-            i = np.searchsorted(unlabeled_indices, s)
-            L_uu_inv = _del_i_inv(L_aa_inv, i, "L_aa_inv")
+            mask_l_s = mask_l
+            y_labeled_ovr_s = y_labeled_ovr
+            if mask_l[s]:
+                # Replace the candidate's observed label by the hypothetical
+                # label, without removing an unrelated unlabeled sample.
+                mask_l_s = mask_l.copy()
+                mask_l_s[s] = False
+                y_labeled_ovr_s = _one_versus_rest_transform(
+                    y[mask_l_s], classes_, l_rest=-1
+                )
+                L_uu_inv = L_aa_inv
+            else:
+                # Use the full unlabeled pool's order for this inverse.
+                i = np.searchsorted(unlabeled_indices, s)
+                L_uu_inv = _del_i_inv(L_aa_inv, i, "L_aa_inv")
 
             utilities_cand[s] = L[s, s] + np.max(
                 [
-                    yl.T.dot(L[mask_l][:, mask_l]).dot(yl)
-                    + 2 * L[s][mask_l].dot(yl)
-                    - (L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
+                    yl.T.dot(L[mask_l_s][:, mask_l_s]).dot(yl)
+                    + 2 * L[s][mask_l_s].dot(yl)
+                    - (L[mask_u][:, mask_l_s].dot(yl) + L[mask_u][:, [s]])
                     .T.dot(L_uu_inv)
-                    .dot(L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
-                    for yl in y_labeled_ovr.T[:, :, np.newaxis]
+                    .dot(L[mask_u][:, mask_l_s].dot(yl) + L[mask_u][:, [s]])
+                    for yl in y_labeled_ovr_s.T[:, :, np.newaxis]
                 ]
             )
 
