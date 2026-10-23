@@ -119,6 +119,72 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         qs = Quire(self.classes)
         _, utils = qs.query(**self.kwargs, return_utilities=True)
 
+    def test_query_candidate_subset_matches_direct_schur_complement(self):
+        X = np.array(
+            [
+                [0, 0],
+                [0.2, 0.1],
+                [0.5, 0.4],
+                [1.5, 0.8],
+                [0.9, 1.1],
+                [1.2, 0.3],
+            ]
+        )
+        for classes in [[0, 1], [0, 1, 2]]:
+            y = np.array([0, np.nan, 1, np.nan, classes[-1], np.nan])
+            labeled = np.flatnonzero(~np.isnan(y))
+            for metric in ["rbf", "linear", "precomputed"]:
+                K = pairwise_kernels(
+                    X, metric="rbf" if metric == "precomputed" else metric
+                )
+                for lmbda in [0.5, 2.0]:
+                    L = np.linalg.inv(K + lmbda * np.eye(len(X)))
+                    for candidates in [[5], [3, 5], [1, 3, 5]]:
+                        with self.subTest(
+                            classes=classes,
+                            metric=metric,
+                            lmbda=lmbda,
+                            candidates=candidates,
+                        ):
+                            expected = np.full(len(X), np.nan)
+                            for candidate in candidates:
+                                known = np.append(labeled, candidate)
+                                remaining = np.setdiff1d(
+                                    np.arange(len(X)), known
+                                )
+                                # Minimize the full quadratic energy over the
+                                # remaining unknown labels, without downdating
+                                # an inverse or indexing the candidate list.
+                                reduced = L[np.ix_(known, known)] - (
+                                    L[np.ix_(known, remaining)]
+                                    @ np.linalg.solve(
+                                        L[np.ix_(remaining, remaining)],
+                                        L[np.ix_(remaining, known)],
+                                    )
+                                )
+                                energies = []
+                                for label in classes:
+                                    labels = np.append(
+                                        np.where(y[labeled] == label, 1, -1), 1
+                                    )
+                                    energies.append(labels @ reduced @ labels)
+                                expected[candidate] = -max(energies)
+                            indices, utilities = Quire(
+                                classes=classes,
+                                metric=metric,
+                                lmbda=lmbda,
+                                random_state=0,
+                            ).query(
+                                K if metric == "precomputed" else X,
+                                y,
+                                candidates=candidates,
+                                return_utilities=True,
+                            )
+                            np.testing.assert_allclose(utilities[0], expected)
+                            self.assertEqual(
+                                indices[0], np.nanargmax(expected)
+                            )
+
     def test__del_i_inv(self):
         self.assertWarns(Warning, _del_i_inv, np.tri(5), 2)
 
