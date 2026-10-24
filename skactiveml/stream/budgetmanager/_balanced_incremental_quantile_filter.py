@@ -64,7 +64,6 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         """
         utilities = self._validate_data(utilities)
 
-        # intialize return parameters
         queried_indices = []
 
         tmp_queried_samples_ = self.queried_samples_
@@ -157,7 +156,6 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             self.w_tol, "w_tol", (float, int), min_val=0, min_inclusive=False
         )
 
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):

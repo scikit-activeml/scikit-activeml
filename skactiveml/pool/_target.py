@@ -21,7 +21,9 @@ from ..utils import (
 )
 from ..utils._label import _check_labels
 from ..utils._target import (
+    _check_target_matches_spec,
     _class_vocabulary_key,
+    _predicted_target_spec,
     _resolve_task_agnostic_target_type,
     _validate_target_semantics,
     _check_target_spec_capability,
@@ -33,15 +35,18 @@ _ALLOWED_DECLARED_TARGET_TYPES = frozenset(
 
 
 def _resolve_estimator_target_spec(
-    strategy, estimator, y, *, missing_label_checked=False
+    strategy,
+    estimator,
+    y,
+    *,
+    missing_label_checked=False,
+    checked_target_spec=None,
 ):
     """Resolve one estimator-backed strategy target specification."""
     if isinstance(estimator, SkactivemlClassifier):
         task = "classification"
-        classes = getattr(estimator, "classes_", estimator.classes)
     elif isinstance(estimator, SkactivemlRegressor):
         task = "regression"
-        classes = None
     else:  # pragma: no cover - callers validate their estimator type first.
         raise TypeError("`estimator` must be a scikit-activeml estimator.")
 
@@ -58,15 +63,12 @@ def _resolve_estimator_target_spec(
     )
 
     if hasattr(estimator, "target_spec_"):
-        target_spec = estimator.target_spec_
-        resolve_target_spec(
-            y,
-            task=target_spec.task,
-            target_type=target_spec.target_type,
-            annotation_type=target_spec.annotation_type,
-            classes=target_spec.classes,
-            missing_label=strategy.missing_label,
-        )
+        estimator_target_spec = estimator.target_spec_
+        target_spec = _predicted_target_spec(estimator_target_spec)
+        if target_spec != checked_target_spec:
+            _check_target_matches_spec(
+                y, target_spec, missing_label=strategy.missing_label
+            )
     else:
         estimator_target_type = getattr(estimator, "target_type", "auto")
         _validate_target_semantics(
@@ -93,13 +95,18 @@ def _resolve_estimator_target_spec(
                 else strategy_target_type
             ),
             annotation_type="single-annotator",
-            classes=classes,
+            classes=(
+                estimator._declared_classes
+                if task == "classification"
+                else None
+            ),
             missing_label=strategy.missing_label,
         )
+        estimator_target_spec = target_spec
 
     _check_target_spec_capability(
         type(estimator).__name__,
-        target_spec,
+        estimator_target_spec,
         estimator._target_capabilities,
     )
 
@@ -113,12 +120,13 @@ def _resolve_estimator_target_spec(
     _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )
-    _check_labels(
-        y,
-        strategy.missing_label,
-        target_type=target_spec.target_type,
-        task=target_spec.task,
-    )
+    if target_spec != checked_target_spec:
+        _check_labels(
+            y,
+            strategy.missing_label,
+            target_type=target_spec.target_type,
+            task=target_spec.task,
+        )
     return target_spec
 
 
@@ -138,19 +146,25 @@ def _fit_and_resolve_estimator_target_spec(
     check_type(estimator, estimator_name, *estimator_types)
     check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     check_type(fit_estimator, fit_name, bool)
+    # Resolving may commit lazily resolved state that would change the fit,
+    # so the declarations of a refit are checked on a separate clone.
+    target_spec = _resolve_estimator_target_spec(
+        strategy,
+        clone(estimator) if fit_estimator else estimator,
+        y,
+        missing_label_checked=True,
+    )
     if fit_estimator:
         # A fresh fit resolves from constructor settings, including explicit
         # classes, rather than freezing the previous fit's inferred vocabulary.
         estimator = clone(estimator)
-    target_spec = _resolve_estimator_target_spec(
-        strategy, estimator, y, missing_label_checked=True
-    )
-    if fit_estimator:
         if sample_weight is None:
             estimator = estimator.fit(X, y)
         else:
             estimator = estimator.fit(X, y, sample_weight)
-        target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
+        target_spec = _resolve_estimator_target_spec(
+            strategy, estimator, y, checked_target_spec=target_spec
+        )
     return estimator, target_spec
 
 
@@ -237,7 +251,7 @@ def _reconcile_target_declarations(
     _check_declared_target_types(declarations)
 
     fitted_specs = [
-        authority.target_spec_
+        _predicted_target_spec(authority.target_spec_)
         for authority in authorities
         if hasattr(authority, "target_spec_")
     ]
@@ -250,14 +264,7 @@ def _reconcile_target_declarations(
                 "Supplied fitted estimators have conflicting target "
                 "specifications."
             )
-        resolve_target_spec(
-            y,
-            task=target_spec.task,
-            target_type=target_spec.target_type,
-            annotation_type=target_spec.annotation_type,
-            classes=target_spec.classes,
-            missing_label=missing_label,
-        )
+        _check_target_matches_spec(y, target_spec, missing_label=missing_label)
         target_type = target_spec.target_type
     else:
         declared_target_type = _resolve_declared_target_type(
@@ -358,7 +365,7 @@ def _resolve_authority_classes(authorities):
     resolved_classes = None
     resolved_key = None
     for authority in authorities:
-        classes = getattr(authority, "classes_", authority.classes)
+        classes = authority._declared_classes
         if classes is None:
             continue
         key = _class_vocabulary_key(classes)

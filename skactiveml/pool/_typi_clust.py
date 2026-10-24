@@ -12,10 +12,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the Typical Clustering (TypiClust) query strategy
     [1]_, which clusters embeddings of both labeled and unlabeled data with
-    `n_clusters=n_labeled_samples + batch_size`. Here, `n_labeled_samples`
-    counts labeled samples outside the candidate set. Clusters containing
-    these samples are covered. It then selects the most typical sample
-    (highest local density / smallest mean kNN distance) from up to
+    `n_clusters=min(n_labeled_samples + batch_size, n_samples)`. Clusters
+    containing labeled samples are covered. It then selects the most typical
+    sample (highest local density / smallest mean kNN distance) from up to
     `batch_size` uncovered clusters, ensuring diversity while avoiding already
     represented regions. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation is task-agnostic
@@ -107,8 +106,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`. Labeled candidates remain eligible and do
-              not mark their clusters as covered.
+              samples in `(X,y)`. Labeled candidates remain eligible and mark
+              their clusters as covered.
             - Candidate samples passed directly with shape
               `(n_candidates, n_features)` are not supported because TypiClust
               requires a mapping to samples in `X`.
@@ -176,10 +175,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             missing_label=self.missing_label,
             target_type=target_type,
         )
-        labeled_sample_indices = np.setdiff1d(labeled_sample_indices, mapping)
 
         # Set number of clusters.
-        n_clusters = len(labeled_sample_indices) + batch_size
+        n_clusters = min(len(labeled_sample_indices) + batch_size, len(X))
         cluster_algo_dict[self.n_cluster_param_name] = n_clusters
 
         _set_random_state_if_supported(

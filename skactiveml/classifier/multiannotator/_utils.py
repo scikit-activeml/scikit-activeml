@@ -300,8 +300,7 @@ try:
             kwargs : dict
                 Keyword arguments consumed by `_validate_data`.
             """
-            vd_kwargs = super()._validate_data_kwargs()
-            return vd_kwargs
+            return super()._validate_data_kwargs()
 
         @abstractmethod
         def _build_neural_net_param_overrides(self, X, y):

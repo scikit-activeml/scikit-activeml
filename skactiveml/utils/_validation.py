@@ -501,7 +501,6 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
 
     families = check_classes(classes)
 
-    # Check whether `classes` contains one vocabulary per target label.
     has_nested_classes = _has_nested_classes(classes)
 
     # Enforce cost_matrix semantics.
@@ -949,6 +948,19 @@ def check_random_state(random_state, seed_multiplier=None):
     return np.random.RandomState(seed)
 
 
+def _ensure_random_state(estimator):
+    """Copy `random_state` to `random_state_` once, then validate it.
+
+    Parameters
+    ----------
+    estimator : object
+        An object with the attribute `random_state`.
+    """
+    if not hasattr(estimator, "random_state_"):
+        estimator.random_state_ = copy.deepcopy(estimator.random_state)
+    estimator.random_state_ = check_random_state(estimator.random_state_)
+
+
 def check_indices(indices, A, dim="adaptive", unique=True):
     """Check if indices fit to array.
 
@@ -1373,13 +1385,10 @@ def _check_forward_outputs(forward_outputs):
         If `forward_outputs` is empty or contains negative indices.
     """
 
-    # Check forward_outputs configured.
     check_type(forward_outputs, "forward_outputs", dict)
     if len(forward_outputs) == 0:
         raise ValueError("`forward_outputs` must contain at least one entry.")
 
-    # Validate and normalize specs into a dict:
-    # name -> (idx, transform)
     for name, spec in forward_outputs.items():
         if (
             not isinstance(spec, tuple)

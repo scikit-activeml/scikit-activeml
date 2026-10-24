@@ -193,10 +193,17 @@ named private file under ``skactiveml/utils``.
 
 Do not import helper functions or constants from ``skactiveml.base``. That
 file is for base classes. If a helper must import a base class, keep it in the
-subpackage that uses it. ``skactiveml/pool/_target.py`` is an example. Put
-exception classes in ``skactiveml/exceptions.py``.
+subpackage that uses it. ``skactiveml/pool/_target.py`` and
+``skactiveml/stream/_target.py`` are examples. Put exception classes in
+``skactiveml/exceptions.py``.
 
-Add a query-strategy base class only when it contains behavior shared by its
+A base class keeps its public contract, the methods it calls itself,
+declarations with conservative defaults such as ``_target_capabilities``,
+behavior all its subclasses share, and methods that work with the state it
+defines, such as the label state of ``SkactivemlClassifier``. Other helpers,
+e.g., those that only check passed arguments or that need attributes only some
+subclasses define, are functions placed by the rules above instead. Add a
+query-strategy base class only when it contains behavior shared by its
 subclasses. Do not add one only to share a constant or to help tests find
 strategies.
 
@@ -293,6 +300,9 @@ label helpers, or multi-annotator components. In particular:
   array shape or the values alone.
 - Declare the exact target combinations a component supports in its
   ``_target_capabilities``.
+- Override ``_declared_classes`` in a classifier wrapper that takes its
+  ``classes`` from a wrapped estimator, as ``SlidingWindowClassifier`` does,
+  so that query strategies see this vocabulary before fitting.
 - Keep the fitted ``target_spec_`` on estimators and wrappers that retain a
   fitted target specification. Query strategies resolve the specification in
   each query and do not retain it.
@@ -426,12 +436,13 @@ Use the ``self._validate_data`` method (implemented in the superclass) exactly
 once for structural validation of the query inputs ``X`` and ``y``. Target
 resolution is a separate semantic step and may intentionally precede
 ``self._validate_data`` so that invalid or unsupported target semantics fail
-before estimator fitting or query-state initialization. If ``fit_clf`` or
-``fit_reg`` is ``True``, fit a clone of the classifier or regressor.
-``_fit_and_resolve_estimator_target_spec`` in ``skactiveml/pool/_target.py``
-does this and resolves the target specification. Calculate utilities via an
-extra public function. Use the ``simple_batch`` function from ``utils`` to
-determine the query indices and set the utilities in naive batch query
+before estimator fitting or query-state initialization. If the strategy takes
+one estimator that it may refit, use ``_fit_and_resolve_estimator_target_spec``
+from ``skactiveml/pool/_target.py``. It validates the estimator and returns the
+estimator to use, i.e., a fitted clone if requested, e.g., via
+``fit_clf=True``, with the resolved target specification. Calculate utilities
+via an extra public function. Use the ``simple_batch`` function from ``utils``
+to determine the query indices and set the utilities in naive batch query
 strategies.
 
 .. _testing-1:
@@ -544,10 +555,18 @@ including ``budget``, ``budget_manager``, and ``random_state``, so that several
 samples can be assessed with the same state. Update the internal state in the
 ``update`` method. If the strategy uses a classifier (``clf``), it also accepts
 the optional parameters ``X``, ``y``, ``sample_weight``, and ``fit_clf``. Use
-the ``self._validate_data`` method of the superclass, and check the inputs
-``X`` and ``y`` only once. If ``fit_clf`` is ``True``, fit a clone of the
-classifier. In both cases, resolve its target specification with
-``self._resolve_clf_target_spec(clf, y)``.
+``self._validate_data`` from the superclass, and check ``X`` and ``y`` only
+once. Call ``_validate_X_y_sample_weight`` from
+``skactiveml/stream/_validation.py``, followed by
+``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``,
+before ``super()._validate_data`` and ``_validate_budget_manager``. Invalid
+inputs must fail before query state is set. The target helper returns
+``(clf, target_spec)``, with a fitted clone when ``fit_clf=True``.
+
+When adapting subclasses written for version 1.0.1, replace overrides of
+``_validate_clf`` and ``_validate_X_y_sample_weight`` with validation in the
+strategy's ``_validate_data`` method. These private methods have moved to
+module helpers, so the old overrides are no longer called.
 
 .. _update-1:
 
@@ -566,9 +585,11 @@ Required Parameters:
 |                               | of ``query``.                               |
 +-------------------------------+---------------------------------------------+
 | ``budget_manager_param_dict`` | Further parameters for the ``update``       |
-|                               | method of the budget manager. Only for      |
-|                               | strategies with a budget manager.           |
+|                               | method of the budget manager.               |
 +-------------------------------+---------------------------------------------+
+
+Strategies without a budget manager accept and ignore
+``budget_manager_param_dict``.
 
 .. _general-advice-3:
 
@@ -576,10 +597,12 @@ General Advice
 ''''''''''''''
 
 ``update`` must also work before the first ``query``. Validate ``candidates``
-and ``queried_indices`` first, for example with ``_validate_budget_update``
-from ``skactiveml.utils._validation``, so that invalid input leaves the state
-unchanged. If the strategy uses a ``budget_manager``, create it if needed and
-forward the call to ``budget_manager.update``.
+and ``queried_indices`` first with ``_validate_budget_update`` from
+``skactiveml/utils/_validation.py``, so that invalid input leaves the state
+unchanged. The update must not set ``n_features_in_``. If the strategy uses a
+budget manager, prepare ``budget_manager_`` with ``_validate_budget_manager``
+from ``skactiveml/stream/_validation.py`` and forward the call to
+``budget_manager.update``.
 
 .. _testing-2:
 
@@ -686,8 +709,14 @@ in a first ``update``:
   budget.
 - With both, it uses the budget manager and warns if the budgets differ.
 
-Then call ``self._sync_default_budget_manager()``, so that a changed ``budget``
-reaches the default budget manager.
+Call ``_validate_budget_manager`` from ``skactiveml/stream/_validation.py`` in
+every ``_validate_data`` and ``update`` call. It creates ``budget_manager_`` on
+first use and applies changes of ``budget`` to a default ``budget_manager_``.
+
+Budget-manager subclasses written for version 1.0.1 must also account for the
+removal of the private ``_validate_random_state`` methods. Random-state setup
+now uses ``_ensure_random_state`` from ``skactiveml/utils/_validation.py``;
+overrides of the removed methods are no longer called.
 
 .. _testing-3:
 
@@ -831,9 +860,9 @@ General Advice
 ''''''''''''''
 
 Use ``self._validate_data`` (implemented in the superclass). Check the inputs
-``X`` and ``y`` only once. Fit the classifier only if ``fit_clf`` is ``True``.
-If the strategy combines a single-annotator query strategy with a performance
-estimate:
+``X`` and ``y`` only once. Fit a clone of the classifier if ``fit_clf`` is
+``True``. If the strategy combines a single-annotator query strategy with a
+performance estimate:
 
 -  define an aggregation function,
 -  evaluate the performance for each sample-annotator pair,

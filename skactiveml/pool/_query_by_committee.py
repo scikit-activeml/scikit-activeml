@@ -173,9 +173,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 SkactivemlRegressor or SkactivemlClassifier or \
                 SkactivemlRegressor
             - If `ensemble` is a `SkactivemlClassifier` or a
-              `SkactivemlRegressor` and has `n_estimators` plus
-              `estimators_` after fitting as attributes, its estimators will
-              be used as committee.
+              `SkactivemlRegressor` and has the attribute `estimators_` after
+              fitting, its estimators will be used as committee.
             - If `ensemble` is array-like, each element of this list must be
               `SkactivemlClassifier` or a `SkactivemlRegressor` and will be
               used as committee member.
@@ -236,7 +235,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label,
+            strategy=self,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,
@@ -387,9 +386,7 @@ def average_kl_divergence(probas, eps=1e-7):
         scores = np.nansum(
             np.nansum(probas * np.log(probas / probas_mean), axis=2), axis=0
         )
-    scores = scores / n_estimators
-
-    return scores
+    return scores / n_estimators
 
 
 def vote_entropy(votes, classes):
@@ -457,9 +454,7 @@ def variation_ratios(votes):
 
     # Count the votes.
     vote_count = compute_vote_vectors(y=votes, missing_label=None)
-    scores = 1 - (vote_count.max(axis=-1) / n_estimators)
-
-    return scores
+    return 1 - (vote_count.max(axis=-1) / n_estimators)
 
 
 def _check_ensemble(
@@ -468,14 +463,14 @@ def _check_ensemble(
     X,
     y,
     sample_weight,
+    strategy,
     fit_ensemble=True,
-    missing_label=MISSING_LABEL,
     sample_predictions_method_name=None,
     sample_predictions_dict=None,
 ):
     error_msg = (
-        f"`ensemble` must either be a `{estimator_types} "
-        f"with the attribute `n_ensembles` or `estimators_` or an array-like "
+        f"`ensemble` must either be a `{estimator_types}` "
+        f"with the attribute `n_estimators` or `estimators_` or an array-like "
         f"of {estimator_types} objects or implement a method with the name "
         f"`{sample_predictions_method_name}`."
     )
@@ -486,9 +481,14 @@ def _check_ensemble(
 
     for estimator_type in estimator_types:
         if isinstance(ensemble, estimator_type):
-            check_equal_missing_label(ensemble.missing_label, missing_label)
+            check_equal_missing_label(
+                ensemble.missing_label, strategy.missing_label
+            )
             # Fit the ensemble.
             if fit_ensemble:
+                _resolve_estimator_target_spec(
+                    strategy, clone(ensemble), y, missing_label_checked=True
+                )
                 if sample_weight is None:
                     ensemble = clone(ensemble).fit(X, y)
                 else:
@@ -526,7 +526,26 @@ def _check_ensemble(
             if sample_func is not None:
                 est_arr = None
             elif hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
+                # Named members, e.g., of `AnnotatorEnsembleClassifier`, are
+                # unpacked to their fitted estimators.
+                est_arr = [
+                    est[1] if isinstance(est, (tuple, list)) else est
+                    for est in ensemble.estimators_
+                ]
+                if not fit_ensemble:
+                    # Predicting votes can advance a member's random state;
+                    # isolate fitted members to preserve the caller's state.
+                    est_arr = copy.deepcopy(est_arr)
+                for i, est in enumerate(est_arr):
+                    check_is_fitted(
+                        est,
+                        msg=(
+                            f"The {i}-th member of `ensemble.estimators_` is "
+                            "not fitted. Committee queries require fitted "
+                            "members, even when the ensemble itself can "
+                            "predict."
+                        ),
+                    )
             elif hasattr(ensemble, "estimators"):
                 est_arr = [ensemble] * len(ensemble.estimators)
             elif hasattr(ensemble, "n_estimators"):
@@ -550,13 +569,19 @@ def _check_ensemble(
                     "is array-like."
                 )
             est_arr = copy.deepcopy(list(ensemble))
-            for i in range(len(est_arr)):
-                check_type(
-                    est_arr[i], f"ensemble[{i}]", estimator_type
-                )  # better error message
+            # Check every member before fitting any of them. A refit member
+            # resolves from its declarations, as an unfitted clone does.
+            for i, est in enumerate(est_arr):
+                check_type(est, f"ensemble[{i}]", estimator_type)
                 check_equal_missing_label(
-                    est_arr[i].missing_label, missing_label
+                    est.missing_label, strategy.missing_label
                 )
+                if fit_ensemble:
+                    _resolve_estimator_target_spec(
+                        strategy, clone(est), y, missing_label_checked=True
+                    )
+
+            for i in range(len(est_arr)):
                 # Fit the ensemble.
                 if fit_ensemble:
                     if sample_weight is None:

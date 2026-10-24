@@ -465,18 +465,16 @@ class TestGeneralBALD(
                 query_params["ensemble"] = ensemble
                 query_params["return_utilities"] = True
                 for greedy_selection in [False, True]:
-                    for candidates in [None, [2, 3]]:
-                        # query_params["candidates"] = candidates
-                        qs = self.qs_class(
-                            greedy_selection=greedy_selection, random_state=42
-                        )
-                        np.testing.assert_equal(
-                            qs.query(**query_params)[1],
-                            qs.query(**query_params)[1],
-                        )
-                        idx, u = qs.query(**query_params)
-                        self.assertEqual(len(idx), batch_size)
-                        self.assertEqual(len(u), batch_size)
+                    qs = self.qs_class(
+                        greedy_selection=greedy_selection, random_state=42
+                    )
+                    np.testing.assert_equal(
+                        qs.query(**query_params)[1],
+                        qs.query(**query_params)[1],
+                    )
+                    idx, u = qs.query(**query_params)
+                    self.assertEqual(len(idx), batch_size)
+                    self.assertEqual(len(u), batch_size)
 
 
 class Testbatch_bald(unittest.TestCase):

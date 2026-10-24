@@ -436,7 +436,6 @@ def uncertainty_scores(
         cost_matrix = check_cost_matrix(cost_matrix, n_classes=n_classes)
 
     # Compute uncertainties.
-    # here changes, multilabel cases
     if method == "least_confident":
         if cost_matrix is None:
             if is_multilabel:

@@ -1,12 +1,13 @@
-from copy import deepcopy
-
 import numpy as np
 
 from ...base import BudgetManager
-from ...utils import check_random_state, check_scalar
+from ...utils import check_scalar
 from skactiveml.utils import check_classes
 from skactiveml.utils._target import _check_class_vocabulary_structure
-from skactiveml.utils._validation import _validate_budget_update
+from skactiveml.utils._validation import (
+    _ensure_random_state,
+    _validate_budget_update,
+)
 
 
 class EstimatedBudgetZliobaite(BudgetManager):
@@ -65,7 +66,6 @@ class EstimatedBudgetZliobaite(BudgetManager):
         """
         queried = _validate_budget_update(candidates, queried_indices)
         self._validate_data(np.array([]))
-        # update u_t for queried candidates
         for s in queried:
             self.u_t_ = self.u_t_ * ((self.w - 1) / self.w) + s
 
@@ -87,7 +87,6 @@ class EstimatedBudgetZliobaite(BudgetManager):
         """
         utilities = super()._validate_data(utilities)
 
-        # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
 
@@ -146,27 +145,21 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
 
-        # intialize return parameters
         queried_indices = []
         budget_left = []
-        # calculate theta with number of classes
         theta = 1 / len(self.classes) + self.budget_ * (
             1 - 1 / len(self.classes)
         )
 
-        # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
 
         samples = np.array(confidence) <= theta
-        # check for each sample separately if budget is left and the utility is
-        # high enough
         for i, d in enumerate(samples):
             budget_left.append(tmp_u_t / self.w < self.budget_)
             if not budget_left[-1]:
                 d = False
             # u_t = u_t-1 * (w-1)/w + labeling_t
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + d
-            # get the indices samples that should be queried
             if d:
                 queried_indices.append(i)
 
@@ -277,14 +270,11 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
 
-        # intialize return parameters
         queried_indices = []
         budget_left = []
-        # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
         tmp_theta = self.theta_
 
-        # get confidence
         for i, c in enumerate(confidence):
             budget_left.append(self.budget_ > tmp_u_t / self.w)
 
@@ -292,7 +282,6 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 sample = False
             else:
                 sample = c < tmp_theta
-                # get the indices samples that should be queried
                 if sample:
                     tmp_theta *= 1 - self.s
                     queried_indices.append(i)
@@ -347,12 +336,9 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
-        # Check w
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
-        # Check theta
         self._validate_theta()
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
-        # Chack s
         check_scalar(
             self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
         )
@@ -362,7 +348,6 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     def _validate_theta(self):
         """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
-        # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
 
@@ -446,16 +431,13 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
 
-        # intialize return parameters
         queried_indices = []
         budget_left = []
-        # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
         tmp_theta = self.theta_
 
         prior_random_state = self.random_state_.get_state()
 
-        # get confidence
         for i, u in enumerate(confidence):
             budget_left.append(self.budget_ > tmp_u_t / self.w)
 
@@ -465,7 +447,6 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 eta = self.random_state_.normal(1, self.delta)
                 theta_random = tmp_theta * eta
                 sample = u < theta_random
-                # get the indices samples that should be queried
                 if sample:
                     tmp_theta *= 1 - self.s
                     queried_indices.append(i)
@@ -525,37 +506,23 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
-        # Check w
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
-        # Check theta
         self._validate_theta()
-        # Chack s
         check_scalar(
             self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
         )
-        # Check delta
         check_scalar(
             self.delta, "delta", float, min_val=0, min_inclusive=False
         )
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
 
     def _validate_theta(self):
         """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
-        # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
 
 
 class SplitBudgetManager(EstimatedBudgetZliobaite):
@@ -629,29 +596,23 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
 
-        # intialise return parameters
         queried_indices = []
         budget_left = []
-        # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
         tmp_theta = self.theta_
         random_state_state = self.random_state_.get_state()
 
-        # check for each queried separately if budget is left and the utility
-        # is high enough
         for i, u in enumerate(confidence):
             budget_left.append(tmp_u_t / self.w < self.budget_)
             if not budget_left[-1]:
                 sample = False
             else:
-                # changed self.v < self.rand_.random_sample()
                 random_val = self.random_state_.random_sample()
                 if self.v > random_val:
                     new_u = self.random_state_.random_sample()
                     sample = new_u <= self.budget_ and not np.isnan(u)
                 else:
                     sample = u < tmp_theta
-                    # get the indices samples that should be queried
                     if sample:
                         tmp_theta *= 1 - self.s
                     else:
@@ -662,7 +623,6 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
             # u_t = u_t-1 * (w-1)/w + labeling_t
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + sample
 
-        # set the internal state to the previous value
         self.random_state_.set_state(random_state_state)
 
         return queried_indices
@@ -715,15 +675,11 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
-        # Check w
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
-        # Check theta
         self._validate_theta()
-        # Check s
         check_scalar(
             self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
         )
-        # Check v
         check_scalar(
             self.v,
             "v",
@@ -733,26 +689,15 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
             max_inclusive=False,
             max_val=1,
         )
-        # Check random_state
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
 
     def _validate_theta(self):
         """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
-        # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
 
 
 class RandomBudgetManager(EstimatedBudgetZliobaite):
@@ -800,10 +745,8 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
 
-        # intialize return parameters
         queried_indices = []
 
-        # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
 
         prior_random_state = self.random_state_.get_state()
@@ -811,15 +754,12 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         samples = (
             self.random_state_.random_sample(len(confidence)) <= self.budget_
         )
-        # check for each sample separately if budget is left and the utility is
-        # high enough
         for i, d in enumerate(samples):
             budget_left = tmp_u_t / self.w < self.budget_
             d = d if budget_left else False
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + (
                 d and not np.isnan(utilities[i])
             )
-            # get the indices samples that should be queried
             if d and not np.isnan(utilities[i]):
                 queried_indices.append(i)
 
@@ -865,15 +805,6 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         """
         utilities = super()._validate_data(utilities)
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
-        self._validate_random_state()
+        _ensure_random_state(self)
 
         return utilities
-
-    def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)

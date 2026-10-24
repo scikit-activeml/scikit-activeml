@@ -13,8 +13,6 @@ from ._label_dtype import (
     _target_type_family,
 )
 
-# Define constant for missing label used throughout the package.
-
 MISSING_LABEL = np.nan
 
 
@@ -110,11 +108,9 @@ def _is_unlabeled_with_role(
         role=role,
     )
 
-    # Handle single output.
     if target_type == "single-output":
         return is_missing
 
-    # Handle multiple outputs.
     row_any = is_missing.any(axis=1)
     row_all = is_missing.all(axis=1)
     mixed_rows = row_any ^ row_all

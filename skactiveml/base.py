@@ -30,7 +30,7 @@ from .utils._target import (
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
-from .utils._validation import _has_nested_classes
+from .utils._validation import _ensure_random_state
 from .utils import (
     MISSING_LABEL,
     is_labeled,
@@ -303,15 +303,12 @@ class PoolQueryStrategy(QueryStrategy):
         return_utilities : bool
             Checked boolean value of `return_utilities`.
         """
-        # Check samples.
         if check_X_dict is None:
             check_X_dict = {"allow_nd": True}
         X = check_array(X, **check_X_dict)
 
-        # Check number of features.
         check_n_features(self, X, reset=reset)
 
-        # Check labels
         y = check_array(
             _as_label_array(y),
             ensure_2d=False,
@@ -320,7 +317,6 @@ class PoolQueryStrategy(QueryStrategy):
         )
         check_consistent_length(X, y)
 
-        # Check missing_label
         check_missing_label(self.missing_label, target_type=y.dtype, name="y")
         self.missing_label_ = self.missing_label
 
@@ -354,13 +350,10 @@ class PoolQueryStrategy(QueryStrategy):
                 candidates = check_array(candidates, **check_candidates_dict)
                 check_n_features(self, candidates, reset=False)
 
-        # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check batch size.
         check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
 
-        # Check random state.
         self.random_state_ = check_random_state(self.random_state, seed_mult)
 
         return X, y, candidates, batch_size, return_utilities
@@ -421,6 +414,23 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return _TARGET_AUTHORITY_QUERY_PARAMS
 
     def _resolve_query_target_type(self, y):
+        """Resolve the target type of `y` from the strategy's declarations.
+
+        The result is checked against `_target_capabilities`. Strategies that
+        do not resolve `y` through an estimator use it, and `_validate_data`
+        calls it if no `target_type` is passed.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+
+        Returns
+        -------
+        target_type : str
+            The resolved target type.
+        """
         tasks = {capability[0] for capability in self._target_capabilities}
         if len(tasks) == 1:
             task = next(iter(tasks))
@@ -1257,12 +1267,10 @@ class BudgetManager(ABC, BaseEstimator):
         utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
-        # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
             raise TypeError(
                 "{} is not a valid type for utilities".format(type(utilities))
             )
-        # Check budget
         self._validate_budget()
         return utilities
 
@@ -1296,57 +1304,6 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return frozenset(
             {("classification", "single-output", "single-annotator")}
         )
-
-    def _resolve_clf_target_spec(self, clf, y):
-        """Resolve the target specification `clf` is the authority for.
-
-        Parameters
-        ----------
-        clf : skactiveml.base.SkactivemlClassifier
-            The classifier passed to `query`.
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
-                None
-            Labels of the training data set, if any.
-
-        Returns
-        -------
-        target_spec : skactiveml.utils.TargetSpec
-            The resolved target specification.
-
-        Raises
-        ------
-        ValueError
-            If the target specification is outside `_target_capabilities`,
-            or if an unfitted `clf` declares no `classes` and `y` provides
-            no class evidence.
-        """
-        target_spec = getattr(clf, "target_spec_", None)
-        if target_spec is None:
-            classes = clf.classes
-            if y is None:
-                # Only the declared vocabulary is evidence. Its nesting
-                # decides the number of label outputs of the empty labels.
-                n_outputs = (
-                    len(classes)
-                    if classes is not None and _has_nested_classes(classes)
-                    else None
-                )
-                y = np.full(
-                    (0,) if n_outputs is None else (0, n_outputs),
-                    clf.missing_label,
-                )
-            target_spec = resolve_target_spec(
-                y,
-                task="classification",
-                target_type=getattr(clf, "target_type", "auto"),
-                annotation_type="single-annotator",
-                classes=classes,
-                missing_label=clf.missing_label,
-            )
-        _check_target_spec_capability(
-            type(self).__name__, target_spec, self._target_capabilities
-        )
-        return target_spec
 
     @abstractmethod
     def query(self, candidates, *args, return_utilities=False, **kwargs):
@@ -1404,7 +1361,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
             Optional kwargs for `budget_manager`. If supplied, `utilities`
             must be a one-dimensional array with one value per candidate.
             Some budget managers, e.g., `BalancedIncrementalQuantileFilter`,
-            require `utilities`.
+            require `utilities`. Strategies without a budget manager ignore it.
 
         Returns
         -------
@@ -1414,28 +1371,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
+        """Copy `random_state` to `random_state_` once, then validate it."""
+        _ensure_random_state(self)
 
     def _validate_budget(self):
         """Validate `budget` and store it as `budget_`, which is
         `_DEFAULT_BUDGET` if `budget` is `None`.
         """
         self.budget_ = _check_budget(self.budget)
-
-    def _sync_default_budget_manager(self):
-        """Apply `budget` to `budget_manager_` if it is the default one. Its
-        other parameters keep the values it was created with.
-        """
-        if self.budget_manager is None:
-            self._validate_budget()
-            if self.budget_manager_.budget != self.budget:
-                self.budget_manager_.set_params(budget=self.budget)
 
     def _validate_data(
         self,
@@ -1468,19 +1411,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # Check candidate samples.
         candidates = check_array(candidates, **check_candidates_params)
 
-        # Check number of features.
         check_n_features(self, candidates, reset=reset)
 
-        # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check random state.
         self._validate_random_state()
 
-        # Check budgetmanager.
         self._validate_budget()
 
         return candidates, return_utilities
@@ -1544,6 +1482,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         return frozenset(
             {("classification", "single-output", "single-annotator")}
         )
+
+    @property
+    def _declared_classes(self):
+        """Class vocabulary declared before fitting."""
+        return self.classes
 
     def _resolve_target_spec(self, y, classes=None):
         annotation_type = getattr(self, "_annotation_type", "single-annotator")
@@ -1792,7 +1735,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        # Create label encoder.
         self._le = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label,
@@ -1820,10 +1762,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         check_consistent_length(X, y)
         check_n_features(self, X, reset=reset)
 
-        # Update detected classes.
         self.classes_ = self._le.classes_
 
-        # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
             if sample_weight.ndim == 1:
@@ -1846,7 +1786,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                     "two-dimensional targets, the same shape as `y`."
                 )
 
-        # Update cost matrix.
         if target_spec.target_type == "multi-label":
             self.cost_matrix_ = None
         else:
@@ -2108,8 +2047,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         R[is_zero, sampled_class_indices] = 1.0
         P = R / R.sum(axis=-1, keepdims=True)
-        P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
-        return P
+        return P.reshape(n_samples, len(X), P.shape[-1], order="F")
 
     @staticmethod
     def _sample_dirichlet_vertices(alphas, random_state):
@@ -2164,7 +2102,6 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         ):
             raise ValueError("`sample_weight` must be non-negative.")
 
-        # Check class prior.
         if self.target_spec_.target_type == "multi-label":
             n_outputs = len(self.classes_)
             if np.isscalar(self.class_prior):
@@ -2605,7 +2542,6 @@ if successful_skorch_torch_import:
                 the requested extra outputs in the order specified by
                 `extra_outputs`.
             """
-            # Check forward_outputs configured.
             _check_forward_outputs(forward_outputs=forward_outputs)
 
             # Primary output = first configured output
@@ -2623,10 +2559,8 @@ if successful_skorch_torch_import:
                 primary_name=primary_name,
             )
 
-            # Run module forward once.
             fw_out = self.neural_net_.forward(X)
 
-            # Normalize to tuple of raw outputs.
             if isinstance(fw_out, tuple):
                 raw_outputs = fw_out
             else:
@@ -2650,10 +2584,8 @@ if successful_skorch_torch_import:
                     value = transform(value)
                 return to_numpy(value)
 
-            # Primary output (transform applied here).
             primary_np = _get_named(primary_name)
 
-            # No extra outputs.
             if not extra_names:
                 return primary_np
 
@@ -2703,7 +2635,6 @@ if successful_skorch_torch_import:
                     "All entries in `extra_outputs` must be strings."
                 )
 
-            # No duplicates
             if len(set(names)) != len(names):
                 raise ValueError(
                     "`extra_outputs` must not contain duplicate names."

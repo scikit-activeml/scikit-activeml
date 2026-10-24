@@ -200,7 +200,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             X=X, y=y, sample_weight=sample_weight
         )
 
-        # Ensure value of 'tol' to be a positive integer.
         if self.n_annotators is not None:
             check_scalar(
                 self.n_annotators,

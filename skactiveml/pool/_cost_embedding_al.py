@@ -356,8 +356,7 @@ def _alce(
 
     dist, _ = nn.kneighbors(pred_embed)
 
-    utilities = dist[:, 0]
-    return utilities
+    return dist[:, 0]
 
 
 """

@@ -537,7 +537,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            # id_offset=5,
         )
 
         test_cases = [
@@ -629,7 +628,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            # id_offset=4,
         )
 
     def test_fit_param_X(self, test_cases=None):
@@ -1052,7 +1050,6 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
 
     def test_param_test_availability(self):
         not_test = ["self"]
-        # Check if predict_freq is being tested.
         check_test_param_test_availability(
             self, self.estimator_class.predict_freq, "predict_freq", not_test
         )
@@ -1083,7 +1080,6 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
         )
 
     def test_sample_proba(self):
-        # Setup test cases.
         X, y_full = make_blobs(n_samples=200, centers=4, random_state=0)
         classes = np.unique(y_full)
         pwc = self.estimator_class(
@@ -1099,12 +1095,10 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             pwc.fit(X, y)
 
             for n_samples in [1, 10]:
-                # Check shape of probabilities.
                 P_sampled = pwc.sample_proba(X, n_samples=n_samples)
                 shape_Expected = [n_samples, len(X), len(classes)]
                 np.testing.assert_array_equal(P_sampled.shape, shape_Expected)
 
-                # Check normalization of probabilities.
                 P_sums = P_sampled.sum(axis=-1)
                 P_sums_expected = np.ones_like(P_sums)
                 np.testing.assert_allclose(P_sums, P_sums_expected)
@@ -1286,7 +1280,6 @@ class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):
 
     def test_param_test_availability(self):
         not_test = ["self"]
-        # Check if predict_target_distribution is being tested.
         check_test_param_test_availability(
             self,
             self.estimator_class.predict_target_distribution,

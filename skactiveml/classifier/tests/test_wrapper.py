@@ -2157,7 +2157,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 self.assertFalse(hasattr(clf, item))
 
     def test_prefit_rejected_classes_fall_back_to_the_declared_ones(self):
-        # The pool target preflight reads the vocabulary through this idiom.
+        # IntervalEstimationThreshold reads the vocabulary through this idiom.
         # A rejected resolution has to leave it with the declared vocabulary,
         # which is what a subsequent `fit` would establish, rather than with
         # the estimator's learned one, which the wrapper does not accept.
@@ -3206,6 +3206,18 @@ class TestSlidingWindowClassifier(
 
         with self.assertRaises(ValueError):
             clf.fit([[0.0], [1.0]], [0, 0])
+
+    def test_fit_resolves_nested_estimator_classes(self):
+        estimator = ParzenWindowClassifier(classes=[0, 1, 2], missing_label=-1)
+        clf = SlidingWindowClassifier(
+            SlidingWindowClassifier(estimator, missing_label=-1),
+            missing_label=-1,
+        )
+
+        for y in ([-1, -1], [0, 1]):
+            with self.subTest(y=y):
+                clf.fit([[0.0], [1.0]], y)
+                np.testing.assert_array_equal(clf.classes_, [0, 1, 2])
 
     def test_unfitted_wrapper_refuses_its_own_fitted_attributes(self):
         clf = SlidingWindowClassifier(

@@ -1,6 +1,7 @@
 import unittest
 from copy import deepcopy
 from itertools import product
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.naive_bayes import GaussianNB
@@ -8,6 +9,7 @@ from sklearn.svm import SVC
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
@@ -80,6 +82,31 @@ class TemplateTestExpectedErrorReduction(
 
     def test_fitted_multilabel_classifier_rejected_before_state(self):
         self._test_fitted_multilabel_classifier_rejection()
+
+    def test_multiannotator_classifier_rejected_before_fit_and_state(self):
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(self.X, np.asarray(self.y)[:, None])
+        clf_before = deepcopy(clf)
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for fit_clf in [False, True]:
+                with self.subTest(fit_clf=fit_clf):
+                    qs = self.qs_class(random_state=0)
+                    with self.assertRaisesRegex(
+                        ValueError, "does not support target capability"
+                    ):
+                        qs.query(self.X, self.y, clf=clf, fit_clf=fit_clf)
+                    assert_no_query_state(self, qs)
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
 
     def test_init_param_cost_matrix(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -654,24 +681,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
             replace_query_params=replace_query_params,
         )
 
-        # qs = self.Strategy()
-        # for swe in [
-        #     "string",
-        #     self.candidates,
-        #     None,
-        #     np.empty((len(self.X_eval) - 1)),
-        # ]:
-        #     with self.assertRaises(
-        #         ValueError, msg=f"sample_weight_eval={swe}"
-        #     ):
-        #         qs.query(
-        #             **self.kwargs,
-        #             X_eval=self.X_eval,
-        #             sample_weight=np.ones(len(self.X)),
-        #             sample_weight_candidates=np.ones(len(self.candidates)),
-        #             sample_weight_eval=swe,
-        #         )
-
     def test_query(self):
         super().test_query()
         classes = [0, 1]
@@ -681,7 +690,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
         id_cost_matrix = 1 - np.eye(2)
 
         clf = self.DummyClf(classes=classes)
-        # clf = ParzenWindowClassifier(classes=classes)
 
         params_list = [
             [
@@ -905,9 +913,6 @@ class TestValueOfInformationEER(
         y2 = [0, 0, MISSING_LABEL, 1]
         cand = [1, 2]
         cost_matrix = 1 - np.eye(2)
-        # clf_partial = SklearnClassifier(
-        #     GaussianNB(), classes=classes
-        # ).fit(X, y)
 
         params_list = [
             ["kapoor-sub", True, True, True, True, False, [[0, 0]]],

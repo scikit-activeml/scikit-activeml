@@ -436,13 +436,10 @@ def assert_fit_failure_is_transactional(
 
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
-    kwargs_var_keyword = []
-    # Get kwargs variables
     kwargs_var_keyword = list(
         filter(lambda p: p.kind == p.VAR_KEYWORD, func_params.values())
     )
 
-    # Test if each required key except for kwargs is included.
     if param_dict is not None:
         for key, val in func_params.items():
             if (
@@ -466,13 +463,11 @@ def check_positional_args(func, func_name, param_dict, kwargs_name=None):
 def check_test_param_test_availability(
     class_, func, func_name, not_test, logic_test=True
 ):
-    # Get func parameters.
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = list(
         filter(lambda p: p.kind == p.VAR_KEYWORD, func_params.values())
     )
 
-    # Check func parameters.
     for param, val in func_params.items():
         if param in not_test or val in kwargs_var_keyword:
             continue
@@ -483,7 +478,6 @@ def check_test_param_test_availability(
                 msg=f"'{test_func_name}()' missing in {class_.__class__}",
             )
     if logic_test:
-        # Check if func is being tested.
         with class_.subTest(msg=f"test_{func_name}"):
             class_.assertTrue(
                 hasattr(class_, f"test_{func_name}"),

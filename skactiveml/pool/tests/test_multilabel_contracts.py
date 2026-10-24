@@ -180,10 +180,12 @@ class TestMultilabelProbaFormatContract(unittest.TestCase):
             Path(__file__).parents[3] / "docs" / "target_semantics.rst"
         ).read_text()
         marker = ".. _multilabel-strategy-inventory:"
+        end_marker = "Estimator Capability for Multi-label Wrapping"
         self.assertIn(marker, target_semantics)
+        self.assertIn(end_marker, target_semantics)
         inventory_section = target_semantics.split(marker, maxsplit=1)[
             1
-        ].split("Estimator capability for multi-label wrapping", maxsplit=1)[0]
+        ].split(end_marker, maxsplit=1)[0]
         documented_strategies = set(
             re.findall(
                 r":class:`~skactiveml\.pool\.([A-Za-z0-9_]+)`",

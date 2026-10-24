@@ -36,15 +36,15 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     """Random Sampling for Data Streams.
 
     The RandomSampling strategy queries labels completely randomly. The
-    probability to query a sample is dependent on the budget specified in
-    the budget manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1)
-    with a probability of 10%. samples are queried regardless of their
-    position in the feature space and disregards any information about the
-    sample. Thus, it should only be used as a baseline strategy. The
-    `allow_exceeding_budget` parameter allows to configure the strategy to
-    strictly adhere to a given budget. Neither labels nor a model are
-    consumed, so the strategy is task-agnostic and supports single-output and
-    multi-label classification as well as regression.
+    probability to query a sample is dependent on `budget`. Given a budget
+    of 10%, the utility exceeds 0.9 (1-0.1) with a probability of 10%.
+    Samples are queried regardless of their position in the feature space
+    and without using information about the sample. Thus, it should only be
+    used as a baseline strategy. The `allow_exceeding_budget` parameter
+    controls whether the strategy strictly adheres to a given budget.
+    Neither labels nor a model are consumed, so the strategy is task-agnostic
+    and supports single-output and multi-label classification as well as
+    regression.
 
     Parameters
     ----------
@@ -108,15 +108,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         self.random_state_.set_state(prior_random_state)
 
-        # keep record if the sample is queried and if there was budget left,
-        # when assessing the corresponding utilities
         queried = np.full(len(utilities), False)
 
         # Track counts locally without advancing acquisition state.
         tmp_observed_samples = self.observed_samples_
         tmp_queried_samples = self.queried_samples_
-        # check for each sample separately if budget is left and the utility is
-        # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_samples += 1
             # Include exact boundaries that round one ULP below the limit.
@@ -129,7 +125,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             ) and (utility >= 1 - self.budget_)
             tmp_queried_samples += queried[i]
 
-        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
 
         if return_utilities:
@@ -137,7 +132,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices):
+    def update(
+        self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the count for seen and queried labels. This function should
         be used in conjunction with the `query` function.
 
@@ -150,6 +147,8 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices < n_candidates`.
+        budget_manager_param_dict : Ignored
+            Not used, present here for API consistency by convention.
 
         Returns
         -------
@@ -199,7 +198,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):
@@ -228,8 +226,8 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     that period is determined by the `budget`. For instance, a `budget` of 0.25
     would result in querying every fourth sample. The main idea behind this
     query strategy is to exhaust a given budget as soon as it is available.
-    samples are queried regardless of their position in the feature space and
-    disregards any information about the sample. Thus, it should only be used
+    Samples are queried regardless of their position in the feature space and
+    without using information about the sample. Thus, it should only be used
     as a baseline strategy. Neither labels nor a model are consumed, so the
     strategy is task-agnostic and supports single-output and multi-label
     classification as well as regression.
@@ -284,8 +282,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         utilities = np.zeros(candidates.shape[0])
 
-        # keep record if the sample is queried and if there was budget left,
-        # when assessing the corresponding utilities
         queried = np.full(len(candidates), False)
 
         tmp_observed_samples = self.observed_samples_
@@ -301,7 +297,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
                 utilities[i] = 1
             tmp_queried_samples += queried[i]
 
-        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
 
         if return_utilities:
@@ -309,7 +304,9 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices):
+    def update(
+        self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the count for seen and queried labels. This function should
         be used in conjunction with the `query` function.
 
@@ -322,6 +319,8 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried, with
             `0 <= queried_indices < n_candidates`.
+        budget_manager_param_dict : Ignored
+            Not used, present here for API consistency by convention.
 
         Returns
         -------
@@ -375,7 +374,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         self._validate_random_state()
 
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):

@@ -6,9 +6,6 @@ from unittest.mock import patch
 import numpy as np
 from sklearn.utils._testing import assert_allclose
 from sklearn.utils.validation import check_array
-from sklearn.linear_model import SGDClassifier
-from sklearn.multioutput import MultiOutputClassifier
-from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.base import (
     QueryStrategy,
@@ -21,7 +18,6 @@ from skactiveml.base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
 )
-from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.exceptions import MappingError
 from skactiveml.pool import RandomSampling
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, match_signature
@@ -751,8 +747,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
     def test__validate_data(self):
         X = np.ones((10, 2))
         y = np.random.rand(10)
-        # TODO: Wait for scikit-learn update.
-        # self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
         y = np.full(10, fill_value=-1)
         self.clf.classes = None
         self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
@@ -1282,49 +1276,6 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
             ),
         )
 
-    def test_resolve_clf_target_spec(self):
-        X = np.array([[0.0], [1.0], [2.0]])
-        y = np.array([0, 1, MISSING_LABEL])
-        capability_error = "does not support target capability"
-
-        fitted_clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
-        self.assertIs(
-            self.qs._resolve_clf_target_spec(fitted_clf, y),
-            fitted_clf.target_spec_,
-        )
-
-        prefitted_clf = SklearnClassifier(GaussianNB().fit(X, [0, 1, 0]))
-        target_spec = self.qs._resolve_clf_target_spec(prefitted_clf, None)
-        self.assertEqual(target_spec.classes, (0, 1))
-        self.assertIs(target_spec, prefitted_clf.target_spec_)
-
-        unfitted_clf = ParzenWindowClassifier(classes=[0, 1])
-        for labels in (y, None):
-            target_spec = self.qs._resolve_clf_target_spec(
-                unfitted_clf, labels
-            )
-            self.assertEqual(target_spec.target_type, "single-output")
-            self.assertEqual(target_spec.classes, (0, 1))
-        self.assertFalse(hasattr(unfitted_clf, "target_spec_"))
-        target_spec = self.qs._resolve_clf_target_spec(
-            ParzenWindowClassifier(), y
-        )
-        self.assertEqual(target_spec.classes, (0, 1))
-        with self.assertRaisesRegex(ValueError, "No class label is observed"):
-            self.qs._resolve_clf_target_spec(ParzenWindowClassifier(), None)
-
-        multilabel_clf = SklearnClassifier(
-            MultiOutputClassifier(
-                SGDClassifier(loss="log_loss", random_state=0)
-            ),
-            classes=[[0, 1], [0, 1]],
-            missing_label=-1,
-            target_type="multi-label",
-        )
-        for labels in (np.array([[0, 1], [1, 0], [-1, -1]]), None):
-            with self.assertRaisesRegex(ValueError, capability_error):
-                self.qs._resolve_clf_target_spec(multilabel_clf, labels)
-
     def test_update(self):
         self.assertRaises(
             NotImplementedError,
@@ -1618,44 +1569,34 @@ if successful_skorch_torch_import:
 
             allowed = ["a", "b", "c"]
 
-            # extra_outputs is None -> returns []
             self.assertEqual(norm(None, allowed_names=allowed), [])
 
-            # extra_outputs is str -> single name list
             self.assertEqual(
                 norm("a", allowed_names=allowed, primary_name=None),
                 ["a"],
             )
 
-            # extra_outputs is sequence of str (list)
             self.assertEqual(
                 norm(["a", "c"], allowed_names=allowed, primary_name="b"),
                 ["a", "c"],
             )
 
-            # extra_outputs is sequence of str (tuple)
             self.assertEqual(
                 norm(("a",), allowed_names=allowed, primary_name=None),
                 ["a"],
             )
 
-            # extra_outputs of invalid type ->
-            # TypeError (non-str / non-sequence)
             with self.assertRaises(TypeError):
                 norm(123, allowed_names=allowed)
 
-            # extra_outputs sequence with non-str element -> TypeError
             with self.assertRaises(TypeError):
                 norm(["a", 1], allowed_names=allowed)
 
-            # duplicate names -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "a"], allowed_names=allowed)
 
-            # unknown names -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "z"], allowed_names=allowed)
 
-            # primary_name included in extras -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "b"], allowed_names=allowed, primary_name="b")

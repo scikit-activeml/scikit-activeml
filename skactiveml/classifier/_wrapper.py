@@ -1747,8 +1747,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         `partial_fit`, this method will be overwritten by this wrapper using
         the sliding window approach.
     classes : array-like of shape (n_classes,), default=None
-        Holds the label for each class. If `None`, `classes` are determined
-        during the fit.
+        Holds the label for each class. If `None`, the classes declared by
+        `estimator` are used, or else determined during the fit.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -1832,6 +1832,15 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator = estimator
         self.only_labeled = only_labeled
         self.window_size = window_size
+
+    @property
+    def _declared_classes(self):
+        """Declared `classes`, or else those declared by `estimator`."""
+        if self.classes is None and isinstance(
+            self.estimator, SkactivemlClassifier
+        ):
+            return self.estimator._declared_classes
+        return self.classes
 
     @match_signature("estimator", "fit")
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -2094,11 +2103,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     ):
         # super._validate_data is not called because a partial-fit window may
         # contain only a subset of the established class vocabulary.
-        outer_classes = (
-            self.classes
-            if self.classes is not None
-            else self.estimator.classes
-        )
+        outer_classes = self._declared_classes
         target_spec = self._resolve_fitting_target_spec(
             y,
             established_spec=established_spec,
@@ -2228,8 +2233,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             ordered according to the attribute `self.classes_`.
         """
         check_is_fitted(self)
-        proba = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-        return proba
+        return self.estimator_.predict_proba(X, **predict_proba_kwargs)
 
     @match_signature("estimator", "predict_freq")
     def predict_freq(self, X, **predict_freq_kwargs):
@@ -2247,8 +2251,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             ordered according to the attribute `self.classes_`.
         """
         check_is_fitted(self)
-        freq = self.estimator_.predict_freq(X, **predict_freq_kwargs)
-        return freq
+        return self.estimator_.predict_freq(X, **predict_freq_kwargs)
 
     def __getattr__(self, item):
         if item in self._own_fitted_attributes:

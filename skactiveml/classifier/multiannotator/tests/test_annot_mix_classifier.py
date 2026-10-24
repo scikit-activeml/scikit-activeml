@@ -133,13 +133,10 @@ try:
             return clf
 
         def _check_predict_outputs(self, out, mode, n_features):
-            # Normalize to a dict so we can selectively check keys
             n_samples = self.X.shape[0]
 
             # primary output: probabilities or labels
             if mode == "proba":
-                # Try common key names, fall back to "first" if using
-                # tuple layout.
                 P_class = out["proba"]
                 self.assertIsNotNone(
                     P_class, "No probability output found for 'proba' mode."

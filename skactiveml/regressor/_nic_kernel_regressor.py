@@ -236,8 +236,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
     def _estimate_update_params(self, X):
         if len(self.X_) != 0:
             N, mu_ml, var_ml = self._estimate_ml_params(X)
-            update_params = (N, N, mu_ml, var_ml)
-            return update_params
+            return N, N, mu_ml, var_ml
         else:
             neutral_params = (np.zeros(len(X)),) * 4
             return neutral_params

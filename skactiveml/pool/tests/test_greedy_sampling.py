@@ -104,11 +104,11 @@ class TestGreedySamplingX(
                         np.testing.assert_array_equal(
                             np.sort(indices), candidates
                         )
-                        expected = (
-                            [2, 1, np.nan, np.nan]
-                            if len(candidates) == 2
-                            else [-6, -4, -4, -6]
-                        )
+                        distances = np.zeros(4)
+                        if np.isnan(labels[1]):
+                            distances[1] = 1
+                        expected = np.full(4, np.nan)
+                        expected[candidates] = distances[candidates]
                         np.testing.assert_allclose(utilities[0], expected)
                         for i, idx in enumerate(indices):
                             self.assertTrue(np.isfinite(utilities[i, idx]))
@@ -132,6 +132,50 @@ class TestGreedySamplingX(
         np.testing.assert_array_equal(
             utilities, np.append([MISSING_LABEL], np.arange(1, 7))
         )
+
+    def test_query_geometric_labeled_candidate_utilities(self):
+        X = np.array([0, 2, 3, 9, 10, 12], dtype=float).reshape(-1, 1)
+        labels = np.array([0, np.nan, np.nan, np.nan, 1, np.nan])
+        for target_type in ["single-output", "multi-label"]:
+            y = (
+                np.column_stack((labels, labels))
+                if target_type == "multi-label"
+                else labels
+            )
+            for candidates in [
+                np.array([5, 0, 2, 1, 4]),
+                np.array([4, 1, 2, 0, 5]),
+            ]:
+                with self.subTest(
+                    target_type=target_type, candidates=candidates
+                ):
+                    indices, utilities = GreedySamplingX(
+                        random_state=0, target_type=target_type
+                    ).query(
+                        X,
+                        y,
+                        candidates=candidates,
+                        batch_size=len(candidates),
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(
+                        np.sort(indices), np.sort(candidates)
+                    )
+                    np.testing.assert_array_equal(indices[:3], [2, 5, 1])
+                    centers = np.flatnonzero(~np.isnan(labels))
+                    for step, index in enumerate(indices):
+                        expected = np.full(len(X), np.nan)
+                        # Recompute distances independently of the helper.
+                        expected[candidates] = np.min(
+                            np.abs(X[candidates, 0, None] - X[centers, 0]),
+                            axis=1,
+                        )
+                        expected[indices[:step]] = np.nan
+                        np.testing.assert_allclose(utilities[step], expected)
+                        self.assertEqual(
+                            utilities[step, index], np.nanmax(expected)
+                        )
+                        centers = np.append(centers, index)
 
     def test_query_matches_dense_reference(self):
         rng = np.random.RandomState(4)

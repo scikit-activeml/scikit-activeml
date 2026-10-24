@@ -23,7 +23,6 @@ class TestBalancedIncrementalQuantileFilter(
         )
 
     def test_init_param_w(self, test_cases=None):
-        # w must be defined as an int with a range of w > 0
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (10, None),
@@ -35,7 +34,6 @@ class TestBalancedIncrementalQuantileFilter(
         self._test_param("init", "w", test_cases)
 
     def test_init_param_w_tol(self, test_cases=None):
-        # w must be defined as an int with a range of w_tol > 0
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (10, None),
