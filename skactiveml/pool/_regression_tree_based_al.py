@@ -151,8 +151,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Validate the estimator and target semantics before acquisition state
-        # is created by the general query-strategy validation.
         check_type(reg, "reg", SklearnRegressor)
         check_type(reg.estimator, "reg.estimator", DecisionTreeRegressor)
         check_equal_missing_label(reg.missing_label, self.missing_label)

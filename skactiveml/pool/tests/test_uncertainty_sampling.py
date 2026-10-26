@@ -17,7 +17,6 @@ from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
 
 
 class TestUncertaintySampling(
@@ -347,8 +346,6 @@ class TestUncertaintySampling(
         with self.assertRaisesRegex(ValueError, r"outside `classes\[0\]`"):
             strategy.query(X, y_query, clf, fit_clf=False)
 
-        assert_no_query_state(self, strategy)
-
     def test_query_fits_explicit_multilabel_without_declared_classes(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.array(
@@ -374,7 +371,7 @@ class TestUncertaintySampling(
         self.assertIn(query_idx[0], [4, 5])
         self.assertTrue(np.isnan(utilities[0, :4]).all())
 
-    def test_multilabel_capability_failure_precedes_acquisition_state(self):
+    def test_multilabel_capability_failure_is_rejected(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
         y = np.array(
             [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
@@ -387,8 +384,6 @@ class TestUncertaintySampling(
 
         with self.assertRaisesRegex(ValueError, "does not support"):
             strategy.query(X, y, clf, fit_clf=False)
-
-        assert_no_query_state(self, strategy)
 
     def test_expected_precision_candidate_mapping_matches_recurrence(self):
         X = np.random.RandomState(0).uniform(size=(8, 2))
@@ -422,7 +417,7 @@ class TestUncertaintySampling(
                     actual[1], expected[1], rtol=1e-12, atol=1e-12
                 )
 
-    def test_cost_sensitive_multilabel_methods_fail_before_acquisition_state(
+    def test_cost_sensitive_multilabel_methods_fail(
         self,
     ):
         X = np.arange(8, dtype=float).reshape(-1, 2)
@@ -443,9 +438,7 @@ class TestUncertaintySampling(
                 with self.assertRaisesRegex(ValueError, "does not support"):
                     strategy.query(X, y, clf, fit_clf=False)
 
-                assert_no_query_state(self, strategy)
-
-    def test_ambiguous_resolution_failure_precedes_acquisition_state(self):
+    def test_ambiguous_resolution_failure(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
         y = np.array(
             [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
@@ -456,9 +449,7 @@ class TestUncertaintySampling(
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             strategy.query(X, y, clf, fit_clf=False)
 
-        assert_no_query_state(self, strategy)
-
-    def test_unfitted_classifier_declaration_conflict_precedes_state(self):
+    def test_unfitted_classifier_declaration_conflict(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
         y = np.array(
             [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
@@ -477,9 +468,7 @@ class TestUncertaintySampling(
                 ):
                     strategy.query(X, y, clf, fit_clf=fit_clf)
 
-                assert_no_query_state(self, strategy)
-
-    def test_estimator_preflight_configuration_cross_product(self):
+    def test_estimator_configuration_cross_product(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         cost_matrix = [[0, 1], [1, 0]]
         target_cases = {
@@ -569,7 +558,6 @@ class TestUncertaintySampling(
                 if vocabulary == "outside" or unsupported:
                     with self.assertRaises(ValueError):
                         strategy.query(X, y, clf, fit_clf=not is_fitted)
-                    assert_no_query_state(self, strategy)
                 else:
                     query_idx = strategy.query(
                         X, y, clf, fit_clf=not is_fitted

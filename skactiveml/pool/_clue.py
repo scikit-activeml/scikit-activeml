@@ -214,7 +214,6 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-        # Resolve through the estimator before acquisition state is changed.
         estimator, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             estimator,

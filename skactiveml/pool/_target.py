@@ -10,6 +10,7 @@ from ..utils import (
 )
 from ..utils._label import _check_labels
 from ..utils._target import (
+    _check_refit_capability,
     _check_target_matches_spec,
     _declared_target_type,
     _predicted_target_spec,
@@ -21,11 +22,12 @@ def _resolve_estimator_target_spec(
     strategy,
     estimator,
     y,
-    *,
-    missing_label_checked=False,
-    checked_target_spec=None,
 ):
-    """Resolve one estimator-backed strategy target specification."""
+    """Resolve one estimator-backed strategy target specification.
+
+    Callers check that the missing labels of `strategy` and `estimator` are
+    equal.
+    """
     if isinstance(estimator, SkactivemlClassifier):
         task = "classification"
     elif isinstance(estimator, SkactivemlRegressor):
@@ -33,18 +35,12 @@ def _resolve_estimator_target_spec(
     else:  # pragma: no cover - callers validate their estimator type first.
         raise TypeError("`estimator` must be a scikit-activeml estimator.")
 
-    if not missing_label_checked:
-        check_equal_missing_label(
-            estimator.missing_label, strategy.missing_label
-        )
-
     if hasattr(estimator, "target_spec_"):
         estimator_target_spec = estimator.target_spec_
         target_spec = _predicted_target_spec(estimator_target_spec)
-        if target_spec != checked_target_spec:
-            _check_target_matches_spec(
-                y, target_spec, missing_label=strategy.missing_label
-            )
+        _check_target_matches_spec(
+            y, target_spec, missing_label=strategy.missing_label
+        )
     else:
         target_spec = resolve_target_spec(
             y,
@@ -68,13 +64,12 @@ def _resolve_estimator_target_spec(
     _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )
-    if target_spec != checked_target_spec:
-        _check_labels(
-            y,
-            strategy.missing_label,
-            target_type=target_spec.target_type,
-            task=target_spec.task,
-        )
+    _check_labels(
+        y,
+        strategy.missing_label,
+        target_type=target_spec.target_type,
+        task=target_spec.task,
+    )
     return target_spec
 
 
@@ -94,15 +89,8 @@ def _fit_and_resolve_estimator_target_spec(
     check_type(estimator, estimator_name, *estimator_types)
     check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     check_type(fit_estimator, fit_name, bool)
-    # Resolving may commit lazily resolved state that would change the fit,
-    # so the declarations of a refit are checked on a separate clone.
-    target_spec = _resolve_estimator_target_spec(
-        strategy,
-        clone(estimator) if fit_estimator else estimator,
-        y,
-        missing_label_checked=True,
-    )
     if fit_estimator:
+        _check_refit_capability(estimator)
         # A fresh fit resolves from constructor settings, including explicit
         # classes, rather than freezing the previous fit's inferred vocabulary.
         estimator = clone(estimator)
@@ -110,7 +98,5 @@ def _fit_and_resolve_estimator_target_spec(
             estimator = estimator.fit(X, y)
         else:
             estimator = estimator.fit(X, y, sample_weight)
-        target_spec = _resolve_estimator_target_spec(
-            strategy, estimator, y, checked_target_spec=target_spec
-        )
+    target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
     return estimator, target_spec

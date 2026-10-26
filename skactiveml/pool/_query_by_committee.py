@@ -24,6 +24,7 @@ from ..utils import (
     check_scalar,
 )
 from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
+from ..utils._target import _check_refit_capability
 from ._target import _resolve_estimator_target_spec
 
 
@@ -486,9 +487,7 @@ def _check_ensemble(
             )
             # Fit the ensemble.
             if fit_ensemble:
-                _resolve_estimator_target_spec(
-                    strategy, clone(ensemble), y, missing_label_checked=True
-                )
+                _check_refit_capability(ensemble)
                 if sample_weight is None:
                     ensemble = clone(ensemble).fit(X, y)
                 else:
@@ -569,17 +568,14 @@ def _check_ensemble(
                     "is array-like."
                 )
             est_arr = copy.deepcopy(list(ensemble))
-            # Check every member before fitting any of them. A refit member
-            # resolves from its declarations, as an unfitted clone does.
+            # Check every member before fitting any of them.
             for i, est in enumerate(est_arr):
                 check_type(est, f"ensemble[{i}]", estimator_type)
                 check_equal_missing_label(
                     est.missing_label, strategy.missing_label
                 )
                 if fit_ensemble:
-                    _resolve_estimator_target_spec(
-                        strategy, clone(est), y, missing_label_checked=True
-                    )
+                    _check_refit_capability(est)
 
             for i in range(len(est_arr)):
                 # Fit the ensemble.

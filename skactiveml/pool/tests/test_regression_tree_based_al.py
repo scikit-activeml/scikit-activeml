@@ -13,7 +13,6 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 
@@ -61,7 +60,7 @@ class TestRegressionTreeBasedAL(
 
         self.assertIn(query_idx[0], [4, 5])
 
-    def test_fitted_target_shape_failure_precedes_acquisition_state(self):
+    def test_fitted_target_shape_failure_is_rejected(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.arange(12, dtype=float).reshape(6, 2)
         reg = SklearnRegressor(
@@ -71,8 +70,6 @@ class TestRegressionTreeBasedAL(
 
         with self.assertRaisesRegex(ValueError, "Single-output regression"):
             strategy.query(X, y, reg, fit_reg=False)
-
-        assert_no_query_state(self, strategy)
 
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []

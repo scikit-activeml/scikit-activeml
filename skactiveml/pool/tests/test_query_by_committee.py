@@ -111,7 +111,7 @@ class TestQueryByCommittee(
                     np.testing.assert_array_equal(results[0][0], results[1][0])
                     np.testing.assert_allclose(results[0][1], results[1][1])
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection(
             estimator_param="ensemble",
             fit_param="fit_ensemble",

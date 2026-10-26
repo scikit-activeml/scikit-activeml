@@ -193,7 +193,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Resolve through the classifier before acquisition state is changed.
         clf, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             clf,

@@ -12,8 +12,6 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.multioutput import MultiOutputClassifier
 
 from skactiveml.tests.utils import (
-    STREAM_QUERY_STATE_ATTRIBUTES,
-    assert_no_query_state,
     assert_state_unchanged,
     check_positional_args,
     check_test_param_test_availability,
@@ -556,7 +554,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                         ):
                             qs.query(**query_params)
                         fit.assert_not_called()
-                    assert_no_query_state(self, qs)
 
         query_params = deepcopy(self.query_default_params_reg)
         reg = query_params["reg"].fit(query_params["X"], query_params["y"])
@@ -568,7 +565,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         qs = self.qs_class(**deepcopy(self.init_default_params))
         with self.assertRaisesRegex(ValueError, "Single-output regression"):
             qs.query(**query_params)
-        assert_no_query_state(self, qs)
 
     def test_init_param_target_type(self):
         if "target_type" not in inspect.signature(self.qs_class).parameters:
@@ -1066,8 +1062,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         ):
             qs.query(**query_params)
 
-        assert_no_query_state(self, qs)
-
     def _multilabel_custom_vocabulary_params(self, vocabularies):
         """Build the multi-label fixture of one custom class vocabulary.
 
@@ -1162,14 +1156,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         init_params = deepcopy(self.init_default_params)
         init_params["missing_label"] = -1
         for fit in (False, True):
-            with (
-                self.subTest(**{fit_param: fit}),
-                patch.object(
-                    SklearnClassifier,
-                    "fit",
-                    side_effect=AssertionError("refit"),
-                ),
-            ):
+            with self.subTest(**{fit_param: fit}):
                 strategy = self.qs_class(**init_params)
                 query_params = {
                     "X": X,
@@ -1184,8 +1171,6 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                     "capability",
                 ):
                     strategy.query(**query_params)
-
-                assert_no_query_state(self, strategy)
 
     def _test_classification_target_contract(self, expected_capabilities):
         strategy = self.qs_class(**deepcopy(self.init_default_params))
@@ -1521,8 +1506,6 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
         ):
             self._query_multilabel_only_strategy(strategy, y, clf)
 
-        assert_no_query_state(self, strategy)
-
     def test_target_contract(self):
         strategy = self.qs_class(**deepcopy(self.init_default_params))
 
@@ -1621,7 +1604,7 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
         self.assertIn(query_idx[0], range(3, len(y)))
         self.assertTrue(np.isfinite(utilities[0, 3:]).all())
 
-    def test_query_rejects_partially_observed_rows_before_state(self):
+    def test_query_rejects_partially_observed_rows(self):
         query_params = self.query_default_params_clf_multilabel
         clf = clone(query_params["clf"]).fit(
             query_params["X"], query_params["y"]
@@ -1635,9 +1618,7 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
                 strategy, y, clf, fit_clf=False
             )
 
-        assert_no_query_state(self, strategy)
-
-    def test_query_rejects_other_target_capabilities_before_state(self):
+    def test_query_rejects_other_target_capabilities(self):
         query_params = self.query_default_params_clf_multilabel
         multiannotator_clf = AnnotatorEnsembleClassifier(
             estimators=[
@@ -1664,7 +1645,6 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
                     self._query_multilabel_only_strategy(
                         strategy, y, clf, fit_clf=False
                     )
-                assert_no_query_state(self, strategy)
 
 
 class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
@@ -1693,7 +1673,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         return deepcopy(self.query_default_params_clf)
 
     def _assert_query_rejects_clf(self, clf, y, error, pattern, fit_clf=False):
-        """Assert that a rejected classifier leaves no query state behind."""
+        """Assert that the strategy rejects the classifier `clf`."""
         query_params = self._stream_clf_query_params()
         query_params["clf"] = clf
         query_params["y"] = y
@@ -1702,10 +1682,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
         with self.assertRaisesRegex(error, pattern):
             strategy.query(**query_params)
-
-        assert_no_query_state(
-            self, strategy, attributes=STREAM_QUERY_STATE_ATTRIBUTES
-        )
 
     def test_target_capabilities(self):
         strategy = self.qs_class(**deepcopy(self.init_default_params))
@@ -1741,14 +1717,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         ).fit(X, y)
 
         for fit_clf in (False, True):
-            with (
-                self.subTest(fit_clf=fit_clf),
-                patch.object(
-                    SklearnClassifier,
-                    "fit",
-                    side_effect=AssertionError("refit"),
-                ),
-            ):
+            with self.subTest(fit_clf=fit_clf):
                 self._assert_query_rejects_clf(
                     clf,
                     y,
@@ -1803,10 +1772,12 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             classes=[0, 1],
         )
         single = clone(clf).set_params(estimators=[("pwc", clone(pwc))])
-        refit_error = "AnnotatorEnsembleClassifier does not support target"
+        refit_error = (
+            "AnnotatorEnsembleClassifier does not support single-annotator"
+        )
         cases = [
             (clone(clf).fit(X, y_matrix), y_matrix, False, "one-dimensional"),
-            (clf, y_matrix, True, "one-dimensional"),
+            (clf, y_matrix, True, refit_error),
             *(
                 (ensemble, labels, True, refit_error)
                 for ensemble in (single, clone(single).fit(X, y[:, None]))
@@ -1829,11 +1800,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                     )
                     with self.assertRaisesRegex(ValueError, error):
                         strategy.query(**query_params)
-                    assert_no_query_state(
-                        self,
-                        strategy,
-                        attributes=STREAM_QUERY_STATE_ATTRIBUTES,
-                    )
                     assert_state_unchanged(self, case_clf, original_state)
 
     def test_query_refitting_respects_wrapped_class_vocabulary(self):
@@ -2376,10 +2342,8 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 qs = self.qs_class(**init_params)
                 qs.update(**deepcopy(update_params))
                 qs.set_params(budget=budget)
-                before = deepcopy(qs)
                 with self.assertRaises(err):
                     qs.update(**deepcopy(update_params))
-                assert_state_unchanged(self, qs, before)
 
     def test_query_param_return_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -2508,22 +2472,16 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
                     qs = self.qs_class(**init_params)
                     if test_func == "update":
-                        check_state = err is not None and (
+                        self._check_update_param(qs, update_params, err)
+                        if err is not None and (
                             test_param
                             in ("queried_indices", "budget_manager_param_dict")
                             or (
                                 test_param == "candidates"
                                 and not replace_init_params
                             )
-                        )
-                        before = deepcopy(qs) if check_state else None
-                        self._check_update_param(qs, update_params, err)
-                        if check_state:
-                            assert_state_unchanged(self, qs, before)
+                        ):
                             qs.update(**deepcopy(self.update_params))
-                            before = deepcopy(qs)
-                            self._check_update_param(qs, update_params, err)
-                            assert_state_unchanged(self, qs, before)
                     elif err is None:
                         qs.query(**query_params)
                     else:

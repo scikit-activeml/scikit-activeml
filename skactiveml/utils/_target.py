@@ -347,16 +347,6 @@ def _resolve_task_agnostic_target_type(
     return target_type
 
 
-def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
-    y_array = _as_label_array(y)
-    expected_ndim = 2 if annotation_type == "multi-annotator" else 1
-    return (
-        target_type in {"auto", "single-output"}
-        and y_array.ndim == expected_ndim
-        and is_unlabeled(y_array, missing_label=missing_label).all()
-    )
-
-
 def _check_target_array(y):
     y = check_array(
         _as_label_array(y),
@@ -507,6 +497,21 @@ def _declared_target_type(y, component):
     ):
         return "single-output"
     return target_type
+
+
+def _check_refit_capability(estimator):
+    """Reject an estimator that a query cannot fit on single-annotator labels.
+
+    A multi-annotator classifier would fit a column vector as the labels of
+    one annotator without any error, so it is rejected before training.
+    """
+    capabilities = estimator._target_capabilities
+    if not any(c[2] == "single-annotator" for c in capabilities):
+        raise ValueError(
+            f"{type(estimator).__name__} does not support single-annotator "
+            "labels `y`, so it cannot be fitted on them. Pass a fitted "
+            "estimator instead."
+        )
 
 
 def _check_target_spec_capability(component, target_spec, capabilities):

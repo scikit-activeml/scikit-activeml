@@ -15,10 +15,7 @@ from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import (
-    assert_no_query_state,
-    assert_state_unchanged,
-)
+from skactiveml.tests.utils import assert_state_unchanged
 from skactiveml.utils import MISSING_LABEL, is_labeled, unlabeled_indices
 
 
@@ -80,10 +77,10 @@ class TemplateTestExpectedErrorReduction(
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection()
 
-    def test_multiannotator_classifier_rejected_before_fit_and_state(self):
+    def test_multiannotator_classifier_rejected_before_fit(self):
         clf = AnnotatorEnsembleClassifier(
             estimators=[("clf", ParzenWindowClassifier(random_state=0))],
             classes=self.classes,
@@ -104,7 +101,6 @@ class TemplateTestExpectedErrorReduction(
                         ValueError, "does not support target capability"
                     ):
                         qs.query(self.X, self.y, clf=clf, fit_clf=fit_clf)
-                    assert_no_query_state(self, qs)
             fit.assert_not_called()
         assert_state_unchanged(self, clf, clf_before)
 
@@ -181,7 +177,6 @@ class TemplateTestExpectedErrorReduction(
                 qs = self.qs_class(random_state=0)
                 with self.assertRaisesRegex(ValueError, "outside `classes`"):
                     qs.query(X, y_three, clf, fit_clf=fit_clf)
-                assert_no_query_state(self, qs)
 
     def test_init_param_subtract_current(self):
         test_cases = [(2, TypeError), ("string", TypeError)]

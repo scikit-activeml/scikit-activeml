@@ -271,7 +271,7 @@ class TestGeneralBALD(
             with self.subTest(strategy=type(strategy).__name__):
                 self.assertEqual(strategy._target_capabilities, expected)
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection(
             estimator_param="ensemble",
             fit_param="fit_ensemble",

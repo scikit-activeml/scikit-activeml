@@ -383,16 +383,15 @@ General Advice
 
 Use the ``self._validate_data`` method (implemented in the superclass) exactly
 once for structural validation of the query inputs ``X`` and ``y``. Target
-resolution is a separate semantic step and may intentionally precede
-``self._validate_data`` so that invalid or unsupported target semantics fail
-before estimator fitting or query-state initialization. If the strategy takes
-one estimator that it may refit, use ``_fit_and_resolve_estimator_target_spec``
-from ``skactiveml/pool/_target.py``. It validates the estimator and returns the
-estimator to use, i.e., a fitted clone if requested, e.g., via
-``fit_clf=True``, with the resolved target specification. Calculate utilities
-via an extra public function. Use the ``simple_batch`` function from ``utils``
-to determine the query indices and set the utilities in naive batch query
-strategies.
+resolution is a separate semantic step and may precede
+``self._validate_data``, e.g., to pass the resolved target type to it. If the
+strategy takes one estimator that it may refit, use
+``_fit_and_resolve_estimator_target_spec`` from ``skactiveml/pool/_target.py``.
+It validates the estimator and returns the estimator to use, i.e., a fitted
+clone if requested, e.g., via ``fit_clf=True``, with the resolved target
+specification. Calculate utilities via an extra public function. Use the
+``simple_batch`` function from ``utils`` to determine the query indices and set
+the utilities in naive batch query strategies.
 
 .. _testing-1:
 
@@ -511,11 +510,9 @@ optional attributes need to be implemented. Use ``self._validate_data`` method
 (is implemented in superclass). Check the input ``X`` and ``y`` only once. For
 a strategy using a classifier, call ``_validate_X_y_sample_weight`` from
 ``skactiveml/stream/_validation.py`` and then
-``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``
-before ``super()._validate_data`` and before ``_validate_budget_manager``, so
-that invalid inputs fail before any query state is set.
-``_fit_and_resolve_clf_target_spec`` returns ``(clf, target_spec)``, where
-``clf`` is a fitted clone if ``fit_clf=True``.
+``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``. It
+returns ``(clf, target_spec)``, where ``clf`` is a fitted clone if
+``fit_clf=True``.
 
 When adapting subclasses written for version 1.0.1, replace overrides of
 ``_validate_clf`` and ``_validate_X_y_sample_weight`` with validation in the

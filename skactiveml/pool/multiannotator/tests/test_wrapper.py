@@ -17,7 +17,6 @@ from skactiveml.pool import (
     RandomSampling,
 )
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import is_labeled
 from skactiveml.utils import majority_vote, MISSING_LABEL, is_unlabeled
 
@@ -106,9 +105,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                 ):
                     query = wrapper.query(X, np.asarray(y), batch_size=1)
                 self.assertEqual(query.shape, (1, 2))
-                self.assertEqual(len(aggregates), 2)
-                for aggregate in aggregates:
-                    np.testing.assert_array_equal(aggregate, expected)
+                self.assertEqual(len(aggregates), 1)
+                np.testing.assert_array_equal(aggregates[0], expected)
                 self.assertIsNone(wrapper.y_aggregate)
 
     def test_outer_and_aggregated_targets_use_separate_semantics(self):
@@ -127,7 +125,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertEqual(query_indices.shape, (2, 2))
         self.assertEqual(utilities.shape, (2, len(self.X), self.y.shape[1]))
 
-    def test_wrapped_target_rejection_precedes_query_state(self):
+    def test_wrapped_target_is_rejected(self):
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(target_type="multi-label"),
             random_state=self.random_state,
@@ -135,8 +133,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             wrapper.query(self.X, self.y)
-
-        assert_no_query_state(self, wrapper)
 
     def test_wrapped_classifier_is_rejected(self):
         strategy = UncertaintySampling(random_state=self.random_state)

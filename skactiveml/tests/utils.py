@@ -8,45 +8,6 @@ from sklearn import clone
 from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
-QUERY_STATE_ATTRIBUTES = (
-    "n_features_in_",
-    "missing_label_",
-    "random_state_",
-)
-
-STREAM_QUERY_STATE_ATTRIBUTES = (
-    "n_features_in_",
-    "random_state_",
-    "budget_",
-    "budget_manager_",
-)
-
-
-def assert_no_query_state(
-    test_case, strategy, attributes=QUERY_STATE_ATTRIBUTES
-):
-    """Assert that semantic query failure did not commit public state.
-
-    Parameters
-    ----------
-    test_case : unittest.TestCase
-        The test case providing the assertion.
-    strategy : skactiveml query strategy
-        The query strategy whose `query` failed.
-    attributes : iterable of str, default=QUERY_STATE_ATTRIBUTES
-        The attributes a failed query must not have committed. Stream query
-        strategies pass `STREAM_QUERY_STATE_ATTRIBUTES` instead, because they
-        commit other state.
-    """
-    for attribute in attributes:
-        test_case.assertFalse(
-            hasattr(strategy, attribute),
-            msg=(
-                f"{type(strategy).__name__} committed query state "
-                f"`{attribute}` after semantic failure."
-            ),
-        )
-
 
 def state_difference(actual, expected, name="state"):
     """Describe the first difference between two object states.

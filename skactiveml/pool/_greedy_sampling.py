@@ -338,7 +338,6 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        # Resolve through the regressor before acquisition state is changed.
         reg, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             reg,

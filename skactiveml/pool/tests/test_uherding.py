@@ -23,7 +23,6 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierLogitsEmbeddingTuple,
     ParzenWindowClassifierLogitsOnly,
     ParzenWindowClassifierWeirdTuple,
-    assert_no_query_state,
     assert_state_unchanged,
 )
 from skactiveml.utils import MISSING_LABEL, TargetSpec, resolve_target_spec
@@ -749,7 +748,7 @@ class TestUHerding(
             ParzenWindowClassifierLogitsEmbedding.fit_calls, fit_calls_before
         )
 
-    def test_multiannotator_calibration_rejected_before_fit_and_state(self):
+    def test_multiannotator_calibration_rejected_before_fit(self):
         X = self.query_default_params_clf["X"]
         y = self.query_default_params_clf["y"]
         clf = AnnotatorEnsembleClassifier(
@@ -774,10 +773,9 @@ class TestUHerding(
                             temperatures=temperatures, random_state=0
                         )
                         with self.assertRaisesRegex(
-                            ValueError, "does not support target capability"
+                            ValueError, "does not support"
                         ):
                             qs.query(X, y, clf=clf, fit_clf=fit_clf)
-                        assert_no_query_state(self, qs)
             fit.assert_not_called()
         assert_state_unchanged(self, clf, clf_before)
 

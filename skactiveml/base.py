@@ -27,7 +27,6 @@ from .utils._label_dtype import (
 from .utils._target import (
     _check_target_capability,
     _declared_target_type,
-    _has_no_class_evidence,
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
@@ -724,11 +723,13 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         except ValueError:
             # A class-agnostic strategy can acquire the first sample-annotator
             # pair before a class vocabulary is observable.
-            lacks_class_evidence = classes is None and _has_no_class_evidence(
-                y,
-                "auto",
-                "multi-annotator",
-                self.missing_label,
+            y_array = _as_label_array(y)
+            lacks_class_evidence = (
+                classes is None
+                and y_array.ndim == 2
+                and is_unlabeled(
+                    y_array, missing_label=self.missing_label
+                ).all()
             )
             if lacks_class_evidence:
                 return None

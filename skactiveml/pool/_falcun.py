@@ -178,7 +178,6 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        # Resolve through the classifier before acquisition state is changed.
         clf, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             clf,

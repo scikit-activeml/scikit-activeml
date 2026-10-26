@@ -59,10 +59,10 @@ An unfitted estimator declares the target semantics through its
 ``target_type``, which are resolved together with ``y``. A
 :class:`~skactiveml.classifier.SlidingWindowClassifier` without ``classes``
 declares the classes of its ``estimator``. A strategy that fits a classifier,
-e.g., with ``fit_clf=True``, resolves and checks the declarations of an
-unfitted clone before fitting and then uses the fitted classifier's
-``target_spec_``. Unsupported target specifications are therefore rejected
-before training.
+e.g., with ``fit_clf=True``, first checks that the classifier supports
+single-annotator labels, then fits a clone and uses its ``target_spec_``. A
+target specification that the strategy does not support may therefore be
+rejected only after training.
 
 .. _label-contract:
 
@@ -910,10 +910,10 @@ Stream query strategies apply the same rules: they accept a fitted
 multi-annotator classifier with ``fit_clf=False`` and check labels ``y``, if
 given, against its single-annotator prediction specification. They reject an
 unfitted multi-annotator classifier, so fit it with declared ``classes`` on an
-all-missing label matrix to start without labels. Refitting is validated
-before training and requires a classifier that supports single-annotator
-labels, including when ``y`` is a column vector. Their algorithm-specific
-requirements apply as well.
+all-missing label matrix to start without labels. Before refitting, the
+strategy checks that the classifier supports single-annotator labels,
+including when ``y`` is a column vector. Their algorithm-specific requirements
+apply as well.
 
 Errors and Component Capabilities
 =================================
@@ -947,14 +947,12 @@ as for pool query strategies. An unfitted classifier declares the meaning of
 ``y`` through its ``classes``,
 ``missing_label``, and ``target_type``, from which the specification is
 resolved together with ``y``; without ``y``, only these declarations count.
-With ``fit_clf=True``, the strategy resolves the declarations of an unfitted
-clone before fitting and then uses the fitted clone's ``target_spec_``, as
-pool query strategies do. As for pool query strategies, the classifier's own
-capabilities are checked against its ``target_spec_``, or against the resolved
-specification if it is unfitted. The strategy's capability is checked against
-the single-annotator prediction specification. Both checks precede changes to
-query state such as ``budget_manager_``, and for a clone they also precede
-training. A multi-label classifier is therefore rejected with the capability
+With ``fit_clf=True``, the strategy fits a clone and then uses its
+``target_spec_``, as pool query strategies do. As for pool query strategies,
+the classifier's own capabilities are checked against its ``target_spec_``, or
+against the resolved specification if it is unfitted. The strategy's
+capability is checked against the single-annotator prediction specification.
+A multi-label classifier is therefore rejected with the capability
 error described above, whereas a fitted multi-annotator classifier passes both
 checks, see :ref:`multiple-annotators`.
 
@@ -997,8 +995,6 @@ number of classes.
    Traceback (most recent call last):
        ...
    ValueError: VariableUncertainty does not support target capability ...
-   >>> hasattr(stream_qs, "budget_manager_")
-   False
 
 An unfitted classifier is the target authority through its declarations, so a
 declared multi-label vocabulary is rejected the same way, even without labels
@@ -1020,8 +1016,6 @@ declared multi-label vocabulary is rejected the same way, even without labels
    Traceback (most recent call last):
        ...
    ValueError: VariableUncertainty does not support target capability ...
-   >>> hasattr(stream_qs, "budget_manager_")
-   False
 
 .. _current-limitations:
 

@@ -11,7 +11,6 @@ from skactiveml.pool.multiannotator import (
     IntervalEstimationThreshold,
     IntervalEstimationAnnotModel,
 )
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import TargetSpec
 
 
@@ -333,14 +332,12 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
                 fit_clf=False,
             )
 
-    def test_query_rejects_unsupported_classifier_before_query_state(self):
+    def test_query_rejects_unsupported_classifier(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)
         clf = ParzenWindowClassifier(classes=[0, 1, 2])
 
         with self.assertRaisesRegex(ValueError, "does not support"):
             ie_thresh.query(X=self.X, y=self.y, clf=clf)
-
-        assert_no_query_state(self, ie_thresh)
 
     def test_cycle_zero_requires_classifier_classes(self):
         y = np.full_like(self.y, np.nan)
@@ -361,9 +358,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
                 fit_clf="invalid",
             )
 
-        self.assertFalse(hasattr(ie_thresh, "n_features_in_"))
-
-    def test_fitted_classifier_conflict_precedes_query_state(self):
+    def test_fitted_classifier_conflict_is_rejected(self):
         ie_thresh = IntervalEstimationThreshold(random_state=0)
         clf = ParzenWindowClassifier(classes=[0, 1]).fit(
             self.X, np.arange(len(self.X)) % 2
@@ -378,33 +373,6 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "vocabulary conflicts"):
             ie_thresh.query(X=self.X, y=y, clf=clf, fit_clf=False)
-
-        assert_no_query_state(self, ie_thresh)
-
-    def test_classifier_rejection_preserves_existing_query_state(self):
-        ie_thresh = IntervalEstimationThreshold(random_state=0)
-        ie_thresh.query(X=self.X, y=self.y, clf=self.clf)
-        expected_n_features = ie_thresh.n_features_in_
-        expected_missing_label = ie_thresh.missing_label_
-        expected_random_state = ie_thresh.random_state_.get_state()
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
-            ie_thresh.query(
-                X=self.X,
-                y=self.y,
-                clf=ParzenWindowClassifier(classes=[0, 1, 2]),
-            )
-
-        self.assertEqual(ie_thresh.n_features_in_, expected_n_features)
-        np.testing.assert_equal(
-            ie_thresh.missing_label_, expected_missing_label
-        )
-        actual_random_state = ie_thresh.random_state_.get_state()
-        self.assertEqual(actual_random_state[0], expected_random_state[0])
-        np.testing.assert_array_equal(
-            actual_random_state[1], expected_random_state[1]
-        )
-        self.assertEqual(actual_random_state[2:], expected_random_state[2:])
 
     def test_init_param_alpha(self):
         ie_thresh = IntervalEstimationThreshold(alpha=0.0, random_state=0)

@@ -16,7 +16,6 @@ from skactiveml.pool import (
     TypiClust,
 )
 from skactiveml.pool.tests._strategy_helpers import _instantiate
-from skactiveml.tests.utils import assert_no_query_state
 
 TASK_AGNOSTIC_CAPABILITIES = frozenset(
     {
@@ -172,7 +171,7 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                     equal_nan=True,
                 )
 
-    def test_auto_rejects_ambiguous_matrix_before_query_state(self):
+    def test_auto_rejects_ambiguous_matrix(self):
         X = np.arange(16, dtype=float).reshape(8, 2)
         y = np.array(
             [
@@ -190,14 +189,13 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
             with self.subTest(strategy=type(strategy).__name__):
                 with self.assertRaisesRegex(ValueError, "ambiguous"):
                     strategy.query(X, y, **extra)
-                assert_no_query_state(self, strategy)
                 self.assertTrue(
                     strategy_specific_state_attributes.isdisjoint(
                         strategy.__dict__
                     )
                 )
 
-    def test_semantic_and_capability_failures_precede_query_state(self):
+    def test_semantic_and_capability_failures(self):
         X = np.arange(16, dtype=float).reshape(8, 2)
         invalid_cases = (
             (
@@ -226,7 +224,6 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 ):
                     with self.assertRaisesRegex(ValueError, message):
                         strategy.query(X, y, **extra)
-                    assert_no_query_state(self, strategy)
 
     def test_target_types_validate_public_shapes(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
