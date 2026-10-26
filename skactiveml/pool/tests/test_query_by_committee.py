@@ -14,7 +14,8 @@ from sklearn.ensemble import (
 )
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.multioutput import MultiOutputClassifier
+from sklearn.linear_model import LinearRegression
+from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError
 
@@ -437,6 +438,25 @@ class TestQueryByCommittee(
                 idx, u = qs.query(**query_params)
                 self.assertEqual(len(idx), 1)
                 self.assertEqual(len(u), 1)
+
+    def test_query_rejects_prefitted_multi_output_regressor(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.full(8, MISSING_LABEL)
+        y[:3] = X[:3, 0]
+        Y = np.column_stack((X[:, 0], 100 - X[:, 0]))
+        estimators = [
+            MultiOutputRegressor(LinearRegression()),
+            RandomForestRegressor(n_estimators=3, random_state=0),
+        ]
+        for estimator in estimators:
+            with self.subTest(estimator=type(estimator).__name__):
+                reg = SklearnRegressor(estimator.fit(X, Y))
+                with self.assertRaisesRegex(
+                    ValueError, "single-output regression"
+                ):
+                    QueryByCommittee().query(
+                        X, y, ensemble=reg, fit_ensemble=False
+                    )
 
     def test_query_is_invariant_to_class_labels(self):
         X = np.array(

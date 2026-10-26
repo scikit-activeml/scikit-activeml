@@ -364,7 +364,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 ("auto", None),
                 ("single-output", None),
                 ("multi-label", ValueError),
-                ("multi-output", ValueError),
                 ("invalid", ValueError),
             ],
         )
@@ -381,7 +380,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         self.assertEqual(estimator.target_type, "auto")
         self.assertIn(capability, estimator._target_capabilities)
         self.assertEqual(capability[0], "classification")
-        self.assertNotEqual(capability[1], "multi-output")
 
     def test_predict_dtype_matches_class_dtype(
         self, replace_init_params=None, replace_fit_params=None
@@ -866,7 +864,6 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
             ("auto", None),
             ("single-output", None),
             ("multi-label", ValueError),
-            ("multi-output", ValueError),
             ("invalid", ValueError),
         ]:
             with self.subTest(target_type=target_type):
@@ -1126,7 +1123,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             [
                 ("auto", None),
                 ("single-output", None),
-                ("multi-output", ValueError),
                 ("multi-label", ValueError),
                 ("invalid", ValueError),
             ],

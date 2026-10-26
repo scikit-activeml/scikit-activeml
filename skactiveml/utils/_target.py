@@ -29,7 +29,7 @@ class TargetSpec:
     ----------
     task : "classification" or "regression"
         The prediction task.
-    target_type : "single-output" or "multi-label" or "multi-output"
+    target_type : "single-output" or "multi-label"
         The resolved structure of one sample's target.
     annotation_type : "single-annotator" or "multi-annotator"
         Whether observations come from one or multiple annotators.
@@ -171,14 +171,14 @@ def _validate_target_semantics(
             "`task` must be either 'classification' or 'regression'."
         )
 
-    target_types = {"single-output", "multi-label", "multi-output"}
+    target_types = {"single-output", "multi-label"}
     if allow_auto:
         target_types.add("auto")
     if target_type not in target_types:
         allowed = (
-            "{'auto', 'single-output', 'multi-label', 'multi-output'}"
+            "{'auto', 'single-output', 'multi-label'}"
             if allow_auto
-            else "{'single-output', 'multi-label', 'multi-output'}"
+            else "{'single-output', 'multi-label'}"
         )
         raise ValueError(f"`target_type` must be one of {allowed}.")
 
@@ -191,15 +191,9 @@ def _validate_target_semantics(
         raise ValueError(
             "`target_type='multi-label'` requires classification."
         )
-    if (
-        target_type in {"multi-label", "multi-output"}
-        and annotation_type == "multi-annotator"
-    ):
-        target_name = (
-            "Multi-label" if target_type == "multi-label" else "Multi-output"
-        )
+    if target_type == "multi-label" and annotation_type == "multi-annotator":
         raise ValueError(
-            f"{target_name} targets cannot be combined with "
+            "Multi-label targets cannot be combined with "
             "`annotation_type='multi-annotator'`."
         )
 
@@ -211,20 +205,13 @@ def _check_class_vocabulary_structure(target_type, classes):
         raise ValueError(
             "Single-output classification requires a flat class vocabulary."
         )
-    if target_type in {"multi-label", "multi-output"}:
+    if target_type == "multi-label":
         if not has_nested_classes:
-            vocabulary_kind = (
-                "nested binary class vocabularies"
-                if target_type == "multi-label"
-                else "nested class vocabularies"
-            )
             raise ValueError(
-                f"{target_type.capitalize()} classification requires "
-                f"{vocabulary_kind}."
+                "Multi-label classification requires nested binary class "
+                "vocabularies."
             )
-        if target_type == "multi-label" and not all(
-            len(classes_i) == 2 for classes_i in classes
-        ):
+        if not all(len(classes_i) == 2 for classes_i in classes):
             raise ValueError(
                 "Each multi-label class vocabulary must contain exactly two "
                 "classes."
@@ -249,8 +236,7 @@ def resolve_target_spec(
         Target observations, including values equal to `missing_label`.
     task : "classification" or "regression"
         The prediction task.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. The returned specification is always concrete.
     annotation_type : "single-annotator" or "multi-annotator", \
             default="single-annotator"
@@ -258,8 +244,7 @@ def resolve_target_spec(
     classes : array-like or tuple of array-like, default=None
         Optional classification class vocabularies. A flat vocabulary
         describes single-output classification. Nested binary vocabularies
-        describe multi-label classification. Nested non-binary vocabularies
-        describe recognized multi-output classification semantics.
+        describe multi-label classification.
     missing_label : scalar or str or None, default=np.nan
         Value representing a missing target observation.
 
@@ -287,20 +272,13 @@ def resolve_target_spec(
                 )
             target_type = "single-output"
         elif task == "regression":
-            target_type = (
-                "single-output"
-                if y.ndim == 1 or y.shape[1] == 1
-                else "multi-output"
-            )
+            target_type = "single-output"
         elif classes is not None:
-            if _has_nested_classes(classes):
-                target_type = (
-                    "multi-label"
-                    if all(len(classes_i) == 2 for classes_i in classes)
-                    else "multi-output"
-                )
-            else:
-                target_type = "single-output"
+            target_type = (
+                "multi-label"
+                if _has_nested_classes(classes)
+                else "single-output"
+            )
         elif y.ndim == 1:
             target_type = "single-output"
         else:
@@ -315,13 +293,6 @@ def resolve_target_spec(
     if target_type == "multi-label":
         return _resolve_multilabel(
             y,
-            classes=classes,
-            missing_label=missing_label,
-        )
-    if target_type == "multi-output":
-        return _resolve_multioutput(
-            y,
-            task=task,
             classes=classes,
             missing_label=missing_label,
         )
@@ -387,21 +358,13 @@ def _resolve_task_agnostic_target_type(
             )
         return target_type
 
-    if target_type == "multi-label":
-        if y.ndim != 2:
-            raise ValueError("Multi-label targets must be two-dimensional.")
-        is_unlabeled(
-            y,
-            missing_label=missing_label,
-            target_type="multi-label",
-        )
-        return target_type
-
-    if y.ndim != 2 or y.shape[1] < 2:
-        raise ValueError(
-            "Multi-output targets must be two-dimensional with at least two "
-            "target columns."
-        )
+    if y.ndim != 2:
+        raise ValueError("Multi-label targets must be two-dimensional.")
+    is_unlabeled(
+        y,
+        missing_label=missing_label,
+        target_type="multi-label",
+    )
     return target_type
 
 
@@ -447,53 +410,6 @@ def _validate_single_output_shape(y, task, annotation_type):
             "Single-output regression targets must be one-dimensional or a "
             "column vector."
         )
-
-
-def _resolve_multioutput(y, *, task, classes, missing_label):
-    if y.ndim != 2 or y.shape[1] < 2:
-        raise ValueError(
-            "Multi-output targets must be two-dimensional with at least two "
-            "target columns."
-        )
-
-    normalized_classes = None
-    if task == "regression":
-        _check_labels(y, missing_label, task="regression")
-    else:
-        if classes is not None and len(classes) != y.shape[1]:
-            raise ValueError(
-                "Multi-output `classes` must contain one vocabulary per "
-                "target column."
-            )
-
-        missing = is_unlabeled(y, missing_label=missing_label)
-        normalized_classes = []
-        for output_idx in range(y.shape[1]):
-            observed = y[:, output_idx][~missing[:, output_idx]]
-            declared = observed if classes is None else classes[output_idx]
-            if len(declared) == 0:
-                raise ValueError(
-                    "No class label is observed for multi-output target "
-                    f"column {output_idx} and `classes` is not defined."
-                )
-            normalized_classes.append(
-                _normalize_class_vocabulary(
-                    declared, observed, f"`classes[{output_idx}]`"
-                )
-            )
-        normalized_classes = tuple(normalized_classes)
-        if classes is None:
-            check_classes(normalized_classes)
-            _check_class_vocabulary_structure(
-                "multi-output", normalized_classes
-            )
-
-    return TargetSpec._from_normalized(
-        task=task,
-        target_type="multi-output",
-        annotation_type="single-annotator",
-        classes=normalized_classes,
-    )
 
 
 def _resolve_multilabel(y, *, classes, missing_label):

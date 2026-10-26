@@ -999,18 +999,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         clf.fit(X, y)
         self.assertEqual(clf.score(X, y), 0.5)
 
-    def test_multi_output_is_rejected_before_fitted_state(self):
-        X = np.arange(4).reshape(2, 2)
-        y = np.array([[2, 1], [1, 0]])
-        clf = DummySkactivemlClassifier(
-            classes=[[0, 1, 2], [0, 1]],
-            missing_label=-1,
-            target_type="multi-output",
-        )
-        with self.assertRaisesRegex(ValueError, "Supported capabilities"):
-            clf.fit(X, y)
-        self.assertFalse(hasattr(clf, "target_spec_"))
-
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
     @patch.multiple(ClassFrequencyEstimator, __abstractmethods__=set())

@@ -204,17 +204,6 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 "target_type",
             ),
             (
-                "multi-output",
-                np.array(
-                    [
-                        [0, 2],
-                        [1, 3],
-                        *[[-1, -1] for _ in range(6)],
-                    ]
-                ),
-                "does not support target capability",
-            ),
-            (
                 "multi-label",
                 np.array(
                     [
@@ -263,7 +252,6 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 "one-dimensional or a column",
             ),
             ("multi-label", np.array([0, 1, -1, -1]), "two-dimensional"),
-            ("multi-output", np.array([[0], [1], [-1], [-1]]), "at least two"),
         )
         for target_type, y, message in invalid_cases:
             with self.subTest(target_type=target_type):

@@ -2419,7 +2419,7 @@ if successful_skorch_torch_import:
                 and unlabeled samples
             y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by self.missing_label). For multioutput
+                ones indicated by self.missing_label). For multi-label
                 problems, a row `y[i]` must be either contain only observed
                 labels or only `missing_label` values, i.e., no mixing
                 within a row.
@@ -2447,7 +2447,7 @@ if successful_skorch_torch_import:
                 and unlabeled samples
             y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by self.missing_label). For multioutput
+                ones indicated by self.missing_label). For multi-label
                 problems, a row `y[i]` must either contain only observed
                 labels or only `missing_label` values, i.e., no mixing
                 within a row.

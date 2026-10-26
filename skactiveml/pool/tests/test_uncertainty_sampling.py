@@ -85,7 +85,6 @@ class TestUncertaintySampling(
                 ("invalid", ValueError),
                 (1, ValueError),
                 ("multi-label", ValueError),
-                ("multi-output", ValueError),
             ],
         )
 

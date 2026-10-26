@@ -24,8 +24,8 @@ specification with four fields:
     ``"classification"`` or ``"regression"``.
 
 ``target_type``
-    The resolved value ``"single-output"``, ``"multi-label"``, or
-    ``"multi-output"``. A resolved specification never contains ``"auto"``.
+    The resolved value ``"single-output"`` or ``"multi-label"``. A resolved
+    specification never contains ``"auto"``.
 
 ``annotation_type``
     ``"single-annotator"`` or ``"multi-annotator"``.
@@ -79,10 +79,8 @@ Three distinct concepts determine whether an input is valid:
 
 ``classes``
     The allowed categories for classification: one vocabulary for single-output
-    classification, one binary vocabulary per multi-label output, or one
-    vocabulary per output for the recognized multi-output classification, see
-    :ref:`recognized-future-semantics`. Missing labels are never classes.
-    Regression has no class vocabulary.
+    classification, or one binary vocabulary per multi-label output. Missing
+    labels are never classes. Regression has no class vocabulary.
 
 ``y``
     Observed labels together with missing entries. Classification labels are
@@ -734,8 +732,8 @@ Ambiguous Two-dimensional Classification
 
 For single-annotator classification, a two-dimensional ``y`` is ambiguous when
 ``target_type="auto"`` and ``classes=None``. Its columns could represent binary
-label outputs or distinct outputs of a multi-output classification task.
-Binary-looking values do not resolve this ambiguity.
+label outputs, or the annotators of a label matrix passed to a single-annotator
+component by mistake. Binary-looking values do not resolve this ambiguity.
 
 Specify ``target_type``, provide a flat or nested class vocabulary, or pass a
 fitted estimator whose ``target_spec_`` already resolves the target semantics.
@@ -750,9 +748,9 @@ fitted estimator whose ``target_spec_`` already resolves the target semantics.
    ValueError:
 
 With ``target_type="auto"``, a flat class vocabulary resolves to single-output
-classification. A nested set of binary vocabularies resolves to multi-label
-classification. A nested vocabulary containing a non-binary output resolves to
-multi-output classification, see :ref:`recognized-future-semantics`.
+classification, and a nested vocabulary resolves to multi-label
+classification. Every nested vocabulary must be binary, see
+:ref:`current-limitations`.
 
 Single-output Column Vectors
 ============================
@@ -814,19 +812,19 @@ floating-point values, whereas ``include_unlabeled_samples=True`` passes the
 raw ``y`` on unchanged, because only its own representation holds the missing
 label. The skorch regressor casts its labels to ``float32`` in either case.
 
-Labels with multiple columns resolve to the recognized
-``target_type="multi-output"`` semantics. The specification itself is valid,
-but regressors reject it because multi-output regression is not yet a supported
-capability.
+Labels with multiple columns are rejected, because multi-output regression is
+not supported, see :ref:`current-limitations`.
 
 A single-output regression label is one value per sample, so ``predict``
 returns an array of shape ``(n_samples,)``. A wrapped estimator may instead
-return one prediction per sample as a column; this column is reduced to the
-shape required by the declared single-output target type.
+return one prediction per sample as a column. This column is reduced to shape
+``(n_samples,)``.
 
-Predictions with several columns are rejected rather than flattened.
+Predictions with several columns are rejected rather than flattened, and so
+are samples drawn with ``sample_y`` that contain several target columns.
 Flattening them would produce ``n_samples * n_outputs`` values and would no
-longer preserve one label per sample.
+longer preserve one label per sample. Non-finite predictions and samples are
+rejected as well.
 
 .. doctest::
 
@@ -859,13 +857,11 @@ so query results identify ``(sample, annotator)`` pairs.
 
 Currently, a multi-annotator specification is always single-output. With
 ``target_type="auto"``, resolution assigns ``"single-output"`` and rejects
-nested class vocabularies. Declaring ``target_type="multi-label"`` or
-``target_type="multi-output"`` together with
-``annotation_type="multi-annotator"`` is rejected during resolution, not
+nested class vocabularies. Declaring ``target_type="multi-label"`` together
+with ``annotation_type="multi-annotator"`` is rejected during resolution, not
 during capability checking, because the two-dimensional label matrix can hold
-either annotators or outputs but not both. Lifting this restriction would
-require a representation with both dimensions, see
-:ref:`recognized-future-semantics`.
+either annotators or label outputs but not both. Lifting this restriction would
+require a representation with both dimensions, see :ref:`current-limitations`.
 
 Compatible single-annotator pool strategies, such as
 :class:`~skactiveml.pool.UncertaintySampling`, :class:`~skactiveml.pool.Badge`,
@@ -1020,21 +1016,19 @@ declared multi-label vocabulary is rejected the same way, even without labels
    >>> hasattr(stream_qs, "budget_manager_")
    False
 
-.. _recognized-future-semantics:
+.. _current-limitations:
 
-Recognized Future Semantics
-===========================
+Current Limitations
+===================
 
-Target resolution already recognizes multi-output classification and
-multi-output regression, although current components do not execute them.
-Partial-label querying is not supported either. Multi-label or multi-output
-targets with multiple annotators are not recognized yet: resolution rejects
-the combination, see :ref:`multiple-annotators`.
+Multi-output classification, where each column is a separate classification
+task with any number of classes, and multi-output regression are not
+supported. A nested class vocabulary must therefore be binary, and a
+regression label must be one-dimensional or a column vector. Partial-label
+querying is not supported either. Multi-label targets with multiple annotators
+are rejected, see :ref:`multiple-annotators`.
 
-The first two are limits of current component capabilities and acquisition
-scope; the last is a limit of the current label representation. None of them
-changes the distinction between target type and annotation type, and
-acquisition granularity is not part of ``TargetSpec``. Future support can
-therefore add the required component capabilities, a label representation
-with an annotator dimension, and an explicit acquisition model without
-changing the target semantics defined here.
+Supporting these cases later would add component capabilities, a label
+representation with an annotator dimension, or an explicit acquisition model.
+It would not change the distinction between target type and annotation type
+defined here.

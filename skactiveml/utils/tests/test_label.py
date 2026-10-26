@@ -46,7 +46,7 @@ class TestLabel(unittest.TestCase):
     def test_is_unlabeled(self):
         self.assertRaises(ValueError, is_unlabeled, y=[0], target_type="auto")
         self.assertRaises(
-            ValueError, is_unlabeled, y=[0], target_type="multi-output"
+            ValueError, is_unlabeled, y=[0], target_type="invalid"
         )
         self.assertRaises(
             ValueError, is_unlabeled, y=[], target_type="multi-label"

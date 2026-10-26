@@ -425,6 +425,6 @@ class TestLabelEncoder(unittest.TestCase):
         )
         self.assertRaises(
             ValueError,
-            ExtLabelEncoder(classes=classes, target_type="multi-output").fit,
+            ExtLabelEncoder(classes=classes, target_type="invalid").fit,
             [["a", "c"], ["b", "d"]],
         )

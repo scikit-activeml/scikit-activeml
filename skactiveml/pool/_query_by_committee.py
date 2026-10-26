@@ -293,6 +293,11 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 results = np.array(
                     [learner.predict(X_cand) for learner in est_arr]
                 )
+                if results.ndim != 2:
+                    raise ValueError(
+                        "The members of `ensemble` must predict single-output "
+                        "regression values."
+                    )
             else:
                 results = sample_func(X_cand, **sample_dict).T
             utilities_cand = np.std(results, axis=0)

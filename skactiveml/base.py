@@ -359,8 +359,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Subclasses reject resolved specifications
         outside their exact capabilities.
     """
@@ -736,8 +735,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Multi-annotator strategies support only
         single-output classification in version 1.1.
     """
@@ -1417,8 +1415,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         - A flat vocabulary describes single-output classification and is
           applied to every annotator entry for multi-annotator components.
         - Nested binary vocabularies describe multi-label classification, one
-          class vocabulary per label output. Nested non-binary vocabularies
-          describe recognized multi-output classification semantics.
+          class vocabulary per label output.
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -1429,8 +1426,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Components reject resolved target specifications
         outside their exact capabilities.
 
@@ -1581,7 +1577,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
                 (n_samples, n_annotators)
             Labels of the training data set (possibly including unlabeled
-            ones indicated by `missing_label`). For multioutput
+            ones indicated by `missing_label`). For multi-label
             problems, a row `y[i]` must either contain only observed
             labels or only `missing_label` values, i.e., no mixing
             within a row. For multi-annotator classification, a row can contain
@@ -1815,8 +1811,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     random_state : int or np.RandomState or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Concrete estimators reject resolved
         specifications outside their exact capabilities.
 
@@ -2141,9 +2136,8 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     random_state : int, RandomState or None, default=None
         Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-output", default="auto"
-        Declared target type. Multi-output regression is recognized but not
-        supported for execution in version 1.1.
+    target_type : "auto" or "single-output", default="auto"
+        Declared target type. Only single-output regression is supported.
 
     Attributes
     ----------

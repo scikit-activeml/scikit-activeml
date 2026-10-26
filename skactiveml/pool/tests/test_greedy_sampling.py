@@ -14,7 +14,6 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL, is_labeled, rand_argmax
 from sklearn.gaussian_process import GaussianProcessRegressor
 
@@ -256,28 +255,6 @@ class TestGreedySamplingTarget(
             strategy._target_capabilities,
             frozenset({("regression", "single-output", "single-annotator")}),
         )
-
-    def test_multi_output_capability_failure_precedes_acquisition_state(self):
-        X = np.arange(12, dtype=float).reshape(6, 2)
-        y = np.array(
-            [
-                [0.0, 1.0],
-                [1.0, 2.0],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-            ]
-        )
-        reg = SklearnRegressor(
-            GaussianProcessRegressor(), target_type="multi-output"
-        )
-        strategy = GreedySamplingTarget()
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
-            strategy.query(X, y, reg, fit_reg=False)
-
-        assert_no_query_state(self, strategy)
 
     def test_query_effective_defaults_match_explicit_parameters(self):
         query_kwargs = deepcopy(self.query_default_params_reg)

@@ -25,7 +25,6 @@ from ..utils import (
     check_type,
     MISSING_LABEL,
     TargetSpec,
-    resolve_target_spec,
 )
 from ..utils._target import _check_target_spec_capability
 from ..utils._wrapper_state import (
@@ -47,13 +46,10 @@ except ImportError:  # pragma: no cover
 def _narrow_to_single_output_prediction(estimator, prediction):
     """Return `prediction` with its primary output as shape `(n_samples,)`.
 
-    The target type of `prediction` is checked against the capabilities of
-    `estimator`, so a multi-output prediction is rejected.
-
     Parameters
     ----------
     estimator : SkactivemlRegressor
-        The regressor whose capabilities the prediction must satisfy.
+        The regressor whose wrapped estimator made the prediction.
     prediction : array-like or tuple
         The predictions of the wrapped estimator. A tuple carries the
         predicted target values as its first element, e.g., together with
@@ -69,28 +65,57 @@ def _narrow_to_single_output_prediction(estimator, prediction):
     Raises
     ------
     ValueError
-        If the predicted target values do not describe a target type
-        supported by `estimator`.
+        If the wrapped estimator predicts several target values per sample or
+        non-finite values.
     """
-    is_tuple = isinstance(prediction, tuple)
-    y_pred = prediction[0] if is_tuple else prediction
-    prediction_spec = resolve_target_spec(
-        y_pred,
-        task="regression",
-        target_type="auto",
-        annotation_type="single-annotator",
-        classes=None,
-        missing_label=estimator.missing_label,
-    )
-    _check_target_spec_capability(
-        type(estimator).__name__,
-        prediction_spec,
-        estimator._target_capabilities,
-    )
-    y_pred = np.asarray(y_pred).reshape(-1)
-    if is_tuple:
+    if isinstance(prediction, tuple):
+        y_pred = _single_output_values(estimator, prediction[0], 1)
         return (y_pred, *prediction[1:])
-    return y_pred
+    return _single_output_values(estimator, prediction, 1)
+
+
+def _single_output_values(estimator, values, ndim):
+    """Drop a singleton target axis and reject several target values.
+
+    Parameters
+    ----------
+    estimator : SkactivemlRegressor
+        The regressor whose wrapped estimator returned `values`.
+    values : array-like
+        Predicted target values or target samples whose second axis may be a
+        target axis.
+    ndim : int
+        The number of dimensions of `values` for single-output regression,
+        i.e., 1 for predictions and 2 for samples.
+
+    Returns
+    -------
+    values : numpy.ndarray
+        The values with `ndim` dimensions.
+
+    Raises
+    ------
+    ValueError
+        If `values` hold several target values per sample or non-finite
+        values.
+    """
+    values = np.asarray(values)
+    if values.dtype == object:
+        values = values.astype(float)
+    if values.ndim == ndim + 1 and values.shape[1] == 1:
+        values = values[:, 0]
+    if values.ndim != ndim:
+        raise ValueError(
+            f"{type(estimator).__name__} supports single-output regression "
+            f"only, but the wrapped estimator returned values of shape "
+            f"{values.shape}."
+        )
+    if not np.isfinite(values).all():
+        raise ValueError(
+            f"The estimator wrapped by {type(estimator).__name__} returned "
+            f"non-finite values."
+        )
+    return values
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -472,9 +497,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         # Branch on `is_fitted_` as `predict` does, because `estimator_` may
         # stem from an earlier fit.
         if self.is_fitted_:
-            return attrgetter(sample_function)(self.estimator_)(
+            y_samples = attrgetter(sample_function)(self.estimator_)(
                 X, n_samples, **sample_kwargs
             )
+            return _single_output_values(self, y_samples, 2)
 
         warnings.warn(
             f"Since the 'estimator' could not be fitted when"
@@ -524,6 +550,11 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         return True
 
     def _resolve_prefitted_target_spec(self):
+        if not get_tags(self.estimator).target_tags.single_output:
+            raise ValueError(
+                f"The pre-fitted estimator '{self.estimator}' does not "
+                f"support single-output regression."
+            )
         target_type = (
             "single-output" if self.target_type == "auto" else self.target_type
         )
@@ -538,81 +569,19 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
 
         estimator_target_spec = getattr(self.estimator, "target_spec_", None)
-        if estimator_target_spec is None:
-            estimator_target_type = self._prefitted_estimator_target_type(
-                self.estimator
-            )
-            if estimator_target_type is None:
+        if estimator_target_spec is not None:
+            if not isinstance(estimator_target_spec, TargetSpec):
                 raise ValueError(
-                    "Cannot establish a single-output target specification "
-                    "from the pre-fitted estimator. The estimator must expose "
-                    "`target_spec_` or fitted output metadata."
+                    "The pre-fitted estimator's `target_spec_` must be a "
+                    "`TargetSpec`."
                 )
-            estimator_target_spec = TargetSpec(
-                task="regression",
-                target_type=estimator_target_type,
-                annotation_type="single-annotator",
-                classes=None,
+            _check_target_spec_capability(
+                type(self).__name__,
+                estimator_target_spec,
+                self._target_capabilities,
             )
-        elif not isinstance(estimator_target_spec, TargetSpec):
-            raise ValueError(
-                "The pre-fitted estimator's `target_spec_` must be a "
-                "`TargetSpec`."
-            )
-        _check_target_spec_capability(
-            type(self).__name__,
-            estimator_target_spec,
-            self._target_capabilities,
-        )
 
         return target_spec
-
-    @classmethod
-    def _prefitted_estimator_target_type(cls, estimator):
-        target_tags = get_tags(estimator).target_tags
-        if not target_tags.multi_output:
-            return "single-output"
-        if not target_tags.single_output:
-            return "multi-output"
-
-        n_outputs = getattr(estimator, "n_outputs_", None)
-        if n_outputs is not None:
-            return "single-output" if n_outputs == 1 else "multi-output"
-
-        # Dual coefficients have one column per prediction output, just like
-        # stored training targets (e.g., for kernel ridge regression).
-        for attr in ("y_train_", "_y", "dual_coef_"):
-            target_values = getattr(estimator, attr, None)
-            if target_values is not None:
-                target_values = np.asarray(target_values)
-                is_single_output = (
-                    target_values.ndim == 1
-                    or target_values.ndim == 2
-                    and target_values.shape[1] == 1
-                )
-                return "single-output" if is_single_output else "multi-output"
-
-        intercept = getattr(estimator, "intercept_", None)
-        if intercept is not None:
-            intercept = np.asarray(intercept)
-            if intercept.ndim > 0:
-                return (
-                    "single-output" if intercept.size == 1 else "multi-output"
-                )
-            coefficients = np.asarray(getattr(estimator, "coef_", []))
-            if coefficients.ndim == 2:
-                return (
-                    "single-output"
-                    if coefficients.shape[0] == 1
-                    else "multi-output"
-                )
-            return "single-output"
-
-        steps = getattr(estimator, "steps", None)
-        if steps:
-            return cls._prefitted_estimator_target_type(steps[-1][1])
-
-        return None
 
     def __getattr__(self, item):
         if item in self._own_fitted_attributes:

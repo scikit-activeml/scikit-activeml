@@ -13,10 +13,7 @@ from skactiveml.utils import (
     resolve_target_spec,
     unlabeled_indices,
 )
-from skactiveml.utils._target import (
-    _class_vocabulary_key,
-    _check_target_spec_capability,
-)
+from skactiveml.utils._target import _class_vocabulary_key
 
 
 class TestTargetSpec(unittest.TestCase):
@@ -44,7 +41,6 @@ class TestTargetSpec(unittest.TestCase):
             ("single-output", ((0, 1), (0, 1)), "flat"),
             ("multi-label", (0, 1), "nested"),
             ("multi-label", ((0, 1, 2), (0, 1)), "exactly two"),
-            ("multi-output", (0, 1), "nested"),
         ]
 
         for target_type, classes, message in invalid_specs:
@@ -253,14 +249,6 @@ class TestTargetSpec(unittest.TestCase):
                 },
                 "cannot be combined",
             ),
-            (
-                {
-                    "task": "classification",
-                    "target_type": "multi-output",
-                    "annotation_type": "multi-annotator",
-                },
-                "cannot be combined",
-            ),
         ]
 
         for declarations, message in invalid_specs:
@@ -369,34 +357,29 @@ class TestResolveTargetSpec(unittest.TestCase):
             task="classification",
             classes=[[1, 0], [0, 1]],
         )
-        multi_output = resolve_target_spec(
-            [[0, 1], [1, 2]],
-            task="classification",
-            classes=[[1, 0], [2, 1, 0]],
-        )
 
         self.assertEqual(single_output.target_type, "single-output")
         self.assertEqual(single_output.classes, ("cat", "dog"))
         self.assertEqual(multi_label.target_type, "multi-label")
         self.assertEqual(multi_label.classes, ((0, 1), (0, 1)))
-        self.assertEqual(multi_output.target_type, "multi-output")
-        self.assertEqual(
-            multi_output.classes,
-            ((0, 1), (0, 1, 2)),
-        )
+        with self.assertRaisesRegex(ValueError, "exactly two classes"):
+            resolve_target_spec(
+                [[0, 1], [1, 2]],
+                task="classification",
+                classes=[[1, 0], [2, 1, 0]],
+            )
 
         inferred_single_output = resolve_target_spec(
             [0, 1], task="classification"
         )
         self.assertEqual(inferred_single_output.target_type, "single-output")
 
-        inferred_multi_output = resolve_target_spec(
-            [[0, 1], [1, 2]],
-            task="classification",
-            target_type="multi-output",
-        )
-        self.assertEqual(inferred_multi_output.target_type, "multi-output")
-        self.assertEqual(inferred_multi_output.classes, ((0, 1), (1, 2)))
+        with self.assertRaisesRegex(ValueError, "`target_type` must be"):
+            resolve_target_spec(
+                [[0, 1], [1, 2]],
+                task="classification",
+                target_type="multi-output",
+            )
 
     def test_public_resolution_validates_shapes_and_metadata(self):
         with self.assertRaisesRegex(ValueError, "Nested class vocabularies"):
@@ -430,13 +413,6 @@ class TestResolveTargetSpec(unittest.TestCase):
                 [[1.0, 2.0], [3.0, 4.0]],
                 task="regression",
                 target_type="single-output",
-            )
-
-        with self.assertRaisesRegex(ValueError, "No class label is observed"):
-            resolve_target_spec(
-                [[0, np.nan], [1, np.nan], [np.nan, np.nan]],
-                task="classification",
-                target_type="multi-output",
             )
 
         with self.assertRaisesRegex(ValueError, "two-dimensional"):
@@ -481,11 +457,7 @@ class TestResolveTargetSpec(unittest.TestCase):
             ([2**64 - 2, 2**64 - 1], float(2**64), False),
             ([2**64 - 2, 2**64 - 1], np.uint64(2**64 - 1), True),
         ):
-            for target_type in (
-                "single-output",
-                "multi-label",
-                "multi-output",
-            ):
+            for target_type in ("single-output", "multi-label"):
                 if target_type == "single-output":
                     labels, declared = [value], classes
                 else:
@@ -541,19 +513,18 @@ class TestResolveTargetSpec(unittest.TestCase):
                 task="classification",
             )
 
-    def test_auto_regression_resolves_single_and_future_multi_output(self):
+    def test_auto_regression_resolves_single_output(self):
         vector = resolve_target_spec([1.0, 2.0], task="regression")
         column = resolve_target_spec([[1.0], [2.0]], task="regression")
-        matrix = resolve_target_spec(
-            [[1.0, 2.0], [3.0, 4.0]], task="regression"
-        )
 
         self.assertEqual(vector.target_type, "single-output")
         self.assertEqual(column.target_type, "single-output")
-        self.assertEqual(matrix.target_type, "multi-output")
         self.assertIsNone(vector.classes)
         self.assertIsNone(column.classes)
-        self.assertIsNone(matrix.classes)
+        with self.assertRaisesRegex(
+            ValueError, "one-dimensional or a column vector"
+        ):
+            resolve_target_spec([[1.0, 2.0], [3.0, 4.0]], task="regression")
 
     def test_explicit_regression_target_types_match_declared_structure(self):
         single_output = resolve_target_spec(
@@ -561,14 +532,8 @@ class TestResolveTargetSpec(unittest.TestCase):
             task="regression",
             target_type="single-output",
         )
-        multi_output = resolve_target_spec(
-            [[1.0, 2.0], [3.0, 4.0]],
-            task="regression",
-            target_type="multi-output",
-        )
 
         self.assertEqual(single_output.target_type, "single-output")
-        self.assertEqual(multi_output.target_type, "multi-output")
 
     def test_empty_targets_resolve_when_metadata_is_sufficient(self):
         single_output = resolve_target_spec(
@@ -631,14 +596,6 @@ class TestResolveTargetSpec(unittest.TestCase):
                 "one-dimensional",
             ),
             (
-                [0, 1],
-                {
-                    "task": "classification",
-                    "target_type": "multi-output",
-                },
-                "at least two",
-            ),
-            (
                 [[0, 1], [1, 0]],
                 {
                     "task": "classification",
@@ -664,22 +621,6 @@ class TestResolveTargetSpec(unittest.TestCase):
             )
 
     def test_declared_structure_must_match_target_columns(self):
-        with self.assertRaisesRegex(ValueError, "one vocabulary per target"):
-            resolve_target_spec(
-                [[0, 1], [1, 0]],
-                task="classification",
-                target_type="multi-output",
-                classes=[[0, 1]],
-            )
-
-        with self.assertRaisesRegex(ValueError, "nested"):
-            resolve_target_spec(
-                [[0, 1], [1, 0]],
-                task="classification",
-                target_type="multi-output",
-                classes=[0, 1],
-            )
-
         with self.assertRaisesRegex(ValueError, "nested binary"):
             resolve_target_spec(
                 [[0, 1], [1, 0]],
@@ -787,19 +728,6 @@ class TestResolveTargetSpec(unittest.TestCase):
             target_spec.classes, (("no", "yes"), ("definitely", "maybe"))
         )
 
-    def test_multioutput_names_its_outputs_without_calling_them_labels(self):
-        with self.assertRaisesRegex(
-            ValueError, "one dtype across all outputs"
-        ) as raised:
-            TargetSpec(
-                task="classification",
-                target_type="multi-output",
-                annotation_type="single-annotator",
-                classes=(("a", "b", "c"), (0, 1, 2)),
-            )
-
-        self.assertNotIn("label outputs", str(raised.exception))
-
     def test_multilabel_reads_output_dtypes_from_the_class_labels(self):
         y = np.array([["no", "off"], ["yes", "always"]])
 
@@ -890,25 +818,6 @@ class TestResolveTargetSpec(unittest.TestCase):
         )
 
         self.assertEqual(target_spec.classes, ((0, 1), (0, 1)))
-
-    def test_valid_future_semantics_fail_only_at_capability_boundary(self):
-        target_spec = resolve_target_spec(
-            [[0, 0], [1, 2]],
-            task="classification",
-            classes=[[0, 1], [0, 1, 2]],
-        )
-        capabilities = frozenset(
-            {("classification", "single-output", "single-annotator")}
-        )
-
-        with self.assertRaisesRegex(
-            ValueError,
-            "ExampleComponent.*multi-output.*Supported "
-            "capabilities.*single-output",
-        ):
-            _check_target_spec_capability(
-                "ExampleComponent", target_spec, capabilities
-            )
 
     def test_multilabel_label_helpers_return_sample_level_results(self):
         y = np.array([[0, 1], [np.nan, np.nan], [1, 0]])

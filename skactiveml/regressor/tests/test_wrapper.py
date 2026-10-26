@@ -13,9 +13,11 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, RBF
+from sklearn.compose import TransformedTargetRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVC
 from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.pipeline import Pipeline
@@ -24,6 +26,7 @@ from sklearn.datasets import make_regression
 
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.regressor import (
+    NICKernelRegressor,
     SklearnRegressor,
     SklearnNormalRegressor,
 )
@@ -162,7 +165,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         cases = [
             ("invalid", "must be one of"),
             ("multi-label", "requires classification"),
-            ("multi-output", "does not support"),
         ]
 
         for target_type, error_message in cases:
@@ -174,20 +176,49 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
 
                 self.assertFalse(hasattr(reg, "target_spec_"))
 
-    def test_prefitted_estimator_rejects_multi_output_before_prediction(self):
+    def test_prefitted_multi_output_estimator_is_rejected_at_prediction(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)
         y = np.column_stack(
             (np.arange(8, dtype=float), np.arange(8, dtype=float) ** 2)
         )
-        estimator = LinearRegression().fit(X, y)
+        estimator = GaussianProcessRegressor().fit(X, y)
         reg = SklearnRegressor(estimator)
 
-        with self.assertRaisesRegex(ValueError, "does not support"):
+        with self.assertRaisesRegex(ValueError, "single-output regression"):
+            reg.predict(X)
+        with self.assertRaisesRegex(ValueError, "single-output regression"):
+            reg.sample_y(X, n_samples=2)
+
+    def test_prefitted_multi_output_estimator_tags_are_rejected(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.column_stack(
+            (np.arange(8, dtype=float), np.arange(8, dtype=float) ** 2)
+        )
+        estimator = MultiOutputRegressor(LinearRegression()).fit(X, y)
+        reg = SklearnRegressor(estimator)
+
+        with self.assertRaisesRegex(ValueError, "single-output regression"):
             check_is_fitted(reg)
 
-        self.assertFalse(hasattr(reg, "target_spec_"))
+    def test_predictions_must_be_finite(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        estimator = TransformedTargetRegressor(
+            LinearRegression(), func=np.log, inverse_func=np.exp
+        )
+        reg = SklearnRegressor(estimator).fit(X, np.exp(X[:, 0] / 10))
 
-    def test_prefitted_dual_coefficients_determine_output_structure(self):
+        with self.assertRaisesRegex(ValueError, "non-finite"):
+            reg.predict([[1e4]])
+
+    def test_prefitted_numeric_object_predictions_are_converted(self):
+        estimator = KNeighborsRegressor(n_neighbors=2).fit(
+            np.arange(4).reshape(-1, 1), np.arange(4).astype(object)
+        )
+        y_pred = SklearnRegressor(estimator).predict([[0.4], [2.6]])
+        np.testing.assert_array_equal(y_pred, [0.5, 2.5])
+        self.assertEqual(y_pred.dtype, float)
+
+    def test_prefitted_predictions_must_be_single_output(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         targets = [
             np.arange(4, dtype=float),
@@ -203,10 +234,9 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
                     reg = SklearnRegressor(estimator, target_type=target_type)
                     if y.ndim == 2 and y.shape[1] > 1:
                         with self.assertRaisesRegex(
-                            ValueError, "does not support"
+                            ValueError, "single-output regression"
                         ):
                             reg.predict(X)
-                        self.assertNotIn("target_spec_", reg.__dict__)
                     else:
                         np.testing.assert_allclose(
                             reg.predict(X), estimator.predict(X).ravel()
@@ -215,49 +245,14 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
                             reg.target_spec_.target_type, "single-output"
                         )
 
-    def test_prefitted_multi_output_estimator_tags_are_rejected(self):
-        X = np.arange(8, dtype=float).reshape(-1, 1)
-        y = np.column_stack(
-            (np.arange(8, dtype=float), np.arange(8, dtype=float) ** 2)
-        )
-        estimator = MultiOutputRegressor(LinearRegression()).fit(X, y)
-        reg = SklearnRegressor(estimator)
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
-            check_is_fitted(reg)
-
-    def test_prefitted_estimator_n_outputs_metadata_is_used(self):
+    def test_prefitted_skactiveml_regressor_keeps_its_target_spec(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)
         y = np.arange(8, dtype=float)
-        estimator = LinearRegression().fit(X, y)
-        estimator.n_outputs_ = 1
-        reg = SklearnRegressor(estimator)
+        reg = SklearnRegressor(NICKernelRegressor().fit(X, y))
 
         check_is_fitted(reg)
-
         self.assertEqual(reg.target_spec_.target_type, "single-output")
-
-    def test_prefitted_estimator_coefficient_shape_is_used(self):
-        X = np.arange(8, dtype=float).reshape(-1, 1)
-        y = np.arange(8, dtype=float)
-        estimator = LinearRegression().fit(X, y)
-        estimator.coef_ = np.asarray(estimator.coef_).reshape(1, -1)
-        reg = SklearnRegressor(estimator)
-
-        check_is_fitted(reg)
-
-        self.assertEqual(reg.target_spec_.target_type, "single-output")
-
-    def test_prefitted_pipeline_without_target_metadata_is_rejected(self):
-        X = np.arange(8, dtype=float).reshape(-1, 1)
-        y = np.arange(8, dtype=float)
-        estimator = Pipeline([("regressor", MetadataFreeRegressor())]).fit(
-            X, y
-        )
-        reg = SklearnRegressor(estimator)
-
-        with self.assertRaisesRegex(ValueError, "Cannot establish"):
-            check_is_fitted(reg)
+        self.assertEqual(reg.predict(X).shape, (8,))
 
     def test_prefitted_estimator_rejects_invalid_target_spec(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)
@@ -325,12 +320,14 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertEqual(prefitted_prediction.shape, (2,))
         np.testing.assert_allclose(prefitted_prediction, direct_prediction)
 
-    def test_multi_output_capability_failure_precedes_fitted_state(self):
+    def test_multi_column_target_is_rejected_before_fitted_state(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.arange(8, dtype=float).reshape(4, 2)
         reg = SklearnRegressor(LinearRegression())
 
-        with self.assertRaisesRegex(ValueError, "does not support"):
+        with self.assertRaisesRegex(
+            ValueError, "one-dimensional or a column vector"
+        ):
             reg.fit(X, y)
 
         self.assertFalse(hasattr(reg, "target_spec_"))
@@ -406,7 +403,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         established_estimator = reg.estimator_
         established_coef = reg.estimator_.coef_.copy()
 
-        reg.target_type = "multi-output"
         with self.assertRaises(ValueError):
             reg.partial_fit(X, np.array([[0.0, 1.0], [1.0, 0.0]]))
 
@@ -445,7 +441,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             "rejected target specification": {
                 "fit_params": {"X": np.zeros((4, 2)), "y": np.zeros((4, 2))},
                 "error": ValueError,
-                "message": "does not support target capability",
+                "message": "one-dimensional or a column vector",
             },
             "inconsistent sample counts": {
                 "fit_params": {"X": np.zeros((4, 1)), "y": [0.0, 1.0, 2.0]},
@@ -808,9 +804,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
                 self.assertEqual(reg.target_spec_, spec)
                 with self.assertRaises(ValueError):
                     reg.partial_fit([[3.0, 4.0]], [np.nan])
-                reg.set_params(target_type="multi-output")
-                with self.assertRaises(ValueError):
-                    reg.partial_fit([[3.0]], [np.nan])
 
     def test_initial_unlabeled_partial_fit_can_learn_later(self):
         reg = SklearnRegressor(SGDRegressor(random_state=0))
@@ -1453,7 +1446,6 @@ assert np.isfinite(estimator.predict(X)).all()
                 deepcopy(reg.neural_net_.module_.input_to_hidden.weight)
             )
 
-            reg.target_type = "multi-output"
             with self.assertRaises(ValueError):
                 reg.partial_fit(self.X, np.column_stack([self.y, self.y]))
 
@@ -1539,7 +1531,7 @@ assert np.isfinite(estimator.predict(X)).all()
             reg = SkorchRegressor(**init_params).fit(self.X, self.y)
 
             with self.assertRaisesRegex(
-                ValueError, "does not support target capability"
+                ValueError, "single-output regression"
             ):
                 reg.predict(self.X)
 

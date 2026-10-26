@@ -580,12 +580,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         self.assertEqual(strategy.target_type, "auto")
         self.assertIsInstance(strategy._target_capabilities, frozenset)
         self.assertTrue(strategy._target_capabilities)
-        self.assertFalse(
-            any(
-                target_type == "multi-output"
-                for _, target_type, _ in strategy._target_capabilities
-            )
-        )
         self._test_param(
             "init",
             "target_type",
@@ -1686,19 +1680,6 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
 
     def test_query_rejects_other_target_capabilities_before_state(self):
         query_params = self.query_default_params_clf_multilabel
-        multi_output_y = np.array(
-            [
-                [0.0, 0.0],
-                [1.0, 1.0],
-                [2.0, 0.0],
-                *[[np.nan, np.nan] for _ in range(5)],
-            ]
-        )
-        multi_output_clf = SklearnClassifier(
-            estimator=MultiOutputClassifier(GaussianNB()),
-            classes=[[0, 1, 2], [0, 1]],
-            target_type="multi-output",
-        )
         multiannotator_clf = AnnotatorEnsembleClassifier(
             estimators=[
                 ("pwc-0", ParzenWindowClassifier(classes=[0, 1])),
@@ -1708,7 +1689,6 @@ class TemplateMultilabelOnlySingleAnnotatorPoolQueryStrategy(
         ).fit(query_params["X"], query_params["y"])
 
         cases = [
-            (multi_output_y, multi_output_clf, "SklearnClassifier"),
             (
                 majority_vote(query_params["y"], random_state=0),
                 multiannotator_clf,

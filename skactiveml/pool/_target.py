@@ -19,7 +19,7 @@ from ..utils._target import (
 )
 
 _ALLOWED_DECLARED_TARGET_TYPES = frozenset(
-    {"auto", "single-output", "multi-label", "multi-output"}
+    {"auto", "single-output", "multi-label"}
 )
 
 
@@ -303,7 +303,7 @@ def _check_declared_target_types(declarations):
         if target_type not in _ALLOWED_DECLARED_TARGET_TYPES:
             raise ValueError(
                 "`target_type` must be one of {'auto', 'single-output', "
-                "'multi-label', 'multi-output'}."
+                "'multi-label'}."
             )
 
 

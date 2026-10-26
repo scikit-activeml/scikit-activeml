@@ -1074,7 +1074,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                 ("invalid", ValueError),
                 (1, ValueError),
                 ("multi-label", ValueError),
-                ("multi-output", ValueError),
             ],
         )
 
@@ -1104,23 +1103,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         y = np.array([[0, 1], [1, np.nan], [np.nan, np.nan]])
 
         with self.assertRaisesRegex(ValueError, "no mixing within a row"):
-            clf.fit(np.arange(3).reshape(-1, 1), y)
-
-        self.assertFalse(hasattr(clf, "target_spec_"))
-        self.assertFalse(hasattr(clf, "classes_"))
-        self.assertFalse(hasattr(clf, "estimator_"))
-
-    def test_multi_output_capability_failure_does_not_commit_fitted_state(
-        self,
-    ):
-        clf = SklearnClassifier(
-            estimator=MultiOutputClassifier(GaussianNB()),
-            classes=[[0, 1, 2], [0, 1]],
-            target_type="multi-output",
-        )
-        y = np.array([[0, 1], [1, 0], [2, 1]])
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
             clf.fit(np.arange(3).reshape(-1, 1), y)
 
         self.assertFalse(hasattr(clf, "target_spec_"))
@@ -4134,7 +4116,6 @@ assert np.isfinite(estimator.predict_proba(X)).all()
                     ("auto", None),
                     ("single-output", None),
                     ("multi-label", ValueError),
-                    ("multi-output", ValueError),
                     ("invalid", ValueError),
                 ],
             )

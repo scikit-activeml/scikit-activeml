@@ -401,18 +401,11 @@ def _check_homogeneous_output_dtypes(classes):
     if len(outputs_per_kind) <= 1:
         return
 
-    # Binary vocabularies describe label outputs, as target resolution reads
-    # them, whereas wider ones describe recognized multi-output semantics.
-    outputs = (
-        "label outputs"
-        if all(len(classes_i) == 2 for classes_i in classes)
-        else "outputs"
-    )
     described = " and ".join(
         _describe_dtype_group(group) for group in outputs_per_kind.values()
     )
     raise ValueError(
-        f"Class vocabularies must declare one dtype across all {outputs}, "
+        "Class vocabularies must declare one dtype across all label outputs, "
         f"because one array holds every output. Got {described}."
     )
 
@@ -441,13 +434,13 @@ def check_classes(classes):
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
         The classes labels (single output setting), or a list of arrays of
-        class labels (multioutput setting).
+        class labels (multi-label setting).
 
     Returns
     -------
     families : str or tuple of str or None
         The label family each vocabulary declares, i.e. `"bool"`, `"int"`,
-        `"float"`, or `"str"`. One family per output for a multioutput
+        `"float"`, or `"str"`. One family per output for a multi-label
         setting, and `None` if `classes` is `None`.
     """
     if classes is None:
@@ -475,16 +468,16 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
         The classes labels (single output setting), or a list of arrays of
-        class labels (multioutput setting).
+        class labels (multi-label setting).
     missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label. In the case of a multioutput
+        Value to represent a missing label. In the case of a multi-label
         setting, we expect that the missing label is identical across all
-        tasks.
+        outputs.
     cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost matrix to quantify costs of misclassifications.
 
         - Checked only for single output.
-        - Must be `None` for multioutput.
+        - Must be `None` for multi-label.
     """
     check_missing_label(missing_label)
 
