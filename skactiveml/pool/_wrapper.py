@@ -455,7 +455,9 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
                 )
             # A keyword argument holding an independent sample set is
             # embedded but never subset, since it is not aligned to `X`.
-            query_kwargs = self._embed_query_kwargs(query_kwargs, ["X_eval"])
+            X_eval = query_kwargs.get("X_eval")
+            if X_eval is not None:
+                query_kwargs["X_eval"] = self._embed_samples(X_eval, "X_eval")
 
         qs_output = query_strategy.query(
             X=new_X,
@@ -521,16 +523,6 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             return new_queried_indices, new_utilities
         else:
             return new_queried_indices
-
-    def _embed_query_kwargs(self, query_kwargs, names):
-        """Embed the sample sets in `names` in a copy of `query_kwargs`."""
-        query_kwargs = dict(query_kwargs)
-        for name in names:
-            value = query_kwargs.get(name)
-            if value is None:
-                continue
-            query_kwargs[name] = self._embed_samples(value, name)
-        return query_kwargs
 
     def _embed_samples(self, samples, name):
         """Embed `samples` by applying `embed_samples_func`.

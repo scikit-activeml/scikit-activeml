@@ -15,6 +15,8 @@ from ..utils import (
 )
 from ._clustering import _set_random_state_if_supported
 
+_MAX_GRAPH_BLOCK_ENTRIES = 2**20
+
 
 class ProbCover(SingleAnnotatorPoolQueryStrategy):
     """Probability Coverage (ProbCover)
@@ -269,6 +271,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             self.cluster_algo, cluster_algo_dict, self.random_state
         )
 
+        chunk_size = max(1, _MAX_GRAPH_BLOCK_ENTRIES // len(X))
         if update or not hasattr(self, "delta_max_"):
             # Compute distances between each pair of observed samples.
             self.distances_ = self.distance_func(X)
@@ -282,7 +285,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 y_cluster = cluster_obj.fit_predict(X)
                 for delta in deltas:
                     n_impure = 0
-                    chunk_size = max(1, 2**20 // len(X))
                     for start in range(0, len(X), chunk_size):
                         stop = start + chunk_size
                         is_impure = y_cluster[start:stop, None] != y_cluster
@@ -326,7 +328,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             else:
                 newly_covered = np.flatnonzero(edges[center] & ~covered)
                 covered[newly_covered] = True
-                chunk_size = max(1, 2**20 // len(X))
                 for start in range(0, len(newly_covered), chunk_size):
                     vertices = newly_covered[start : start + chunk_size]
                     degrees[:] -= edges[:, vertices].sum(axis=1)
@@ -359,7 +360,7 @@ def _radius_graph(distances, radius):
     """
     blocks = []
     storage = 0
-    chunk_size = max(1, 2**20 // len(distances))
+    chunk_size = max(1, _MAX_GRAPH_BLOCK_ENTRIES // len(distances))
     for start in range(0, len(distances), chunk_size):
         block = csr_matrix(distances[start : start + chunk_size] <= radius)
         storage += (

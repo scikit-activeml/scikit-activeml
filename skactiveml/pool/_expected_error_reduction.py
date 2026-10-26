@@ -899,13 +899,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
                 probs, probs, self.cost_matrix_, w_eval[idx_unlabeled]
             )
 
-        if self.normalize:
-            if norm == 0:
-                return 0.0
-            else:
-                return err / norm
-        else:
+        if not self.normalize:
             return err
+        return err / norm if norm else 0.0
 
     def _precompute_and_fit_clf(
         self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf
