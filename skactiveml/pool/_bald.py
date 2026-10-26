@@ -94,9 +94,6 @@ class _GeneralBALD(QueryByCommittee):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. BALD strategies support only single-output
-        classification.
 
     References
     ----------
@@ -124,7 +121,6 @@ class _GeneralBALD(QueryByCommittee):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             eps=eps,
@@ -132,7 +128,6 @@ class _GeneralBALD(QueryByCommittee):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.n_MC_samples = n_MC_samples
         self.greedy_selection = greedy_selection
@@ -349,9 +344,6 @@ class BatchBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. BatchBALD supports only single-output
-        classification.
 
     References
     ----------
@@ -368,7 +360,6 @@ class BatchBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -378,7 +369,6 @@ class BatchBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
 
@@ -424,9 +414,6 @@ class GreedyBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. GreedyBALD supports only single-output
-        classification.
 
     References
     ----------
@@ -443,7 +430,6 @@ class GreedyBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -453,7 +439,6 @@ class GreedyBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
 

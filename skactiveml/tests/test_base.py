@@ -57,8 +57,8 @@ class DummySkactivemlClassifier(SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.probas = probas
 
     def fit(self, X, y, sample_weight=None):

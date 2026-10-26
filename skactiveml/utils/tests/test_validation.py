@@ -401,19 +401,6 @@ class TestValidation(unittest.TestCase):
         X = [[1, 2], [3, 4]]
         y = [1, 0]
         X_cand = [[5, 6]]
-        with self.assertRaisesRegex(ValueError, "target_type.*one of"):
-            check_X_y(X, y, target_type="invalid")
-        with self.assertRaisesRegex(
-            ValueError, "multi-label.*two-dimensional"
-        ):
-            check_X_y(X, y, target_type="multi-label")
-        with self.assertRaisesRegex(
-            ValueError, "multi-output.*two-dimensional"
-        ):
-            check_X_y(X, y, target_type="multi-output")
-        with self.assertRaisesRegex(ValueError, "at least two target columns"):
-            check_X_y(X, [[1], [0]], target_type="multi-output")
-
         X, y, sample_weight = check_X_y(X, y)
         np.testing.assert_array_equal(sample_weight, np.array([1.0, 1.0]))
         X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
@@ -425,15 +412,9 @@ class TestValidation(unittest.TestCase):
         self.assertTrue(isinstance(X, np.ndarray))
         y = [[1], [0]]
         X, y, X_cand, sample_weight, _ = check_X_y(
-            X, y, X_cand, sample_weight, target_type="multi-label"
+            X, y, X_cand, sample_weight, multi_output=True
         )
         self.assertTrue(isinstance(y, np.ndarray))
-        _, y_multi_output, _ = check_X_y(
-            X, [[1, 0], [0, 1]], target_type="multi-output"
-        )
-        np.testing.assert_array_equal(
-            y_multi_output, np.array([[1, 0], [0, 1]])
-        )
         y = np.array([1, 0], dtype=object)
         X, y, X_cand, sample_weight, _ = check_X_y(
             X, y, X_cand, sample_weight, y_numeric=True
@@ -443,80 +424,59 @@ class TestValidation(unittest.TestCase):
             check_X_y(X, y, X_cand_false, sample_weight)
         y = np.array([[1, 0, 1], [2, 0, 1]])
         _, _, _, checked_weight, _ = check_X_y(
-            X,
-            y,
-            X_cand,
-            sample_weight,
-            target_type="multi-label",
+            X, y, X_cand, sample_weight, multi_output=True
         )
         np.testing.assert_array_equal(checked_weight, sample_weight)
 
         X = np.ones((3, 2))
         y = np.array([[0, 1], [1, 0], [0, 1]])
-        for target_type in ("multi-label", "multi-output"):
-            for w in (None, [1, 2, 3], [[1, 2], [3, 4], [5, 6]]):
-                with self.subTest(target_type=target_type, weights=w):
-                    _, checked_y, checked_weight = check_X_y(
-                        X, y, sample_weight=w, target_type=target_type
-                    )
-                    np.testing.assert_array_equal(checked_y, y)
-                    np.testing.assert_array_equal(
-                        checked_weight, np.ones(y.shape) if w is None else w
-                    )
-            for w in ([1, 2], np.ones((3, 1)), np.ones((3, 3))):
-                with self.subTest(target_type=target_type, shape=np.shape(w)):
+        for w in (None, [1, 2, 3], [[1, 2], [3, 4], [5, 6]]):
+            with self.subTest(weights=w):
+                _, checked_y, checked_weight = check_X_y(
+                    X, y, sample_weight=w, multi_output=True
+                )
+                np.testing.assert_array_equal(checked_y, y)
+                np.testing.assert_array_equal(
+                    checked_weight, np.ones(y.shape) if w is None else w
+                )
+        for w in ([1, 2], np.ones((3, 1)), np.ones((3, 3))):
+            with self.subTest(shape=np.shape(w)):
+                with self.assertRaises(ValueError):
+                    check_X_y(X, y, sample_weight=w, multi_output=True)
+
+        missing_y = y.astype(float)
+        missing_y[1] = np.nan
+        for allow_nan in (None, True, False):
+            with self.subTest(allow_nan=allow_nan):
+                if allow_nan is False:
                     with self.assertRaises(ValueError):
                         check_X_y(
-                            X, y, sample_weight=w, target_type=target_type
+                            X, missing_y, multi_output=True, allow_nan=False
                         )
-
-            missing_y = y.astype(float)
-            missing_y[1] = np.nan
-            for allow_nan in (None, True, False):
-                with self.subTest(
-                    target_type=target_type, allow_nan=allow_nan
-                ):
-                    if allow_nan is False:
-                        with self.assertRaises(ValueError):
-                            check_X_y(
-                                X,
-                                missing_y,
-                                target_type=target_type,
-                                allow_nan=allow_nan,
-                            )
-                    else:
-                        _, checked_y, _ = check_X_y(
-                            X,
-                            missing_y,
-                            target_type=target_type,
-                            allow_nan=allow_nan,
-                        )
-                        np.testing.assert_array_equal(checked_y, missing_y)
-            missing_y[1] = np.inf
-            with self.assertRaises(ValueError):
-                check_X_y(
-                    X, missing_y, target_type=target_type, allow_nan=True
-                )
+                else:
+                    _, checked_y, _ = check_X_y(
+                        X, missing_y, multi_output=True, allow_nan=allow_nan
+                    )
+                    np.testing.assert_array_equal(checked_y, missing_y)
+        missing_y[1] = np.inf
+        with self.assertRaises(ValueError):
+            check_X_y(X, missing_y, multi_output=True, allow_nan=True)
 
         y = [[0.5, 1.5], [np.nan, 0.5], [1.5, 0.5]]
-        for params in (
-            {"target_type": "multi-label"},
-            {"target_type": "multi-output"},
-            {"target_type": "multi-label", "missing_label": -1},
-        ):
+        for params in ({}, {"missing_label": -1}):
             with self.subTest(params=params):
-                _, checked_y, _ = check_X_y(X, y, allow_nan=True, **params)
+                _, checked_y, _ = check_X_y(
+                    X, y, multi_output=True, allow_nan=True, **params
+                )
                 np.testing.assert_array_equal(checked_y, y)
 
-        for target_type in ("multi-label", "multi-output"):
-            y = csr_matrix([[0, 1.5], [np.nan, np.nan], [1.5, 0]])
-            with self.subTest(target_type=target_type, sparse=True):
-                _, checked_y, checked_weight = check_X_y(
-                    X, y, sample_weight=[1, 2, 3], target_type=target_type
-                )
-                self.assertTrue(issparse(checked_y))
-                np.testing.assert_array_equal(checked_y.toarray(), y.toarray())
-                np.testing.assert_array_equal(checked_weight, [1, 2, 3])
+        y = csr_matrix([[0, 1.5], [np.nan, np.nan], [1.5, 0]])
+        _, checked_y, checked_weight = check_X_y(
+            X, y, sample_weight=[1, 2, 3], multi_output=True
+        )
+        self.assertTrue(issparse(checked_y))
+        np.testing.assert_array_equal(checked_y.toarray(), y.toarray())
+        np.testing.assert_array_equal(checked_weight, [1, 2, 3])
 
         cases = [
             ([1, 2], [3, 4, 5], {"ensure_2d": False}),
@@ -568,47 +528,6 @@ class TestValidation(unittest.TestCase):
                 np.testing.assert_array_equal(
                     np.isnan(checked_y), [False, True]
                 )
-
-    def test_check_X_y_deprecated_multi_output(self):
-        X = [[1, 2], [3, 4]]
-        y_2d = [[1, 0], [0, 1]]
-        y_1d = [1, 0]
-
-        # `multi_output=True` warns and validates `y` as multi-label.
-        with self.assertWarnsRegex(
-            FutureWarning, "multi_output.*deprecated.*target_type"
-        ):
-            _, y_out, _ = check_X_y(X, y_2d, multi_output=True)
-        np.testing.assert_array_equal(y_out, np.array(y_2d))
-
-        # `multi_output=False` warns and validates `y` as single-output.
-        with self.assertWarnsRegex(FutureWarning, "multi_output"):
-            _, y_out, _ = check_X_y(X, y_1d, multi_output=False)
-        np.testing.assert_array_equal(y_out, np.array(y_1d))
-
-        with self.assertWarnsRegex(FutureWarning, "multi_output"):
-            _, y_out, _ = check_X_y(
-                X, y_2d, target_type="multi-output", multi_output=False
-            )
-        np.testing.assert_array_equal(y_out, np.array(y_2d))
-        with self.assertWarnsRegex(FutureWarning, "multi_output"):
-            _, y_out, _ = check_X_y(
-                X, y_2d, target_type="single-output", multi_output=True
-            )
-        np.testing.assert_array_equal(y_out, np.array(y_2d))
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            with self.assertRaisesRegex(
-                ValueError, "multi-label.*two-dimensional"
-            ):
-                check_X_y(X, y_1d, multi_output=True)
-
-        # Omitting the keyword emits no deprecation warning.
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", FutureWarning)
-            check_X_y(X, y_1d)
-            check_X_y(X, y_2d, target_type="multi-label")
 
     def test_check_random_state(self):
         seed = 12

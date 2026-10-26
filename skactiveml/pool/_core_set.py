@@ -74,8 +74,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.metric = metric
         self.metric_dict = metric_dict
 

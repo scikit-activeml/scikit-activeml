@@ -46,9 +46,6 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         `metric_dict=None` and `metric="rbf"`, queries use `{"gamma": "mean"}`.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification.
 
     References
     ----------
@@ -65,12 +62,10 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         metric=None,
         metric_dict=None,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict

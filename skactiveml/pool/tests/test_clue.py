@@ -31,11 +31,7 @@ class ExactMultilabelClassifier(SkactivemlClassifier):
         classes=((0, 1), (0, 1)),
         missing_label=MISSING_LABEL,
     ):
-        super().__init__(
-            classes=classes,
-            missing_label=missing_label,
-            target_type="multi-label",
-        )
+        super().__init__(classes=classes, missing_label=missing_label)
         self.probas = probas
 
     @property
@@ -125,8 +121,6 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
                     ("regression", "single-output", "single-annotator"),
                 }
             ),
-            estimator_param="estimator",
-            fit_param="fit_estimator",
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):

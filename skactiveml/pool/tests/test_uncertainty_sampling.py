@@ -75,19 +75,6 @@ class TestUncertaintySampling(
         test_cases += [(np.max, None), (np.average, None)]
         self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
-    def test_init_param_target_type(self):
-        self._test_param(
-            "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("invalid", ValueError),
-                (1, ValueError),
-                ("multi-label", ValueError),
-            ],
-        )
-
     def test_capabilities_are_exact_and_configuration_dependent(self):
         standard = UncertaintySampling(method="entropy")
         average_precision = UncertaintySampling(
@@ -323,7 +310,7 @@ class TestUncertaintySampling(
                 [np.nan, np.nan],
             ]
         )
-        strategy = UncertaintySampling(target_type="auto", random_state=0)
+        strategy = UncertaintySampling(random_state=0)
 
         query_idx, utilities = strategy.query(
             X,
@@ -483,9 +470,11 @@ class TestUncertaintySampling(
         )
         for fit_clf in [False, True]:
             with self.subTest(fit_clf=fit_clf):
-                strategy = UncertaintySampling(target_type="multi-label")
+                strategy = UncertaintySampling()
 
-                with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
+                with self.assertRaisesRegex(
+                    ValueError, "flat class vocabulary"
+                ):
                     strategy.query(X, y, clf, fit_clf=fit_clf)
 
                 assert_no_query_state(self, strategy)
@@ -573,7 +562,6 @@ class TestUncertaintySampling(
                 strategy = UncertaintySampling(
                     method=method,
                     cost_matrix=cost_matrix if has_cost else None,
-                    target_type=target_type,
                     random_state=0,
                 )
 

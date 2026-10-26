@@ -34,10 +34,16 @@ specification with four fields:
     The canonical immutable class vocabulary for classification, or ``None``
     for regression.
 
-Public estimators and pool query strategies expose a ``target_type``
-constructor parameter. The default ``"auto"`` keeps existing unambiguous
-single-output calls working. After a successful fit, classifiers and regressors
-expose the resolved ``target_spec_`` attribute.
+Components that interpret the labels themselves have a ``target_type``
+constructor parameter: classifiers that support multi-label targets, e.g.,
+:class:`~skactiveml.classifier.ParzenWindowClassifier`, and pool strategies
+that use no estimator for ``y``, e.g.,
+:class:`~skactiveml.pool.RandomSampling`. Other strategies take the target
+type from the estimator they receive, and the remaining components support
+single-output labels only. A class's docstring states whether it accepts
+``target_type``. The default ``"auto"`` keeps unambiguous single-output calls
+working. After a successful fit, classifiers and regressors expose the
+resolved ``target_spec_`` attribute.
 
 Query strategies resolve the target semantics separately for each call and do
 not store the specification from the previous query. If a fitted estimator is
@@ -46,14 +52,11 @@ and class vocabulary of ``y`` for that query. For single-output classification,
 single-annotator pool strategies expect one label per sample even if a fitted
 classifier was trained on multiple annotators' labels, see
 :ref:`multiple-annotators`. Multi-label queries retain one label per output
-for each sample. With the default ``target_type="auto"``, the strategy adopts
-the target type of the fitted estimator. An explicit strategy ``target_type``
-must agree with the fitted estimator; a conflicting declaration raises a
-``ValueError`` rather than silently overriding either side.
+for each sample.
 
 An unfitted estimator declares the target semantics through its
-``target_type``, ``missing_label``, and, for classifiers, ``classes``, which
-are resolved together with ``y``. A
+``missing_label`` and, for classifiers, ``classes`` and, where available,
+``target_type``, which are resolved together with ``y``. A
 :class:`~skactiveml.classifier.SlidingWindowClassifier` without ``classes``
 declares the classes of its ``estimator``. A strategy that fits a classifier,
 e.g., with ``fit_clf=True``, resolves and checks the declarations of an
@@ -478,9 +481,10 @@ uses the class dtype.
 Explicit Multi-label Classification
 ===================================
 
-For multi-label classification, declare ``target_type="multi-label"`` instead
-of relying on ``y`` being two-dimensional. The following example fits a
-classifier and queries one complete label vector.
+For multi-label classification, declare ``target_type="multi-label"`` on the
+classifier instead of relying on ``y`` being two-dimensional. A strategy that
+receives the classifier takes the target type from it. The following example
+fits a classifier and queries one complete label vector.
 
 .. doctest::
 
@@ -506,9 +510,7 @@ classifier and queries one complete label vector.
    >>> _ = clf.fit(X, y)
    >>> assert clf.target_spec_.target_type == "multi-label"
    >>> assert clf.target_spec_.classes == ((0.0, 1.0), (0.0, 1.0))
-   >>> strategy = UncertaintySampling(
-   ...     method="entropy", target_type="multi-label", random_state=0
-   ... )
+   >>> strategy = UncertaintySampling(method="entropy", random_state=0)
    >>> query_indices = strategy.query(
    ...     X=X, y=y, clf=clf, fit_clf=False
    ... )
@@ -735,8 +737,12 @@ For single-annotator classification, a two-dimensional ``y`` is ambiguous when
 label outputs, or the annotators of a label matrix passed to a single-annotator
 component by mistake. Binary-looking values do not resolve this ambiguity.
 
-Specify ``target_type``, provide a flat or nested class vocabulary, or pass a
-fitted estimator whose ``target_spec_`` already resolves the target semantics.
+Declare multi-label targets where the labels are interpreted: on the
+classifier, with ``target_type="multi-label"`` or a nested class vocabulary, or
+with ``target_type="multi-label"`` on a strategy that uses no estimator for
+``y``. Pass the labels of several annotators to a multi-annotator component. A
+fitted estimator whose ``target_spec_`` resolves the target semantics also
+suffices.
 
 .. doctest::
 
@@ -756,17 +762,19 @@ Single-output Column Vectors
 ============================
 
 Labels with shape ``(n_samples, 1)`` are accepted once their semantics resolve
-to single-output. For classification, either an explicit
-``target_type="single-output"`` or a flat class vocabulary provides enough
-information. Classifiers and pool query strategies then convert the column to
-the canonical one-dimensional representation and emit a
-``DataConversionWarning``. A classification column with ``target_type="auto"``
-and ``classes=None`` remains ambiguous.
+to single-output. For classification, an explicit
+``target_type="single-output"``, a flat class vocabulary, or a component
+without multi-label support provides enough information. In pool and stream
+queries, the estimator decides: the column stays ambiguous if it supports
+multi-label targets. Classifiers and pool query strategies convert a
+single-output column to the canonical one-dimensional representation and emit
+a ``DataConversionWarning``. A classification column with ``target_type="auto"``
+and ``classes=None`` remains ambiguous for components that support
+multi-label targets.
 
-For regression, both ``target_type="auto"`` and an explicit
-``target_type="single-output"`` accept a column vector. This applies whenever
-the task is known, for example in a regressor or in a strategy that resolves
-its labels through a regressor.
+For regression, a column vector is accepted whenever the task is known, for
+example in a regressor or in a strategy that resolves its labels through a
+regressor.
 
 A task-agnostic strategy has neither a known task nor a class vocabulary.
 Therefore, it treats every bare two-dimensional ``y`` as ambiguous, regardless
@@ -801,9 +809,8 @@ resolved target specification.
 Regression
 ==========
 
-Regressors accept ``target_type="auto"`` and ``target_type="single-output"``.
-One-dimensional numeric labels resolve to single-output regression, and column
-vectors are supported.
+Regressors have no ``target_type`` parameter. One-dimensional numeric labels
+resolve to single-output regression, and column vectors are supported.
 
 The estimator wrapped by :class:`~skactiveml.regressor.SklearnRegressor`
 receives the observed labels as ``float64``, so that integer labels and the

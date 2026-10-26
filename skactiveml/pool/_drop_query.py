@@ -97,10 +97,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         `n_dropout_samples`. A scale-preserving reduction therefore keeps the
         resulting rate in `[0, 1]`, but the multi-label path does not restrict
         the threshold to that interval.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output and
-        multi-label classification. A fitted classifier's target specification
-        is authoritative when available.
 
 
     References
@@ -122,7 +118,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         random_state=None,
         multilabel_aggregation_fn=np.mean,
         disagreement_threshold=0.5,
-        target_type="auto",
     ):
         self.dropout_rate = dropout_rate
         self.n_dropout_samples = n_dropout_samples
@@ -135,7 +130,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
     @property

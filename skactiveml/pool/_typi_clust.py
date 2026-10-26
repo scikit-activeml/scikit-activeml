@@ -73,8 +73,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
         self.n_cluster_param_name = n_cluster_param_name

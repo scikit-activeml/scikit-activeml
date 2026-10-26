@@ -156,26 +156,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
 
         self.assertEqual(reg.target_spec_.target_type, "single-output")
 
-    def test_prefitted_estimator_rejects_invalid_and_unsupported_declarations(
-        self,
-    ):
-        X = np.arange(8, dtype=float).reshape(-1, 1)
-        y = np.arange(8, dtype=float)
-        estimator = LinearRegression().fit(X, y)
-        cases = [
-            ("invalid", "must be one of"),
-            ("multi-label", "requires classification"),
-        ]
-
-        for target_type, error_message in cases:
-            with self.subTest(target_type=target_type):
-                reg = SklearnRegressor(estimator, target_type=target_type)
-
-                with self.assertRaisesRegex(ValueError, error_message):
-                    reg.predict([[8.0]])
-
-                self.assertFalse(hasattr(reg, "target_spec_"))
-
     def test_prefitted_multi_output_estimator_is_rejected_at_prediction(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)
         y = np.column_stack(
@@ -226,24 +206,21 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             np.arange(8, dtype=float).reshape(4, 2),
         ]
         for y in targets:
-            for target_type in ["auto", "single-output"]:
-                with self.subTest(shape=y.shape, target_type=target_type):
-                    estimator = Pipeline([("regressor", KernelRidge())]).fit(
-                        X, y
+            with self.subTest(shape=y.shape):
+                estimator = Pipeline([("regressor", KernelRidge())]).fit(X, y)
+                reg = SklearnRegressor(estimator)
+                if y.ndim == 2 and y.shape[1] > 1:
+                    with self.assertRaisesRegex(
+                        ValueError, "single-output regression"
+                    ):
+                        reg.predict(X)
+                else:
+                    np.testing.assert_allclose(
+                        reg.predict(X), estimator.predict(X).ravel()
                     )
-                    reg = SklearnRegressor(estimator, target_type=target_type)
-                    if y.ndim == 2 and y.shape[1] > 1:
-                        with self.assertRaisesRegex(
-                            ValueError, "single-output regression"
-                        ):
-                            reg.predict(X)
-                    else:
-                        np.testing.assert_allclose(
-                            reg.predict(X), estimator.predict(X).ravel()
-                        )
-                        self.assertEqual(
-                            reg.target_spec_.target_type, "single-output"
-                        )
+                    self.assertEqual(
+                        reg.target_spec_.target_type, "single-output"
+                    )
 
     def test_prefitted_skactiveml_regressor_keeps_its_target_spec(self):
         X = np.arange(8, dtype=float).reshape(-1, 1)

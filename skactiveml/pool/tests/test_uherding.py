@@ -49,11 +49,8 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
         missing_label=MISSING_LABEL,
         target_type="multi-label",
     ):
-        super().__init__(
-            classes=classes,
-            missing_label=missing_label,
-            target_type=target_type,
-        )
+        super().__init__(classes=classes, missing_label=missing_label)
+        self.target_type = target_type
         self.probas = probas
         self.logits = logits
         self.return_as_list = return_as_list
@@ -590,7 +587,6 @@ class TestUHerding(
         query_indices = UHerding(
             temperatures=1.0,
             predict_proba_dict=None,
-            target_type="multi-label",
             random_state=0,
         ).query(X, y, clf=clf, fit_clf=False)
 
@@ -614,7 +610,6 @@ class TestUHerding(
         query_indices = UHerding(
             temperatures=1.0,
             predict_proba_dict=None,
-            target_type="multi-label",
             random_state=0,
         ).query(X, y, clf=clf, fit_clf=False)
 
@@ -1146,7 +1141,6 @@ class TestUHerding(
             "validation_size": 0.5,
             "missing_label": None,
             "random_state": 0,
-            "target_type": "multi-label",
         }
         query_params = {
             "X": X,

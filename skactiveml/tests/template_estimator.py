@@ -8,7 +8,6 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 import numpy as np
-from sklearn.base import clone
 from sklearn.datasets import make_blobs
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
@@ -357,6 +356,11 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         return self.fit_default_params_multilabel is not None
 
     def test_init_param_target_type(self):
+        if (
+            "target_type"
+            not in inspect.signature(self.estimator_class).parameters
+        ):
+            return
         self._test_param(
             "init",
             "target_type",
@@ -377,7 +381,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             estimator.target_spec_.target_type,
             estimator.target_spec_.annotation_type,
         )
-        self.assertEqual(estimator.target_type, "auto")
         self.assertIn(capability, estimator._target_capabilities)
         self.assertEqual(capability[0], "classification")
 
@@ -859,25 +862,6 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
             self.target_contract_fit_params,
         )
 
-    def test_init_param_target_type(self):
-        for target_type, error in [
-            ("auto", None),
-            ("single-output", None),
-            ("multi-label", ValueError),
-            ("invalid", ValueError),
-        ]:
-            with self.subTest(target_type=target_type):
-                estimator = clone(
-                    self.target_contract_estimator_factory()
-                ).set_params(target_type=target_type)
-                if error is None:
-                    estimator.fit(**deepcopy(self.target_contract_fit_params))
-                else:
-                    with self.assertRaises(error):
-                        estimator.fit(
-                            **deepcopy(self.target_contract_fit_params)
-                        )
-
     def test_predict_dtype_matches_class_dtype(self):
         """Check that `predict` returns the declared class dtype."""
         estimator = self.target_contract_estimator_factory()
@@ -892,7 +876,6 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
 
-        self.assertEqual(estimator.target_type, "auto")
         self.assertEqual(
             estimator._target_capabilities,
             frozenset(
@@ -911,14 +894,6 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
         self.assertEqual(
             estimator.target_spec_.annotation_type, "multi-annotator"
         )
-
-        unsupported = clone(estimator).set_params(target_type="multi-label")
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            unsupported.fit(**fit_params)
-        self.assertFalse(hasattr(unsupported, "target_spec_"))
-        self.assertFalse(hasattr(unsupported, "classes_"))
 
     def test_fit_with_one_observed_class(self):
         estimator = self.target_contract_estimator_factory()
@@ -1114,18 +1089,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             "missing_label",
             [(1.2, None)],
             replace_fit_params={"y": [1.2] + [1.0] * (n_samples - 1)},
-        )
-
-    def test_init_param_target_type(self):
-        self._test_param(
-            "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("multi-label", ValueError),
-                ("invalid", ValueError),
-            ],
         )
 
     def test_fitted_target_spec_is_single_output_regression(self):

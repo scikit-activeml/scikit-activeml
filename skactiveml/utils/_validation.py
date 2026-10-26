@@ -670,8 +670,7 @@ def check_X_y(
     ensure_all_finite=True,
     ensure_2d=True,
     allow_nd=False,
-    target_type="single-output",
-    multi_output="deprecated",
+    multi_output=False,
     allow_nan=None,
     ensure_min_samples=1,
     ensure_min_features=1,
@@ -682,10 +681,9 @@ def check_X_y(
     """Input validation for standard estimators. Adjusted from `sklearn` [1]_.
 
     Checks X and y for consistent length and enforces `X` to be at least 2D.
-    Targets are one-dimensional unless a multi-label or multi-output
-    `target_type` is specified. By default, `X` is checked to be non-empty and
-    containing only finite values. NaN admission in targets is controlled by
-    `allow_nan`.
+    `y` is one-dimensional unless `multi_output=True`. By default, `X` is
+    checked to be non-empty and containing only finite values. NaN admission
+    in `y` is controlled by `allow_nan`.
     If the dtype of `X` is object, attempt converting to float, raising on
     failure.
 
@@ -738,16 +736,9 @@ def check_X_y(
         Whether to raise a value error if X is not 2D.
     allow_nd : boolean, default=False
         Whether to allow X.ndim > 2.
-    target_type : "single-output" or "multi-label" or "multi-output", \
-            default="single-output"
-        Resolved target type controlling target-array dimensionality.
-    multi_output : boolean, default="deprecated"
-        Deprecated. Use `target_type` instead: `multi_output=True` maps to
-        `target_type="multi-label"` and `multi_output=False` to
-        `target_type="single-output"`. Passing it emits a `FutureWarning`, and
-        the legacy value is ignored unless `target_type` is `"single-output"`.
-        Note that `target_type="multi-label"` requires a two-dimensional `y`,
-        whereas `multi_output=True` also accepted a one-dimensional one.
+    multi_output : boolean, default=False
+        Whether to allow a two-dimensional `y`, e.g., for multi-label
+        targets. If False, `y` is validated as a vector.
     allow_nan : boolean, default=None
         Whether to allow np.nan in y. If None, NaN is allowed when
         `missing_label` is NaN. This does not change the configured
@@ -797,19 +788,6 @@ def check_X_y(
        Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
        Res., 12:2825–2830, 2011.
     """
-    if multi_output != "deprecated":
-        warnings.warn(
-            "`multi_output` is deprecated and will be removed in a future "
-            "release. Use `target_type='multi-label'` for multi-label "
-            "targets, `target_type='multi-output'` for multi-output targets, "
-            "and `target_type='single-output'` otherwise. `multi_output=True` "
-            "maps to `target_type='multi-label'`, which requires a "
-            "two-dimensional `y`.",
-            FutureWarning,
-            stacklevel=2,
-        )
-        if multi_output and target_type == "single-output":
-            target_type = "multi-label"
     if allow_nan is None:
         allow_nan = _is_nan_missing_label(missing_label)
     if X is not None:
@@ -828,16 +806,7 @@ def check_X_y(
             estimator=estimator,
         )
     if y is not None:
-        if target_type not in {
-            "single-output",
-            "multi-label",
-            "multi-output",
-        }:
-            raise ValueError(
-                "`target_type` must be one of {'single-output', "
-                "'multi-label', 'multi-output'}."
-            )
-        if target_type in {"multi-label", "multi-output"}:
+        if multi_output:
             y = check_array(
                 y,
                 accept_sparse="csr",
@@ -845,16 +814,6 @@ def check_X_y(
                 ensure_2d=False,
                 dtype=None,
             )
-            if y.ndim != 2:
-                raise ValueError(
-                    f"`target_type='{target_type}'` requires a "
-                    "two-dimensional `y`."
-                )
-            if target_type == "multi-output" and y.shape[1] < 2:
-                raise ValueError(
-                    "`target_type='multi-output'` requires `y` with at least "
-                    "two target columns."
-                )
         else:
             y = column_or_1d(y, warn=True)
             assert_all_finite(y, allow_nan=allow_nan)

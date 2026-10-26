@@ -11,8 +11,8 @@ from ..utils import (
 from ..utils._label import _check_labels
 from ..utils._target import (
     _check_target_matches_spec,
+    _declared_target_type,
     _predicted_target_spec,
-    _validate_target_semantics,
     _check_target_spec_capability,
 )
 
@@ -37,13 +37,6 @@ def _resolve_estimator_target_spec(
         check_equal_missing_label(
             estimator.missing_label, strategy.missing_label
         )
-    strategy_target_type = strategy.target_type
-    _validate_target_semantics(
-        task,
-        strategy_target_type,
-        "single-annotator",
-        allow_auto=True,
-    )
 
     if hasattr(estimator, "target_spec_"):
         estimator_target_spec = estimator.target_spec_
@@ -53,30 +46,10 @@ def _resolve_estimator_target_spec(
                 y, target_spec, missing_label=strategy.missing_label
             )
     else:
-        estimator_target_type = getattr(estimator, "target_type", "auto")
-        _validate_target_semantics(
-            task,
-            estimator_target_type,
-            "single-annotator",
-            allow_auto=True,
-        )
-        if (
-            strategy_target_type != "auto"
-            and estimator_target_type != "auto"
-            and strategy_target_type != estimator_target_type
-        ):
-            raise ValueError(
-                f"{type(strategy).__name__}'s explicit `target_type` "
-                "conflicts with the estimator's explicit `target_type`."
-            )
         target_spec = resolve_target_spec(
             y,
             task=task,
-            target_type=(
-                estimator_target_type
-                if estimator_target_type != "auto"
-                else strategy_target_type
-            ),
+            target_type=_declared_target_type(y, estimator),
             annotation_type="single-annotator",
             classes=(
                 estimator._declared_classes
@@ -92,14 +65,6 @@ def _resolve_estimator_target_spec(
         estimator_target_spec,
         estimator._target_capabilities,
     )
-
-    if strategy_target_type != "auto" and (
-        strategy_target_type != target_spec.target_type
-    ):
-        raise ValueError(
-            f"{type(strategy).__name__}'s explicit `target_type` conflicts "
-            "with the fitted estimator's target specification."
-        )
     _check_target_spec_capability(
         type(strategy).__name__, target_spec, strategy._target_capabilities
     )

@@ -255,8 +255,13 @@ def resolve_target_spec(
             target_type = "single-output"
         else:
             raise ValueError(
-                "Two-dimensional targets with `target_type='auto'` are "
-                "ambiguous; declare `target_type` or `classes`."
+                "Two-dimensional labels `y` are ambiguous, because they can "
+                "be multi-label targets or the labels of several annotators. "
+                "Declare multi-label targets on the classifier with "
+                "`target_type='multi-label'` or nested binary `classes`, and "
+                "pass the labels of several annotators to a multi-annotator "
+                "component. For single-output labels, pass a one-dimensional "
+                "`y` or flat `classes`."
             )
 
     if classes is not None:
@@ -312,11 +317,13 @@ def _resolve_task_agnostic_target_type(
     if target_type == "auto":
         if y.ndim != 1:
             raise ValueError(
-                "Two-dimensional targets with `target_type='auto'` are "
-                "ambiguous for a task-agnostic strategy, because it has "
-                "neither classes nor an estimator to resolve them by. "
-                "Declare `target_type`, or pass an estimator whose target "
-                "semantics resolve them."
+                "Two-dimensional labels `y` are ambiguous for a strategy "
+                "without a classifier, because they can be multi-label "
+                "targets or the labels of several annotators. Declare "
+                "multi-label targets with `target_type='multi-label'` on the "
+                "strategy, and pass the labels of several annotators to a "
+                "multi-annotator component. For single-output labels, pass a "
+                "one-dimensional `y`."
             )
         return "single-output"
 
@@ -470,6 +477,36 @@ def _check_target_matches_spec(y, target_spec, *, missing_label):
         classes=target_spec.classes,
         missing_label=missing_label,
     )
+
+
+def _declared_target_type(y, component):
+    """Return the target type that `component` declares for `y`.
+
+    Parameters
+    ----------
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        The labels to be resolved.
+    component : object with `_target_capabilities`
+        The component interpreting `y`, e.g., a classifier.
+
+    Returns
+    -------
+    target_type : str
+        The explicit `target_type` of `component`. Otherwise, a column vector
+        is single-output if `component` does not support multi-label targets,
+        and every other `y` gives `"auto"`.
+    """
+    target_type = getattr(component, "target_type", "auto")
+    if (
+        target_type == "auto"
+        and np.ndim(y) == 2
+        and np.shape(y)[1] == 1
+        and not any(
+            c[1] == "multi-label" for c in component._target_capabilities
+        )
+    ):
+        return "single-output"
+    return target_type
 
 
 def _check_target_spec_capability(component, target_spec, capabilities):

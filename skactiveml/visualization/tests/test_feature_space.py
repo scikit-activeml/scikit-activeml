@@ -686,9 +686,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_plot_utilities_multilabel_prediction_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
-        qs = LabelCardinalityInconsistency(
-            target_type="multi-label", random_state=0
-        )
+        qs = LabelCardinalityInconsistency(random_state=0)
         _, ax = plt.subplots()
 
         returned_ax = plot_utilities(
@@ -707,9 +705,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_plot_utilities_multilabel_probability_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
-        qs = MaxLossReductionMaxConfidence(
-            target_type="multi-label", random_state=0
-        )
+        qs = MaxLossReductionMaxConfidence(random_state=0)
         discriminator = ParzenWindowClassifier(random_state=0)
         _, ax = plt.subplots()
 
@@ -774,10 +770,9 @@ class TestFeatureSpace(unittest.TestCase):
         y[:15, 0] = X[:15, 0]
         reg = SklearnRegressor(
             DecisionTreeRegressor(random_state=0),
-            target_type="auto",
             random_state=0,
         ).fit(X, y)
-        qs = MappingOnlyRegressionStrategy(target_type="auto", random_state=0)
+        qs = MappingOnlyRegressionStrategy(random_state=0)
         feature_bound = [X.min(axis=0), X.max(axis=0)]
         _, ax = plt.subplots()
 

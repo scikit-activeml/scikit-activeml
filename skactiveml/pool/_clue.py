@@ -104,11 +104,6 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         supported, because its result grows with the number of label outputs.
         Only the callability of the reduction is validated at runtime, so a
         violating reduction silently changes the acquisition scale.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output
-        classification and regression, and multi-label classification. A
-        fitted estimator's target specification is authoritative when
-        available.
 
     References
     ----------
@@ -127,12 +122,10 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict

@@ -222,7 +222,6 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
         cases = [
             (self.y_matrix, {}, "one-dimensional or a column vector"),
             (invalid_y, {}, "outside `classes`"),
-            (self.y, {"target_type": "multi-label"}, "conflicts"),
             (self.y, {"missing_label": np.nan}, "must be equal"),
         ]
         for y, init_params, error in cases:

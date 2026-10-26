@@ -28,6 +28,7 @@ from ..utils._label_dtype import _as_class_vocabulary_array, _as_label_array
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
+    _declared_target_type,
 )
 from ..utils._wrapper_state import (
     _resolve_own_fitted_attribute,
@@ -578,8 +579,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
         self.proba_format = proba_format
@@ -599,7 +600,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=self.target_type,
+            target_type=_declared_target_type(y, self),
             annotation_type="single-annotator",
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
@@ -1693,10 +1694,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. It must remain compatible with the wrapped
-        estimator across incremental updates. The wrapper supports only
-        single-output classification.
 
     Notes
     -----
@@ -1740,14 +1737,12 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         window_size=None,
         only_labeled=False,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
         self.estimator = estimator
         self.only_labeled = only_labeled
@@ -2924,9 +2919,6 @@ if successful_capymoa_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : "auto" or "single-output", default="auto"
-            Declared target type. This wrapper supports only single-output
-            classification.
 
         Attributes
         ----------
@@ -2955,14 +2947,12 @@ if successful_capymoa_import:
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
-            target_type="auto",
         ):
             super().__init__(
                 classes=classes,
                 missing_label=missing_label,
                 cost_matrix=cost_matrix,
                 random_state=random_state,
-                target_type=target_type,
             )
             self.estimator_class = estimator_class
             self.estimator_param_dict = estimator_param_dict
@@ -3271,9 +3261,6 @@ if successful_river_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : "auto" or "single-output", default="auto"
-            Declared target type. This wrapper supports only single-output
-            classification.
 
         Attributes
         ----------
@@ -3301,14 +3288,12 @@ if successful_river_import:
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
-            target_type="auto",
         ):
             super().__init__(
                 classes=classes,
                 missing_label=missing_label,
                 cost_matrix=cost_matrix,
                 random_state=random_state,
-                target_type=target_type,
             )
             self.estimator = estimator
 

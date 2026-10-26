@@ -59,6 +59,22 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             dtype=float,
         )
 
+    def test_target_capabilities(self):
+        wrapper = SingleAnnotatorWrapper(RandomSampling())
+
+        self.assertEqual(
+            wrapper._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+
     def test_default_aggregation_honors_missing_label(self):
         X = np.arange(3)[:, None]
         for missing_label, y, expected in [
@@ -95,31 +111,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                     np.testing.assert_array_equal(aggregate, expected)
                 self.assertIsNone(wrapper.y_aggregate)
 
-    def test_init_param_target_type(self):
-        wrapper = SingleAnnotatorWrapper(
-            RandomSampling(random_state=self.random_state),
-            target_type="auto",
-            random_state=self.random_state,
-        )
-
-        self.assertEqual(wrapper.target_type, "auto")
-        self.assertEqual(
-            wrapper._target_capabilities,
-            frozenset(
-                {
-                    (
-                        "classification",
-                        "single-output",
-                        "multi-annotator",
-                    )
-                }
-            ),
-        )
-
     def test_outer_and_aggregated_targets_use_separate_semantics(self):
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(random_state=self.random_state),
-            target_type="auto",
             random_state=self.random_state,
         )
 
@@ -132,28 +126,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         self.assertEqual(query_indices.shape, (2, 2))
         self.assertEqual(utilities.shape, (2, len(self.X), self.y.shape[1]))
-
-    def test_explicit_multilabel_intent_fails_before_aggregation(self):
-        calls = []
-
-        def y_aggregate(y):
-            calls.append(y)
-            return majority_vote(y)
-
-        wrapper = SingleAnnotatorWrapper(
-            RandomSampling(random_state=self.random_state),
-            y_aggregate=y_aggregate,
-            target_type="multi-label",
-            random_state=self.random_state,
-        )
-
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            wrapper.query(self.X, self.y)
-
-        self.assertEqual(calls, [])
-        assert_no_query_state(self, wrapper)
 
     def test_wrapped_target_rejection_precedes_query_state(self):
         wrapper = SingleAnnotatorWrapper(

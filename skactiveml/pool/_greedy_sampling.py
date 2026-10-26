@@ -74,8 +74,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.metric = metric
         self.metric_dict = metric_dict
 
@@ -238,10 +238,6 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. A fitted regressor's target specification is
-        authoritative when available. Only single-output regression is
-        supported.
 
     References
     ----------
@@ -259,12 +255,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         n_GSx_samples=1,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.method = method
         self.x_metric = x_metric

@@ -250,7 +250,6 @@ class TestGreedySamplingTarget(
     def test_target_contract(self):
         strategy = GreedySamplingTarget()
 
-        self.assertEqual(strategy.target_type, "auto")
         self.assertEqual(
             strategy._target_capabilities,
             frozenset({("regression", "single-output", "single-annotator")}),

@@ -49,10 +49,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. The outer target matrix is resolved as
-        single-output classification with multiple annotators before its
-        aggregated vector is resolved for `strategy`.
     """
 
     def __init__(
@@ -61,12 +57,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         y_aggregate=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.strategy = strategy
         self.y_aggregate = y_aggregate

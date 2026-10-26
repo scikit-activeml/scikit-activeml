@@ -212,11 +212,6 @@ class TestSubSamplingWrapper(
             restricted_wrapper._target_capabilities,
         )
 
-    def test_init_param_target_type(self):
-        self.assertNotIn(
-            "target_type", inspect.signature(self.qs_class).parameters
-        )
-
     def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
         init_params, query_params = self._multilabel_custom_vocabulary_params(
             self._multilabel_heterogeneous_vocabularies()
@@ -1004,11 +999,6 @@ class TestParallelUtilityEstimationWrapper(
 
         self.assertEqual(
             wrapper._target_capabilities, wrapped._target_capabilities
-        )
-
-    def test_init_param_target_type(self):
-        self.assertNotIn(
-            "target_type", inspect.signature(self.qs_class).parameters
         )
 
     def test_query_multilabel_rejects_heterogeneous_vocabularies(self):

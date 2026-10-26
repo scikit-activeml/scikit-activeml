@@ -26,6 +26,7 @@ from .utils._label_dtype import (
 )
 from .utils._target import (
     _check_target_capability,
+    _declared_target_type,
     _has_no_class_evidence,
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
@@ -354,22 +355,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. Subclasses reject resolved specifications
-        outside their exact capabilities.
     """
-
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label,
-            random_state=random_state,
-        )
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -396,6 +382,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         target_type : str
             The resolved target type.
         """
+        declared_target_type = _declared_target_type(y, self)
         tasks = {capability[0] for capability in self._target_capabilities}
         if len(tasks) == 1:
             task = next(iter(tasks))
@@ -404,7 +391,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 if classes is None:
                     target_type = _resolve_task_agnostic_target_type(
                         y,
-                        target_type=self.target_type,
+                        target_type=declared_target_type,
                         missing_label=self.missing_label,
                     )
                     _check_target_capability(
@@ -417,7 +404,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                     target_spec = resolve_target_spec(
                         y,
                         task=task,
-                        target_type=self.target_type,
+                        target_type=declared_target_type,
                         annotation_type="single-annotator",
                         classes=classes,
                         missing_label=self.missing_label,
@@ -426,7 +413,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 target_spec = resolve_target_spec(
                     y,
                     task=task,
-                    target_type=self.target_type,
+                    target_type=declared_target_type,
                     annotation_type="single-annotator",
                     classes=None,
                     missing_label=self.missing_label,
@@ -437,7 +424,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             return target_spec.target_type
         target_type = _resolve_task_agnostic_target_type(
             y,
-            target_type=self.target_type,
+            target_type=declared_target_type,
             missing_label=self.missing_label,
         )
         applicable_tasks = (
@@ -716,22 +703,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. Multi-annotator strategies support only
-        single-output classification in version 1.1.
     """
-
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label,
-            random_state=random_state,
-        )
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -745,7 +717,6 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             target_spec = resolve_target_spec(
                 y,
                 task="classification",
-                target_type=self.target_type,
                 annotation_type="multi-annotator",
                 classes=classes,
                 missing_label=self.missing_label,
@@ -755,7 +726,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             # pair before a class vocabulary is observable.
             lacks_class_evidence = classes is None and _has_no_class_evidence(
                 y,
-                self.target_type,
+                "auto",
                 "multi-annotator",
                 self.missing_label,
             )
@@ -1407,9 +1378,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. Components reject resolved target specifications
-        outside their exact capabilities.
 
     Attributes
     ----------
@@ -1424,13 +1392,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
-        target_type="auto",
     ):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
         self.random_state = random_state
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -1454,7 +1420,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         target_spec = resolve_target_spec(
             resolution_y,
             task="classification",
-            target_type=getattr(self, "target_type", "auto"),
+            target_type=_declared_target_type(resolution_y, self),
             annotation_type=annotation_type,
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
@@ -1818,8 +1784,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.class_prior = class_prior
 
     @abstractmethod
@@ -2117,8 +2083,6 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     random_state : int, RandomState or None, default=None
         Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. Only single-output regression is supported.
 
     Attributes
     ----------
@@ -2131,11 +2095,9 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         self,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         self.missing_label = missing_label
         self.random_state = random_state
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -2146,7 +2108,6 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         target_spec = resolve_target_spec(
             y,
             task="regression",
-            target_type=self.target_type,
             annotation_type="single-annotator",
             classes=None,
             missing_label=self.missing_label,

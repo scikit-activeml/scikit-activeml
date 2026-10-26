@@ -68,10 +68,6 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         inflated uncertainty would dominate the diversity term, which is
         min-max normalized to `[0, 1]` from the second selection of a batch
         onward.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output and
-        multi-label classification. A fitted classifier's target specification
-        is authoritative when available.
 
     References
     ----------
@@ -86,12 +82,10 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.gamma = gamma
         self.multilabel_aggregation_fn = multilabel_aggregation_fn

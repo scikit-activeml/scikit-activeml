@@ -146,9 +146,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This wrapper supports only single-output
-        regression.
 
     Attributes
     ----------
@@ -186,12 +183,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         include_unlabeled_samples=False,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
@@ -555,17 +550,11 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
                 f"The pre-fitted estimator '{self.estimator}' does not "
                 f"support single-output regression."
             )
-        target_type = (
-            "single-output" if self.target_type == "auto" else self.target_type
-        )
         target_spec = TargetSpec(
             task="regression",
-            target_type=target_type,
+            target_type="single-output",
             annotation_type="single-annotator",
             classes=None,
-        )
-        _check_target_spec_capability(
-            type(self).__name__, target_spec, self._target_capabilities
         )
 
         estimator_target_spec = getattr(self.estimator, "target_spec_", None)
@@ -612,9 +601,6 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This wrapper supports only single-output
-        regression.
     """
 
     def __init__(
@@ -622,13 +608,11 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
         estimator,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             estimator,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
@@ -828,9 +812,6 @@ if successful_skorch_torch_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for 'predict' method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : "auto" or "single-output", default="auto"
-            Declared target type. This wrapper supports only single-output
-            regression.
 
         References
         ----------
@@ -850,12 +831,10 @@ if successful_skorch_torch_import:
             include_unlabeled_samples=False,
             missing_label=MISSING_LABEL,
             random_state=None,
-            target_type="auto",
         ):
             super(SkorchRegressor, self).__init__(
                 missing_label=missing_label,
                 random_state=random_state,
-                target_type=target_type,
             )
             self.module = module
             self.criterion = criterion

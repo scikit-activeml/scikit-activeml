@@ -71,10 +71,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output and
-        multi-label classification. A fitted classifier's target specification
-        is authoritative when available.
 
     References
     ----------
@@ -92,13 +88,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         clf_embedding_flag_name=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         self.clf_embedding_flag_name = clf_embedding_flag_name
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
     @property
