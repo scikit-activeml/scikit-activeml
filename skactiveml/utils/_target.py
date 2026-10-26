@@ -116,34 +116,6 @@ class TargetSpec:
         )
 
 
-def _class_vocabulary_key(classes):
-    """Return a comparable key for a declared class vocabulary.
-
-    Parameters
-    ----------
-    classes : array-like or tuple of array-like or None
-        The declared class vocabulary.
-
-    Returns
-    -------
-    key : tuple or None
-        A key comparing equal exactly for equal vocabularies.
-    """
-    if classes is None:
-        return None
-    if _has_nested_classes(classes):
-        # The order of the label outputs is meaningful, whereas the order of
-        # the classes within one output is not.
-        return tuple(_sorted_classes(classes_j) for classes_j in classes)
-    return _sorted_classes(classes)
-
-
-def _sorted_classes(classes):
-    """Normalize one output's class vocabulary into sorted unique classes."""
-    classes = _as_class_vocabulary_array(classes)
-    return tuple(LabelEncoder().fit(classes).classes_)
-
-
 def _class_vocabulary_identity_key(classes):
     """Return the value-and-dtype-kind identity of normalized classes.
 

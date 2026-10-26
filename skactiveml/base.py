@@ -77,11 +77,6 @@ except ImportError:  # pragma: no cover
 
 _TARGET_SPEC_NOT_PROVIDED = object()
 
-# Names of `query` parameters whose estimator describes the labels `y`.
-# Other estimators, e.g., the `discriminator` of `DiscriminativeAL`,
-# solve an auxiliary problem.
-_TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
-
 _DEFAULT_BUDGET = 0.1
 
 
@@ -382,20 +377,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return frozenset(
             {("classification", "single-output", "single-annotator")}
         )
-
-    @property
-    def _target_authority_params(self):
-        """Names of `query` parameters carrying a target authority.
-
-        Strategies naming such an estimator differently, or accepting
-        estimators for an auxiliary problem, override this property.
-
-        Returns
-        -------
-        authority_params : tuple of str
-            The declared parameter names in deterministic resolution order.
-        """
-        return _TARGET_AUTHORITY_QUERY_PARAMS
 
     def _resolve_query_target_type(self, y):
         """Resolve the target type of `y` from the strategy's declarations.

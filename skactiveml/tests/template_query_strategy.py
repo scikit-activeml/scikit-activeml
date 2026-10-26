@@ -36,7 +36,6 @@ from skactiveml.utils import (
     unlabeled_indices,
     call_func,
 )
-from skactiveml.utils._target import _class_vocabulary_key
 from skactiveml.utils._validation import _has_nested_classes
 
 from sklearn.base import BaseEstimator
@@ -1120,9 +1119,9 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             classes = getattr(value, "classes", None)
             if not _has_nested_classes(classes):
                 continue
-            if declared_classes is not None and _class_vocabulary_key(
-                classes
-            ) != _class_vocabulary_key(declared_classes):
+            if declared_classes is not None and [
+                sorted(classes_j) for classes_j in classes
+            ] != [sorted(classes_j) for classes_j in declared_classes]:
                 raise AssertionError(
                     "The default multi-label query parameters declare "
                     "conflicting class vocabularies, so they cannot be "

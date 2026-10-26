@@ -30,7 +30,7 @@ TASK_AGNOSTIC_CAPABILITIES = frozenset(
 def _task_agnostic_strategies():
     """Collect every estimator-free strategy with these exact capabilities.
 
-    Wrappers and strategies taking a target authority, e.g., `clf`, are
+    Wrappers and strategies taking an estimator for `y`, e.g., `clf`, are
     excluded.
     """
     strategies = set()
@@ -46,7 +46,9 @@ def _task_agnostic_strategies():
         if strategy._target_capabilities != TASK_AGNOSTIC_CAPABILITIES:
             continue
         query_params = inspect.signature(obj.query).parameters
-        if any(p in query_params for p in strategy._target_authority_params):
+        if any(
+            p in query_params for p in ("clf", "reg", "ensemble", "estimator")
+        ):
             continue
         strategies.add(obj)
     return strategies

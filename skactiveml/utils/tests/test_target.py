@@ -13,7 +13,6 @@ from skactiveml.utils import (
     resolve_target_spec,
     unlabeled_indices,
 )
-from skactiveml.utils._target import _class_vocabulary_key
 
 
 class TestTargetSpec(unittest.TestCase):
@@ -775,9 +774,6 @@ class TestResolveTargetSpec(unittest.TestCase):
         )
 
         self.assertEqual(forward, reversed_declarations)
-
-    def test_undeclared_vocabularies_have_no_comparison_key(self):
-        self.assertIsNone(_class_vocabulary_key(None))
 
     def test_multilabel_rejects_partially_observed_rows(self):
         y = np.array([[0, 1], [1, np.nan], [np.nan, np.nan]])

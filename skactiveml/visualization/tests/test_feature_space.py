@@ -40,10 +40,7 @@ from skactiveml.visualization import (
     plot_stream_training_data,
     plot_stream_decision_boundary,
 )
-from skactiveml.visualization._feature_space import (
-    _general_plot_utilities,
-    _resolve_utility_target_type,
-)
+from skactiveml.visualization._feature_space import _general_plot_utilities
 
 # PDF rasterization differs slightly across supported Matplotlib versions.
 IMAGE_COMPARE_TOL = 6.0
@@ -912,14 +909,6 @@ class TestFeatureSpace(unittest.TestCase):
 
                 self.assertEqual(returned_axes.shape, (1,))
                 self.assertIsInstance(returned_axes[0], plt.Axes)
-
-    def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
-        qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
-
-        self.assertEqual(
-            _resolve_utility_target_type(qs, self.y_active_multi, {}),
-            "single-output",
-        )
 
     def test_plot_utilities_rejects_annotator_options_for_multilabel(self):
         y = np.column_stack([self.y_active, self.y_active])

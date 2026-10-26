@@ -254,7 +254,8 @@ label helpers, or multi-annotator components. In particular:
 
 - resolve target meaning with
   :func:`~skactiveml.utils.resolve_target_spec`; do not infer semantics from
-  array shape or values alone;
+  array shape or values alone. Only label masks may use the shape, e.g., a
+  wrapper treats each row of a two-dimensional ``y`` as one sample;
 - declare the exact target combinations a component supports through its
   ``_target_capabilities``;
 - override ``_declared_classes`` in a classifier wrapper that takes its

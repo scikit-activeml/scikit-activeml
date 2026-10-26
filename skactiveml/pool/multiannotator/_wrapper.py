@@ -9,10 +9,6 @@ from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
 )
-from .._target import (
-    _collect_declared_authorities,
-    _resolve_estimator_target_spec,
-)
 from ...utils import (
     rand_argmax,
     check_type,
@@ -283,10 +279,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 aggregate_target_spec,
                 self.strategy._target_capabilities,
             )
-        for estimator in self._collect_target_authorities(query_kwargs):
-            _resolve_estimator_target_spec(
-                self.strategy, estimator, preflight_aggregated_y
-            )
 
         (
             X,
@@ -473,15 +465,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             indices[:, 0] = mapping[w_indices[:, 0]]
             indices[:, 1] = w_indices[:, 1]
             return indices
-
-    def _collect_target_authorities(self, query_kwargs):
-        """Discover the target authorities among the query arguments.
-
-        Only the roles `self.strategy` declares are searched.
-        """
-        return _collect_declared_authorities(
-            self.strategy._target_authority_params, query_kwargs
-        )
 
     def _query_annotators(
         self,

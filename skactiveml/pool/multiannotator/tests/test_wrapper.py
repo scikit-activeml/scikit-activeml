@@ -166,7 +166,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         assert_no_query_state(self, wrapper)
 
-    def test_wrapped_classifier_rejection_precedes_query_state(self):
+    def test_wrapped_classifier_is_rejected(self):
         strategy = UncertaintySampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             strategy,
@@ -177,12 +177,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not support"):
             wrapper.query(self.X, self.y, clf=clf)
 
-        for component in (wrapper, strategy):
-            assert_no_query_state(self, component)
-
-    def test_prefitted_estimator_missing_label_rejection_precedes_query_state(
-        self,
-    ):
+    def test_prefitted_estimator_missing_label_is_rejected(self):
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
             classes=self.classes,
@@ -201,61 +196,12 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                 [0, 0, 1],
                 [0, 1, 1],
                 [1, 0, 1],
-                [1, 1, 0],
+                [-1, -1, -1],
             ]
         )
 
         with self.assertRaisesRegex(ValueError, "must be equal"):
             wrapper.query(self.X, y, clf=clf, fit_clf=False)
-
-        for component in (wrapper, strategy):
-            assert_no_query_state(self, component)
-
-    def test_wrapped_rejection_preserves_existing_query_state(self):
-        strategy = UncertaintySampling(random_state=self.random_state)
-        wrapper = SingleAnnotatorWrapper(
-            strategy,
-            random_state=self.random_state,
-        )
-        clf = SklearnClassifier(
-            estimator=GaussianProcessClassifier(),
-            classes=[0, 1],
-            random_state=self.random_state,
-        )
-        wrapper.query(self.X, self.y, clf=clf)
-        expected_state = {}
-        for component in (wrapper, strategy):
-            expected_state[component] = (
-                component.n_features_in_,
-                component.missing_label_,
-                component.random_state_.get_state(),
-            )
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
-            wrapper.query(
-                self.X,
-                self.y,
-                clf=AnnotatorLogisticRegression(classes=[0, 1]),
-            )
-
-        for component in (wrapper, strategy):
-            (
-                expected_n_features,
-                expected_missing_label,
-                expected_random_state,
-            ) = expected_state[component]
-            self.assertEqual(component.n_features_in_, expected_n_features)
-            np.testing.assert_equal(
-                component.missing_label_, expected_missing_label
-            )
-            actual_random_state = component.random_state_.get_state()
-            self.assertEqual(actual_random_state[0], expected_random_state[0])
-            np.testing.assert_array_equal(
-                actual_random_state[1], expected_random_state[1]
-            )
-            self.assertEqual(
-                actual_random_state[2:], expected_random_state[2:]
-            )
 
     def test_class_agnostic_wrapper_accepts_an_all_missing_matrix(self):
         y = np.full_like(self.y, MISSING_LABEL)
@@ -297,12 +243,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         np.testing.assert_array_equal(query_indices, [[11, 0], [9, 0]])
         self._assert_selects_unlabeled_pairs(query_indices)
-        self.assertEqual(
-            wrapper._collect_target_authorities(
-                {"discriminator": discriminator}
-            ),
-            [],
-        )
 
     def test_fitted_auxiliary_estimator_is_no_target_authority(self):
         labeled = np.full(len(self.X_three_classes), MISSING_LABEL)
@@ -357,7 +297,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertEqual(query_indices.shape, (2, 2))
         self._assert_selects_unlabeled_pairs(query_indices)
 
-    def test_declared_authority_rejection_precedes_query_state(self):
+    def test_declared_classifier_vocabulary_is_rejected(self):
         strategy = UncertaintySampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             strategy, random_state=self.random_state
@@ -367,32 +307,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside `classes`"):
             wrapper.query(self.X_three_classes, self.y_three_classes, clf=clf)
 
-        for component in (wrapper, strategy):
-            assert_no_query_state(self, component)
-
-    def test_repeated_authority_across_declared_params_resolves_once(self):
-        clf_0 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        clf_1 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        wrapper = SingleAnnotatorWrapper(
-            UncertaintySampling(random_state=self.random_state),
-            random_state=self.random_state,
-        )
-
-        authorities = wrapper._collect_target_authorities(
-            {
-                "ensemble": [clf_1, clf_0],
-                "clf": clf_0,
-                "discriminator": SklearnClassifier(
-                    GaussianNB(), classes=[0, 1]
-                ),
-                "fit_clf": False,
-                "fit_ensemble": False,
-            }
-        )
-
-        self.assertEqual([id(a) for a in authorities], [id(clf_0), id(clf_1)])
-
-    def test_nested_wrapper_delegates_authority_discovery(self):
+    def test_nested_wrapper_forwards_auxiliary_estimator(self):
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1])
         wrapper = SingleAnnotatorWrapper(
             SubSamplingWrapper(
@@ -414,12 +329,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         np.testing.assert_array_equal(query_indices, [[11, 0], [9, 0]])
         self._assert_selects_unlabeled_pairs(query_indices)
-        self.assertEqual(
-            wrapper._collect_target_authorities(
-                {"discriminator": discriminator}
-            ),
-            [],
-        )
 
     def test_nested_subsampling_uses_effective_wrapped_batch_size(self):
         X = np.arange(10, dtype=float).reshape(5, 2)

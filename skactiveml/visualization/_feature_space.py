@@ -25,10 +25,6 @@ from ..base import (
     MultiAnnotatorPoolQueryStrategy,
 )
 from ..exceptions import MappingError
-from ..pool._target import (
-    _collect_declared_authorities,
-    _reconcile_target_declarations,
-)
 from ..utils._label_dtype import _as_label_array
 from ..utils._validation import _canonicalize_multilabel_probas
 from ..utils import (
@@ -38,28 +34,6 @@ from ..utils import (
     check_type,
     check_indices,
 )
-
-
-def _resolve_utility_target_type(qs, y, query_kwargs):
-    """Resolve target semantics for utility-plot candidate fallback."""
-    if isinstance(qs, MultiAnnotatorPoolQueryStrategy):
-        return "single-output"
-
-    wrapped_resolver = getattr(qs, "_resolve_wrapped_target_type", None)
-    if wrapped_resolver is not None:
-        return wrapped_resolver(y, query_kwargs)
-
-    authorities = _collect_declared_authorities(
-        qs._target_authority_params, query_kwargs
-    )
-    target_type, _ = _reconcile_target_declarations(
-        [(qs.target_type, type(qs).__name__)],
-        authorities,
-        y,
-        missing_label=qs.missing_label,
-        owner_name=type(qs).__name__,
-    )
-    return target_type
 
 
 def plot_utilities(qs, X, y, candidates=None, **kwargs):
@@ -74,10 +48,10 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         unlabeled samples.
     y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by `qs.missing_label`). Target semantics are resolved by the
-        query strategy and any estimator it declares as authoritative. For
-        multi-label targets, all label outputs contribute to one utility
-        surface because the query strategy returns one utility per sample.
+        indicated by `qs.missing_label`). The query strategy resolves the
+        target type of `y`. For multi-label targets, all label outputs
+        contribute to one utility surface because the query strategy returns
+        one utility per sample.
     candidates : None or array-like of shape (n_candidates), dtype=int or \
             array-like of shape (n_candidates, n_features), default=None
         - If `candidates` is `None`, the utilities are plotted on a mesh
@@ -836,18 +810,16 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
                 f"of the following error. Trying plotting over "
                 f"candidates. \n\n Unexpected {err.__repr__()}"
             )
-        target_type = _resolve_utility_target_type(qs, y, kwargs)
-        fallback_y = (
-            y[:, 0]
-            if not is_multi_annotator
-            and target_type == "single-output"
-            and y.ndim == 2
-            else y
-        )
+        # A row of a two-dimensional `y` is one sample for a
+        # single-annotator strategy.
         candidates = unlabeled_indices(
-            fallback_y,
+            y,
             missing_label=qs.missing_label,
-            target_type=target_type,
+            target_type=(
+                "multi-label"
+                if not is_multi_annotator and y.ndim == 2
+                else "single-output"
+            ),
         )
         if is_multi_annotator and candidates.ndim == 2:
             # A sample is a candidate if at least one annotator has not
