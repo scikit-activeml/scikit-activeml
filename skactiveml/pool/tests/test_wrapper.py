@@ -108,8 +108,6 @@ class TestSubSamplingWrapper(
             "random_state": 0,
             "missing_label": MISSING_LABEL,
         }
-        # The wrapped strategy is estimator-backed, so that the multi-label
-        # fixture carries a class vocabulary the wrapper must preserve.
         init_default_params_multilabel = {
             "query_strategy": UncertaintySampling(random_state=0),
             "max_candidates": 20,
@@ -382,8 +380,6 @@ class TestSubSamplingWrapper(
     def test_reordered_estimator_class_vocabularies_are_equivalent(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
-        # The same class vocabulary declared in a different order describes the
-        # same targets, so wrapping must not change the selected candidates.
         estimators = [
             SklearnClassifier(GaussianNB(), classes=[1, 0]),
             SklearnClassifier(GaussianNB(), classes=[0, 1]),
@@ -508,8 +504,6 @@ class TestSubSamplingWrapper(
     def test_estimator_like_argument_is_no_target_authority(self):
         X = np.arange(24, dtype=float).reshape(12, 2)
         y_discriminator = np.array([0.0, 1.0] + [MISSING_LABEL] * 10)
-        # The discriminator separates labeled from unlabeled samples such that
-        # its target semantics do not describe `y`.
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
             X, y_discriminator
         )
@@ -1218,9 +1212,6 @@ class TestParallelUtilityEstimationWrapper(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
     supports_multilabel_batch_variation = False
-    # This wrapper parallelizes one-sample utility estimates and deliberately
-    # rejects larger batches; its wrapped strategies retain their own batch
-    # reproducibility coverage.
     reproducibility_batch_size = 1
 
     def setUp(self):
@@ -1262,8 +1253,6 @@ class TestParallelUtilityEstimationWrapper(
                 "query_strategy": QueryByCommittee(random_state=0),
                 "n_jobs": 2,
             },
-            # The wrapped strategy is estimator-backed, so that the multi-label
-            # fixture carries a class vocabulary the wrapper must preserve.
             init_default_params_multilabel={
                 "query_strategy": UncertaintySampling(random_state=0),
                 "n_jobs": 2,
@@ -1436,10 +1425,6 @@ class TestParallelUtilityEstimationWrapper(
             self.assertEqual(len(q_sub), 1)
 
     def test_query_fewer_candidates_than_jobs(self):
-        # With `n_jobs=-1`, the candidates are split across all available
-        # CPUs. Fewer candidates than CPUs must not produce an empty chunk,
-        # which would ask the wrapped strategy to select from an exhausted
-        # candidate pool and contribute no utilities.
         query_params = deepcopy(self.query_default_params_clf)
         candidates = unlabeled_indices(
             query_params["y"], self.init_default_params["missing_label"]

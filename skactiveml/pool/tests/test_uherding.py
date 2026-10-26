@@ -29,9 +29,7 @@ from skactiveml.tests.utils import (
 from skactiveml.utils import MISSING_LABEL, TargetSpec, resolve_target_spec
 from skactiveml.utils._validation import _canonicalize_multilabel_probas
 
-# Semantically equivalent binary class vocabularies per label output. The
-# reversed declaration must resolve to the same canonical, i.e. sorted,
-# ordering as its counterpart.
+# Equivalent binary class vocabularies per label output.
 _VOCABULARY_CASES = (
     ("numeric", [[0, 1], [0, 1]]),
     ("string", [["no", "yes"], ["off", "on"]]),
@@ -1104,11 +1102,6 @@ class TestUHerding(
         )
 
     def _multilabel_custom_vocabulary_params(self, vocabularies):
-        # The default multi-label fixture provides no logits, so its query
-        # never reaches temperature calibration. This specialized fixture
-        # supplies a logits-capable classifier, a multi-element temperature
-        # candidate grid, and enough labeled samples for a calibration split,
-        # i.e. the path inspecting the raw validation labels.
         X = np.array(
             [
                 [0.0, 0.0],
@@ -1125,11 +1118,8 @@ class TestUHerding(
                 [0.6, 0.6],
             ]
         )
-        # Every fixture is semantically equivalent, i.e. code `0` denotes the
-        # negative and code `1` the positive class of each output. The first
-        # output agrees with the logits of the classifier, while the second one
-        # is deliberately underconfident, so that the two outputs disagree
-        # about their best temperature.
+        # The first output agrees with the logits of the classifier, while the
+        # second one is underconfident.
         codes = np.array(
             [
                 [0, 1],
@@ -1185,9 +1175,6 @@ class TestUHerding(
         return qs, query_params, target_spec
 
     def test_query_multilabel_custom_vocabularies_with_temperature_grid(self):
-        # A valid multi-label target may use its own binary class vocabulary
-        # per output. The searched-temperature path inspects the validation
-        # labels and must therefore encode them instead of coercing them.
         results = {}
         for name, vocabularies in _VOCABULARY_CASES:
             with self.subTest(vocabularies=name):
@@ -1218,8 +1205,6 @@ class TestUHerding(
                 )
 
     def test_select_temperature_multilabel_custom_vocabularies(self):
-        # The searched grid is evaluated independently per output, so the
-        # equivalence must hold for the selected temperatures themselves.
         taus = {}
         for name, vocabularies in _VOCABULARY_CASES:
             qs, query_params, target_spec = self._multilabel_calibration_setup(
@@ -1233,8 +1218,6 @@ class TestUHerding(
                 target_spec=target_spec,
             )
 
-        # One selected temperature per output, searched independently, i.e.
-        # the outputs of this setup disagree about their calibration.
         self.assertEqual(taus["numeric"].shape, (2,))
         self.assertNotEqual(taus["numeric"][0], taus["numeric"][1])
         for name, _ in _VOCABULARY_CASES[1:]:
@@ -1242,16 +1225,11 @@ class TestUHerding(
                 np.testing.assert_allclose(taus["numeric"], taus[name])
 
     def test_select_temperature_multilabel_uses_positive_class_column(self):
-        # Inverting the observed labels must change the calibration outcome,
-        # i.e. the encoded positive class must match the positive-class
-        # probability column of the corresponding output.
         vocabularies = [["no", "yes"], ["off", "on"]]
         qs, query_params, target_spec = self._multilabel_calibration_setup(
             vocabularies
         )
         y = query_params["y"]
-        # Relabeling from reversed source vocabularies onto the canonical ones
-        # swaps the negative and the positive class of every output.
         y_inverted = _relabel_multilabel_target(
             y,
             source_classes=tuple(
@@ -1278,9 +1256,6 @@ class TestUHerding(
         self.assertFalse(np.allclose(taus[0], taus[1]))
 
     def test_select_temperature_multilabel_fixed_temperature_is_shared(self):
-        # A scalar or length-one `temperatures` is one fixed temperature
-        # shared by every output, i.e. no per-output grid is searched and no
-        # calibration refit takes place.
         qs, query_params, target_spec = self._multilabel_calibration_setup(
             [["no", "yes"], ["off", "on"]]
         )

@@ -1,15 +1,4 @@
-"""Shared target reconciliation helpers for pool-based query strategies.
-
-Every helper in this module operates on plain values only, i.e., target
-declarations, estimators, and capability sets. Helpers that would need to know
-how a component stores those values (for instance how a wrapper reaches its
-wrapped strategy or its query arguments) belong to that component instead. The
-orchestration of wrapper target reconciliation is therefore owned by each
-wrapper, i.e., by `skactiveml.pool._wrapper._TargetPreservingWrapper` and by
-`skactiveml.pool.multiannotator._wrapper.SingleAnnotatorWrapper`. Each collects
-its own declarations and authorities and then delegates the wrapper-agnostic
-resolution, comparison, and capability checks to this module.
-"""
+"""Shared target reconciliation helpers for pool-based query strategies."""
 
 from sklearn import clone
 
@@ -171,10 +160,8 @@ def _fit_and_resolve_estimator_target_spec(
 def _collect_declared_authorities(authority_params, query_kwargs):
     """Discover the estimators declared as target authorities.
 
-    Discovery is deliberately restricted to the parameter names a strategy
-    declares through `_target_authority_params`, so that query arguments
-    holding an estimator for an auxiliary problem are never mistaken for a
-    semantic authority for `y`.
+    Only the parameter names declared through `_target_authority_params`
+    are searched.
 
     Parameters
     ----------
@@ -187,11 +174,10 @@ def _collect_declared_authorities(authority_params, query_kwargs):
     -------
     authorities : list of skactiveml estimators
         The discovered estimators, ordered by declaration and, for sequence
-        valued arguments, by position. Authorities that will be refitted are
-        represented by unfitted clones, so preflight uses their constructor
-        declarations. The canonical `fit_clf`, `fit_reg`, `fit_ensemble`, and
-        `fit_estimator` arguments default to `True`, as in the query methods.
-        Other authority roles retain their supplied estimators.
+        valued arguments, by position. An authority passed as `clf`, `reg`,
+        `ensemble`, or `estimator` is represented by an unfitted clone if its
+        `fit_<name>` argument is `True` or omitted. Other authorities are
+        returned as supplied.
     """
     authorities = []
     seen_authorities = set()
@@ -219,11 +205,6 @@ def _reconcile_target_declarations(
     declarations, authorities, y, *, missing_label, owner_name
 ):
     """Reconcile target declarations and authorities into one target type.
-
-    This helper is shared because it consumes already collected declarations
-    and authorities, i.e., it never asks how a component stores them. Only the
-    collection of both is component specific and therefore owned by the
-    caller.
 
     Parameters
     ----------
@@ -256,8 +237,7 @@ def _reconcile_target_declarations(
         if hasattr(authority, "target_spec_")
     ]
     if fitted_specs:
-        # Fitted specifications outrank every declaration, so conflicting
-        # declarations are reported against the resolved specification below.
+        # Fitted specifications outrank every declaration.
         target_spec = fitted_specs[0]
         if any(spec != target_spec for spec in fitted_specs[1:]):
             raise ValueError(
@@ -383,11 +363,6 @@ def _check_resolved_target_capability(
     component, target_type, target_spec, capabilities
 ):
     """Check a resolved target against a component's capabilities.
-
-    This helper is shared because it needs the resolved target and the
-    capability set only, both of which every component already exposes. It
-    covers the task-agnostic case as well, where no authority assigned a
-    prediction task and therefore no exact semantic triple exists.
 
     Parameters
     ----------

@@ -247,10 +247,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
         self.assertEqual(query_indices.shape, (0,))
 
     def test_guard_does_not_rewrap_a_republished_query(self):
-        # A strategy may republish the `query` it inherits under its own name.
-        # That function already carries the guard, so guarding it again would
-        # wrap it twice and warn about an exhausted pool for a query that has
-        # already answered it.
         class ParentStrategy(DummySingleAnnotatorPoolQueryStrategy):
             pass
 
@@ -268,8 +264,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
         self.assertEqual(query_indices.shape, (0,))
 
     def test_guard_covers_a_query_published_through_a_descriptor(self):
-        # `match_signature` publishes `query` as a descriptor, which stays in
-        # place while the function it binds carries the guard.
         class DescriptorPublishingStrategy(SingleAnnotatorPoolQueryStrategy):
             @match_signature("query_strategy", "query")
             def query(
@@ -305,8 +299,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
                 query = property(lambda self: None)
 
     def test_guard_preserves_an_abstract_query(self):
-        # The guard wraps `query` while the class is created, i.e., before the
-        # abstract methods are collected, so it must not hide abstractness.
         for base in (
             SingleAnnotatorPoolQueryStrategy,
             MultiAnnotatorPoolQueryStrategy,
@@ -930,8 +922,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         np.testing.assert_array_equal(clf.predict(X), y)
 
     def test_predict_dtype_matches_class_dtype(self):
-        # `missing_label=np.nan` widens the label encoder to `float64`, so
-        # the decoded labels must be narrowed back to the class dtype.
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, np.nan])
         clf = DummySkactivemlClassifier(
@@ -944,7 +934,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         y_pred = clf.predict(X)
 
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
-        # The decoded labels are usable where class labels are expected.
         np.testing.assert_array_equal(np.array(["a", "b"])[y_pred], ["a", "b"])
 
     def test_predict_dtype_matches_class_dtype_multilabel(self):
@@ -963,7 +952,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
 
     def test_predict_dtype_preserves_extra_outputs(self):
-        # Only the class labels are narrowed; extra outputs are untouched.
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, np.nan])
         extra = np.array([[0.5], [0.5]], dtype=np.float32)

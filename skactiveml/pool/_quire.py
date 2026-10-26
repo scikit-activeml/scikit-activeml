@@ -168,8 +168,8 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         )
 
         # --- Computation ----------------------------------------------------
-        # Preserve sklearn's full-pool symmetrization of callable kernels and
-        # float32 rounding, which can depend on the shape of the kernel call.
+        # Callable kernels and float32 data use the full kernel matrix,
+        # because sklearn's symmetrization and rounding depend on its shape.
         K = None
         if self.metric == "precomputed":
             K = X
@@ -185,8 +185,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         )
 
         if K is not None and not np.array_equal(K, K.T):
-            # The reduced quadratic form assumes symmetry. Keep the previous
-            # calculation and its warning for nonsymmetric precomputed inputs.
+            # The reduced quadratic form assumes a symmetric kernel matrix.
             utilities = _full_kernel_utilities(
                 K, lmbda, mask_l, mapping, y_labeled_ovr
             )
@@ -203,8 +202,8 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                 else:
                     K_ll = np.empty((0, 0))
                     K_lc = np.empty((0, len(X_cand)))
-                # Bounded blocks support every built-in kernel diagonal and
-                # retain its parameter validation without an M-by-M matrix.
+                # Compute the kernel diagonal in blocks to avoid an M-by-M
+                # matrix.
                 diagonal = np.empty(len(X_cand))
                 for start in range(0, len(X_cand), 256):
                     stop = start + 256
@@ -246,7 +245,10 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
 
 def _full_kernel_utilities(K, lmbda, mask_l, mapping, y_labeled_ovr):
-    """Retain the original calculation for nonsymmetric kernel matrices."""
+    """Compute the utilities from the full inverse kernel matrix.
+
+    This is used for nonsymmetric kernel matrices.
+    """
     mask_a = ~mask_l
     L = np.linalg.inv(K + lmbda * np.eye(len(K)))
     L_aa_inv = _L_aa_inv(K, lmbda, mask_a, mask_l)

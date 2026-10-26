@@ -533,8 +533,8 @@ def _check_ensemble(
                     for est in ensemble.estimators_
                 ]
                 if not fit_ensemble:
-                    # Predicting votes can advance a member's random state;
-                    # isolate fitted members to preserve the caller's state.
+                    # Predicting votes can advance a member's random state, so
+                    # fitted members are copied.
                     est_arr = copy.deepcopy(est_arr)
                 for i, est in enumerate(est_arr):
                     check_is_fitted(

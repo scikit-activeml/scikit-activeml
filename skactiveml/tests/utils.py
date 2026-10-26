@@ -51,18 +51,9 @@ def assert_no_query_state(
 def state_difference(actual, expected, name="state"):
     """Describe the first difference between two object states.
 
-    The comparison is recursive and by value: objects are compared through
-    their attributes, mappings and sequences element by element, and numeric
-    arrays and scalars with equal-NaN semantics, so that two states holding
-    `nan` in the same place count as equal. Random generators are compared
-    through their drawn-from state, so that an advanced generator counts as a
-    difference.
-
-    Objects are only comparable when they have the same type. An object the
-    recursion cannot decompose falls back on `==` where its type defines one,
-    and counts as equal otherwise, because two copies of a state without
-    attributes and without value equality, e.g. a function, are
-    indistinguishable here.
+    The comparison is recursive and by value, with NaNs counting as equal.
+    Objects without attributes and without value equality, e.g., functions,
+    count as equal.
 
     Parameters
     ----------
@@ -298,10 +289,6 @@ def _short_repr(value, limit=120):
 def assert_predicts_class_dtype(test_case, y_pred, classes):
     """Assert that predictions carry the declared class dtype.
 
-    The label encoder decodes into a dtype that can also represent
-    `missing_label`, so predictions must be narrowed back to the dtype of
-    the declared classes to stay usable where those labels are expected.
-
     Parameters
     ----------
     test_case : unittest.TestCase
@@ -399,26 +386,15 @@ def assert_fit_failure_is_transactional(
 ):
     """Assert that a rejected fit raises as expected and commits no state.
 
-    This is the counterpart of `assert_no_query_state` for a fit, and is
-    strictly stronger: it compares the full `__dict__` by identity rather than
-    three named absences, so it holds for an already fitted estimator as well
-    as an unfitted one, and a same-valued replacement object fails it.
-
-    Comparing by identity is also its one blind spot: an estimator holding
-    fitted state that its fit updates in place, e.g. a sliding window, passes
-    this assertion while carrying mutated contents. Assert those contents
-    separately.
+    The full `__dict__` is compared by identity. Fitted state updated in
+    place, e.g., a sliding window, has to be asserted separately.
 
     Parameters
     ----------
     test_case : unittest.TestCase
         The test case reporting the failure.
     estimator : object
-        The estimator whose fit is expected to be rejected. It is snapshotted
-        here, so a caller that mutated it beforehand still gets the full
-        identity comparison over every attribute. There is deliberately no
-        `ignored` parameter for that reason: it could only weaken the
-        comparison.
+        The estimator whose fit is expected to be rejected.
     action : callable
         Zero-argument callable performing the rejected fit.
     expected_error : type

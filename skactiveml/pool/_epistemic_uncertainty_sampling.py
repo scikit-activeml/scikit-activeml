@@ -255,7 +255,7 @@ def _epistemic_uncertainty_pwc(
         necessary. All entries that are 'np.nan' will be filled.
     interpolation_cache : dict or None, default=None
         Interpolation state retained across queries by the strategy. Reused
-        while the table shape is unchanged; existing values must not change.
+        while the table shape is unchanged. Existing values must not change.
     interpolation_shape : tuple of int or None, default=None
         Shape of the active grid rectangle. If `None`, use the entire table.
         The remaining precomputed values are retained for subsequent queries.

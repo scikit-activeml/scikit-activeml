@@ -76,30 +76,20 @@ class IndexClassifierWrapper:
     use_speed_up : bool, default=False
         Specifies if potentially available speed ups should be used. Currently
         implemented for `skactiveml.classifier.ParzenWindowClassifier`, whose
-        kernel matrix is then precomputed once. Its kernel parameters are
-        resolved once on the training data passed to this wrapper, so a
-        bandwidth requested via `metric_dict={'gamma': 'mean'}` is held fixed
-        for all subsequent fits, which differ from that training data by
-        single labels.
+        kernel matrix is then precomputed once. A bandwidth requested via
+        `metric_dict={'gamma': 'mean'}` is then held fixed for all fits.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
 
     Notes
     -----
-    Attributes this wrapper does not hold itself are read from the wrapped
-    `clf`, `classes_` among them: the wrapper resolves no target semantics of
-    its own, so those its `SkactivemlClassifier` resolved are the wrapper's own
-    answer. The fitted attributes it does hold itself, e.g. `clf_` and `idx_`,
-    are never read from `clf` and raise the usual not-fitted error before a
-    fit.
+    Attributes this wrapper does not hold itself, e.g., `classes_`, are read
+    from the wrapped `clf`.
     """
 
-    #: Fitted attributes this wrapper holds itself, which `__getattr__`
-    #: therefore never forwards to the wrapped `clf`. `classes_` and
-    #: `target_spec_` are deliberately absent: this wrapper resolves no target
-    #: semantics of its own, so those the wrapped `SkactivemlClassifier`
-    #: resolved are the wrapper's own answer. `missing_label_` is the one name
-    #: here that `__init__` already sets, so it never reaches `__getattr__`.
+    #: Fitted attributes `__getattr__` never forwards to `clf`. `classes_` and
+    #: `target_spec_` are forwarded, because this wrapper resolves no target
+    #: semantics of its own.
     _own_fitted_attributes = frozenset(
         {
             "base_clf_",
@@ -196,12 +186,8 @@ class IndexClassifierWrapper:
             self.missing_label, target_type=self.y.dtype, name="y"
         )
         self.missing_label_ = self.missing_label
-        # Labels handed to `fit` and `partial_fit` are cast to the dtype of
-        # `self.y`, so a numeric one must be able to hold the missing label:
-        # integer labels beside `missing_label=np.nan` could not, and the
-        # missing label would silently become another label. Fixed-width
-        # Unicode arrays can truncate a longer missing marker in the same
-        # way, so they are checked as well.
+        # Labels are cast to the dtype of `self.y`, which must therefore hold
+        # the missing label.
         if self.y.dtype.kind in "biufU" and not _holds_missing_label(
             self.y, self.missing_label
         ):
@@ -224,10 +210,8 @@ class IndexClassifierWrapper:
                 and self.pwc_metric_dict_.get("gamma") == "mean"
                 and self.pwc_metric_ == "rbf"
             ):
-                # The kernel matrix is precomputed once, so the mean criterion
-                # is resolved once on the actual training data. Its bandwidth
-                # is thereby held fixed for the hypothetical refits, which
-                # differ from the actual training data by a single label.
+                # The mean bandwidth is resolved once and held fixed for the
+                # hypothetical refits.
                 self.pwc_metric_dict_ = (
                     self.clf.metric_dict_
                     if hasattr(self.clf, "metric_dict_")
@@ -835,9 +819,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     """
 
     X = check_array(X, input_name="`X`")
-    # Keep the labels in their own dtype: converting them to a numeric one
-    # would turn a `missing_label=None` into a NaN and thereby into an
-    # unmarked missing label.
+    # Keep the labels' dtype, so that `missing_label=None` stays `None`.
     y = column_or_1d(
         check_array(
             y,
@@ -901,7 +883,7 @@ def _reshape_scipy_dist(dist, shape):
         The distribution.
     shape : tuple
         The new shape of the distribution's parameter grid. A scalar or
-        singleton grid is broadcast to an explicit shape; otherwise the
+        singleton grid is broadcast to an explicit shape. Otherwise, the
         number of distributions must remain unchanged.
 
     Returns
@@ -1141,9 +1123,7 @@ def conditional_expect(
         quad_dict = {}
     if method == "quantile" and quantile_method == "romberg":
         # `romb` needs `2**k + 1` points. Take the smallest such count that
-        # is not below the requested one, so a count already of that form is
-        # kept. Rounding the exponent through `log2` instead would raise
-        # every exact power of two by a further factor of two.
+        # is not below the requested one.
         gaps = max(n_integration_samples - 1, 1)
         n_integration_samples = (1 << (gaps - 1).bit_length()) + 1
     is_optional = vector_func == "both"
@@ -1185,13 +1165,9 @@ def conditional_expect(
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
 
-            # The evaluation points are spaced `dx` apart and span the
-            # probability mass `covered`, leaving one such step at either end
-            # uncovered. Those tails cannot be evaluated because `ppf` is
-            # infinite at 0 and 1, so the closed rules integrate the interior
-            # only and are divided by the mass they actually cover. Without
-            # that division they would not even return a constant integrand
-            # unchanged.
+            # The points are spaced `dx` apart and span the probability mass
+            # `covered`. The tails are left out, because `ppf` is infinite at
+            # 0 and 1, so the closed rules are divided by `covered`.
             dx = 1 / (n_integration_samples + 1)
             covered = (n_integration_samples - 1) * dx
 

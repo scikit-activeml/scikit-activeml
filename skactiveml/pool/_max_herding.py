@@ -20,7 +20,6 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
     kernel-based coverage objective in embedding space, accounting for the
     already labeled set. The objective promotes representativeness and
     diversity via kernel similarity. Originally, this query strategy was only
-    proposed for classification. Originally, this query strategy was only
     proposed for classification tasks. Nevertheless, this implementation is
     task-agnostic such that it can handle class labels, numerical targets, and
     multilabel targets represented by a two-dimensional `y`.
@@ -41,7 +40,7 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
 
     References

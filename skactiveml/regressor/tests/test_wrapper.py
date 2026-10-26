@@ -427,13 +427,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertIsNot(reg.estimator_, established_estimator)
 
     def test_rejections_before_the_estimator_fit_are_transactional(self):
-        # The snapshot `_fit` takes has to cover every rejection raised
-        # between the snapshot and the estimator call, not only a failing
-        # estimator fit. The estimator type and `include_unlabeled_samples`
-        # are checked before the first attribute is written, so those two were
-        # already safe and are covered here against regression. The other
-        # three did commit fitted attributes, the last one including
-        # `n_features_in_`.
         default_fit_params = {
             "X": np.zeros((4, 1)),
             "y": [0.0, 1.0, 2.0, 3.0],
@@ -503,9 +496,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             self.assertFalse(hasattr(reg, attribute), msg=attribute)
 
     def test_failed_validation_refit_preserves_previously_fitted_state(self):
-        # A rejection raised inside `_validate_data` used to leave the widened
-        # `n_features_in_` behind, so a regressor that stayed `is_fitted_`
-        # could no longer predict on the data it was trained on.
         X = np.arange(4.0).reshape(-1, 1)
         reg = SklearnRegressor(LinearRegression(), missing_label=np.nan).fit(
             X, [0.0, 1.0, 2.0, 3.0]
@@ -545,9 +535,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         np.testing.assert_allclose(reg.predict(X), expected_predictions)
 
     def test_label_mean_fallback_keeps_its_state(self):
-        # The fallback is not a failure: it warns, keeps the empirical label
-        # statistics it just computed, and returns `self` rather than raising,
-        # so the transaction never rolls it back.
         class FailingRegressor(SkactivemlRegressor):
             def fit(self, X, y, sample_weight=None):
                 raise ValueError("the estimator refuses to fit")
@@ -910,8 +897,6 @@ class TestSklearnNormalRegressor(
         )
 
     def test_return_std_rejection_writes_nothing(self):
-        # This wrapper's own rejection precedes the inherited transaction, so
-        # it has to write nothing itself, before and after a successful fit.
         X = np.arange(4.0).reshape(-1, 1)
         y = np.array([0.0, 1.0, 2.0, 3.0])
         unfitted_reg = SklearnNormalRegressor(LinearRegression())
@@ -938,8 +923,6 @@ class TestSklearnNormalRegressor(
         )
 
     def test_failed_validation_refit_preserves_previously_fitted_state(self):
-        # The transaction is inherited from `SklearnRegressor._fit`, which
-        # this wrapper's `_fit` delegates to after its own rejection.
         X = np.arange(4.0).reshape(-1, 1)
         reg = SklearnNormalRegressor(
             GaussianProcessRegressor(), missing_label=np.nan
@@ -1215,9 +1198,6 @@ if successful_skorch_torch_import:
             }
             init_default_params = {
                 "module": TestNeuralNet,
-                # The module's output is passed on untransformed for this
-                # criterion, so the default configuration exercises the
-                # narrowing that `predict` performs itself.
                 "criterion": nn.HuberLoss,
                 "missing_label": MISSING_LABEL,
                 "random_state": 1,
@@ -1507,9 +1487,6 @@ assert np.isfinite(estimator.predict(X)).all()
             self.assertGreaterEqual(reg.score(self.X, self.y_true), 0.9)
 
         def test_predict_shape_is_independent_of_forward_outputs(self):
-            # The module emits a column, so the shape of the predicted
-            # target values must not depend on how the module's outputs
-            # are named and transformed.
             configurations = [
                 {"criterion": nn.MSELoss},
                 {"criterion": nn.HuberLoss},
@@ -1531,8 +1508,6 @@ assert np.isfinite(estimator.predict(X)).all()
 
                     self.assertEqual(y_pred.shape, (len(self.X),))
 
-            # Further model outputs describe the module, not the targets,
-            # so they keep the shape the module gave them.
             init_params = self.init_default_params.copy()
             init_params["forward_outputs"] = {
                 "output": (0, None),
@@ -1546,8 +1521,6 @@ assert np.isfinite(estimator.predict(X)).all()
             self.assertEqual(X_embed.shape, (len(self.X), 128))
 
         def test_predict_rejects_multi_output_module(self):
-            # Narrowing a multi-output prediction would silently turn it
-            # into `n_samples * n_outputs` meaningless values.
             class MultiOutputNeuralNet(nn.Module):
                 def __init__(self):
                     super().__init__()

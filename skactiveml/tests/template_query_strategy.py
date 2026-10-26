@@ -42,10 +42,8 @@ from skactiveml.utils._validation import _has_nested_classes
 from sklearn.base import BaseEstimator
 from sklearn.naive_bayes import GaussianNB
 
-# Distinct binary class vocabularies covering the shared custom-vocabulary
-# contract of multi-label pool query strategies. Each vocabulary is given in
-# canonical, i.e. sorted, order, so that its second entry is the positive
-# class of the corresponding label output.
+# Distinct binary class vocabularies in sorted order, i.e., the second entry
+# is the positive class.
 _MULTILABEL_STRING_VOCABULARIES = (
     ("no", "yes"),
     ("off", "on"),
@@ -63,9 +61,7 @@ def _relabel_multilabel_target(
     """Relabel a multi-label target into other binary class vocabularies.
 
     Each observation is mapped by its position in the source vocabulary of its
-    label output onto the canonically, i.e. sorted, ordered target vocabulary.
-    Canonically ordered source classes therefore preserve the meaning of every
-    observation, i.e. negative stays negative and positive stays positive.
+    label output onto the sorted target vocabulary.
 
     Parameters
     ----------
@@ -97,9 +93,7 @@ def _relabel_multilabel_target(
 def _fully_observed_target(y, missing_label, target_type):
     """Return a copy of `y` in which every observation is observed.
 
-    The missing observations are filled with an already observed value, so
-    that the class vocabulary and, for a multi-label target, the all-or-nothing
-    row contract are preserved.
+    The missing observations are filled with an already observed value.
 
     Parameters
     ----------
@@ -125,11 +119,8 @@ def _fully_observed_target(y, missing_label, target_type):
 def _with_component_params(params, *, missing_label, classes=None):
     """Apply a missing label and class vocabularies to all components.
 
-    Every component carried by the parameters, e.g. a wrapped query strategy
-    or a classifier query argument, must agree with the strategy about the
-    missing label. Class vocabularies are replaced only where a component
-    declares one vocabulary per label output, so that a vocabulary of an
-    auxiliary single-output problem is never overwritten.
+    Class vocabularies are replaced only where a component declares one
+    vocabulary per label output.
     """
     params = deepcopy(params)
     for key, value in params.items():
@@ -141,12 +132,7 @@ def _with_component_params(params, *, missing_label, classes=None):
 
 
 def _declares_nested_classes(*param_dicts):
-    """Check whether a fixture supplies one class vocabulary per output.
-
-    A strategy resolving no class vocabulary receives none through its
-    fixture either, because `_component_with_params` applies vocabularies
-    only where a component declares one itself.
-    """
+    """Check whether a fixture supplies one class vocabulary per output."""
     return any(
         _has_nested_classes(getattr(value, "classes", None))
         for params in param_dicts
@@ -157,11 +143,7 @@ def _declares_nested_classes(*param_dicts):
 def _component_with_params(value, missing_label, classes):
     """Return one component with the given declarations applied.
 
-    Only the parameters a component declares itself are replaced. A component
-    nested more deeply, e.g. the strategy wrapped by a wrapped strategy, or a
-    collection of components is not covered by any current fixture and fails
-    loudly through the missing-label checks, so such a fixture requires an
-    explicit override.
+    Only the parameters a component declares itself are replaced.
     """
     if not isinstance(value, BaseEstimator):
         return value
@@ -857,10 +839,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         ]:
             if query_params is not None:
                 query_params = deepcopy(query_params)
-                # Batch-level algorithms may delegate randomness to a
-                # component that is not exercised for `batch_size=1`, e.g.,
-                # a one-centroid clustering problem. Keep the shared
-                # reproducibility contract on a genuine batch.
+                # Some strategies use randomness only for `batch_size > 1`.
                 query_params["batch_size"] = self.reproducibility_batch_size
                 query_params["return_utilities"] = True
                 id1, u1 = qs1.query(**query_params)
@@ -877,8 +856,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_allclose(u2, u2_again)
 
     def test_query_multilabel_invalid_rows(self):
-        # Partially observed multi-label rows are rejected, for the ordinary
-        # as well as for a custom class vocabulary.
         if self.query_default_params_clf_multilabel is None:
             return
 
@@ -929,10 +906,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         self.assertRaises(ValueError, qs.query, **query_params)
 
     def test_query_multilabel_proba_format_contract(self):
-        # The public multilabel probability formats of `SklearnClassifier`
-        # ("array" and "list") must be interchangeable at the acquisition
-        # boundary of a query strategy, i.e., a strategy must never assume the
-        # native representation of the wrapped estimator.
         if self.query_default_params_clf_multilabel is None:
             return
 
@@ -980,9 +953,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
     @staticmethod
     def _multilabel_proba_format_estimator_key(query_params):
-        # Locates the wrapper whose public multilabel probability format can
-        # be varied. Strategies without such an estimator, e.g. purely
-        # representation-based ones, are not covered by this contract.
+        # Locates the classifier whose `proba_format` can be varied.
         for key in ["clf", "estimator"]:
             candidate = query_params.get(key)
             if isinstance(candidate, SklearnClassifier) and "proba_format" in (
@@ -1003,10 +974,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         return init_params
 
     def test_query_multilabel_custom_class_vocabularies(self):
-        # A multi-label target may use its own binary class vocabulary per
-        # label output, including string labels. Every strategy must therefore
-        # operate on encoded targets instead of assuming that raw labels are
-        # numeric or that they are `{0, 1}`.
         if self.query_default_params_clf_multilabel is None:
             return
 
@@ -1039,9 +1006,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                     msg=f"Non-finite utility of the selected candidate for "
                     f"the {name}-valued class vocabularies {vocabularies}.",
                 )
-                # Only labeled samples are excluded via `np.nan`, i.e. a
-                # candidate that a strategy deliberately excludes must remain
-                # comparable through `-np.inf` instead of becoming invalid.
                 self.assertFalse(np.isnan(utilities[0, unld_idx]).any())
                 self.assertFalse(np.isposinf(utilities).any())
                 self.assertTrue(np.isnan(utilities[0, lbld_idx]).all())
@@ -1051,7 +1015,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             # A failing query is already reported by its own subtest.
             return
 
-        # Semantically equivalent vocabularies must not change acquisition.
         np.testing.assert_array_equal(
             results["numeric"][0],
             results["string"][0],
@@ -1094,16 +1057,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         return tuple(vocabularies)
 
     def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
-        # One array holds every label output, so vocabularies of different
-        # dtypes cannot be represented. A strategy resolving a class
-        # vocabulary has to reject them through the shared resolution, and
-        # must not commit query state while doing so.
-        #
-        # A strategy resolving no class vocabulary is exempt: it takes no
-        # estimator declaring one, so it resolves the target type alone and
-        # never receives a vocabulary to reject. The exemption is read off the
-        # generated fixture, which is where a declared vocabulary has to
-        # appear for this contract to apply at all.
         if self.query_default_params_clf_multilabel is None:
             return
         if self._multilabel_n_outputs() < 2:
@@ -1134,10 +1087,8 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         requires `missing_label=None` for the strategy as well as for each of
         its components.
 
-        Override this hook if a strategy needs auxiliary inputs, e.g.
-        embeddings, logits, or a discriminator, that cannot be derived from the
-        default multi-label query parameters. Overriding replaces the fixture;
-        it must never skip the custom-vocabulary contract.
+        Override this hook if a strategy needs auxiliary inputs, e.g.,
+        embeddings, logits, or a discriminator.
 
         Parameters
         ----------
@@ -1471,8 +1422,6 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 self.assertEqual(query_indices.shape, (0,))
 
     def test_query_exhausted_candidate_pool(self):
-        # An exhausted candidate pool is a valid acquisition state that is
-        # answered with an empty batch instead of an error about array shapes.
         init_params = deepcopy(self.init_default_params)
         for query_params in [
             self.query_default_params_clf,

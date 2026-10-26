@@ -39,13 +39,9 @@ def _subset_query_kwargs(
     query_kwargs = dict(query_kwargs)
     for name in names:
         value = query_kwargs.get(name)
-        # Scalars are forwarded unchanged, such that the wrapped query
-        # strategy reports them.
         if np.ndim(value) == 0:
             continue
         value = np.asarray(value)
-        # A length mismatch is reported here, since the subset could
-        # otherwise have a length the wrapped query strategy accepts.
         if len(value) != n_aligned:
             raise ValueError(
                 f"`{name}` must have length `{n_aligned_name}` but "
@@ -58,14 +54,8 @@ def _subset_query_kwargs(
 class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
     """Base class for wrappers preserving the wrapped target semantics.
 
-    A wrapper owns the reconciliation of its own target declaration with the
-    declarations of the strategies it wraps and with the estimators passed as
-    query arguments. It therefore keeps every step that depends on wrapper
-    internals, i.e., traversing the wrapped strategy chain, discovering
-    declared authorities among the query arguments, and validating the wrapped
-    capabilities. The wrapper-agnostic steps, i.e., comparing target
-    declarations, resolving target specifications, and checking capabilities,
-    are shared through :mod:`skactiveml.pool._target`.
+    A wrapper reconciles its target declaration with those of the wrapped
+    strategies and of the estimators passed as query arguments.
     """
 
     @property
@@ -82,8 +72,7 @@ class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
     def _resolve_wrapped_target_type(self, y, query_kwargs):
         """Resolve the target type this wrapper must preserve.
 
-        This is the entry point of the wrapper's target reconciliation. It
-        fails before any query state is committed.
+        Fails before any query state is committed.
 
         Parameters
         ----------
@@ -748,9 +737,7 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
                 return utilities[0]
             return utilities[0][chunk_candidates]
 
-        # Never split into more chunks than there are candidates, because an
-        # empty chunk would ask the wrapped strategy to select from an
-        # exhausted candidate pool and contribute no utilities.
+        # Never split into more chunks than there are candidates.
         if parallel_dict["n_jobs"] < 0:
             n_chunks = min(cpu_count(), len(X_cand))
         else:

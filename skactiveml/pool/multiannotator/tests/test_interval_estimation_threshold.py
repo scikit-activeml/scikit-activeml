@@ -268,8 +268,6 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.assertEqual(utilities.shape, (3, len(self.X), self.y.shape[1]))
 
     def test_query_exhausted_candidate_pool(self):
-        # An exhausted candidate pool is a valid acquisition state that is
-        # answered with an empty batch instead of an error about array shapes.
         ie_thresh = IntervalEstimationThreshold()
         n_annotators = self.y.shape[1]
         cases = [

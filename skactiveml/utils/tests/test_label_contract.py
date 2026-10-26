@@ -492,11 +492,7 @@ class TestMissingLabelContract(_ContractCase):
     """The rows of the missing-label compatibility table.
 
     A compatible missing label is checked with it present among the labels,
-    against every component the labels reach: a numeric missing label widens
-    the labels it is stored beside, and a component resolving a class
-    vocabulary from them has to recognize the widened values as the declared
-    classes. An incompatible missing label is checked with it absent,
-    because it could not denote anything there in the first place.
+    an incompatible one with it absent.
     """
 
     NUMERIC_CLASSES = [0, 1]

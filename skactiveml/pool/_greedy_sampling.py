@@ -44,7 +44,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Random state for candidate selection.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
 
     References
@@ -523,8 +523,8 @@ def _greedy_sampling(
                             X_norm_squared=norms.reshape(-1)[start:stop],
                         )
             distances = _measure_distance(sample_indices, **chunk_args)
-            # Keep the original column-wise summation order, including ties,
-            # while chunking candidates instead of the summed sample axis.
+            # Chunk the candidates rather than the summed sample axis to keep
+            # the column-wise summation order.
             if len(X_cand) == 1:
                 initial_utilities[start:stop] = -np.sum(distances, axis=1)
             else:

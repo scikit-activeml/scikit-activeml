@@ -44,7 +44,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
 
     References
@@ -347,8 +347,7 @@ def k_greedy_center(
             )
         else:
             # With no initial centers, the first row contains initialization
-            # zeros rather than distances. Compute real distances once a
-            # first center has been selected; keep genuine zero distances.
+            # zeros rather than distances. Later rows contain real distances.
             latest_dist = (
                 None
                 if i == 1 and len(selected_samples) == 0

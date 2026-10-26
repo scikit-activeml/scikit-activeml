@@ -30,17 +30,8 @@ TASK_AGNOSTIC_CAPABILITIES = frozenset(
 def _task_agnostic_strategies():
     """Collect every estimator-free strategy with these exact capabilities.
 
-    The roster below is written out, so this scan is what keeps it complete.
-    Declaring the capabilities is not sufficient on its own, which is why two
-    kinds of strategy are excluded. A wrapper reports the capabilities of the
-    strategy it wraps rather than its own. An estimator-backed strategy
-    receives a semantic authority for `y` and resolves its target with that
-    estimator, whereas these strategies resolve the target type alone; the
-    auxiliary `discriminator` of `DiscriminativeAL` is no such authority and
-    is therefore not among the authority parameter names.
-
-    `_instantiate` is reused rather than reimplemented, because it already
-    owns how an arbitrary pool strategy is built for capability inspection.
+    Wrappers and strategies taking a target authority, e.g., `clf`, are
+    excluded.
     """
     strategies = set()
     for name in dir(skactiveml.pool):

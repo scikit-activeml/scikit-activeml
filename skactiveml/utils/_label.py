@@ -316,7 +316,7 @@ def check_missing_label(missing_label, target_type=None, name=None):
     target_type : numpy.dtype or Type or tuple, default=None
         The dtype or scalar type of the labels `missing_label` has to fit. If
         `None`, only `missing_label` itself is checked. A dtype carrying no
-        label family, such as `object`, constrains no missing label; the
+        label family, such as `object`, constrains no missing label. The
         label-mask functions then check the missing label against the values
         they see.
     name : str, default=None

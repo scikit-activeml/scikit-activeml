@@ -850,8 +850,6 @@ class TestFeatureSpace(unittest.TestCase):
             res=5,
         )
 
-        # A sample is a candidate as soon as one annotator still owes a label
-        # for it, which includes sample 0.
         np.testing.assert_array_equal(
             qs.candidates_, np.concatenate([[0], np.arange(15, len(X))])
         )

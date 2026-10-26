@@ -219,12 +219,8 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             estimator_types=(SkactivemlClassifier,),
         )
         if not fit_clf:
-            # A refitted classifier is already a clone, whereas a prefitted
-            # one is the caller's object. `predict` draws from its
-            # `random_state_` to break ties, so predicting on it would leave
-            # the caller with an advanced classifier. Only the generator is
-            # copied: a deep copy would duplicate the whole fitted model on
-            # every query, and the dropout predictions read the rest.
+            # `predict` draws from `random_state_` to break ties. Copy only the
+            # generator, so that the caller's classifier is not advanced.
             clf = copy(clf)
             clf.random_state_ = deepcopy(clf.random_state_)
         is_multilabel = target_spec.target_type == "multi-label"

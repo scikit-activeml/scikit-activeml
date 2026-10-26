@@ -241,10 +241,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
 
-        # `candidates` is authoritative, i.e., an index array is taken as
-        # given, such that labeled samples remain candidates, e.g., to relabel
-        # them or to recompute their utilities. For `candidates=None`,
-        # `mapping` already refers to the unlabeled samples only.
+        # Explicit index candidates may include labeled samples. For
+        # `candidates=None`, `mapping` refers to the unlabeled samples only.
         if mapping is not None:
             cand_mapping = mapping
         else:
@@ -294,13 +292,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         query_indices = []
         query_indices_in_cand = []
         # In the first round, `d_2` holds the squared gradient norms, which
-        # only serve to determine the first center. Afterwards, it is replaced
-        # by the squared distances to that center, such that the origin does
-        # not act as a permanent ghost center in the running minimum.
+        # only determine the first center. Afterwards, it holds the squared
+        # distances to the nearest selected center.
         d_2 = g_norm_2.copy()
         for i in range(batch_size):
-            # Zeroing the distances of the already selected centers gives them
-            # zero probability, so that they cannot be drawn a second time.
+            # Selected centers cannot be drawn again.
             d_2[query_indices_in_cand] = 0
             d_2_sum = d_2.sum()
             if d_2_sum > 0:
@@ -328,9 +324,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
             # Squared distance to the newest center via the factorization:
             # `||g_i - g_c||^2 = ||g_i||^2 + ||g_c||^2
-            #  - 2 * <q_i, q_c> * <v_i, v_c>`. Rounding may produce tiny
-            # negative values, which are rejected by `choice(p=...)`, such
-            # that they are clipped.
+            #  - 2 * <q_i, q_c> * <v_i, v_c>`. Negative rounding errors are
+            # clipped, because `choice(p=...)` rejects them.
             if i + 1 < batch_size:
                 cross = (Q @ Q[idx_in_cand]) * (V @ V[idx_in_cand])
                 d_2_new = g_norm_2 + g_norm_2[idx_in_cand] - 2 * cross

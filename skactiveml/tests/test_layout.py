@@ -1,16 +1,7 @@
-"""Enforces where shared helpers live.
+"""Check that other modules import only classes from `base.py`.
 
-`skactiveml/base.py` holds base classes. It may keep a private function or
-constant serving the classes declared beside it, but such a helper must not
-become a shared utility of the package: a module needing one imports it from
-the subpackage owning it, or from a clearly named private module under
-`skactiveml/utils`. `docs/contributing.rst` states the rule in prose; this
-test is what keeps it true.
-
-The check is static. It reads `base.py` to learn which of its module-level
-names are classes, and reads every other module to learn which of those names
-it refers to. Nothing is imported, so a class declared behind an optional
-dependency counts as a class whether or not that dependency is installed.
+The check parses the source files without importing them, so that classes
+behind optional dependencies are found as well.
 """
 
 import ast
@@ -27,10 +18,8 @@ _BASE_MODULE = "skactiveml.base"
 def _module_level_statements(body):
     """Yield the statements a module executes at import time.
 
-    Conditional and guarded blocks are entered, because a class declared
-    behind an optional dependency is still declared at module level. Class
-    and function bodies are not, so that a method never shadows the name of
-    a module-level declaration.
+    Conditional and guarded blocks are entered. Class and function bodies
+    are not.
     """
     for node in body:
         if isinstance(node, (ast.If, ast.Try)):
@@ -65,10 +54,7 @@ def _containing_package(path):
 def _absolute_module(node, package):
     """Resolve the module a `from ... import ...` statement names.
 
-    A relative import is resolved against the package containing the file, so
-    that `..base` in `skactiveml/pool` and `skactiveml.base` are recognized as
-    the same module. Matching the last component alone would also flag
-    `sklearn.base`, which several modules import legitimately.
+    A relative import is resolved against the package containing the file.
     """
     if not node.level:
         return node.module
@@ -94,8 +80,7 @@ def _dotted_name(node):
 def _base_names_used(path):
     """Collect the `base.py` names one module refers to.
 
-    Both spellings are covered: importing a name directly, and binding the
-    module and reading a name off it.
+    Covers direct imports and attribute access on the imported module.
     """
     tree = ast.parse(path.read_text())
     package = _containing_package(path)

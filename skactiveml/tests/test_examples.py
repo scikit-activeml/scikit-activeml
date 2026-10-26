@@ -195,15 +195,6 @@ class TestExamples(unittest.TestCase):
             for strategy, examples in examples_by_strategy.items()
             if any("multi-label" in example["tags"] for example in examples)
         }
-        # The tags are not rendered; they only decide which rows the
-        # `Multi-Label` filter of the strategy overview surfaces. What a user
-        # depends on is therefore that no multi-label capable strategy is
-        # missing from that filter, which is what this comparison states.
-        # Whether every single example of such a strategy is tagged is not
-        # checked, because a class declares its capabilities while an example
-        # describes one configuration of it, e.g.
-        # `UncertaintySampling(method="expected_average_precision")` is not
-        # multi-label capable although its class is.
         self.assertEqual(expected_strategies, tagged_strategies)
 
     @staticmethod
@@ -233,8 +224,6 @@ class TestExamples(unittest.TestCase):
             return file.read()
 
     def test_strategy_overview_groups_tasks_under_their_scenario(self):
-        # Two sections of one scenario share its heading, and each task and
-        # category is one level below the previous one.
         sections = list(OVERVIEW_HEADINGS)[:2]
         scenario, first_task = OVERVIEW_HEADINGS[sections[0]]
         _, second_task = OVERVIEW_HEADINGS[sections[1]]
@@ -277,8 +266,6 @@ class TestExamples(unittest.TestCase):
                 self.assertIn(f"{title}\n{expected}\n", overview)
 
     def test_strategy_overview_keeps_a_section_without_a_heading_path(self):
-        # A gallery section that nobody added to `OVERVIEW_HEADINGS` keeps
-        # its own title instead of silently losing its strategies.
         json_data = {
             "9-unmapped": {
                 "data": [
@@ -296,10 +283,6 @@ class TestExamples(unittest.TestCase):
         self.assertIn("RandomSampling", overview)
 
     def test_strategy_overview_offers_a_filter_per_tag(self):
-        # The tags themselves are never rendered; a strategy reaches a user
-        # only through these checkboxes, so every tag a row can carry needs
-        # one. The rows are real, because a filter over nothing filters
-        # nothing.
         section = next(iter(OVERVIEW_HEADINGS))
         json_data = {
             section: {
@@ -325,8 +308,6 @@ class TestExamples(unittest.TestCase):
             with self.subTest(tag=tag):
                 self.assertIn(f'value="{tag}"', overview)
         self.assertIn("<label>Multi-Label</label>", overview)
-        # The filter reads the tags of a rendered row, so the row has to
-        # carry them where the filter looks.
         self.assertIn("RandomSampling", overview)
         self.assertIn("single-annotator", overview)
 

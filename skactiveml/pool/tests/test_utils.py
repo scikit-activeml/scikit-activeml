@@ -449,8 +449,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         iclf = IndexClassifierWrapper(clf, self.X, self.y)
         own = IndexClassifierWrapper._own_fitted_attributes
 
-        # `missing_label_` is the one own attribute `__init__` already sets, so
-        # it is the only one that never reaches `__getattr__`.
         self.assertEqual({"missing_label_"}, own & set(iclf.__dict__))
 
         for item in own - set(iclf.__dict__):
@@ -460,9 +458,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     getattr(iclf, item)
 
     def test_classes_stay_delegated_to_the_wrapped_classifier(self):
-        # This wrapper resolves no target semantics of its own, so `classes_`
-        # is not among its own fitted attributes and keeps being answered by
-        # the `SkactivemlClassifier` it wraps.
         clf = ParzenWindowClassifier(classes=[0, 1]).fit(self.X, self.y)
         iclf = IndexClassifierWrapper(clf, self.X, self.y)
 

@@ -47,11 +47,8 @@ except ImportError:  # pragma: no cover
 def _narrow_to_single_output_prediction(estimator, prediction):
     """Return `prediction` with its primary output as shape `(n_samples,)`.
 
-    A single-output regression target is described by one value per sample,
-    so the wrapped estimator's predictions are narrowed to that shape. The
-    target type is resolved from the prediction itself and checked against
-    the capabilities of `estimator`, so that a multi-output prediction is
-    rejected instead of being flattened into meaningless values.
+    The target type of `prediction` is checked against the capabilities of
+    `estimator`, so a multi-output prediction is rejected.
 
     Parameters
     ----------
@@ -138,18 +135,15 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     Notes
     -----
     Attributes this wrapper does not hold itself are read from the wrapped
-    `estimator`. The fitted attributes it resolves itself, e.g. `target_spec_`,
-    never are: around a pre-fitted `estimator` they resolve this wrapper's own
-    target semantics on first access, and they raise the usual not-fitted error
-    while no such semantics exist. A pre-fitted estimator's own target
-    specification stays readable as `estimator.target_spec_`.
+    `estimator`, except for its own fitted attributes, e.g., `target_spec_`.
+    Around a pre-fitted `estimator`, these are resolved on first access. The
+    estimator's own target specification remains available as
+    `estimator.target_spec_`.
     """
 
-    #: Fitted attributes this wrapper resolves itself, which `__getattr__`
-    #: therefore never forwards to the wrapped `estimator`. `n_features_in_`
-    #: is deliberately absent: it describes the input data rather than the
-    #: target, both objects agree on it, and `partial_fit` reads it through
-    #: `hasattr` to decide whether to reset the feature count.
+    #: Fitted attributes `__getattr__` never forwards to `estimator`.
+    #: `n_features_in_` is forwarded, so that `partial_fit` around a
+    #: pre-fitted `estimator` keeps that estimator's feature count.
     _own_fitted_attributes = frozenset(
         {
             "_label_mean",
@@ -242,19 +236,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
         """Fit or partially fit this wrapper as a single transaction.
 
-        The snapshot taken here covers the entire fit, not only the estimator
-        call: a rejection raised while validating the estimator, the inputs,
-        or the target specification rolls the wrapper back just as a failing
-        estimator fit would. Without that, a failing re-fit would leave an
-        already fitted wrapper reporting metadata from the abandoned attempt,
-        e.g. an `n_features_in_` that contradicts its `estimator_`, so that it
-        could no longer predict on the data it was trained on.
-
-        The label-mean fallback is not a failure and keeps its state, because
-        `_validate_and_fit` returns `self` for it rather than raising. The
-        transaction also covers this wrapper only: as
-        `_restore_wrapper_attributes` documents, a `partial_fit` that already
-        mutated `estimator_` in place cannot be rolled back.
+        A failure at any step restores the pre-call attributes of this wrapper.
+        A wrapped estimator already mutated by `partial_fit` is not restored.
 
         Parameters
         ----------
@@ -292,9 +275,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     ):
         """Validate the inputs and fit the estimator, committing state freely.
 
-        This method may write fitted attributes before a later step rejects
-        the call, because its only caller `_fit` rolls them back. See `_fit`
-        for the parameters and the transactional guarantee.
+        Its only caller `_fit` rolls back the written attributes if a later
+        step fails. See `_fit` for the parameters.
         """
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
@@ -334,8 +316,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             y, self.missing_label_
         )
         if self.include_unlabeled_samples:
-            # The wrapped estimator is documented to handle the missing label
-            # itself, so its raw representation is passed on unchanged.
+            # The estimator handles the missing label itself.
             is_included = np.full_like(y, True, dtype=bool)
             y_train = y[is_included]
         else:
@@ -347,8 +328,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             and len(X_train) == 0
             and hasattr(self, "estimator_")
         ):
-            # Validation still runs, but an empty update preserves both the
-            # learned model and any established fallback statistics.
+            # An empty update keeps the model and the fallback statistics.
             return self
         estimator_params = dict(fit_kwargs) if fit_kwargs is not None else {}
 
@@ -489,9 +469,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        # Branch on this wrapper's own fit outcome, as `predict` does: after
-        # a failed refit, the copied estimator still answers from the
-        # superseded training data instead of raising `NotFittedError`.
+        # Branch on `is_fitted_` as `predict` does, because `estimator_` may
+        # stem from an earlier fit.
         if self.is_fitted_:
             return attrgetter(sample_function)(self.estimator_)(
                 X, n_samples, **sample_kwargs
@@ -686,10 +665,7 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
         """Reject an estimator without `return_std`, then fit as usual.
 
-        The rejection precedes `SklearnRegressor._fit` and therefore the
-        transaction it opens. It writes nothing itself, so the wrapper is
-        equally untouched by it, and every later failure is rolled back by the
-        inherited transaction. See `SklearnRegressor._fit` for the parameters.
+        See `SklearnRegressor._fit` for the parameters.
         """
         if (
             hasattr(self.estimator, "predict")
@@ -1061,10 +1037,7 @@ if successful_skorch_torch_import:
             if self.forward_outputs is not None:
                 return self.forward_outputs
 
-            # The single forward output is treated as already being in the
-            # desired target space. Its shape is not the mapping's concern:
-            # `predict` narrows the predicted target values itself, and the
-            # transforms are ignored while training.
+            # The single forward output holds the predicted target values.
             return {"output": (0, None)}
 
         def _net_parts(self, X=None, y=None):

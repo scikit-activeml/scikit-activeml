@@ -556,7 +556,7 @@ def expected_average_precision(classes, probas):
             omitted = np.arange(start, stop)
             g = np.zeros((len(omitted), n_samples))
             f = np.zeros_like(g)
-            # Preserve the base cases in equations (17) and (18) of [1].
+            # Base cases of equations (17) and (18) of [1].
             g[:, 0] = 1
             f[:, 0] = 1
             for n in range(1, n_samples):

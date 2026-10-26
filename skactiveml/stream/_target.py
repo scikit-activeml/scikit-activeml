@@ -1,8 +1,6 @@
 """Shared target resolution helpers for stream-based query strategies.
 
-A stream query strategy does not resolve its labels `y` itself. The classifier
-passed to `query` is the target authority, and these helpers resolve its
-target specification for the strategy.
+The classifier passed to `query` determines the target specification.
 """
 
 import numpy as np

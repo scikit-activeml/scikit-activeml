@@ -45,8 +45,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ]
         )
         self.random_state = 0
-        # A three-class annotation matrix, i.e., a class vocabulary a binary
-        # auxiliary estimator could never describe.
         self.X_three_classes = np.arange(24, dtype=float).reshape(12, 2)
         self.y_three_classes = np.full((12, 3), MISSING_LABEL)
         self.y_three_classes[:6] = np.array(
@@ -284,10 +282,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_auxiliary_estimator_argument_is_no_target_authority(self):
-        # The discriminator separates labeled from unlabeled samples such that
-        # its target semantics do not describe `y`. Querying first keeps this a
-        # behavioural guard, i.e., a wrapper resolving the discriminator
-        # against `y` fails here rather than on the declaration seam below.
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1])
         strategy = DiscriminativeAL(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
@@ -311,10 +305,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_fitted_auxiliary_estimator_is_no_target_authority(self):
-        # Mirrors the pool wrapper's
-        # `test_estimator_like_argument_is_no_target_authority`, which
-        # supplies a fitted discriminator so that `target_spec_` and
-        # `classes_` both exist.
         labeled = np.full(len(self.X_three_classes), MISSING_LABEL)
         labeled[:6], labeled[6:] = 1.0, 0.0
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
@@ -368,8 +358,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self._assert_selects_unlabeled_pairs(query_indices)
 
     def test_declared_authority_rejection_precedes_query_state(self):
-        # Unlike the auxiliary discriminator, a declared `clf` does describe
-        # `y` and must therefore still be rejected for a narrower vocabulary.
         strategy = UncertaintySampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             strategy, random_state=self.random_state
@@ -1153,8 +1141,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_exhausted_candidate_pool(self):
-        # An exhausted candidate pool is a valid acquisition state that is
-        # answered with an empty batch instead of an error about array shapes.
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(random_state=self.random_state),
             random_state=self.random_state,

@@ -6,8 +6,7 @@ import numpy as np
 
 _NO_MISSING_LABEL = object()
 
-# The label families of the label and missing-value contract, in the order
-# error messages name them.
+# Label families in the order error messages name them.
 _FAMILY_ORDER = ("bool", "int", "float", "str")
 
 _FAMILY_DESCRIPTIONS = {
@@ -68,8 +67,8 @@ def _as_label_array(y):
     Parameters
     ----------
     y : array-like
-        Original targets. Existing arrays retain their dtype and values;
-        precision already lost by a caller cannot be recovered.
+        Original targets. Existing arrays retain their dtype and values.
+        Precision already lost by a caller cannot be recovered.
 
     Returns
     -------
@@ -83,9 +82,9 @@ def _as_label_array(y):
         return result
     if result.dtype.kind == "f":
         # Strictly below this boundary all integers are exactly representable.
-        # Keep the boundary itself on the slow path: an integer just above it
-        # can round down onto it. NaNs are common missing labels; infinities
-        # still take the value-by-value path.
+        # The boundary itself takes the slow path, because an integer just
+        # above it can round down onto it. NaNs, which commonly mark missing
+        # labels, take the fast path.
         integer_limit = 2 ** (np.finfo(result.dtype).nmant + 1)
         if np.all(np.isnan(result) | (np.abs(result) < integer_limit)):
             return result
@@ -139,7 +138,7 @@ def _lossless_decode_dtype(vocabularies, missing_label=_NO_MISSING_LABEL):
         One-dimensional arrays of class labels.
     missing_label : scalar, optional
         Also represent this missing label if supplied. Omission selects a
-        class-only dtype; explicitly passing `None` includes that value.
+        class-only dtype. Explicitly passing `None` includes that value.
 
     Returns
     -------

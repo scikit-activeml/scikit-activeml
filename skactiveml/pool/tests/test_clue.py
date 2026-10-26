@@ -357,8 +357,6 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
         ).query(X, y, estimator=estimator, batch_size=5)
         np.testing.assert_array_equal(explicit_seed, propagated_seed)
 
-        # A one-centroid clustering problem was deterministic before seed
-        # propagation and remains unchanged for integer and absent seeds.
         np.testing.assert_array_equal(
             Clue(random_state=7).query(
                 X, y, estimator=estimator, batch_size=1

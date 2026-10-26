@@ -350,9 +350,7 @@ class TemplateEstimator(_TemplateEstimatorFitContract):
 
 
 class TemplateSkactivemlClassifier(TemplateEstimator):
-    # Error expected when fitting on non-integral float class labels. Wrappers
-    # forwarding the declared class labels to a `scikit-learn` estimator have
-    # to report the estimator's rejection of such a continuous target.
+    # Error expected when fitting on non-integral float class labels.
     non_integral_classes_error = None
 
     def _has_multilabel_defaults(self):
@@ -388,14 +386,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
     def test_predict_dtype_matches_class_dtype(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that `predict` returns the declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, so integer classes combined with the default
-        `missing_label=np.nan` decode to `float64`. Predictions never carry
-        `missing_label` and must therefore be narrowed back, so that they
-        remain usable where the declared class labels are expected.
-        """
+        """Check that `predict` returns the declared class dtype."""
         init_params = deepcopy(self.init_default_params)
         init_params["classes"] = [0, 1]
         init_params["missing_label"] = np.nan
@@ -420,16 +411,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
     def test_fit_rejects_class_identities_beyond_64_bits(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that class identifiers beyond 64 bits are rejected.
-
-        An integer wider than a 64-bit dtype has no lossless storage, so the
-        contract rejects it instead of letting NumPy promote it to `float64`
-        and merge distinct identifiers onto one value. The rejection happens
-        in the shared validation chokepoint, before any estimator arithmetic,
-        so it holds whether the vocabulary is declared or inferred from `y`,
-        and the message names the offending integer rather than surfacing as
-        an opaque failure further in.
-        """
+        """Check that class identifiers beyond 64 bits are rejected."""
         labels = [2**200, 2**200 + 1]
         for declared in (False, True):
             with self.subTest(declared=declared):
@@ -900,12 +882,7 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
                         )
 
     def test_predict_dtype_matches_class_dtype(self):
-        """Check that `predict` returns the declared class dtype.
-
-        Multi-annotator classifiers decode their predictions through the
-        same label encoder as single-annotator ones, so their predictions
-        are narrowed back to the declared class dtype as well.
-        """
+        """Check that `predict` returns the declared class dtype."""
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
         estimator.fit(**fit_params)
@@ -1174,12 +1151,7 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
     def test_predict_returns_one_dimensional_targets(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that `predict` describes one target value per sample.
-
-        A single-output regression target is described by one value per
-        sample. A wrapped estimator may emit a column instead, which every
-        consumer indexing predictions by sample then misreads.
-        """
+        """Check that `predict` describes one target value per sample."""
         init_params = deepcopy(self.init_default_params)
         if replace_init_params is not None:
             init_params.update(deepcopy(replace_init_params))
@@ -1237,14 +1209,7 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
     def test_fit_rejects_numerical_labels_beyond_64_bits(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that numerical labels beyond 64 bits are rejected.
-
-        Regression labels are numerical, so an integer wider than a
-        64-bit dtype cannot be stored without NumPy promoting it to
-        `float64`. The contract rejects it in the shared validation
-        chokepoint, naming the offending integer, rather than letting the
-        silently rounded value reach the arithmetic a regressor performs.
-        """
+        """Check that numerical labels beyond 64 bits are rejected."""
         n_samples = len(self.fit_default_params["X"])
         init_params = deepcopy(self.init_default_params)
         init_params["missing_label"] = np.nan

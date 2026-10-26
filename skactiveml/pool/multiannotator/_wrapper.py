@@ -238,9 +238,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
 
         if uses_default_aggregate:
-            # Majority voting preserves the outer class vocabulary and always
-            # produces one value per sample. A fixed local seed preflights the
-            # aggregate without consuming query randomness.
+            # A fixed seed checks the aggregate without consuming query
+            # randomness.
             preflight_aggregated_y = majority_vote(
                 y, missing_label=self.missing_label, random_state=0
             )
@@ -478,10 +477,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
     def _collect_target_authorities(self, query_kwargs):
         """Discover the target authorities among the query arguments.
 
-        Discovery is restricted to the roles `self.strategy` declares, so that
-        a query argument holding an estimator for an auxiliary problem is never
-        mistaken for a semantic authority for `y`. See
-        `skactiveml.pool._target._collect_declared_authorities`.
+        Only the roles `self.strategy` declares are searched.
         """
         return _collect_declared_authorities(
             self.strategy._target_authority_params, query_kwargs

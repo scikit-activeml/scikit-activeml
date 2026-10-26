@@ -586,8 +586,6 @@ class TestValidation(unittest.TestCase):
             _, y_out, _ = check_X_y(X, y_1d, multi_output=False)
         np.testing.assert_array_equal(y_out, np.array(y_1d))
 
-        # A `target_type` other than the default wins over the legacy keyword,
-        # which the single-output default alone does not.
         with self.assertWarnsRegex(FutureWarning, "multi_output"):
             _, y_out, _ = check_X_y(
                 X, y_2d, target_type="multi-output", multi_output=False
@@ -599,8 +597,6 @@ class TestValidation(unittest.TestCase):
             )
         np.testing.assert_array_equal(y_out, np.array(y_2d))
 
-        # Unlike `multi_output=True`, `target_type="multi-label"` requires a
-        # two-dimensional `y`, so a legacy one-dimensional call now fails.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", FutureWarning)
             with self.assertRaisesRegex(

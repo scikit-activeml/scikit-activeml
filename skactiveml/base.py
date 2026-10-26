@@ -77,10 +77,9 @@ except ImportError:  # pragma: no cover
 
 _TARGET_SPEC_NOT_PROVIDED = object()
 
-# Canonical names of `query` parameters carrying an estimator whose target
-# semantics describe the queried targets `y`. Estimators passed under any other
-# name (e.g. the labeled-vs-unlabeled `discriminator` of `DiscriminativeAL`)
-# solve an auxiliary problem and are therefore no semantic authority for `y`.
+# Names of `query` parameters whose estimator describes the labels `y`.
+# Other estimators, e.g., the `discriminator` of `DiscriminativeAL`,
+# solve an auxiliary problem.
 _TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
 
 _DEFAULT_BUDGET = 0.1
@@ -108,10 +107,7 @@ def _answer_exhausted_candidate_pool(
 ):
     """Warn about an exhausted candidate pool and answer it as an empty batch.
 
-    The result is shaped like an ordinary acquisition with a batch size of
-    zero, so that a budget loop running one cycle past exhaustion can consume
-    it without a special case. The warning names the exhaustion, so that the
-    empty batch is never mistaken for a defect.
+    The result is shaped like an acquisition with a batch size of zero.
 
     Parameters
     ----------
@@ -211,13 +207,8 @@ class PoolQueryStrategy(QueryStrategy):
     def __init_subclass__(cls, **kwargs):
         """Guard the `query` a pool query strategy defines itself.
 
-        Every `query` is guarded, so that the shared validation can answer an
-        exhausted candidate pool for all pool strategies at once. A `query`
-        published through a descriptor, i.e. the one `match_signature`
-        creates, is guarded through the function that descriptor binds, so
-        that the descriptor keeps owning how `query` is exposed. Any other
-        publication is rejected at class definition time rather than silently
-        left unguarded.
+        A `query` published through a descriptor, e.g., by `match_signature`,
+        is guarded through the function the descriptor binds.
 
         Raises
         ------
@@ -340,10 +331,8 @@ class PoolQueryStrategy(QueryStrategy):
             else:
                 check_candidates_dict = deepcopy(check_X_dict)
                 check_candidates_dict["ensure_2d"] = False
-                # An empty candidate matrix is an exhausted candidate pool,
-                # i.e., a valid acquisition state the guarded `query` answers
-                # with an empty batch. Anything without a sample axis at all
-                # stays a rejected input.
+                # The guarded `query` answers an empty candidate matrix with
+                # an empty batch. A scalar is still rejected.
                 check_candidates_dict["ensure_min_samples"] = (
                     0 if np.ndim(candidates) > 0 else 1
                 )
@@ -399,12 +388,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     def _target_authority_params(self):
         """Names of `query` parameters carrying a target authority.
 
-        This is the narrow interface through which a strategy declares which
-        of its `query` arguments hold an estimator whose target semantics are
-        authoritative for `y`. Wrappers use it instead of inspecting arbitrary
-        query arguments. Strategies naming such an estimator differently, or
-        accepting estimators that describe an auxiliary problem rather than
-        `y`, override this property.
+        Strategies naming such an estimator differently, or accepting
+        estimators for an auxiliary problem, override this property.
 
         Returns
         -------
@@ -553,8 +538,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         An exhausted candidate pool, i.e., a fully labeled `(X, y)` queried
         with `candidates=None` or an empty `candidates`, is a valid
         acquisition state. It is answered with an empty batch of `batch_size`
-        zero and a warning naming the exhaustion, so that a budget loop
-        running one cycle past exhaustion needs no special case.
+        zero and a warning.
         """
         raise NotImplementedError
 
@@ -788,9 +772,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 missing_label=self.missing_label,
             )
         except ValueError:
-            # A class-agnostic strategy can still acquire the first
-            # sample-annotator pair before a class vocabulary is observable.
-            # The matrix structure remains unambiguously multi-annotator.
+            # A class-agnostic strategy can acquire the first sample-annotator
+            # pair before a class vocabulary is observable.
             lacks_class_evidence = classes is None and _has_no_class_evidence(
                 y,
                 self.target_type,
@@ -898,9 +881,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         -----
         An exhausted candidate pool, i.e., no candidate annotator-sample pair
         left to be queried, is a valid acquisition state. It is answered with
-        an empty batch of `batch_size` zero and a warning naming the
-        exhaustion, so that a budget loop running one cycle past exhaustion
-        needs no special case.
+        an empty batch of `batch_size` zero and a warning.
         """
         raise NotImplementedError
 
@@ -1012,10 +993,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
-            # An empty set of available annotators exhausts the candidate
-            # pairs, i.e., a valid acquisition state the guarded `query`
-            # answers with an empty batch. Anything without a sample axis at
-            # all stays a rejected input.
+            # The guarded `query` answers an empty set of available
+            # annotators with an empty batch. A scalar is still rejected.
             annotators = check_array(
                 annotators,
                 ensure_2d=False,
@@ -1562,12 +1541,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     def _class_label_dtype(self):
         """Return the dtype the declared class labels are described by.
 
-        For a single-output target, `classes_` is one array and its dtype
-        describes every label. For a multi-label target, `classes_` is one
-        array per output, so the labels of one sample are described by the
-        dtype their vocabularies have in common. Resolution rejects outputs
-        of differing dtype kinds, so this common dtype only ever widens
-        between vocabularies of one kind, e.g. `<U3` and `<U6` to `<U6`.
+        For a multi-label target, this is the common dtype of the per-output
+        vocabularies, e.g., `<U6` for `<U3` and `<U6`.
 
         Returns
         -------
@@ -1753,9 +1728,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")
         else:
-            # Resolving the target specification has already rejected a `y`
-            # without observed class labels and without declared `classes`,
-            # so the encoder always has a vocabulary to fit here.
+            # Target resolution has already rejected a `y` without observed
+            # class labels and without declared `classes`.
             self._le.fit(y)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
@@ -1966,9 +1940,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             normalizer = np.sum(P, axis=-1)
             positive = normalizer > 0
             P[positive] /= normalizer[positive, np.newaxis]
-            # Only a genuinely zero output can remain, because negative
-            # frequencies and priors are both rejected. Masking a negative
-            # one as `0.5` here would hide invalid evidence.
+            # Negative frequencies and priors are rejected, so a zero
+            # normalizer means an output without any evidence.
             P[normalizer == 0] = 0.5
             return P[..., 1]
 

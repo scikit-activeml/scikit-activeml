@@ -850,10 +850,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
             target_type=target_type,
         )
         if is_multi_annotator and candidates.ndim == 2:
-            # A multi-annotator `y` yields one `(sample, annotator)` pair per
-            # missing annotation, whereas the fallback needs candidate
-            # samples. A sample is a candidate as soon as at least one
-            # annotator still owes a label for it.
+            # A sample is a candidate if at least one annotator has not
+            # labeled it.
             candidates = np.unique(candidates[:, 0])
 
     candidates = check_array(

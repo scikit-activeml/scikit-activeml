@@ -19,7 +19,7 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
         Random state for candidate selection.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
     """
 

@@ -222,12 +222,9 @@ def _check_1d_class_list(c, name="classes"):
             f"(strings or numbers)."
         ) from e
 
-    # A declared vocabulary is short and its exact types define the dtype of
-    # predictions, so it is checked value by value rather than through the
-    # dtype its values would be converted to. The family is reported before
-    # any duplicate, because values of different families compare equal
-    # across them: `True` is no duplicate of the integer class `1` but a
-    # mixture with it.
+    # The exact types of a declared vocabulary define the dtype of
+    # predictions, so they are checked value by value. Mixed families are
+    # reported before duplicates, because `True` equals the class `1`.
     family = _label_family(arr, name=name)
 
     if n_unique != arr.size:
