@@ -35,7 +35,6 @@ from skactiveml.tests.template_estimator import (
     TemplateSkactivemlRegressor,
     TemplateProbabilisticRegressor,
 )
-from skactiveml.tests.utils import assert_fit_failure_is_transactional
 
 successful_skorch_torch_import = False
 try:
@@ -297,7 +296,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertEqual(prefitted_prediction.shape, (2,))
         np.testing.assert_allclose(prefitted_prediction, direct_prediction)
 
-    def test_multi_column_target_is_rejected_before_fitted_state(self):
+    def test_multi_column_target_is_rejected(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.arange(8, dtype=float).reshape(4, 2)
         reg = SklearnRegressor(LinearRegression())
@@ -306,9 +305,6 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
             ValueError, "one-dimensional or a column vector"
         ):
             reg.fit(X, y)
-
-        self.assertFalse(hasattr(reg, "target_spec_"))
-        self.assertFalse(hasattr(reg, "estimator_"))
 
     def test_fit(self):
         class DummyRegressor(SkactivemlRegressor):
@@ -370,22 +366,13 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertIs(reg.target_spec_, established_spec)
         self.assertIs(reg.estimator_, established_estimator)
 
-    def test_partial_fit_rejects_changed_target_type_before_mutating_state(
-        self,
-    ):
+    def test_partial_fit_rejects_changed_target_type(self):
         reg = SklearnRegressor(SGDRegressor(random_state=0))
         X = np.array([[0.0], [1.0]])
         reg.partial_fit(X, np.array([0.0, 1.0]))
-        established_spec = reg.target_spec_
-        established_estimator = reg.estimator_
-        established_coef = reg.estimator_.coef_.copy()
 
         with self.assertRaises(ValueError):
             reg.partial_fit(X, np.array([[0.0, 1.0], [1.0, 0.0]]))
-
-        self.assertIs(reg.target_spec_, established_spec)
-        self.assertIs(reg.estimator_, established_estimator)
-        np.testing.assert_array_equal(reg.estimator_.coef_, established_coef)
 
     def test_fit_reinitializes_target_spec_after_partial_fit(self):
         reg = SklearnRegressor(SGDRegressor(random_state=0))
@@ -399,7 +386,7 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertIsNot(reg.target_spec_, established_spec)
         self.assertIsNot(reg.estimator_, established_estimator)
 
-    def test_rejections_before_the_estimator_fit_are_transactional(self):
+    def test_rejections_before_the_estimator_fit(self):
         default_fit_params = {
             "X": np.zeros((4, 1)),
             "y": [0.0, 1.0, 2.0, 3.0],
@@ -444,68 +431,9 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
                 fit_params = case.get("fit_params", default_fit_params)
                 reg = SklearnRegressor(**init_params)
 
-                assert_fit_failure_is_transactional(
-                    self,
-                    reg,
-                    lambda: reg.fit(**fit_params),
-                    case["error"],
-                    case["message"],
-                )
+                with self.assertRaisesRegex(case["error"], case["message"]):
+                    reg.fit(**fit_params)
                 self.assertRaises(NotFittedError, check_is_fitted, reg)
-
-    def test_failed_first_fit_leaves_no_fitted_attribute(self):
-        reg = SklearnRegressor(LinearRegression(), missing_label=np.nan)
-
-        with self.assertRaises(TypeError):
-            reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"])
-
-        for attribute in [
-            "check_X_dict_",
-            "missing_label_",
-            "n_features_in_",
-            "random_state_",
-            "target_spec_",
-        ]:
-            self.assertFalse(hasattr(reg, attribute), msg=attribute)
-
-    def test_failed_validation_refit_preserves_previously_fitted_state(self):
-        X = np.arange(4.0).reshape(-1, 1)
-        reg = SklearnRegressor(LinearRegression(), missing_label=np.nan).fit(
-            X, [0.0, 1.0, 2.0, 3.0]
-        )
-        established_spec = reg.target_spec_
-        expected_predictions = reg.predict(X)
-
-        assert_fit_failure_is_transactional(
-            self,
-            reg,
-            lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
-            TypeError,
-            "numerical labels",
-        )
-
-        self.assertEqual(reg.n_features_in_, 1)
-        self.assertIs(reg.target_spec_, established_spec)
-        self.assertTrue(np.isnan(reg.missing_label_))
-        np.testing.assert_allclose(reg.predict(X), expected_predictions)
-
-    def test_failed_validation_partial_fit_preserves_fitted_state(self):
-        X = np.arange(4.0).reshape(-1, 1)
-        reg = SklearnRegressor(
-            SGDRegressor(random_state=0), missing_label=np.nan
-        )
-        reg.partial_fit(X, [0.0, 1.0, 2.0, 3.0])
-        expected_predictions = reg.predict(X)
-
-        assert_fit_failure_is_transactional(
-            self,
-            reg,
-            lambda: reg.partial_fit(X, ["a", "b", "c", "d"]),
-            TypeError,
-            "numerical labels",
-        )
-
-        np.testing.assert_allclose(reg.predict(X), expected_predictions)
 
     def test_label_mean_fallback_keeps_its_state(self):
         class FailingRegressor(SkactivemlRegressor):
@@ -871,44 +799,16 @@ class TestSklearnNormalRegressor(
         y = np.array([0.0, 1.0, 2.0, 3.0])
         unfitted_reg = SklearnNormalRegressor(LinearRegression())
 
-        assert_fit_failure_is_transactional(
-            self,
-            unfitted_reg,
-            lambda: unfitted_reg.fit(X, y),
-            ValueError,
-            "must have keyword argument",
-        )
+        with self.assertRaisesRegex(ValueError, "must have keyword argument"):
+            unfitted_reg.fit(X, y)
 
         fitted_reg = SklearnNormalRegressor(GaussianProcessRegressor()).fit(
             X, y
         )
         fitted_reg.estimator = LinearRegression()
 
-        assert_fit_failure_is_transactional(
-            self,
-            fitted_reg,
-            lambda: fitted_reg.fit(X, y),
-            ValueError,
-            "must have keyword argument",
-        )
-
-    def test_failed_validation_refit_preserves_previously_fitted_state(self):
-        X = np.arange(4.0).reshape(-1, 1)
-        reg = SklearnNormalRegressor(
-            GaussianProcessRegressor(), missing_label=np.nan
-        ).fit(X, [0.0, 1.0, 2.0, 3.0])
-        expected_predictions = reg.predict(X)
-
-        assert_fit_failure_is_transactional(
-            self,
-            reg,
-            lambda: reg.fit(np.zeros((4, 3)), ["a", "b", "c", "d"]),
-            TypeError,
-            "numerical labels",
-        )
-
-        self.assertEqual(reg.n_features_in_, 1)
-        np.testing.assert_allclose(reg.predict(X), expected_predictions)
+        with self.assertRaisesRegex(ValueError, "must have keyword argument"):
+            fitted_reg.fit(X, y)
 
     def test_predict_target_distribution(self):
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())

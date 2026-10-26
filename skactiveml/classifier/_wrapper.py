@@ -30,10 +30,7 @@ from ..utils._target import (
     _check_target_spec_capability,
     _declared_target_type,
 )
-from ..utils._wrapper_state import (
-    _resolve_own_fitted_attribute,
-    _restore_wrapper_attributes,
-)
+from ..utils._wrapper_state import _resolve_own_fitted_attribute
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
@@ -195,34 +192,6 @@ def _discover_fitted_target_evidence(estimator):
     return _FittedTargetEvidence("single-output", classes, None)
 
 
-def _class_column(class_label, declared_classes):
-    """Locate one class label in a declared class vocabulary.
-
-    Class labels are compared NaN-aware, because an estimator may learn
-    `numpy.nan` as a class.
-
-    Parameters
-    ----------
-    class_label : scalar
-        The class label to locate, e.g., one an estimator learned during its
-        own fitting.
-    declared_classes : array-like of shape (n_classes,)
-        The class vocabulary of one output declared through the wrapper.
-
-    Returns
-    -------
-    class_index : int or None
-        The column `class_label` occupies in `declared_classes`, or `None` if
-        that vocabulary does not contain it.
-    """
-    for class_index, declared_class in enumerate(declared_classes):
-        if declared_class == class_label or (
-            declared_class != declared_class and class_label != class_label
-        ):
-            return class_index
-    return None
-
-
 def _format_class(class_label):
     """Render one class label readably for an error message."""
     return (
@@ -238,33 +207,15 @@ def _format_classes(classes):
 
 
 def _classes_missing_from(class_labels, declared_classes):
-    """Collect class labels that a declared class vocabulary lacks.
-
-    Parameters
-    ----------
-    class_labels : array-like of shape (n_class_labels,)
-        The class labels an estimator predicts for one output.
-    declared_classes : array-like of shape (n_classes,)
-        The class vocabulary of the same output declared through the wrapper.
-
-    Returns
-    -------
-    missing_classes : list
-        The class labels that `declared_classes` does not contain, compared by
-        class identity rather than position or count.
-    """
-    return [
-        class_label
-        for class_label in class_labels
-        if _class_column(class_label, declared_classes) is None
-    ]
+    """Return the class labels that `declared_classes` does not contain."""
+    class_labels = np.asarray(class_labels)
+    return list(class_labels[~np.isin(class_labels, declared_classes)])
 
 
 def _map_proba_columns(P, learned_classes, declared_classes, output_idx=None):
-    """Map probability columns onto a declared class vocabulary.
+    """Map probability columns onto a sorted declared class vocabulary.
 
-    The columns are mapped by class identity. Declared classes the estimator
-    never learned receive zero-filled columns.
+    Declared classes the estimator never learned receive zero-filled columns.
 
     Parameters
     ----------
@@ -273,8 +224,8 @@ def _map_proba_columns(P, learned_classes, declared_classes, output_idx=None):
     learned_classes : array-like of shape (n_learned_classes,)
         The class labels the estimator learned for that output, in the order of
         its probability columns.
-    declared_classes : array-like of shape (n_classes,)
-        The class vocabulary of the same output declared through the wrapper.
+    declared_classes : numpy.ndarray of shape (n_classes,)
+        The sorted class vocabulary of the same output, e.g., `classes_`.
     output_idx : int or None, default=None
         Index of the label output, or `None` for single-output classification.
 
@@ -296,16 +247,15 @@ def _map_proba_columns(P, learned_classes, declared_classes, output_idx=None):
             f"{name} has {P.shape[1]} columns but the fitted estimator "
             f"reports {len(learned_classes)} classes{output}."
         )
+    missing_classes = _classes_missing_from(learned_classes, declared_classes)
+    if missing_classes:
+        raise ValueError(
+            f"Class {_format_class(missing_classes[0])!r} learned by the "
+            f"wrapped estimator is not contained in the declared "
+            f"classes{output}."
+        )
     P_mapped = np.zeros((len(P), len(declared_classes)), dtype=float)
-    for column, learned_class in enumerate(learned_classes):
-        class_index = _class_column(learned_class, declared_classes)
-        if class_index is None:
-            raise ValueError(
-                f"Class {_format_class(learned_class)!r} learned by the "
-                f"wrapped estimator is not contained in the declared "
-                f"classes{output}."
-            )
-        P_mapped[:, class_index] = P[:, column]
+    P_mapped[:, np.searchsorted(declared_classes, learned_classes)] = P
     return P_mapped
 
 
@@ -796,10 +746,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if not self._is_multilabel_target():
                 # Single output classification.
                 P = self._normalize_single_output_proba(P, n_samples=n_samples)
-                # Fall through to the label-count prior fallback if the
-                # fitted estimator yielded NaN probabilities.
-                if not np.any(np.isnan(P)):
-                    return P
+                return self._replace_nan_rows([P])[0]
             else:
                 # Multi-label targets correspond to one binary class
                 # vocabulary per output.
@@ -844,16 +791,14 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         np.column_stack([1 - P_ml[:, j], P_ml[:, j]])
                         for j in range(n_outputs)
                     ]
-                # Fall through to the label-count prior fallback if the
-                # fitted estimator yielded NaN probabilities.
-                if not any(np.any(np.isnan(P_j)) for P_j in P_list):
-                    if proba_format == "array":
-                        # Binary per output: return positive-class
-                        # probabilities of shape (n_samples, n_outputs).
-                        return np.column_stack(
-                            [P_list[j][:, 1] for j in range(n_outputs)]
-                        )
-                    return P_list
+                P_list = self._replace_nan_rows(P_list)
+                if proba_format == "array":
+                    # Binary per output: return positive-class
+                    # probabilities of shape (n_samples, n_outputs).
+                    return np.column_stack(
+                        [P_list[j][:, 1] for j in range(n_outputs)]
+                    )
+                return P_list
 
         # Fallback, if fitting of the underlying estimator failed.
         warnings.warn(
@@ -883,10 +828,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ]
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
-        """Fit or partially fit this wrapper as a single transaction.
-
-        A failure at any step restores the pre-call attributes of this wrapper.
-        A wrapped estimator already mutated by `partial_fit` is not restored.
+        """Fit or partially fit this wrapper.
 
         Parameters
         ----------
@@ -905,27 +847,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         -------
         self : SklearnClassifier
             The wrapper fitted on the training data.
-        """
-        attributes_before = dict(self.__dict__)
-        try:
-            return self._validate_and_fit(
-                fit_function=fit_function,
-                X=X,
-                y=y,
-                sample_weight=sample_weight,
-                **fit_kwargs,
-            )
-        except Exception:
-            _restore_wrapper_attributes(self, attributes_before)
-            raise
-
-    def _validate_and_fit(
-        self, fit_function, X, y, sample_weight=None, **fit_kwargs
-    ):
-        """Validate the inputs and fit the estimator, committing state freely.
-
-        Its only caller `_fit` rolls back the written attributes if a later
-        step fails. See `_fit` for the parameters.
         """
         is_incremental = fit_function == "partial_fit"
         had_established_target_spec = (
@@ -1005,7 +926,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if had_established_target_spec and not np.any(is_included):
             return self
 
-        had_estimator = hasattr(self, "estimator_")
+        # `hasattr` would resolve a pre-fitted estimator's label state, which
+        # a fit must not mix with the one `_validate_data` just set.
+        had_estimator = "estimator_" in self.__dict__
         if not is_incremental or not had_estimator:
             self.estimator_ = deepcopy(self.estimator)
 
@@ -1069,16 +992,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 )
                 return self
 
-            # Build the message before `_fit` restores the previous
-            # `estimator_`.
-            message = (
+            raise RuntimeError(
                 f"Calling '{fit_function}' of the estimator "
                 f"'{self.estimator_}' failed on {len(y_train)} labeled "
                 f"samples covering at least two classes per output. This is "
                 f"not one of the degenerate training cases for which the "
                 f"class label distribution is used as a fallback."
-            )
-            raise RuntimeError(message) from error
+            ) from error
 
         self.is_fitted_ = True
         return self
@@ -1446,6 +1366,47 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             P = np.where(np.isnan(P).any(axis=1, keepdims=True), np.nan, 1.0)
         return P
 
+    def _replace_nan_rows(self, P_list):
+        """Replace probability rows containing NaN by the label prior.
+
+        Some estimators, e.g., `LabelPropagation` with an RBF kernel, return
+        NaN probabilities for samples far from the training data.
+
+        Parameters
+        ----------
+        P_list : list of numpy.ndarray of shape (n_samples, n_classes)
+            The probabilities of each output.
+
+        Returns
+        -------
+        P_list : list of numpy.ndarray of shape (n_samples, n_classes)
+            The probabilities with the label prior in rows containing NaN.
+        """
+        is_nan = [np.isnan(P_j).any(axis=1) for P_j in P_list]
+        n_nan = sum(is_nan_j.sum() for is_nan_j in is_nan)
+        if n_nan == 0:
+            return P_list
+        warnings.warn(
+            f"The 'estimator' returned NaN probabilities in {n_nan} rows, "
+            f"which are replaced by the class label distribution "
+            f"`_label_counts={self._label_counts}`."
+        )
+        label_counts = (
+            self._label_counts
+            if self._is_multilabel_target()
+            else [self._label_counts]
+        )
+        # New arrays, because the estimator's arrays may be shared or
+        # read-only.
+        return [
+            np.where(
+                is_nan_j[:, None],
+                _prior_matrix_from_counts(counts_j, len(P_j)),
+                P_j,
+            )
+            for P_j, is_nan_j, counts_j in zip(P_list, is_nan, label_counts)
+        ]
+
     @staticmethod
     def _check_estimator_probas_are_valid(P, is_multilabel):
         """Validate estimator probabilities while preserving NaN fallback.
@@ -1702,9 +1663,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     `target_spec_` and the sliding window in `X_train_`, are never read from
     the `estimator`.
 
-    A `fit` or `partial_fit` that raises leaves this wrapper unchanged, the
-    sliding window included.
-
     When a window mixes weighted and unweighted batches, samples from an
     unweighted batch have unit weight. Their weights are retained until the
     corresponding samples leave the window or a new `fit` replaces it.
@@ -1724,9 +1682,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "y_train_",
         }
     )
-
-    #: Fitted attributes holding the sliding window, updated in place.
-    _window_attributes = ("X_train_", "y_train_", "sample_weight_train_")
 
     def __init__(
         self,
@@ -1818,10 +1773,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return self._fit("partial_fit", X, y, sample_weight, **fit_kwargs)
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
-        """Fit or partially fit this wrapper as a single transaction.
-
-        A failure restores the pre-call attributes, including the sliding
-        window.
+        """Fit or partially fit this wrapper.
 
         Parameters
         ----------
@@ -1841,23 +1793,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         -------
         self : SlidingWindowClassifier
             The wrapper fitted on the sliding window.
-        """
-        snapshot_before = self._snapshot_attributes()
-        try:
-            return self._validate_and_fit(
-                fit_function, X, y, sample_weight, **fit_kwargs
-            )
-        except Exception:
-            self._restore_snapshot(snapshot_before)
-            raise
-
-    def _validate_and_fit(
-        self, fit_function, X, y, sample_weight=None, **fit_kwargs
-    ):
-        """Validate the inputs, fill the window, and fit the estimator.
-
-        Its only caller `_fit` rolls back the written attributes and the
-        window if a later step fails. See `_fit` for the parameters.
         """
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
@@ -1916,45 +1851,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator_.fit(X=X_train, y=y_train, **fit_kwargs)
 
         return self
-
-    def _snapshot_attributes(self):
-        """Snapshot this wrapper's attributes, sliding window included.
-
-        The window contents are copied, because `_add_samples` extends the
-        window `deque`s in place.
-
-        Returns
-        -------
-        attributes : dict
-            Snapshot of `self.__dict__`.
-        window_contents : dict
-            Copied contents of each sliding window present in `attributes`.
-        """
-        attributes = dict(self.__dict__)
-        window_contents = {
-            name: list(attributes[name])
-            for name in self._window_attributes
-            if isinstance(attributes.get(name), deque)
-        }
-        return attributes, window_contents
-
-    def _restore_snapshot(self, snapshot):
-        """Restore this wrapper, sliding window included, to a snapshot.
-
-        The windows are refilled in place rather than replaced.
-
-        Parameters
-        ----------
-        snapshot : tuple
-            Return value of `_snapshot_attributes`, taken before the failing
-            call.
-        """
-        attributes, window_contents = snapshot
-        _restore_wrapper_attributes(self, attributes)
-        for name, contents in window_contents.items():
-            window = attributes[name]
-            window.clear()
-            window.extend(contents)
 
     def _add_samples(self, fit_func, X, y, sample_weight=None):
         if not hasattr(self, "X_train_"):
@@ -3062,11 +2958,9 @@ if successful_capymoa_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
-            """Fit or partially fit this wrapper as a single transaction.
+            """Fit or partially fit this wrapper.
 
-            Training failures fall back to the label prior. Any other failure,
-            e.g., a rejected `estimator_class`, restores the pre-call
-            attributes.
+            Training failures fall back to the label prior.
 
             Parameters
             ----------
@@ -3085,21 +2979,6 @@ if successful_capymoa_import:
             -------
             self : CapyMOAClassifier
                 The wrapper fitted on the training data.
-            """
-            attributes_before = dict(self.__dict__)
-            try:
-                return self._validate_and_fit(
-                    fit_function, X, y, sample_weight
-                )
-            except Exception:
-                _restore_wrapper_attributes(self, attributes_before)
-                raise
-
-        def _validate_and_fit(self, fit_function, X, y, sample_weight=None):
-            """Validate the inputs and train, committing state freely.
-
-            Its only caller `_fit` rolls back the written attributes if a
-            later step fails. See `_fit` for the parameters.
             """
             import capymoa
             import capymoa.base
@@ -3408,39 +3287,12 @@ if successful_river_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
-            """Fit or partially fit this wrapper as a single transaction.
-
-            Parameters
-            ----------
-            fit_function : "fit" or "partial_fit"
-                Whether the estimator is re-created or updated incrementally.
-            X : array-like of shape (n_samples, ...)
-                The feature matrix representing the samples.
-            y : array-like of shape (n_samples,)
-                Class labels of the training samples, possibly including
-                missing labels indicated by `self.missing_label`.
-            sample_weight : array-like of shape (n_samples,), default=None
-                It contains the weights of the training samples' class labels.
+            """Fit or partially fit this wrapper.
 
             Returns
             -------
             self : RiverClassifier
                 The wrapper fitted on the training data.
-            """
-            attributes_before = dict(self.__dict__)
-            try:
-                return self._validate_and_fit(
-                    fit_function, X, y, sample_weight
-                )
-            except Exception:
-                _restore_wrapper_attributes(self, attributes_before)
-                raise
-
-        def _validate_and_fit(self, fit_function, X, y, sample_weight=None):
-            """Validate the inputs and train, committing state freely.
-
-            Its only caller `_fit` rolls back the written attributes if a
-            later step fails. See `_fit` for the parameters.
             """
             had_established_target_spec = (
                 fit_function == "partial_fit"

@@ -60,21 +60,3 @@ def _resolve_own_fitted_attribute(wrapper, item):
         f"This '{type(wrapper).__name__}' instance is not fitted yet. Call "
         f"'fit' with appropriate arguments before accessing '{item}'."
     )
-
-
-def _restore_wrapper_attributes(wrapper, attributes):
-    """Restore every attribute of a wrapper to a pre-call snapshot.
-
-    Only the attribute mapping is restored. A wrapped estimator mutated by
-    `partial_fit` and fitted state updated in place, e.g., a sliding window,
-    are not rolled back.
-
-    Parameters
-    ----------
-    wrapper : object
-        The wrapper to roll back.
-    attributes : dict
-        Snapshot of `wrapper.__dict__` taken before the failing call.
-    """
-    wrapper.__dict__.clear()
-    wrapper.__dict__.update(attributes)

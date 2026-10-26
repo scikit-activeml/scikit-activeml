@@ -205,7 +205,7 @@ class TestClassifierTargetParity(unittest.TestCase):
         lr = LogisticRegression().fit(X, np.arange(30) % 3)
         y = np.full(len(X), MISSING_LABEL)
         y[:2] = [0, 1]
-        clf = SklearnClassifier(FrozenEstimator(lr))
+        clf = SklearnClassifier(FrozenEstimator(lr), classes=[0, 1, 2])
         results = [
             _fit_and_resolve_estimator_target_spec(
                 UncertaintySampling(),

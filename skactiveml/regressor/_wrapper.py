@@ -27,10 +27,7 @@ from ..utils import (
     TargetSpec,
 )
 from ..utils._target import _check_target_spec_capability
-from ..utils._wrapper_state import (
-    _resolve_own_fitted_attribute,
-    _restore_wrapper_attributes,
-)
+from ..utils._wrapper_state import _resolve_own_fitted_attribute
 
 successful_skorch_torch_import = False
 try:
@@ -254,10 +251,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
-        """Fit or partially fit this wrapper as a single transaction.
-
-        A failure at any step restores the pre-call attributes of this wrapper.
-        A wrapped estimator already mutated by `partial_fit` is not restored.
+        """Fit or partially fit this wrapper.
 
         Parameters
         ----------
@@ -276,27 +270,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         -------
         self : SklearnRegressor
             The wrapper fitted on the training data.
-        """
-        attributes_before = dict(self.__dict__)
-        try:
-            return self._validate_and_fit(
-                fit_function=fit_function,
-                X=X,
-                y=y,
-                sample_weight=sample_weight,
-                **fit_kwargs,
-            )
-        except Exception:
-            _restore_wrapper_attributes(self, attributes_before)
-            raise
-
-    def _validate_and_fit(
-        self, fit_function, X, y, sample_weight, **fit_kwargs
-    ):
-        """Validate the inputs and fit the estimator, committing state freely.
-
-        Its only caller `_fit` rolls back the written attributes if a later
-        step fails. See `_fit` for the parameters.
         """
         if not is_regressor(estimator=self.estimator):
             raise TypeError(

@@ -342,35 +342,6 @@ def assert_attributes_unchanged(
             test_case.assertIs(estimator.__dict__[name], value)
 
 
-def assert_fit_failure_is_transactional(
-    test_case, estimator, action, expected_error, expected_message
-):
-    """Assert that a rejected fit raises as expected and commits no state.
-
-    The full `__dict__` is compared by identity. Fitted state updated in
-    place, e.g., a sliding window, has to be asserted separately.
-
-    Parameters
-    ----------
-    test_case : unittest.TestCase
-        The test case reporting the failure.
-    estimator : object
-        The estimator whose fit is expected to be rejected.
-    action : callable
-        Zero-argument callable performing the rejected fit.
-    expected_error : type
-        Exception type the rejection is expected to raise.
-    expected_message : str
-        Pattern the raised message is expected to match.
-    """
-    attributes_before = dict(estimator.__dict__)
-
-    with test_case.assertRaisesRegex(expected_error, expected_message):
-        action()
-
-    assert_attributes_unchanged(test_case, estimator, attributes_before)
-
-
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = list(
