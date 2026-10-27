@@ -211,7 +211,7 @@ def resolve_target_spec(
                 if _has_nested_classes(classes)
                 else "single-output"
             )
-        elif y.ndim == 1:
+        elif y.ndim == 1 or y.shape[1] == 1:
             target_type = "single-output"
         else:
             raise ValueError(
@@ -221,7 +221,7 @@ def resolve_target_spec(
                 "`target_type='multi-label'` or nested binary `classes`, and "
                 "pass the labels of several annotators to a multi-annotator "
                 "component. For single-output labels, pass a one-dimensional "
-                "`y` or flat `classes`."
+                "`y`."
             )
 
     if classes is not None:
@@ -275,7 +275,7 @@ def _resolve_task_agnostic_target_type(
     y = _check_target_array(y)
 
     if target_type == "auto":
-        if y.ndim != 1:
+        if y.ndim == 2 and y.shape[1] != 1:
             raise ValueError(
                 "Two-dimensional labels `y` are ambiguous for a strategy "
                 "without a classifier, because they can be multi-label "
@@ -427,36 +427,6 @@ def _check_target_matches_spec(y, target_spec, *, missing_label):
         classes=target_spec.classes,
         missing_label=missing_label,
     )
-
-
-def _declared_target_type(y, component):
-    """Return the target type that `component` declares for `y`.
-
-    Parameters
-    ----------
-    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-        The labels to be resolved.
-    component : object with `_target_capabilities`
-        The component interpreting `y`, e.g., a classifier.
-
-    Returns
-    -------
-    target_type : str
-        The explicit `target_type` of `component`. Otherwise, a column vector
-        is single-output if `component` does not support multi-label targets,
-        and every other `y` gives `"auto"`.
-    """
-    target_type = getattr(component, "target_type", "auto")
-    if (
-        target_type == "auto"
-        and np.ndim(y) == 2
-        and np.shape(y)[1] == 1
-        and not any(
-            c[1] == "multi-label" for c in component._target_capabilities
-        )
-    ):
-        return "single-output"
-    return target_type
 
 
 def _check_refit_capability(estimator):

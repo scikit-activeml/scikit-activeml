@@ -28,7 +28,6 @@ from ..utils._label_dtype import _as_class_vocabulary_array, _as_label_array
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
-    _declared_target_type,
 )
 from ..utils._wrapper_state import _resolve_own_fitted_attribute
 from ..utils import (
@@ -550,7 +549,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=_declared_target_type(y, self),
+            target_type=self.target_type,
             annotation_type="single-annotator",
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,

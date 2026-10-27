@@ -79,8 +79,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets. Two-dimensional multi-label
-        targets must be declared explicitly.
+        single-output targets. Multi-label targets must be declared
+        explicitly.
 
     References
     ----------

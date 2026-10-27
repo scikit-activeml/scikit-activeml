@@ -661,10 +661,11 @@ vocabulary, and a partially observed row are rejected.
 Ambiguous Two-dimensional Classification
 ========================================
 
-For single-annotator classification, a two-dimensional ``y`` is ambiguous when
-``target_type="auto"`` and ``classes=None``. Its columns could represent binary
-label outputs, or the annotators of a label matrix passed to a single-annotator
-component by mistake. Binary-looking values do not resolve this ambiguity.
+For single-annotator classification, a two-dimensional ``y`` with more than one
+column is ambiguous when ``target_type="auto"`` and ``classes=None``. Its
+columns could represent binary label outputs, or the annotators of a label
+matrix passed to a single-annotator component by mistake. Binary-looking values
+do not resolve this ambiguity.
 
 Declare multi-label targets where the labels are interpreted: on the
 classifier, with ``target_type="multi-label"`` or a nested class vocabulary, or
@@ -690,25 +691,15 @@ classification. Every nested vocabulary must be binary, see
 Single-output Column Vectors
 ============================
 
-Labels with shape ``(n_samples, 1)`` are accepted once their semantics resolve
-to single-output. For classification, an explicit
-``target_type="single-output"``, a flat class vocabulary, or a component
-without multi-label support provides enough information. In pool and stream
-queries, the estimator's declarations or its fitted ``target_spec_`` provide
-this information. Classifiers and pool query strategies convert a
-single-output column to the canonical one-dimensional representation and emit
-a ``DataConversionWarning``. A classification column with ``target_type="auto"``
-and ``classes=None`` remains ambiguous for components that support
-multi-label targets.
+As in scikit-learn, labels with shape ``(n_samples, 1)`` are single-output
+unless multi-label targets are declared. This holds for classification,
+regression, and task-agnostic strategies. Classifiers and pool query strategies
+convert such a column to the canonical one-dimensional representation and emit
+a ``DataConversionWarning``. With ``target_type="multi-label"`` or a nested
+class vocabulary, the column is one binary label output.
 
-For regression, a column vector is accepted whenever the task is known, for
-example in a regressor or in a strategy that resolves its labels through a
-regressor.
-
-A task-agnostic strategy has neither a known task nor a class vocabulary.
-Therefore, it treats every bare two-dimensional ``y`` as ambiguous, regardless
-of whether the values are continuous or discrete. Labels with more than one
-column are not single-output for either classification or regression.
+Labels with more than one column are not single-output for either
+classification or regression.
 
 Target-aware Masks and Indices
 ==============================

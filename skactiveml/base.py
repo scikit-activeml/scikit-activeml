@@ -26,7 +26,6 @@ from .utils._label_dtype import (
 )
 from .utils._target import (
     _check_target_capability,
-    _declared_target_type,
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
@@ -381,7 +380,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         target_type : str
             The resolved target type.
         """
-        declared_target_type = _declared_target_type(y, self)
+        declared_target_type = getattr(self, "target_type", "auto")
         tasks = {capability[0] for capability in self._target_capabilities}
         if len(tasks) == 1:
             task = next(iter(tasks))
@@ -1421,7 +1420,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         target_spec = resolve_target_spec(
             resolution_y,
             task="classification",
-            target_type=_declared_target_type(resolution_y, self),
+            target_type=getattr(self, "target_type", "auto"),
             annotation_type=annotation_type,
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,

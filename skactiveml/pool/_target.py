@@ -12,7 +12,6 @@ from ..utils._label import _check_labels
 from ..utils._target import (
     _check_refit_capability,
     _check_target_matches_spec,
-    _declared_target_type,
     _predicted_target_spec,
     _check_target_spec_capability,
 )
@@ -45,7 +44,7 @@ def _resolve_estimator_target_spec(
         target_spec = resolve_target_spec(
             y,
             task=task,
-            target_type=_declared_target_type(y, estimator),
+            target_type=getattr(estimator, "target_type", "auto"),
             annotation_type="single-annotator",
             classes=(
                 estimator._declared_classes
