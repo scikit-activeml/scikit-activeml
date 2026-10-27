@@ -2,21 +2,20 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
+from sklearn.gaussian_process.kernels import (
+    ConstantKernel,
+    DotProduct,
+    PairwiseKernel,
+)
 from sklearn.metrics import pairwise_kernels
 
-from skactiveml.pool._quire import (
-    _del_i_inv,
-    _L_aa_inv,
-    _one_versus_rest_transform,
-    Quire,
-)
+from skactiveml.pool._quire import _one_versus_rest_transform, Quire
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import (
     MISSING_LABEL,
     is_labeled,
-    is_unlabeled,
     simple_batch,
 )
 
@@ -24,9 +23,7 @@ from skactiveml.utils import (
 class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def setUp(self):
         self.candidates = np.array([1, 3])
-        self.X_cand = np.array([[8, 1], [9, 1], [5, 1]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.y_true = np.array([0, 0, 1, 1])
         self.y = np.array([0, MISSING_LABEL, 1, MISSING_LABEL])
         self.classes = np.array([0, 1])
         self.kwargs = dict(
@@ -197,31 +194,64 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                     )
                 )
 
-    def test_query_single_precision_kernel_compatibility(self):
+    def test_query_matches_double_precision(self):
         rng = np.random.RandomState(1)
         X = rng.normal(size=(25, 6)).astype(np.float32)
         y = np.arange(len(X), dtype=float) % 3
         y[-1] = np.nan
-        for metric in ["rbf", "linear", "cosine"]:
+        for metric in ["rbf", "linear", "cosine", DotProduct(sigma_0=0)]:
             K = pairwise_kernels(X, X, metric=metric)
             for lmbda in [1e-4, 0.1, 1.0, 10.0]:
-                expected = _full_quadratic_utilities(
-                    K, y, [0, 1, 2], [len(X) - 1], lmbda
-                )
                 for precomputed in [False, True]:
                     with self.subTest(
                         metric=metric, lmbda=lmbda, precomputed=precomputed
                     ):
-                        _, utilities = Quire(
+                        qs = Quire(
                             [0, 1, 2],
                             lmbda=lmbda,
                             metric="precomputed" if precomputed else metric,
-                        ).query(
-                            K if precomputed else X, y, return_utilities=True
                         )
-                        np.testing.assert_allclose(
-                            utilities[0], expected, rtol=1e-8, atol=1e-8
+                        data = K if precomputed else X
+                        _, utilities = qs.query(data, y, return_utilities=True)
+                        _, expected = qs.query(
+                            data.astype(float), y, return_utilities=True
                         )
+                        np.testing.assert_array_equal(utilities, expected)
+
+    def test_query_precomputed_kernel_dtypes(self):
+        y = np.array([0, np.nan, np.nan])
+        for K in [
+            np.array([[100, 0, 20], [0, 200, 30], [20, 30, 250]], np.uint8),
+            np.array([[1, 0, 1], [0, 1, 0], [1, 0, 1]], bool),
+            np.array([[4e4, 0, 0], [0, 5e4, 1e4], [0, 1e4, 6e4]], np.float16),
+        ]:
+            with self.subTest(dtype=K.dtype):
+                qs = Quire([0, 1], metric="precomputed")
+                _, utilities = qs.query(K, y, return_utilities=True)
+                _, expected = qs.query(
+                    K.astype(float), y, return_utilities=True
+                )
+                np.testing.assert_array_equal(utilities, expected)
+
+    def test_query_custom_kernels_keep_feature_dtype(self):
+        X = np.array([[1, 0], [0, 1], [1, 1]], dtype=bool)
+        y = np.array([0, np.nan, np.nan])
+
+        def kernel(x, z, gamma=None):
+            return np.bitwise_and(x, z).sum()
+
+        for metric in [
+            kernel,
+            PairwiseKernel(metric=kernel),
+            PairwiseKernel(metric=kernel) + ConstantKernel(1),
+        ]:
+            with self.subTest(metric=metric):
+                K = pairwise_kernels(X, metric=metric)
+                expected = _full_quadratic_utilities(K, y, [0, 1], [1, 2], 1.0)
+                _, utilities = Quire([0, 1], metric=metric).query(
+                    X, y, return_utilities=True
+                )
+                np.testing.assert_allclose(utilities[0], expected)
 
     def test_query_rejects_labeled_candidates(self):
         for candidates in [[0], [0, 3], [2, 1, 3]]:
@@ -247,22 +277,7 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         np.testing.assert_array_equal(actual[0], reference[0])
         np.testing.assert_array_equal(actual[1], reference[1])
 
-    def test_query_asymmetric_callable_preserves_symmetrization(self):
-        X = np.arange(18).reshape(6, 3) / 10
-        y = np.array([np.nan, 0, np.nan, 1, np.nan, np.nan])
-
-        def kernel(x, z):
-            return np.dot(x, z) + x[0] - z[0]
-
-        K = pairwise_kernels(X, X, metric=kernel)
-        candidates = np.array([5, 0, 4])
-        expected = _full_quadratic_utilities(K, y, [0, 1], candidates, 1.0)
-        _, utilities = Quire([0, 1], metric=kernel).query(
-            X, y, candidates=candidates, return_utilities=True
-        )
-        np.testing.assert_allclose(utilities[0], expected)
-
-    def test_query_nonsymmetric_precomputed_compatibility(self):
+    def test_query_symmetrizes_precomputed_kernel(self):
         K = np.array(
             [
                 [0.8, 0.2, 0.1, 0.0, 0.6, 0.1],
@@ -274,19 +289,13 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ]
         )
         y = np.array([np.nan, 0, np.nan, 1, np.nan, np.nan])
-        expected = [
-            -1.62206740,
-            np.nan,
-            -1.58640760,
-            np.nan,
-            -1.99950640,
-            -1.70899301,
-        ]
-        with self.assertWarnsRegex(UserWarning, "not symmetric"):
-            _, utilities = Quire([0, 1], metric="precomputed").query(
-                K, y, return_utilities=True
-            )
-        np.testing.assert_allclose(utilities[0], expected, atol=1e-8)
+        expected = _full_quadratic_utilities(
+            (K + K.T) / 2, y, [0, 1], [0, 2, 4, 5], 1.0
+        )
+        _, utilities = Quire([0, 1], metric="precomputed").query(
+            K, y, return_utilities=True
+        )
+        np.testing.assert_allclose(utilities[0], expected)
 
     def test_query_candidate_subset_matches_direct_schur_complement(self):
         X = np.array(
@@ -353,32 +362,6 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                             self.assertEqual(
                                 indices[0], np.nanargmax(expected)
                             )
-
-    def test__del_i_inv(self):
-        self.assertWarns(Warning, _del_i_inv, np.tri(5), 2)
-
-        A = np.random.random((3, 3))
-        A = A + A.T
-        A_inv = np.linalg.inv(A)
-        for i in range(len(A)):
-            B = np.delete(np.delete(A, i, axis=0), i, axis=1)
-            B_inv = np.linalg.inv(B)
-            np.testing.assert_allclose(B_inv, _del_i_inv(A_inv, i))
-
-    def test__L_aa_inv(self):
-        lmbda = 1
-        X = np.append(self.X, self.X_cand, axis=0)
-        y = np.append(self.y_true, np.full(len(self.X_cand), MISSING_LABEL))
-        is_lbld = is_labeled(y=y, missing_label=MISSING_LABEL)
-        is_unlbld = is_unlabeled(y=y, missing_label=MISSING_LABEL)
-        K = pairwise_kernels(X, X, metric="rbf")
-        # compute L and L_aa
-        L = np.linalg.inv(K + lmbda * np.eye(len(X)))
-        L_aa = L[is_unlbld][:, is_unlbld]
-        L_aa_inv = np.linalg.inv(L_aa)
-        np.testing.assert_allclose(
-            L_aa_inv, _L_aa_inv(K, lmbda, is_unlbld, is_lbld)
-        )
 
     def test__one_versus_rest_transform(self):
         y = np.array([0, 1, 2, 1, 2, 0])
