@@ -4,7 +4,6 @@ from ..utils import (
     check_random_state,
     check_equal_missing_label,
     is_labeled,
-    is_unlabeled,
     labeled_indices,
     unlabeled_indices,
     check_scalar,
@@ -16,24 +15,42 @@ import numpy as np
 from joblib import Parallel, delayed, cpu_count
 from sklearn import clone
 import warnings
-from ._target import (
-    _check_resolved_target_capability,
-    _collect_declared_authorities,
-    _reconcile_target_declarations,
-)
+
+# Query arguments aligned to the candidate samples if `candidates` contains
+# samples instead of indices.
+_CANDIDATE_ALIGNED_KWARGS = ["sample_weight_candidates", "utility_weight"]
+
+
+def _subset_query_kwargs(
+    query_kwargs, names, indices, n_aligned, n_aligned_name
+):
+    """Subset the sample-aligned arguments in `names` by `indices`.
+
+    Check lengths against `n_aligned`, using `n_aligned_name` in errors.
+    Return a new dictionary without changing caller arrays. Scalars are
+    forwarded for validation by the wrapped strategy.
+    """
+    query_kwargs = dict(query_kwargs)
+    for name in names:
+        value = query_kwargs.get(name)
+        if np.ndim(value) == 0:
+            continue
+        value = np.asarray(value)
+        if len(value) != n_aligned:
+            raise ValueError(
+                f"`{name}` must have length `{n_aligned_name}` but "
+                f"{len(value)} != {n_aligned}."
+            )
+        query_kwargs[name] = value[indices]
+    return query_kwargs
 
 
 class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
-    """Base class for wrappers preserving the wrapped target semantics.
+    """Base class for wrappers passing `y` unchanged to the wrapped strategy.
 
-    A wrapper owns the reconciliation of its own target declaration with the
-    declarations of the strategies it wraps and with the estimators passed as
-    query arguments. It therefore keeps every step that depends on wrapper
-    internals, i.e., traversing the wrapped strategy chain, discovering
-    declared authorities among the query arguments, and validating the wrapped
-    capabilities. The wrapper-agnostic steps, i.e., comparing target
-    declarations, resolving target specifications, and checking capabilities,
-    are shared through :mod:`skactiveml.pool._target`.
+    The wrapped strategy resolves the target type of `y`. A wrapper only
+    separates labeled from unlabeled samples, where each row of a
+    two-dimensional `y` is one sample.
     """
 
     @property
@@ -41,46 +58,6 @@ class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
         return getattr(
             self.query_strategy, "_target_capabilities", frozenset()
         )
-
-    @property
-    def _target_authority_params(self):
-        """Delegate the declared authority roles to the wrapped strategy."""
-        return getattr(self.query_strategy, "_target_authority_params", ())
-
-    def _resolve_wrapped_target_type(self, y, query_kwargs):
-        """Resolve the target type this wrapper must preserve.
-
-        This is the entry point of the wrapper's target reconciliation. It
-        fails before any query state is committed.
-
-        Parameters
-        ----------
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            Labels of the training data set (possibly including unlabeled
-            ones indicated by `self.missing_label`).
-        query_kwargs : dict
-            The keyword arguments forwarded to the wrapped query strategy.
-
-        Returns
-        -------
-        target_type : str
-            The resolved target type.
-        """
-        self._check_wrapped_strategy()
-        target_type, target_spec = _reconcile_target_declarations(
-            self._collect_target_declarations(),
-            self._collect_target_authorities(query_kwargs),
-            y,
-            missing_label=self.missing_label,
-            owner_name=type(self).__name__,
-        )
-        self._check_wrapped_target_capability(target_type, target_spec)
-        is_unlabeled(
-            y,
-            missing_label=self.missing_label,
-            target_type=target_type,
-        )
-        return target_type
 
     def _check_wrapped_strategy(self):
         """Check the wrapped strategy's type and missing label."""
@@ -95,54 +72,10 @@ class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
             self.query_strategy.missing_label, self.missing_label
         )
 
-    def _collect_target_declarations(self):
-        """Collect the target declarations along the wrapped chain.
-
-        Returns
-        -------
-        declarations : list of (str, str)
-            The declared target types with their declaring component's name,
-            ordered from this wrapper to the innermost wrapped strategy. A
-            cyclic chain is traversed only once per strategy.
-        """
-        declarations = [(self.target_type, type(self).__name__)]
-        seen_strategies = {id(self)}
-        strategy = self.query_strategy
-        while strategy is not None and id(strategy) not in seen_strategies:
-            seen_strategies.add(id(strategy))
-            declarations.append(
-                (
-                    getattr(strategy, "target_type", "auto"),
-                    type(strategy).__name__,
-                )
-            )
-            strategy = getattr(strategy, "query_strategy", None)
-        return declarations
-
-    def _collect_target_authorities(self, query_kwargs):
-        """Discover the target authorities among the query arguments."""
-        return _collect_declared_authorities(
-            self._target_authority_params, query_kwargs
-        )
-
-    def _check_wrapped_target_capability(self, target_type, target_spec):
-        """Check the resolved target against the wrapped capabilities."""
-        capabilities = self._target_capabilities
-        if capabilities:
-            _check_resolved_target_capability(
-                type(self.query_strategy).__name__,
-                target_type,
-                target_spec,
-                capabilities,
-            )
-
-    def _query_strategy_for_target_type(self, target_type):
-        query_strategy = self.query_strategy
-        if getattr(query_strategy, "target_type", None) == "auto":
-            query_strategy = clone(query_strategy).set_params(
-                target_type=target_type
-            )
-        return query_strategy
+    @staticmethod
+    def _mask_type(y):
+        """Return the target type whose label masks have one entry per row."""
+        return "multi-label" if np.ndim(y) == 2 else "single-output"
 
 
 class SubSamplingWrapper(_TargetPreservingWrapper):
@@ -159,8 +92,8 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
     can further improve the runtime for query strategies that utilize all
     available unlabeled data in their selection.
 
-    Resolved multi-label targets preserve sample-level masks, so each row must
-    be either fully labeled or fully unlabeled.
+    Each row of a two-dimensional `y` is one sample, so it must be either
+    fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -180,16 +113,21 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
         - If `False`, `X` and `y` stay the same.
     embed_samples_func : Callable or None, default=None
         - If `embed_samples_func` is a `Callable`, it must accept the samples
-          `X` as input and return the sample-wise embeddings.
+          `X` as input and return the sample-wise embeddings as an at least
+          two-dimensional array, preserving the number and order of samples,
+          whereas the remaining dimensions may change. It is applied to
+          `candidates`, too, if they are passed as samples instead of
+          indices, and to a sample set passed as the query argument
+          `X_eval`, such that all samples share a single feature space.
+          An estimator that is passed as an already fitted one, i.e., with a
+          query argument such as `fit_clf=False`, must have been fitted in
+          this embedded space, because `query_strategy` scores the embedded
+          samples with it.
         - If `embed_samples_func` is None, no action is performed.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The selected target type must be supported by
-        `query_strategy`. Automatic resolution preserves target semantics
-        declared by the wrapped strategy or a supplied estimator.
     """
 
     def __init__(
@@ -200,12 +138,10 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
         embed_samples_func=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.query_strategy = query_strategy
         self.max_candidates = max_candidates
@@ -231,8 +167,8 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). For multi-label targets, a row
-            `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
@@ -278,8 +214,11 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        target_type = self._resolve_wrapped_target_type(y, query_kwargs)
-        query_strategy = self._query_strategy_for_target_type(target_type)
+        self._check_wrapped_strategy()
+        # A clone keeps results cached for one `X`, e.g., distances, out of a
+        # later query with other samples.
+        query_strategy = clone(self.query_strategy)
+        mask_type = self._mask_type(y)
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -288,14 +227,14 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             batch_size,
             return_utilities,
             reset=True,
-            target_type=target_type,
+            target_type=mask_type,
         )
 
         check_scalar(self.exclude_non_subsample, "exclude_non_subsample", bool)
         is_lbld = is_labeled(
             y=y,
             missing_label=self.missing_label_,
-            target_type=target_type,
+            target_type=mask_type,
         )
         seed_multiplier = int(is_lbld.sum() + 1)
         max_candidates = self.max_candidates
@@ -335,7 +274,7 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             candidate_indices = unlabeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                target_type=target_type,
+                target_type=mask_type,
             )
             # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
@@ -372,7 +311,7 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             all_labeled = labeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                target_type=target_type,
+                target_type=mask_type,
             )
             if candidates is not None and candidates.ndim > 1:
                 subset_and_labeled_indices = all_labeled
@@ -395,8 +334,39 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             new_X = X
             new_y = y
 
+        if candidates is not None and candidates.ndim > 1:
+            X_aligned_kwargs = ["sample_weight"]
+            # `utility_weight` weights the samples whose utilities are
+            # computed, which are the candidate samples in this case.
+            query_kwargs = _subset_query_kwargs(
+                query_kwargs,
+                _CANDIDATE_ALIGNED_KWARGS,
+                new_candidate_indices,
+                len(candidates),
+                "n_candidates",
+            )
+        else:
+            X_aligned_kwargs = ["sample_weight", "utility_weight"]
+        if self.exclude_non_subsample:
+            query_kwargs = _subset_query_kwargs(
+                query_kwargs,
+                X_aligned_kwargs,
+                subset_and_labeled_indices,
+                len(X),
+                "n_samples",
+            )
+
         if self.embed_samples_func:
-            new_X = self.embed_samples_func(new_X)
+            new_X = self._embed_samples(new_X, "X")
+            if candidates is not None and candidates.ndim > 1:
+                new_candidates = self._embed_samples(
+                    new_candidates, "candidates"
+                )
+            # A keyword argument holding an independent sample set is
+            # embedded but never subset, since it is not aligned to `X`.
+            X_eval = query_kwargs.get("X_eval")
+            if X_eval is not None:
+                query_kwargs["X_eval"] = self._embed_samples(X_eval, "X_eval")
 
         qs_output = query_strategy.query(
             X=new_X,
@@ -463,6 +433,37 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
         else:
             return new_queried_indices
 
+    def _embed_samples(self, samples, name):
+        """Embed `samples` by applying `embed_samples_func`.
+
+        Parameters
+        ----------
+        samples : array-like of shape (n_samples, ...)
+            Samples to be embedded.
+        name : str
+            Name of `samples` being used for the error message.
+
+        Returns
+        -------
+        embedded_samples : array-like of shape (n_samples, ...)
+            The embedded samples in the order of `samples`.
+        """
+        embedded_samples = self.embed_samples_func(samples)
+        if np.ndim(embedded_samples) < 2:
+            raise ValueError(
+                f"`embed_samples_func` returned a "
+                f"{np.ndim(embedded_samples)}-dimensional embedding for "
+                f"`{name}` but must return an at least two-dimensional one."
+            )
+        if len(embedded_samples) != len(samples):
+            raise ValueError(
+                f"`embed_samples_func` returned "
+                f"{len(embedded_samples)} samples for the {len(samples)} "
+                f"samples of `{name}` but must preserve the number and "
+                f"order of samples."
+            )
+        return embedded_samples
+
 
 class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
     """Parallel Utility Estimation Wrapper
@@ -472,8 +473,8 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
     assumption for this is that the utility computations are independent from
     another. Therefore, only `batch_size=1` is supported.
 
-    Resolved multi-label targets preserve sample-level masks, so each row must
-    be either fully labeled or fully unlabeled.
+    Each row of a two-dimensional `y` is one sample, so it must be either
+    fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -491,10 +492,6 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The selected target type must be supported by
-        `query_strategy`. Automatic resolution preserves target semantics
-        declared by the wrapped strategy or a supplied estimator.
 
     """
 
@@ -505,12 +502,10 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
         parallel_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.query_strategy = query_strategy
         self.n_jobs = n_jobs
@@ -535,8 +530,8 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). For multi-label targets, a row
-            `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features), (default=None)
@@ -584,8 +579,11 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        target_type = self._resolve_wrapped_target_type(y, query_kwargs)
-        query_strategy = self._query_strategy_for_target_type(target_type)
+        self._check_wrapped_strategy()
+        # A clone keeps results cached for one `X`, e.g., distances, out of a
+        # later query with other samples.
+        query_strategy = clone(self.query_strategy)
+        mask_type = self._mask_type(y)
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -595,13 +593,13 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
             batch_size,
             return_utilities,
             reset=True,
-            target_type=target_type,
+            target_type=mask_type,
         )
         if batch_size != 1:
             raise ValueError("`batch_size` must be set to 1.")
         # Determine candidate samples for selection.
         X_cand, mapping = self._transform_candidates(
-            candidates=candidates, X=X, y=y, target_type=target_type
+            candidates=candidates, X=X, y=y, target_type=mask_type
         )
 
         # Determine number of parallel jobs.
@@ -623,30 +621,55 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
         parallel_dict["n_jobs"] = min(self.n_jobs, len(X_cand))
         parallel_pool = Parallel(**parallel_dict)
 
-        def query_lambda_func(candidate):
-            return query_strategy.query(
+        def query_lambda_func(chunk_candidates, chunk_kwargs):
+            _, utilities = query_strategy.query(
                 X=X,
                 y=y,
-                candidates=np.array(candidate),
+                candidates=chunk_candidates,
                 batch_size=1,
                 return_utilities=True,
-                **query_kwargs,
+                **chunk_kwargs,
             )
+            # Utilities of index candidates refer to the samples in `X`.
+            if mapping is None:
+                return utilities[0]
+            return utilities[0][chunk_candidates]
 
-        # Never split into more chunks than there are candidates, because an
-        # empty chunk would ask the wrapped strategy to select from an
-        # exhausted candidate pool and contribute no utilities.
+        # Never split into more chunks than there are candidates.
         if parallel_dict["n_jobs"] < 0:
             n_chunks = min(cpu_count(), len(X_cand))
         else:
             n_chunks = parallel_dict["n_jobs"]
-        chunks = np.array_split(X_cand, n_chunks)
-        qs_outputs = parallel_pool(
-            delayed(query_lambda_func)(c) for c in chunks
-        )
-
+        if mapping is None:
+            # Candidate-aligned arguments are split along with the candidate
+            # samples.
+            chunks = [
+                (
+                    X_cand[positions],
+                    _subset_query_kwargs(
+                        query_kwargs,
+                        _CANDIDATE_ALIGNED_KWARGS,
+                        positions,
+                        len(X_cand),
+                        "n_candidates",
+                    ),
+                )
+                for positions in np.array_split(
+                    np.arange(len(X_cand)), n_chunks
+                )
+            ]
+        else:
+            # Index candidates keep the arguments aligned to `X` valid and
+            # are scored by the wrapped strategy as in a direct query.
+            chunks = [
+                (indices, query_kwargs)
+                for indices in np.array_split(mapping, n_chunks)
+            ]
         utilities_cand = np.concatenate(
-            [qs_output[1][0] for qs_output in qs_outputs], axis=0
+            parallel_pool(
+                delayed(query_lambda_func)(*chunk) for chunk in chunks
+            ),
+            axis=0,
         )
 
         if mapping is None:

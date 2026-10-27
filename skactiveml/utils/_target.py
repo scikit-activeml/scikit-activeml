@@ -6,17 +6,20 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.validation import check_array
 
-from ._label import MISSING_LABEL, is_unlabeled
+from ._label import MISSING_LABEL, _check_labels, is_unlabeled
+from ._label_dtype import (
+    _as_class_vocabulary_array,
+    _as_label_array,
+    _check_compatible_kinds,
+)
 from ._validation import (
     _has_nested_classes,
     check_classes,
     check_classifier_params,
 )
 
-_NAN_CLASS_HASH_KEY = object()
 
-
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True)
 class TargetSpec:
     """Immutable description of resolved target semantics.
 
@@ -24,14 +27,16 @@ class TargetSpec:
     ----------
     task : "classification" or "regression"
         The prediction task.
-    target_type : "single-output" or "multi-label" or "multi-output"
+    target_type : "single-output" or "multi-label"
         The resolved structure of one sample's target.
     annotation_type : "single-annotator" or "multi-annotator"
         Whether observations come from one or multiple annotators.
     classes : tuple or None
         The normalized immutable class vocabulary for classification, or
-        `None` for regression. Single-output classification stores one tuple;
-        multi-label classification stores one binary tuple per label output.
+        `None` for regression. Single-output classification stores one tuple.
+        Multi-label classification stores one binary tuple per label output.
+        Specifications compare classes by value, so `(0, 1)` equals
+        `(0.0, 1.0)`.
     """
 
     task: str
@@ -89,99 +94,6 @@ class TargetSpec:
         object.__setattr__(target_spec, "classes", classes)
         return target_spec
 
-    def __eq__(self, other):
-        if not isinstance(other, TargetSpec):
-            return NotImplemented
-        return (
-            self.task == other.task
-            and self.target_type == other.target_type
-            and self.annotation_type == other.annotation_type
-            and _class_vocabulary_identity_key(self.classes)
-            == _class_vocabulary_identity_key(other.classes)
-        )
-
-    def __hash__(self):
-        return hash(
-            (
-                self.task,
-                self.target_type,
-                self.annotation_type,
-                _class_vocabulary_identity_key(self.classes),
-            )
-        )
-
-
-def _class_vocabulary_key(classes):
-    """Return a comparable key for a declared class vocabulary.
-
-    Unlike `_class_vocabulary_hash_key`, this helper also accepts the not yet
-    normalized vocabularies that estimators expose through `classes` or
-    `classes_`, i.e., arbitrarily nested sequences and arrays. The classes of
-    one output are normalized as `TargetSpec` normalizes them, so that the same
-    vocabulary declared in a different order yields the same key.
-
-    Parameters
-    ----------
-    classes : array-like or tuple of array-like or None
-        The declared class vocabulary.
-
-    Returns
-    -------
-    key : tuple or None
-        A key comparing equal exactly for equal vocabularies.
-    """
-    if classes is None:
-        return None
-    if _has_nested_classes(classes):
-        # The order of the label outputs is meaningful, whereas the order of
-        # the classes within one output is not.
-        return _class_vocabulary_hash_key(
-            tuple(_sorted_classes(classes_j) for classes_j in classes)
-        )
-    return _class_vocabulary_hash_key(_sorted_classes(classes))
-
-
-def _sorted_classes(classes):
-    """Normalize one output's class vocabulary into sorted unique classes."""
-    return tuple(LabelEncoder().fit(classes).classes_)
-
-
-def _class_vocabulary_hash_key(classes):
-    return tuple(
-        (
-            _class_vocabulary_hash_key(value)
-            if isinstance(value, tuple)
-            else _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value
-        )
-        for value in classes
-    )
-
-
-def _class_vocabulary_identity_key(classes):
-    """Return the value-and-dtype-kind identity of normalized classes.
-
-    Target specifications preserve a declaration's dtype kind even when
-    Python considers its values equal, such as integer ``0`` and floating
-    ``0.0``. Width differences within one kind remain immaterial.
-    """
-    if classes is None:
-        return None
-    return tuple(
-        (
-            _class_vocabulary_identity_key(value)
-            if isinstance(value, tuple)
-            else (
-                np.asarray(value).dtype.kind,
-                _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value,
-            )
-        )
-        for value in classes
-    )
-
-
-def _is_nan_class(value):
-    return bool(value != value)
-
 
 def _validate_target_semantics(
     task, target_type, annotation_type, *, allow_auto
@@ -191,14 +103,14 @@ def _validate_target_semantics(
             "`task` must be either 'classification' or 'regression'."
         )
 
-    target_types = {"single-output", "multi-label", "multi-output"}
+    target_types = {"single-output", "multi-label"}
     if allow_auto:
         target_types.add("auto")
     if target_type not in target_types:
         allowed = (
-            "{'auto', 'single-output', 'multi-label', 'multi-output'}"
+            "{'auto', 'single-output', 'multi-label'}"
             if allow_auto
-            else "{'single-output', 'multi-label', 'multi-output'}"
+            else "{'single-output', 'multi-label'}"
         )
         raise ValueError(f"`target_type` must be one of {allowed}.")
 
@@ -211,117 +123,32 @@ def _validate_target_semantics(
         raise ValueError(
             "`target_type='multi-label'` requires classification."
         )
-    if (
-        target_type in {"multi-label", "multi-output"}
-        and annotation_type == "multi-annotator"
-    ):
-        target_name = (
-            "Multi-label" if target_type == "multi-label" else "Multi-output"
-        )
+    if target_type == "multi-label" and annotation_type == "multi-annotator":
         raise ValueError(
-            f"{target_name} targets cannot be combined with "
+            "Multi-label targets cannot be combined with "
             "`annotation_type='multi-annotator'`."
         )
 
 
 def _check_class_vocabulary_structure(target_type, classes):
-    """Validate nesting, width, and output dtypes against a target type.
-
-    Called both with the vocabularies a caller declares and with the resolved
-    ones a `TargetSpec` is built from, so that every path reaches the same
-    structural contract. Homogeneity *within* one vocabulary is `check_classes`
-    business and is already established by both callers.
-    """
+    """Validate nesting, width, and output dtypes against a target type."""
     has_nested_classes = _has_nested_classes(classes)
     if target_type == "single-output" and has_nested_classes:
         raise ValueError(
             "Single-output classification requires a flat class vocabulary."
         )
-    if target_type in {"multi-label", "multi-output"}:
+    if target_type == "multi-label":
         if not has_nested_classes:
-            vocabulary_kind = (
-                "nested binary class vocabularies"
-                if target_type == "multi-label"
-                else "nested class vocabularies"
-            )
             raise ValueError(
-                f"{target_type.capitalize()} classification requires "
-                f"{vocabulary_kind}."
+                "Multi-label classification requires nested binary class "
+                "vocabularies."
             )
-        if target_type == "multi-label" and not all(
-            len(classes_i) == 2 for classes_i in classes
-        ):
+        if not all(len(classes_i) == 2 for classes_i in classes):
             raise ValueError(
                 "Each multi-label class vocabulary must contain exactly two "
                 "classes."
             )
-        _check_homogeneous_output_dtypes(target_type, classes)
     return has_nested_classes
-
-
-def _check_homogeneous_output_dtypes(target_type, classes):
-    """Check that every output declares classes of one dtype kind.
-
-    One sample's outputs are held by one row of a single array, so they cannot
-    carry different dtypes: the array coerces them to a common one, and the
-    labels a sample is then described by are no longer the labels that were
-    declared, e.g. the integer `0` of one output becomes the string `'0'` when
-    another output declares strings. Prediction and probability columns then
-    disagree about the vocabulary of the same output.
-
-    Only the dtype kind has to agree, so outputs may declare different
-    vocabularies and different widths of the same kind, e.g. `("no", "yes")`
-    beside `("off", "always")`. The kind is read from the class labels
-    themselves rather than from their container, so that an object-valued
-    array of strings agrees with a list of the same strings. Mixing kinds
-    *within* one vocabulary is rejected earlier by `check_classes`.
-
-    Parameters
-    ----------
-    target_type : "multi-label" or "multi-output"
-        The resolved target type naming the outputs in the error message.
-    classes : tuple of array-like
-        One class vocabulary per output.
-
-    Raises
-    ------
-    ValueError
-        If the outputs do not share one dtype kind. The message names every
-        output and the dtype it declares, grouped by kind so that a single
-        deviating output stands out.
-    """
-    dtypes = [np.asarray(list(classes_i)).dtype for classes_i in classes]
-
-    outputs_per_kind = {}
-    for output_idx, dtype in enumerate(dtypes):
-        outputs_per_kind.setdefault(dtype.kind, []).append((output_idx, dtype))
-    if len(outputs_per_kind) <= 1:
-        return
-
-    outputs = "label outputs" if target_type == "multi-label" else "outputs"
-    described = " and ".join(
-        _describe_dtype_group(group) for group in outputs_per_kind.values()
-    )
-    raise ValueError(
-        f"Class vocabularies must declare one dtype across all {outputs}, "
-        f"because one array holds every output. Got {described}."
-    )
-
-
-def _describe_dtype_group(group):
-    """Describe the outputs sharing one dtype kind for an error message."""
-    output_indices = [output_idx for output_idx, _ in group]
-    dtype_names = sorted({str(dtype) for _, dtype in group})
-    quoted = ", ".join(repr(name) for name in dtype_names)
-    label = "dtype" if len(dtype_names) == 1 else "dtypes"
-    return f"{label} {quoted} for {_describe_outputs(output_indices)}"
-
-
-def _describe_outputs(output_indices):
-    """Name one or more outputs for an error message."""
-    if len(output_indices) == 1:
-        return f"output {output_indices[0]}"
-    return "outputs " + ", ".join(str(idx) for idx in output_indices)
 
 
 def resolve_target_spec(
@@ -341,8 +168,7 @@ def resolve_target_spec(
         Target observations, including values equal to `missing_label`.
     task : "classification" or "regression"
         The prediction task.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. The returned specification is always concrete.
     annotation_type : "single-annotator" or "multi-annotator", \
             default="single-annotator"
@@ -350,8 +176,7 @@ def resolve_target_spec(
     classes : array-like or tuple of array-like, default=None
         Optional classification class vocabularies. A flat vocabulary
         describes single-output classification. Nested binary vocabularies
-        describe multi-label classification; nested non-binary vocabularies
-        describe recognized multi-output classification semantics.
+        describe multi-label classification.
     missing_label : scalar or str or None, default=np.nan
         Value representing a missing target observation.
 
@@ -379,26 +204,24 @@ def resolve_target_spec(
                 )
             target_type = "single-output"
         elif task == "regression":
-            target_type = (
-                "single-output"
-                if y.ndim == 1 or y.shape[1] == 1
-                else "multi-output"
-            )
+            target_type = "single-output"
         elif classes is not None:
-            if _has_nested_classes(classes):
-                target_type = (
-                    "multi-label"
-                    if all(len(classes_i) == 2 for classes_i in classes)
-                    else "multi-output"
-                )
-            else:
-                target_type = "single-output"
-        elif y.ndim == 1:
+            target_type = (
+                "multi-label"
+                if _has_nested_classes(classes)
+                else "single-output"
+            )
+        elif y.ndim == 1 or y.shape[1] == 1:
             target_type = "single-output"
         else:
             raise ValueError(
-                "Two-dimensional targets with `target_type='auto'` are "
-                "ambiguous; declare `target_type` or `classes`."
+                "Two-dimensional labels `y` are ambiguous, because they can "
+                "be multi-label targets or the labels of several annotators. "
+                "Declare multi-label targets on the classifier with "
+                "`target_type='multi-label'` or nested binary `classes`, and "
+                "pass the labels of several annotators to a multi-annotator "
+                "component. For single-output labels, pass a one-dimensional "
+                "`y`."
             )
 
     if classes is not None:
@@ -410,19 +233,14 @@ def resolve_target_spec(
             classes=classes,
             missing_label=missing_label,
         )
-    if target_type == "multi-output":
-        return _resolve_multioutput(
-            y,
-            task=task,
-            classes=classes,
-            missing_label=missing_label,
-        )
     _validate_single_output_shape(y, task, annotation_type)
 
     normalized_classes = None
-    if task == "classification":
+    if task == "regression":
+        _check_labels(y, missing_label, task="regression")
+    else:
         observed = np.asarray(y)[~is_unlabeled(y, missing_label=missing_label)]
-        declared = observed if classes is None else np.asarray(classes)
+        declared = observed if classes is None else classes
         if classes is None and len(observed) == 0:
             raise ValueError(
                 "No class label is observed and `classes` is not defined."
@@ -457,13 +275,15 @@ def _resolve_task_agnostic_target_type(
     y = _check_target_array(y)
 
     if target_type == "auto":
-        if y.ndim != 1:
+        if y.ndim == 2 and y.shape[1] != 1:
             raise ValueError(
-                "Two-dimensional targets with `target_type='auto'` are "
-                "ambiguous for a task-agnostic strategy, because it has "
-                "neither classes nor an estimator to resolve them by. "
-                "Declare `target_type`, or pass an estimator whose target "
-                "semantics resolve them."
+                "Two-dimensional labels `y` are ambiguous for a strategy "
+                "without a classifier, because they can be multi-label "
+                "targets or the labels of several annotators. Declare "
+                "multi-label targets with `target_type='multi-label'` on the "
+                "strategy, and pass the labels of several annotators to a "
+                "multi-annotator component. For single-output labels, pass a "
+                "one-dimensional `y`."
             )
         return "single-output"
 
@@ -477,37 +297,19 @@ def _resolve_task_agnostic_target_type(
             )
         return target_type
 
-    if target_type == "multi-label":
-        if y.ndim != 2:
-            raise ValueError("Multi-label targets must be two-dimensional.")
-        is_unlabeled(
-            y,
-            missing_label=missing_label,
-            target_type="multi-label",
-        )
-        return target_type
-
-    if y.ndim != 2 or y.shape[1] < 2:
-        raise ValueError(
-            "Multi-output targets must be two-dimensional with at least two "
-            "target columns."
-        )
-    return target_type
-
-
-def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
-    y_array = np.asarray(y)
-    expected_ndim = 2 if annotation_type == "multi-annotator" else 1
-    return (
-        target_type in {"auto", "single-output"}
-        and y_array.ndim == expected_ndim
-        and is_unlabeled(y_array, missing_label=missing_label).all()
+    if y.ndim != 2:
+        raise ValueError("Multi-label targets must be two-dimensional.")
+    is_unlabeled(
+        y,
+        missing_label=missing_label,
+        target_type="multi-label",
     )
+    return target_type
 
 
 def _check_target_array(y):
     y = check_array(
-        y,
+        _as_label_array(y),
         ensure_2d=False,
         ensure_all_finite=False,
         ensure_min_samples=0,
@@ -537,51 +339,6 @@ def _validate_single_output_shape(y, task, annotation_type):
             "Single-output regression targets must be one-dimensional or a "
             "column vector."
         )
-
-
-def _resolve_multioutput(y, *, task, classes, missing_label):
-    if y.ndim != 2 or y.shape[1] < 2:
-        raise ValueError(
-            "Multi-output targets must be two-dimensional with at least two "
-            "target columns."
-        )
-
-    normalized_classes = None
-    if task == "classification":
-        if classes is not None and len(classes) != y.shape[1]:
-            raise ValueError(
-                "Multi-output `classes` must contain one vocabulary per "
-                "target column."
-            )
-
-        missing = is_unlabeled(y, missing_label=missing_label)
-        normalized_classes = []
-        for output_idx in range(y.shape[1]):
-            observed = y[:, output_idx][~missing[:, output_idx]]
-            declared = observed if classes is None else classes[output_idx]
-            if len(declared) == 0:
-                raise ValueError(
-                    "No class label is observed for multi-output target "
-                    f"column {output_idx} and `classes` is not defined."
-                )
-            normalized_classes.append(
-                _normalize_class_vocabulary(
-                    declared, observed, f"`classes[{output_idx}]`"
-                )
-            )
-        normalized_classes = tuple(normalized_classes)
-        if classes is None:
-            check_classes(normalized_classes)
-            _check_class_vocabulary_structure(
-                "multi-output", normalized_classes
-            )
-
-    return TargetSpec._from_normalized(
-        task=task,
-        target_type="multi-output",
-        annotation_type="single-annotator",
-        classes=normalized_classes,
-    )
 
 
 def _resolve_multilabel(y, *, classes, missing_label):
@@ -636,6 +393,57 @@ def _resolve_multilabel(y, *, classes, missing_label):
     )
 
 
+def _predicted_target_spec(target_spec):
+    """Describe predictions independently of the training annotation type.
+
+    Parameters
+    ----------
+    target_spec : TargetSpec
+        The fitted estimator's resolved training target specification.
+
+    Returns
+    -------
+    prediction_spec : TargetSpec
+        The same task, target type, and class vocabulary with single-annotator
+        semantics.
+    """
+    if target_spec.annotation_type == "single-annotator":
+        return target_spec
+    return TargetSpec._from_normalized(
+        task=target_spec.task,
+        target_type=target_spec.target_type,
+        annotation_type="single-annotator",
+        classes=target_spec.classes,
+    )
+
+
+def _check_target_matches_spec(y, target_spec, *, missing_label):
+    """Raise when `y` does not match a resolved target specification."""
+    resolve_target_spec(
+        y,
+        task=target_spec.task,
+        target_type=target_spec.target_type,
+        annotation_type=target_spec.annotation_type,
+        classes=target_spec.classes,
+        missing_label=missing_label,
+    )
+
+
+def _check_refit_capability(estimator):
+    """Reject an estimator that a query cannot fit on single-annotator labels.
+
+    A multi-annotator classifier would fit a column vector as the labels of
+    one annotator without any error, so it is rejected before training.
+    """
+    capabilities = estimator._target_capabilities
+    if not any(c[2] == "single-annotator" for c in capabilities):
+        raise ValueError(
+            f"{type(estimator).__name__} does not support single-annotator "
+            "labels `y`, so it cannot be fitted on them. Pass a fitted "
+            "estimator instead."
+        )
+
+
 def _check_target_spec_capability(component, target_spec, capabilities):
     """Raise when a component does not declare an exact target capability."""
     capability = (
@@ -657,24 +465,13 @@ def _check_target_capability(component, capability, capabilities):
 
 
 def _normalize_class_vocabulary(declared, observed, name):
-    normalized = tuple(LabelEncoder().fit(declared).classes_)
-    observed_in_classes = np.isin(observed, normalized)
-    if any(_is_nan_class(value) for value in normalized):
-        observed_in_classes |= np.asarray(
-            [_is_nan_class(value) for value in observed], dtype=bool
+    classes_array = _as_class_vocabulary_array(declared)
+    classes_array = LabelEncoder().fit(classes_array).classes_
+    _check_compatible_kinds(observed, classes_array, name=name)
+    if not np.isin(np.asarray(observed), classes_array).all():
+        raise ValueError(
+            f"`y` contains labels outside {name}. All observed labels must "
+            "belong to the class vocabulary, whether declared explicitly "
+            "or inferred during fitting."
         )
-    if not observed_in_classes.all():
-        _raise_unknown_class_error(observed, normalized, name)
-    return normalized
-
-
-def _raise_unknown_class_error(observed, declared, name):
-    observed_dtype = np.asarray(observed).dtype
-    declared_dtype = np.asarray(declared).dtype
-    observed_is_numeric = np.issubdtype(observed_dtype, np.number)
-    declared_is_numeric = np.issubdtype(declared_dtype, np.number)
-    if observed_is_numeric != declared_is_numeric:
-        raise TypeError(
-            f"The labels in `y` are not type-compatible with {name}."
-        )
-    raise ValueError(f"`y` contains labels outside {name}.")
+    return tuple(classes_array)

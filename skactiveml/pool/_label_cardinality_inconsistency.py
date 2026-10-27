@@ -27,10 +27,6 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
-    target_type : "auto" or "multi-label", default="auto"
-        Declared target type. A fitted classifier's target specification is
-        authoritative when available. This strategy supports only multi-label
-        classification with a single annotator.
 
     References
     ----------
@@ -128,7 +124,6 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         acquisition state. It is answered with an empty batch of `batch_size`
         zero and a warning naming the exhaustion.
         """
-        # Resolve through the classifier before acquisition state is changed.
         clf, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             clf,

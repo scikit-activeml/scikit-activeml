@@ -12,6 +12,7 @@ from sklearn.svm import SVC
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.pool import MaxHerding, UHerding
 from skactiveml.tests.template_query_strategy import (
     TemplateMultilabelAggregationQueryStrategy,
@@ -22,13 +23,12 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierLogitsEmbeddingTuple,
     ParzenWindowClassifierLogitsOnly,
     ParzenWindowClassifierWeirdTuple,
+    assert_state_unchanged,
 )
 from skactiveml.utils import MISSING_LABEL, TargetSpec, resolve_target_spec
 from skactiveml.utils._validation import _canonicalize_multilabel_probas
 
-# Semantically equivalent binary class vocabularies per label output. The
-# reversed declaration must resolve to the same canonical, i.e. sorted,
-# ordering as its counterpart.
+# Equivalent binary class vocabularies per label output.
 _VOCABULARY_CASES = (
     ("numeric", [[0, 1], [0, 1]]),
     ("string", [["no", "yes"], ["off", "on"]]),
@@ -48,11 +48,8 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
         missing_label=MISSING_LABEL,
         target_type="multi-label",
     ):
-        super().__init__(
-            classes=classes,
-            missing_label=missing_label,
-            target_type=target_type,
-        )
+        super().__init__(classes=classes, missing_label=missing_label)
+        self.target_type = target_type
         self.probas = probas
         self.logits = logits
         self.return_as_list = return_as_list
@@ -589,7 +586,6 @@ class TestUHerding(
         query_indices = UHerding(
             temperatures=1.0,
             predict_proba_dict=None,
-            target_type="multi-label",
             random_state=0,
         ).query(X, y, clf=clf, fit_clf=False)
 
@@ -613,7 +609,6 @@ class TestUHerding(
         query_indices = UHerding(
             temperatures=1.0,
             predict_proba_dict=None,
-            target_type="multi-label",
             random_state=0,
         ).query(X, y, clf=clf, fit_clf=False)
 
@@ -752,6 +747,78 @@ class TestUHerding(
         self.assertEqual(
             ParzenWindowClassifierLogitsEmbedding.fit_calls, fit_calls_before
         )
+
+    def test_multiannotator_calibration_rejected_before_fit(self):
+        X = self.query_default_params_clf["X"]
+        y = self.query_default_params_clf["y"]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(X, y[:, None])
+        clf_before = deepcopy(clf)
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for temperatures in [None, [0.5, 1.0]]:
+                for fit_clf in [False, True]:
+                    with self.subTest(
+                        temperatures=temperatures, fit_clf=fit_clf
+                    ):
+                        qs = UHerding(
+                            temperatures=temperatures, random_state=0
+                        )
+                        with self.assertRaisesRegex(
+                            ValueError, "does not support"
+                        ):
+                            qs.query(X, y, clf=clf, fit_clf=fit_clf)
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
+
+    def test_multiannotator_fixed_temperature_requires_predictions_only(self):
+        X = self.query_default_params_clf["X"]
+        y = self.query_default_params_clf["y"]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(X, y[:, None])
+        clf_before = deepcopy(clf)
+        expected = UHerding(temperatures=0.5, random_state=0).query(
+            X,
+            y,
+            clf=ParzenWindowClassifier(
+                classes=self.classes, random_state=0
+            ).fit(X, y),
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for temperatures in [0.5, [0.5]]:
+                with self.subTest(temperatures=temperatures):
+                    actual = UHerding(
+                        temperatures=temperatures, random_state=0
+                    ).query(
+                        X,
+                        y,
+                        clf=clf,
+                        fit_clf=False,
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(actual[0], expected[0])
+                    np.testing.assert_allclose(actual[1], expected[1])
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
 
     def test_query_multilabel_fixed_temperature_skips_calibration_refits(self):
         DummyMultilabelLogitClassifier.reset_fit_calls()
@@ -1028,11 +1095,6 @@ class TestUHerding(
         )
 
     def _multilabel_custom_vocabulary_params(self, vocabularies):
-        # The default multi-label fixture provides no logits, so its query
-        # never reaches temperature calibration. This specialized fixture
-        # supplies a logits-capable classifier, a multi-element temperature
-        # candidate grid, and enough labeled samples for a calibration split,
-        # i.e. the path inspecting the raw validation labels.
         X = np.array(
             [
                 [0.0, 0.0],
@@ -1049,11 +1111,8 @@ class TestUHerding(
                 [0.6, 0.6],
             ]
         )
-        # Every fixture is semantically equivalent, i.e. code `0` denotes the
-        # negative and code `1` the positive class of each output. The first
-        # output agrees with the logits of the classifier, while the second one
-        # is deliberately underconfident, so that the two outputs disagree
-        # about their best temperature.
+        # The first output agrees with the logits of the classifier, while the
+        # second one is underconfident.
         codes = np.array(
             [
                 [0, 1],
@@ -1080,7 +1139,6 @@ class TestUHerding(
             "validation_size": 0.5,
             "missing_label": None,
             "random_state": 0,
-            "target_type": "multi-label",
         }
         query_params = {
             "X": X,
@@ -1109,9 +1167,6 @@ class TestUHerding(
         return qs, query_params, target_spec
 
     def test_query_multilabel_custom_vocabularies_with_temperature_grid(self):
-        # A valid multi-label target may use its own binary class vocabulary
-        # per output. The searched-temperature path inspects the validation
-        # labels and must therefore encode them instead of coercing them.
         results = {}
         for name, vocabularies in _VOCABULARY_CASES:
             with self.subTest(vocabularies=name):
@@ -1142,8 +1197,6 @@ class TestUHerding(
                 )
 
     def test_select_temperature_multilabel_custom_vocabularies(self):
-        # The searched grid is evaluated independently per output, so the
-        # equivalence must hold for the selected temperatures themselves.
         taus = {}
         for name, vocabularies in _VOCABULARY_CASES:
             qs, query_params, target_spec = self._multilabel_calibration_setup(
@@ -1157,8 +1210,6 @@ class TestUHerding(
                 target_spec=target_spec,
             )
 
-        # One selected temperature per output, searched independently, i.e.
-        # the outputs of this setup disagree about their calibration.
         self.assertEqual(taus["numeric"].shape, (2,))
         self.assertNotEqual(taus["numeric"][0], taus["numeric"][1])
         for name, _ in _VOCABULARY_CASES[1:]:
@@ -1166,16 +1217,11 @@ class TestUHerding(
                 np.testing.assert_allclose(taus["numeric"], taus[name])
 
     def test_select_temperature_multilabel_uses_positive_class_column(self):
-        # Inverting the observed labels must change the calibration outcome,
-        # i.e. the encoded positive class must match the positive-class
-        # probability column of the corresponding output.
         vocabularies = [["no", "yes"], ["off", "on"]]
         qs, query_params, target_spec = self._multilabel_calibration_setup(
             vocabularies
         )
         y = query_params["y"]
-        # Relabeling from reversed source vocabularies onto the canonical ones
-        # swaps the negative and the positive class of every output.
         y_inverted = _relabel_multilabel_target(
             y,
             source_classes=tuple(
@@ -1202,9 +1248,6 @@ class TestUHerding(
         self.assertFalse(np.allclose(taus[0], taus[1]))
 
     def test_select_temperature_multilabel_fixed_temperature_is_shared(self):
-        # A scalar or length-one `temperatures` is one fixed temperature
-        # shared by every output, i.e. no per-output grid is searched and no
-        # calibration refit takes place.
         qs, query_params, target_spec = self._multilabel_calibration_setup(
             [["no", "yes"], ["off", "on"]]
         )

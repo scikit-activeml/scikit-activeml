@@ -17,21 +17,17 @@ from ..base import (
     SkactivemlRegressor,
     ProbabilisticRegressor,
 )
+from ..utils._label import _observed_numerical_labels
 from ..utils import (
-    is_labeled,
     match_signature,
     check_n_features,
     check_scalar,
     check_type,
     MISSING_LABEL,
     TargetSpec,
-    resolve_target_spec,
 )
 from ..utils._target import _check_target_spec_capability
-from ..utils._wrapper_state import (
-    _resolve_own_fitted_attribute,
-    _restore_wrapper_attributes,
-)
+from ..utils._wrapper_state import _resolve_own_fitted_attribute
 
 successful_skorch_torch_import = False
 try:
@@ -47,16 +43,10 @@ except ImportError:  # pragma: no cover
 def _narrow_to_single_output_prediction(estimator, prediction):
     """Return `prediction` with its primary output as shape `(n_samples,)`.
 
-    A single-output regression target is described by one value per sample,
-    so the wrapped estimator's predictions are narrowed to that shape. The
-    target type is resolved from the prediction itself and checked against
-    the capabilities of `estimator`, so that a multi-output prediction is
-    rejected instead of being flattened into meaningless values.
-
     Parameters
     ----------
     estimator : SkactivemlRegressor
-        The regressor whose capabilities the prediction must satisfy.
+        The regressor whose wrapped estimator made the prediction.
     prediction : array-like or tuple
         The predictions of the wrapped estimator. A tuple carries the
         predicted target values as its first element, e.g., together with
@@ -72,28 +62,57 @@ def _narrow_to_single_output_prediction(estimator, prediction):
     Raises
     ------
     ValueError
-        If the predicted target values do not describe a target type
-        supported by `estimator`.
+        If the wrapped estimator predicts several target values per sample or
+        non-finite values.
     """
-    is_tuple = isinstance(prediction, tuple)
-    y_pred = prediction[0] if is_tuple else prediction
-    prediction_spec = resolve_target_spec(
-        y_pred,
-        task="regression",
-        target_type="auto",
-        annotation_type="single-annotator",
-        classes=None,
-        missing_label=estimator.missing_label,
-    )
-    _check_target_spec_capability(
-        type(estimator).__name__,
-        prediction_spec,
-        estimator._target_capabilities,
-    )
-    y_pred = np.asarray(y_pred).reshape(-1)
-    if is_tuple:
+    if isinstance(prediction, tuple):
+        y_pred = _single_output_values(estimator, prediction[0], 1)
         return (y_pred, *prediction[1:])
-    return y_pred
+    return _single_output_values(estimator, prediction, 1)
+
+
+def _single_output_values(estimator, values, ndim):
+    """Drop a singleton target axis and reject several target values.
+
+    Parameters
+    ----------
+    estimator : SkactivemlRegressor
+        The regressor whose wrapped estimator returned `values`.
+    values : array-like
+        Predicted target values or target samples whose second axis may be a
+        target axis.
+    ndim : int
+        The number of dimensions of `values` for single-output regression,
+        i.e., 1 for predictions and 2 for samples.
+
+    Returns
+    -------
+    values : numpy.ndarray
+        The values with `ndim` dimensions.
+
+    Raises
+    ------
+    ValueError
+        If `values` hold several target values per sample or non-finite
+        values.
+    """
+    values = np.asarray(values)
+    if values.dtype == object:
+        values = values.astype(float)
+    if values.ndim == ndim + 1 and values.shape[1] == 1:
+        values = values[:, 0]
+    if values.ndim != ndim:
+        raise ValueError(
+            f"{type(estimator).__name__} supports single-output regression "
+            f"only, but the wrapped estimator returned values of shape "
+            f"{values.shape}."
+        )
+    if not np.isfinite(values).all():
+        raise ValueError(
+            f"The estimator wrapped by {type(estimator).__name__} returned "
+            f"non-finite values."
+        )
+    return values
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -109,19 +128,21 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         scikit-learn regressor.
     include_unlabeled_samples : bool, default=False
         - If `False`, only labeled samples are passed to the `fit` method of
-          the `estimator`.
+          the `estimator`. Their labels are converted to `float64`, so that
+          the `estimator` performs its arithmetic on ordinary floating-point
+          values however `y` stores them, e.g. as integers or as an object
+          array beside `missing_label=None`.
         - If `True`, all samples including the unlabeled ones are passed to
           the `fit` method of the `estimator`. Ensure that your `estimator`
           is able to handle unlabeled samples marked by `missing_label`.
           Otherwise, `missing_label` is interpreted as a regular target value.
+          `y` is passed on unchanged in this case, because only its raw
+          representation holds the missing label.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This wrapper supports only single-output
-        regression.
 
     Attributes
     ----------
@@ -133,18 +154,15 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     Notes
     -----
     Attributes this wrapper does not hold itself are read from the wrapped
-    `estimator`. The fitted attributes it resolves itself, e.g. `target_spec_`,
-    never are: around a pre-fitted `estimator` they resolve this wrapper's own
-    target semantics on first access, and they raise the usual not-fitted error
-    while no such semantics exist. A pre-fitted estimator's own target
-    specification stays readable as `estimator.target_spec_`.
+    `estimator`, except for its own fitted attributes, e.g., `target_spec_`.
+    Around a pre-fitted `estimator`, these are resolved on first access. The
+    estimator's own target specification remains available as
+    `estimator.target_spec_`.
     """
 
-    #: Fitted attributes this wrapper resolves itself, which `__getattr__`
-    #: therefore never forwards to the wrapped `estimator`. `n_features_in_`
-    #: is deliberately absent: it describes the input data rather than the
-    #: target, both objects agree on it, and `partial_fit` reads it through
-    #: `hasattr` to decide whether to reset the feature count.
+    #: Fitted attributes `__getattr__` never forwards to `estimator`.
+    #: `n_features_in_` is forwarded, so that `partial_fit` around a
+    #: pre-fitted `estimator` keeps that estimator's feature count.
     _own_fitted_attributes = frozenset(
         {
             "_label_mean",
@@ -162,12 +180,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         include_unlabeled_samples=False,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
@@ -235,21 +251,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
-        """Fit or partially fit this wrapper as a single transaction.
-
-        The snapshot taken here covers the entire fit, not only the estimator
-        call: a rejection raised while validating the estimator, the inputs,
-        or the target specification rolls the wrapper back just as a failing
-        estimator fit would. Without that, a failing re-fit would leave an
-        already fitted wrapper reporting metadata from the abandoned attempt,
-        e.g. an `n_features_in_` that contradicts its `estimator_`, so that it
-        could no longer predict on the data it was trained on.
-
-        The label-mean fallback is not a failure and keeps its state, because
-        `_validate_and_fit` returns `self` for it rather than raising. The
-        transaction also covers this wrapper only: as
-        `_restore_wrapper_attributes` documents, a `partial_fit` that already
-        mutated `estimator_` in place cannot be rolled back.
+        """Fit or partially fit this wrapper.
 
         Parameters
         ----------
@@ -268,28 +270,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         -------
         self : SklearnRegressor
             The wrapper fitted on the training data.
-        """
-        attributes_before = dict(self.__dict__)
-        try:
-            return self._validate_and_fit(
-                fit_function=fit_function,
-                X=X,
-                y=y,
-                sample_weight=sample_weight,
-                **fit_kwargs,
-            )
-        except Exception:
-            _restore_wrapper_attributes(self, attributes_before)
-            raise
-
-    def _validate_and_fit(
-        self, fit_function, X, y, sample_weight, **fit_kwargs
-    ):
-        """Validate the inputs and fit the estimator, committing state freely.
-
-        This method may write fitted attributes before a later step rejects
-        the call, because its only caller `_fit` rolls them back. See `_fit`
-        for the parameters and the transactional guarantee.
         """
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
@@ -325,20 +305,31 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             target_spec=target_spec,
         )
 
-        is_lbld = is_labeled(y, missing_label=self.missing_label_)
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
+        )
         if self.include_unlabeled_samples:
+            # The estimator handles the missing label itself.
             is_included = np.full_like(y, True, dtype=bool)
+            y_train = y[is_included]
         else:
             is_included = is_lbld
+            y_train = y_observed
         X_train = X[is_included]
-        y_train = y[is_included]
+        if (
+            fit_function == "partial_fit"
+            and len(X_train) == 0
+            and hasattr(self, "estimator_")
+        ):
+            # An empty update keeps the model and the fallback statistics.
+            return self
         estimator_params = dict(fit_kwargs) if fit_kwargs is not None else {}
 
         if sample_weight is not None:
             estimator_params["sample_weight"] = sample_weight[is_included]
 
-        self._label_mean = np.mean(y[is_lbld]) if np.sum(is_lbld) > 0 else 0
-        self._label_std = np.std(y[is_lbld]) if np.sum(is_lbld) > 1 else 1
+        self._label_mean = np.mean(y_observed) if len(y_observed) > 0 else 0
+        self._label_std = np.std(y_observed) if len(y_observed) > 1 else 1
         if fit_function != "partial_fit" or not hasattr(self, "estimator_"):
             self.estimator_ = deepcopy(self.estimator)
         try:
@@ -423,7 +414,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Returns
         -------
         y_samples : ndarray of shape (n_samples_X, n_samples)
-            Drawn random target samples.
+            Drawn random target samples. If the `estimator` could not be
+            fitted, the samples follow the same normal fallback distribution
+            that `predict` reports, defined by the empirical label mean and
+            standard deviation.
         """
         return self._sample(
             sample_function="sample_y",
@@ -454,7 +448,10 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         Returns
         -------
         y_samples : ndarray of shape (n_samples_X, n_samples)
-            Drawn random target samples.
+            Drawn random target samples. If the `estimator` could not be
+            fitted, the samples follow the same normal fallback distribution
+            that `predict` reports, defined by the empirical label mean and
+            standard deviation.
         """
         return self._sample(
             sample_function="sample", X=X, n_samples=n_samples, **sample_kwargs
@@ -465,31 +462,34 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        try:
-            return attrgetter(sample_function)(self.estimator_)(
+        # Branch on `is_fitted_` as `predict` does, because `estimator_` may
+        # stem from an earlier fit.
+        if self.is_fitted_:
+            y_samples = attrgetter(sample_function)(self.estimator_)(
                 X, n_samples, **sample_kwargs
             )
-        except NotFittedError:
-            warnings.warn(
-                f"Since the 'estimator' could not be fitted when"
-                f" calling the `fit` method, the label "
-                f"mean `_label_mean={self._label_mean}` and optionally the "
-                f"label standard deviation `_label_std={self._label_std}` is "
-                f"used to make the predictions."
-            )
-            random_state = sample_kwargs.get("random_state", None)
-            random_state = check_random_state(random_state)
-            check_scalar(
-                n_samples,
-                "n_samples",
-                min_val=1,
-                min_inclusive=True,
-                target_type=int,
-            )
-            y_samples = random_state.randn(len(X), n_samples)
-            y_samples *= self._label_std
-            y_samples += self._label_mean
-            return y_samples
+            return _single_output_values(self, y_samples, 2)
+
+        warnings.warn(
+            f"Since the 'estimator' could not be fitted when"
+            f" calling the `fit` method, the label "
+            f"mean `_label_mean={self._label_mean}` and optionally the "
+            f"label standard deviation `_label_std={self._label_std}` is "
+            f"used to make the predictions."
+        )
+        random_state = sample_kwargs.get("random_state", None)
+        random_state = check_random_state(random_state)
+        check_scalar(
+            n_samples,
+            "n_samples",
+            min_val=1,
+            min_inclusive=True,
+            target_type=int,
+        )
+        y_samples = random_state.randn(len(X), n_samples)
+        y_samples *= self._label_std
+        y_samples += self._label_mean
+        return y_samples
 
     def __sklearn_is_fitted__(self):
         if "is_fitted_" in self.__dict__:
@@ -518,95 +518,32 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         return True
 
     def _resolve_prefitted_target_spec(self):
-        target_type = (
-            "single-output" if self.target_type == "auto" else self.target_type
-        )
+        if not get_tags(self.estimator).target_tags.single_output:
+            raise ValueError(
+                f"The pre-fitted estimator '{self.estimator}' does not "
+                f"support single-output regression."
+            )
         target_spec = TargetSpec(
             task="regression",
-            target_type=target_type,
+            target_type="single-output",
             annotation_type="single-annotator",
             classes=None,
         )
-        _check_target_spec_capability(
-            type(self).__name__, target_spec, self._target_capabilities
-        )
 
         estimator_target_spec = getattr(self.estimator, "target_spec_", None)
-        if estimator_target_spec is None:
-            estimator_target_type = self._prefitted_estimator_target_type(
-                self.estimator
-            )
-            if estimator_target_type is None:
+        if estimator_target_spec is not None:
+            if not isinstance(estimator_target_spec, TargetSpec):
                 raise ValueError(
-                    "Cannot establish a single-output target specification "
-                    "from the pre-fitted estimator. The estimator must expose "
-                    "`target_spec_` or fitted output metadata."
+                    "The pre-fitted estimator's `target_spec_` must be a "
+                    "`TargetSpec`."
                 )
-            estimator_target_spec = TargetSpec(
-                task="regression",
-                target_type=estimator_target_type,
-                annotation_type="single-annotator",
-                classes=None,
+            _check_target_spec_capability(
+                type(self).__name__,
+                estimator_target_spec,
+                self._target_capabilities,
             )
-        elif not isinstance(estimator_target_spec, TargetSpec):
-            raise ValueError(
-                "The pre-fitted estimator's `target_spec_` must be a "
-                "`TargetSpec`."
-            )
-        _check_target_spec_capability(
-            type(self).__name__,
-            estimator_target_spec,
-            self._target_capabilities,
-        )
 
         return target_spec
-
-    @classmethod
-    def _prefitted_estimator_target_type(cls, estimator):
-        target_tags = get_tags(estimator).target_tags
-        if not target_tags.multi_output:
-            return "single-output"
-        if not target_tags.single_output:
-            return "multi-output"
-
-        n_outputs = getattr(estimator, "n_outputs_", None)
-        if n_outputs is not None:
-            return "single-output" if n_outputs == 1 else "multi-output"
-
-        # Dual coefficients have one column per prediction output, just like
-        # stored training targets (e.g., for kernel ridge regression).
-        for attr in ("y_train_", "_y", "dual_coef_"):
-            target_values = getattr(estimator, attr, None)
-            if target_values is not None:
-                target_values = np.asarray(target_values)
-                is_single_output = (
-                    target_values.ndim == 1
-                    or target_values.ndim == 2
-                    and target_values.shape[1] == 1
-                )
-                return "single-output" if is_single_output else "multi-output"
-
-        intercept = getattr(estimator, "intercept_", None)
-        if intercept is not None:
-            intercept = np.asarray(intercept)
-            if intercept.ndim > 0:
-                return (
-                    "single-output" if intercept.size == 1 else "multi-output"
-                )
-            coefficients = np.asarray(getattr(estimator, "coef_", []))
-            if coefficients.ndim == 2:
-                return (
-                    "single-output"
-                    if coefficients.shape[0] == 1
-                    else "multi-output"
-                )
-            return "single-output"
-
-        steps = getattr(estimator, "steps", None)
-        if steps:
-            return cls._prefitted_estimator_target_type(steps[-1][1])
-
-        return None
 
     def __getattr__(self, item):
         if item in self._own_fitted_attributes:
@@ -637,9 +574,6 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This wrapper supports only single-output
-        regression.
     """
 
     def __init__(
@@ -647,22 +581,17 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
         estimator,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             estimator,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
         """Reject an estimator without `return_std`, then fit as usual.
 
-        The rejection precedes `SklearnRegressor._fit` and therefore the
-        transaction it opens. It writes nothing itself, so the wrapper is
-        equally untouched by it, and every later failure is rolled back by the
-        inherited transaction. See `SklearnRegressor._fit` for the parameters.
+        See `SklearnRegressor._fit` for the parameters.
         """
         if (
             hasattr(self.estimator, "predict")
@@ -689,23 +618,32 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
         Returns
         -------
         dist : scipy.stats._distn_infrastructure.rv_frozen
-            The distribution of the targets at the test samples.
+            The distribution of the targets at the test samples. A predicted
+            standard deviation of zero yields a point mass at the predicted
+            mean.
 
         """
         check_is_fitted(self)
 
         try:
             loc, scale = SklearnRegressor.predict(self, X, return_std=True)
-            return norm(loc=loc, scale=scale)
         except TypeError as e:
             if (
                 "predict() got an unexpected keyword argument 'return_std'"
                 in str(e)
             ):
                 raise ValueError(
-                    "SklearnNormalRegressors require the Regressor from"
+                    "SklearnNormalRegressors require the Regressor from "
                     "`sklearn` to accept `return_std`."
                 ) from e
+            raise
+        scale = np.asarray(scale, dtype=float)
+        if not np.all(np.isfinite(scale) & (scale >= 0)):
+            raise ValueError(
+                "The standard deviations predicted by `estimator` must be "
+                "finite and nonnegative."
+            )
+        return norm(loc=loc, scale=np.maximum(scale, np.finfo(float).tiny))
 
 
 if successful_skorch_torch_import:
@@ -833,20 +771,20 @@ if successful_skorch_torch_import:
             always cast to  `np.float32`.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
-              of the `estimator`.
+              of the `estimator`. Their labels are converted to floating-point
+              values however `y` stores them, e.g. as integers or as an object
+              array beside `missing_label=None`.
             - If `True`, all samples including the unlabeled ones are passed to
               the `fit` method of the `estimator`. Ensure that the `criterion`
               is able to handle unlabeled samples marked by `missing_label`.
               Otherwise, `missing_label` is interpreted as a regular target
-              value.
+              value. The missing label is converted along with the labels,
+              so `missing_label=None` reaches the `criterion` as NaN.
         missing_label : scalar or string or np.nan or None, default=np.nan
             Value to represent a missing label.
         random_state : int or RandomState instance or None, default=None
             Determines random number for 'predict' method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : "auto" or "single-output", default="auto"
-            Declared target type. This wrapper supports only single-output
-            regression.
 
         References
         ----------
@@ -866,12 +804,10 @@ if successful_skorch_torch_import:
             include_unlabeled_samples=False,
             missing_label=MISSING_LABEL,
             random_state=None,
-            target_type="auto",
         ):
             super(SkorchRegressor, self).__init__(
                 missing_label=missing_label,
                 random_state=random_state,
-                target_type=target_type,
             )
             self.module = module
             self.criterion = criterion
@@ -1022,10 +958,7 @@ if successful_skorch_torch_import:
             if self.forward_outputs is not None:
                 return self.forward_outputs
 
-            # The single forward output is treated as already being in the
-            # desired target space. Its shape is not the mapping's concern:
-            # `predict` narrows the predicted target values itself, and the
-            # transforms are ignored while training.
+            # The single forward output holds the predicted target values.
             return {"output": (0, None)}
 
         def _net_parts(self, X=None, y=None):
@@ -1051,10 +984,8 @@ if successful_skorch_torch_import:
                 work.
             criterion : torch.nn.Module.__class__
                 The uninitialized criterion (loss) used to optimize the module.
-            predict_nonlinearity : Callable
-                The nonlinearity to be applied to the prediction.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """
@@ -1111,13 +1042,18 @@ if successful_skorch_torch_import:
                 Training labels or `None` if none exist.
             """
             X_train, y_train = None, None
+            is_lbld, y_observed = _observed_numerical_labels(
+                y, self.missing_label_
+            )
             if self.include_unlabeled_samples:
                 is_included = np.full_like(y, fill_value=True, dtype=bool)
+                y_included = y[is_included]
             else:
-                is_included = is_labeled(y, missing_label=self.missing_label_)
+                is_included = is_lbld
+                y_included = y_observed
             if np.sum(is_included) > 0:
                 X_train = X[is_included]
-                y_train = y[is_included]
-            if y_train is not None:
-                y_train = y_train.astype(np.float32, copy=True).reshape(-1, 1)
+                y_train = np.asarray(y_included, dtype=np.float32).reshape(
+                    -1, 1
+                )
             return X_train, y_train

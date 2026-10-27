@@ -28,7 +28,6 @@ class TemplateEstimatedBudgetManager(TemplateBudgetManager):
         )
 
     def test_init_param_w(self, test_cases=None):
-        # w must be defined as an int with a range of w > 0
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (10, None),
@@ -40,7 +39,6 @@ class TemplateEstimatedBudgetManager(TemplateBudgetManager):
         self._test_param("init", "w", test_cases)
 
     def test_init_param_theta(self, test_cases=None):
-        # theta must be defined as a float
         init_params_list = inspect.signature(self.bm_class.__init__).parameters
         if "theta" in init_params_list:
             test_cases = [] if test_cases is None else test_cases
@@ -48,7 +46,6 @@ class TemplateEstimatedBudgetManager(TemplateBudgetManager):
             self._test_param("init", "theta", test_cases)
 
     def test_init_param_s(self, test_cases=None):
-        # s must be defined as a float with a range of: 0 < s <= 1
         init_params_list = inspect.signature(self.bm_class.__init__).parameters
         if "s" in init_params_list:
             test_cases = [] if test_cases is None else test_cases
@@ -80,7 +77,6 @@ class TestFixedUncertaintyBudgetManager(
         )
 
     def test_init_param_classes(self):
-        # classes must be defined
         test_cases = []
         test_cases += [
             ([0, 1], None),
@@ -89,6 +85,7 @@ class TestFixedUncertaintyBudgetManager(
             ("string", TypeError),
             (-1, TypeError),
             (0, TypeError),
+            ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)
 
@@ -158,7 +155,6 @@ class TestSplitBudgetManager(
         )
 
     def test_init_param_v(self, test_cases=None):
-        # v must be defined as an float with a range of: 0 < v < 1
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (0.2, None),

@@ -1,11 +1,35 @@
 """
-Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
-the Apache-2.0 license and the associated query strategy is presented:
+This module's computations, i.e., `batch_bald` and its entropy
+helpers, are a modification of batchbald_redux
+(https://github.com/BlackHC/batchbald_redux), distributed under the Apache-2.0
+license.
+
+Copyright 2020- Andreas Kirsch
+
+The full Apache-2.0 text and the NOTICE file are distributed with
+scikit-activeml in ``LICENSES/batchbald_redux/``.
+
+Central changes made by the scikit-activeml developers:
+
+- NumPy replaces PyTorch.
+- Chunking or progress bars are removed.
+- The inputs are probabilities of shape `(n_estimators, n_samples, n_classes)`
+  instead of log probabilities. They are checked for dimensionality and
+  finite values, then clipped to `[eps, 1]` before taking logarithms.
+- Sampling uses NumPy's `RandomState`. Ties inside `batch_bald` are broken
+  with `rand_argmax` using the supplied random state.
+- The utilities of every batch step are returned, where candidates
+  selected earlier in the batch are marked as NaN.
+- Only the parts needed for `BatchBALD` are kept.
+
+The associated query strategy is presented in:
 
 A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and Diverse
 Batch Acquisition for Deep Bayesian Active Learning. In Adv. Neural Inf.
 Process. Syst., 2019.
 """
+
+import warnings
 
 import numpy as np
 from sklearn.utils import check_array
@@ -26,7 +50,7 @@ from ._target import _resolve_estimator_target_spec
 class _GeneralBALD(QueryByCommittee):
     """General Bayesian Active Learning by Disagreement (_GeneralBALD)
 
-    The Bayesian Active Learning by Disagreement (BatchBALD) [1]_ strategy
+    The Bayesian Active Learning by Disagreement (BALD) [1]_ strategy
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
@@ -36,8 +60,10 @@ class _GeneralBALD(QueryByCommittee):
 
     Parameters
     ----------
-    n_MC_samples : int > 0, default=n_estimators
-        The number of monte carlo samples used for label estimation.
+    n_MC_samples : int > 0 or None, default=None
+        Number of Monte Carlo samples used to estimate joint label entropy.
+        If `None`, use the ensemble size. When sampling is needed, the count
+        is rounded up to a multiple of the ensemble size.
     greedy_selection : bool, default=False
         Flag to either use BatchBALD (`greedy_selection=False`) or a greedy
         (top-k) selection (`greedy_selection=True`) if `batch_size>1`.
@@ -68,9 +94,6 @@ class _GeneralBALD(QueryByCommittee):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. BALD strategies support only single-output
-        classification.
 
     References
     ----------
@@ -98,7 +121,6 @@ class _GeneralBALD(QueryByCommittee):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             eps=eps,
@@ -106,7 +128,6 @@ class _GeneralBALD(QueryByCommittee):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.n_MC_samples = n_MC_samples
         self.greedy_selection = greedy_selection
@@ -133,9 +154,9 @@ class _GeneralBALD(QueryByCommittee):
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         ensemble : array-like of SkactivemlClassifier or SkactivemlClassifier
-            - If `ensemble` is a `SkactivemlClassifier` and has
-              `n_estimators` plus `estimators_` after fitting as
-              attributes, its estimators will be used as committee.
+            - If `ensemble` is a `SkactivemlClassifier` and has the attribute
+              `estimators_` after fitting, its estimators will be used as
+              committee.
             - If `ensemble` is array-like, each element of this list must be
               `SkactivemlClassifier` and will be
               used as committee member.
@@ -195,7 +216,7 @@ class _GeneralBALD(QueryByCommittee):
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label,
+            strategy=self,
             estimator_types=[SkactivemlClassifier],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,
@@ -223,18 +244,32 @@ class _GeneralBALD(QueryByCommittee):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if sample_func is None:
-            probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
+            probas = self._aggregate_predict_probas(X_cand, est_arr)
         else:
             probas = sample_func(X_cand, **sample_dict)
 
-        if self.n_MC_samples is None:
+        n_MC_samples_ = self.n_MC_samples
+        if self.greedy_selection:
+            if (
+                isinstance(n_MC_samples_, str)
+                and n_MC_samples_ == "deprecated"
+            ):
+                n_MC_samples_ = None
+            else:
+                warnings.warn(
+                    "`n_MC_samples` is deprecated for greedy BALD selection "
+                    "and will be removed from `GreedyBALD` in a future "
+                    "release. Omit this parameter since it has no effect "
+                    "on the utilities.",
+                    FutureWarning,
+                    stacklevel=2,
+                )
+        if n_MC_samples_ is None:
             n_MC_samples_ = len(probas)
-        else:
-            n_MC_samples_ = self.n_MC_samples
         check_scalar(n_MC_samples_, "n_MC_samples", int, min_val=1)
 
         utils_batch_size = 1 if self.greedy_selection else batch_size
-        batch_utilities_cand = batch_bald(
+        query_indices_cand, batch_utilities_cand = _batch_bald(
             probas=probas,
             batch_size=utils_batch_size,
             n_MC_samples=n_MC_samples_,
@@ -256,8 +291,10 @@ class _GeneralBALD(QueryByCommittee):
                 return_utilities=return_utilities,
             )
         else:
-            best_indices = rand_argmax(
-                batch_utilities, axis=1, random_state=self.random_state_
+            best_indices = (
+                query_indices_cand
+                if mapping is None
+                else mapping[query_indices_cand]
             )
             if return_utilities:
                 return best_indices, batch_utilities
@@ -270,14 +307,16 @@ class BatchBALD(_GeneralBALD):
 
     Batch Bayesian Active Learning by Disagreement (BatchBALD) [1]_ selects a
     batch that maximizes the joint mutual information between the labels of the
-    selected points and the model parameters, typically estimated with MC
-    dropout or any other ensemble. This captures uncertainty and inter-sample
-    diversity in one objective, optimized greedily.
+    selected points and the model parameters, typically estimated with
+    Monte Carlo dropout or another ensemble. This captures uncertainty and
+    inter-sample diversity in one objective, optimized greedily.
 
     Parameters
     ----------
-    n_MC_samples : int > 0, default=n_estimators
-        The number of monte carlo samples used for label estimation.
+    n_MC_samples : int > 0 or None, default=None
+        Number of Monte Carlo samples used to estimate joint label entropy.
+        If `None`, use the ensemble size. When sampling is needed, the count
+        is rounded up to a multiple of the ensemble size.
     eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities.
     sample_predictions_method_name : str, default=None
@@ -305,9 +344,6 @@ class BatchBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. BatchBALD supports only single-output
-        classification.
 
     References
     ----------
@@ -324,7 +360,6 @@ class BatchBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -334,7 +369,6 @@ class BatchBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
 
@@ -349,8 +383,10 @@ class GreedyBALD(_GeneralBALD):
 
     Parameters
     ----------
-    n_MC_samples : int > 0, default=n_estimators
-        The number of monte carlo samples used for label estimation.
+    n_MC_samples : int > 0 or None, default="deprecated"
+        Deprecated and will be removed in a future release. GreedyBALD
+        computes individual label entropies exactly. Omit this parameter
+        to avoid a `FutureWarning` when calling `query`.
     eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities.
     sample_predictions_method_name : str, default=None
@@ -378,9 +414,6 @@ class GreedyBALD(_GeneralBALD):
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. GreedyBALD supports only single-output
-        classification.
 
     References
     ----------
@@ -391,13 +424,12 @@ class GreedyBALD(_GeneralBALD):
 
     def __init__(
         self,
-        n_MC_samples=None,
+        n_MC_samples="deprecated",
         eps=1e-7,
         sample_predictions_method_name=None,
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -407,7 +439,6 @@ class GreedyBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
 
@@ -421,7 +452,7 @@ def batch_bald(
     """BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian
     Active Learning
 
-    BatchBALD [1]_ is an extension of BALD  [2]_ (Bayesian Active Learning by
+    BatchBALD [2]_ is an extension of BALD [1]_ (Bayesian Active Learning by
     Disagreement) whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.
@@ -432,12 +463,14 @@ def batch_bald(
         The probability estimates of all estimators, samples, and classes.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
-    n_MC_samples : int > 0, default=n_estimators
-        The number of monte carlo samples used for label estimation.
+    n_MC_samples : int > 0 or None, default=None
+        Number of Monte Carlo samples used to estimate joint label entropy.
+        If `None`, use the ensemble size. When sampling is needed, the count
+        is rounded up to a multiple of the ensemble size.
     eps : float  > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities.
     random_state : int or np.random.RandomState, default=None
-        The random state to use.
+        The random state used for Monte Carlo sampling and breaking ties.
 
     Returns
     -------
@@ -453,12 +486,25 @@ def batch_bald(
        Diverse Batch Acquisition for Deep Bayesian Active Learning. In Adv.
        Neural Inf. Process. Syst., 2019.
     """
-    # Validate input parameters.
+    _, utilities = _batch_bald(
+        probas=probas,
+        batch_size=batch_size,
+        n_MC_samples=n_MC_samples,
+        random_state=random_state,
+        eps=eps,
+    )
+    return utilities
+
+
+def _batch_bald(probas, batch_size, n_MC_samples, random_state, eps):
+    """Return BatchBALD indices and the utilities used to select them."""
     if probas.ndim != 3:
         raise ValueError(
             f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
         )
-    probs_K_N_C = check_array(probas, ensure_2d=False, allow_nd=True)
+    probs_K_N_C = check_array(
+        probas, ensure_2d=False, allow_nd=True, dtype=float, copy=True
+    )
     check_scalar(batch_size, "batch_size", int, min_val=1)
     check_scalar(
         eps,
@@ -505,11 +551,11 @@ def batch_bald(
         utilities[i] -= conditional_entropies_N + shared_conditinal_entropies
         utilities[i, query_indices] = np.nan
 
-        query_idx = rand_argmax(utilities[i], random_state=0)[0]
+        query_idx = rand_argmax(utilities[i], random_state=random_state)[0]
 
         query_indices.append(query_idx)
 
-    return utilities
+    return np.asarray(query_indices, dtype=int), utilities
 
 
 class _ExactJointEntropy:
@@ -537,17 +583,9 @@ class _ExactJointEntropy:
 
     def compute_batch(self, log_probs_B_K_C):
         B, K, C = log_probs_B_K_C.shape
-        M = self.joint_probs_M_K.shape[0]
 
         probs_b_K_C = np.exp(log_probs_B_K_C)
-        b = probs_b_K_C.shape[0]
-        probs_b_M_C = np.empty((b, M, C))
-        for i in range(b):
-            np.matmul(
-                self.joint_probs_M_K,
-                probs_b_K_C[i],
-                out=probs_b_M_C[i],
-            )
+        probs_b_M_C = np.matmul(self.joint_probs_M_K, probs_b_K_C)
         probs_b_M_C /= K
 
         output_entropies_B = np.sum(
@@ -565,17 +603,19 @@ def _batch_multi_choices(probs_b_C, M, random_state):
         choices: Ni... x M
     """
     probs_B_C = probs_b_C.reshape((-1, probs_b_C.shape[-1]))
-    B = probs_B_C.shape[0]
-    C = probs_B_C.shape[1]
 
-    # samples: Ni... x draw_per_xx
-    choices = [
-        random_state.choice(
-            C, size=M, p=probs_B_C[b] / np.sum(probs_B_C[b]), replace=True
-        )
-        for b in range(B)
-    ]
-    choices = np.array(choices, dtype=int)
+    cdf_B_C = np.cumsum(
+        probs_B_C / probs_B_C.sum(axis=1, keepdims=True), axis=1
+    )
+    cdf_B_C /= cdf_B_C[:, -1:]
+    uniform_B_M = random_state.random_sample((len(cdf_B_C), M))
+    choices = np.array(
+        [
+            np.searchsorted(cdf_C, uniform_M, side="right")
+            for cdf_C, uniform_M in zip(cdf_B_C, uniform_B_M)
+        ],
+        dtype=int,
+    )
 
     choices_b_M = choices.reshape(list(probs_b_C.shape[:-1]) + [M])
     return choices_b_M
@@ -613,9 +653,7 @@ class _SampledJointEntropy:
     @staticmethod
     def sample(probs_N_K_C, M, random_state):
         K = probs_N_K_C.shape[1]
-
-        # S: num of samples per w
-        S = M // K
+        S = (M + K - 1) // K
 
         choices_N_K_S = _batch_multi_choices(probs_N_K_C, S, random_state)
 
@@ -638,17 +676,9 @@ class _SampledJointEntropy:
         B, K, C = log_probs_B_K_C.shape
         M = self.sampled_joint_probs_M_K.shape[0]
 
-        b = log_probs_B_K_C.shape[0]
-
-        probs_b_M_C = np.empty(
-            (b, M, C),
+        probs_b_M_C = np.matmul(
+            self.sampled_joint_probs_M_K, np.exp(log_probs_B_K_C)
         )
-        for i in range(b):
-            np.matmul(
-                self.sampled_joint_probs_M_K,
-                np.exp(log_probs_B_K_C[i]),
-                out=probs_b_M_C[i],
-            )
         probs_b_M_C /= K
 
         q_1_M_1 = self.sampled_joint_probs_M_K.mean(axis=1, keepdims=True)[

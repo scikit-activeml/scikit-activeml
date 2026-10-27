@@ -160,13 +160,11 @@ class TestLabelCardinalityInconsistency(
             )
 
         utility_mock.assert_called_once()
-        # The query passes encoded predictions and encoded observed labels.
         self.assertEqual(np.shape(recorded["y_pred"]), (len(self.unld_idx), 2))
         self.assertTrue(np.isin(recorded["y_pred"], [0, 1]).all())
         np.testing.assert_array_equal(
             recorded["y_labeled"], [[0, 0], [0, 1], [1, 1]]
         )
-        # The returned acquisition scores drive utilities and selection.
         np.testing.assert_allclose(
             utilities[0, self.unld_idx], acquisition_scores
         )
@@ -203,9 +201,8 @@ class TestLabelCardinalityInconsistency(
 
 class TestLabelCardinalityInconsistencyFunction(unittest.TestCase):
     def test_label_cardinality_inconsistency(self):
-        # Worked example: the labeled pool contains 0, 1, and 2 positive
-        # labels, i.e., a mean label cardinality of one. The candidates
-        # deviate from it by 1, 1, and 0 positive labels.
+        # The labeled cardinalities 0, 1, and 2 have a mean of one. The
+        # candidates deviate from it by 1, 1, and 0 positive labels.
         y_labeled = np.array([[0, 0], [0, 1], [1, 1]])
         y_pred = np.array([[1, 1], [0, 0], [1, 0]])
 
@@ -214,8 +211,6 @@ class TestLabelCardinalityInconsistencyFunction(unittest.TestCase):
         np.testing.assert_allclose(utilities, [1.0, 1.0, 0.0])
 
     def test_custom_class_vocabularies(self):
-        # Encoded targets carry no trace of the raw class values, so a custom
-        # vocabulary is scored exactly like a `{0, 1}` vocabulary.
         encoder = ExtLabelEncoder(
             classes=[[0, 2], [0, 5]],
             missing_label=-1,
@@ -231,8 +226,7 @@ class TestLabelCardinalityInconsistencyFunction(unittest.TestCase):
         np.testing.assert_allclose(utilities, [0.0, 1.0])
 
     def test_without_labeled_samples(self):
-        # An empty labeled pool has a label cardinality of zero, so each
-        # candidate's utility is its own number of predicted positive labels.
+        # Without labeled samples, the mean label cardinality is zero.
         utilities = label_cardinality_inconsistency(
             np.array([[1, 1], [0, 0], [0, 1]]), np.empty((0, 2), dtype=int)
         )

@@ -46,6 +46,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
 
     Parameters
     ----------
+    n_annotators : int >= 1 or None, default=None
+        Number of annotators. If `None`, it is inferred from `y` during
+        fitting.
     tol : float, default=0.0001
         Threshold for stopping the EM-Algorithm and the optimization of
         the logistic regression weights. If the change of the respective value
@@ -57,24 +60,20 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         Specifies if a constant (a.k.a. bias or intercept) should be
         added to input samples.
     annot_prior_full : int or float or array-like, default=1
-        Determines `A` as the Dirichlet prior for each annotator `l`
-        (i.e., `A[l] = annot_prior_full * np.ones(n_classes, n_classes)` for
-        numeric or `A[l] = annot_prior_full[l] * np.ones(n_classes, n_classes)`
-        for array-like parameter). `A[l,i,j]` is the estimated number of times.
-        annotator `l` has provided label `j` for a sample of true label `i`.
+        Base concentration of the Dirichlet prior `A` for each annotator's
+        confusion matrix. A scalar applies to every annotator, while an array
+        supplies one value per annotator. Values must be at least 1 because
+        the MAP update uses `A - 1` as prior counts.
     annot_prior_diag : int or float or array-like, default=0
-        Adds a value to the diagonal of `A[l]` being the Dirichlet
-        prior for annotator `l` (i.e., `A[l] += annot_prior_diag *
-        np.eye(n_classes)` for numeric or `A[l] += annot_prior_diag[l] *
-        np.ones(n_classes)` for array-like parameter). `A[l,i,j]` is the
-        estimated number of times annotator `l` has provided label `j` for
-        a sample of true label `i`.
-    weights_prior : int or float, default=1
+        Non-negative values added to the diagonal of each annotator's
+        Dirichlet prior `A`. A scalar applies to every annotator, while an
+        array supplies one value per annotator.
+    weights_prior : int or float >= 0, default=1
         Determines Gamma as the inverse covariance matrix of the
         prior distribution for every weight vector
         (i.e., `Gamma=weights_prior * np.eye(n_features)`).
         As default, the identity matrix is used for each weight vector.
-    solver : str or callable, default='L-BFGS-B'
+    solver : str or callable, default='Newton-CG'
         Type of solver.  Should be 'Nelder-Mead', 'Powell', 'CG',
         'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'COBYLA', 'SLSQP',
         'trust-constr', 'dogleg', 'trust-ncg', 'trust-exact', 'trust-krylov',
@@ -95,9 +94,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This classifier supports only single-output
-        classification with multiple annotators.
 
 
     Attributes
@@ -152,14 +148,12 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
         self.n_annotators = n_annotators
         self.tol = tol
@@ -183,13 +177,13 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             missing labels are represented via `missing_label`.
             Specifically, label `y[n, m]` refers to the label of sample
             `X[n]` from annotator `m`.
-        sample_weight : array-like of shape (n_samples, n_annotators)
-            It contains the weights of the training samples' class labels.
-            It must have the same shape as `y`. Accordingly, the sample
-            weights are only used for the initialization of the majority vote
-            and the computation of the confusion matrix. It is not supported
-            for the update of logistic regression weights and the expectation
-            computation.
+        sample_weight : array-like of shape (n_samples, n_annotators), \
+                default=None
+            Annotation weights with the same shape as `y`. An annotation with
+            zero weight is treated as missing. Weights are applied to
+            majority-vote initialization and confusion matrix updates. They
+            do not directly weight the logistic regression or expectation
+            updates.
 
         Returns
         -------
@@ -201,7 +195,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             X=X, y=y, sample_weight=sample_weight
         )
 
-        # Ensure value of 'tol' to be a positive integer.
         if self.n_annotators is not None:
             check_scalar(
                 self.n_annotators,
@@ -246,6 +239,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             min_inclusive=True,
             target_type=(int, float),
         )
+        if not np.isfinite(self.weights_prior):
+            raise ValueError("`weights_prior` must be finite.")
 
         # Set auxiliary variables.
         n_classes = len(self.classes_)
@@ -270,23 +265,23 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
 
         # Check input 'annot_prior_full' and 'annot_prior_diag'.
         annot_prior = []
-        for name, prior in [
-            ("annot_prior_full", self.annot_prior_full),
-            ("annot_prior_diag", self.annot_prior_diag),
+        for name, prior, minimum in [
+            ("annot_prior_full", self.annot_prior_full, 1),
+            ("annot_prior_diag", self.annot_prior_diag, 0),
         ]:
             if isinstance(prior, (int, float)):
                 prior_array = np.ones(self.n_annotators_) * prior
             else:
                 prior_array = column_or_1d(prior)
-            if name == "annot_prior_full":
-                is_invalid_prior = np.sum(prior_array <= 0)
-            else:
-                is_invalid_prior = np.sum(prior_array < 0)
-            if len(prior_array) != self.n_annotators_ or is_invalid_prior:
+            if (
+                len(prior_array) != self.n_annotators_
+                or not np.isfinite(prior_array).all()
+                or np.any(prior_array < minimum)
+            ):
                 raise ValueError(
-                    f"'{name}' must be either 'int', 'float' or "
-                    f"array-like with positive values and shape "
-                    f"(n_annotators), got {prior}"
+                    f"`{name}` must contain finite values >= {minimum}, "
+                    "given as a scalar or an array of shape "
+                    f"(n_annotators,), got {prior}."
                 )
             annot_prior.append(prior_array)
 
@@ -310,10 +305,19 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             self.Alpha_ = A_norm
             return self
 
+        if sample_weight is not None:
+            if sample_weight.shape != y.shape:
+                raise ValueError(
+                    "`sample_weight` must have the same shape as `y`."
+                )
+            y = np.where(sample_weight == 0, -1, y)
+
         # Remove samples without labels.
         is_lbld = is_labeled(y, missing_label=-1).any(axis=-1)
         X = X[is_lbld]
         y = y[is_lbld]
+        if sample_weight is not None:
+            sample_weight = sample_weight[is_lbld]
         n_samples = X.shape[0]
         is_lbld = is_labeled(y, missing_label=-1)
 
@@ -333,6 +337,11 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         if n_samples == 0:
             self.Alpha_ = A_norm
             return self
+
+        # Group the observed labels by sample for the E-step.
+        sample_idx, annot_idx = np.nonzero(is_lbld)
+        y_observed = y[sample_idx, annot_idx]
+        sample_starts = np.flatnonzero(np.diff(sample_idx, prepend=-1))
 
         # Initialize first expectation to infinity such that
         # |current - new| < tol is False.
@@ -357,13 +366,12 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
                 Mu /= np.sum(Mu, axis=1, keepdims=True)
             else:
                 # Use current model parameters to estimate ground truth labels.
-                U = np.ones((n_samples, n_classes))
-                for c in range(n_classes):
-                    for k in range(n_classes):
-                        y_is_k = y == k
-                        U[:, c] *= np.prod(
-                            self.Alpha_[:, c, k] ** y_is_k, axis=1
-                        )
+                # Multiply the likelihoods of each sample's labels per class.
+                U = np.multiply.reduceat(
+                    self.Alpha_[annot_idx, :, y_observed],
+                    sample_starts,
+                    axis=0,
+                )
                 Mu = P * U
                 Mu_sum = Mu.sum(axis=1, keepdims=True)
                 Mu = np.divide(
@@ -574,9 +582,10 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             Class predictions of the test samples.
         *extras : numpy.ndarray, optional
             Only returned if `extra_outputs` is not `None`. In that
-            case, the method returns a tuple whose first element is `P`
-            and whose remaining elements correspond to the requested
-            forward outputs in the order given by `extra_outputs`.
+            case, the method returns a tuple whose first element is
+            `y_pred` and whose remaining elements correspond to the
+            requested forward outputs in the order given by
+            `extra_outputs`.
             Potential outputs are:
 
             - `L_class` : `np.ndarray` of shape `(n_samples, n_classes)`,
@@ -650,7 +659,6 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
               `(n_samples, n_annotators, n_classes)`, where
               `P_annot[n, m, c]` refers to the probability that annotator
               `m` provides the class label `c` for sample `X[n]`.
-              Only returned, if `return_annotator_class=True`.
         """
         # Check extra outputs format.
         if extra_outputs is None:

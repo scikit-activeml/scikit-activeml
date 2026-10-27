@@ -7,8 +7,9 @@ Implementation of epistemic uncertainty sampling.
 import warnings
 
 import numpy as np
-from scipy.interpolate import griddata
+from scipy.interpolate import LinearNDInterpolator
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
+from scipy.special import xlogy, xlog1py
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils.extmath import safe_sparse_dot
 
@@ -47,9 +48,6 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification.
 
     References
     ----------
@@ -62,12 +60,10 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         precompute=False,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.precompute = precompute
 
@@ -99,6 +95,8 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -166,23 +164,35 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
         # Chose the correct method for the given classifier.
         if isinstance(clf, ParzenWindowClassifier):
-            if not hasattr(self, "precompute_array"):
-                self._precompute_array = None
-
             # Create precompute_array if necessary.
             if not isinstance(self.precompute, bool):
                 raise TypeError(
                     "'precompute' should be of type bool but {} "
                     "were given".format(type(self.precompute))
                 )
-            if self.precompute and self._precompute_array is None:
-                self._precompute_array = np.full((2, 2), np.nan)
-
             freq = clf.predict_freq(X_cand)
-            (
-                utilities_cand,
-                self._precompute_array,
-            ) = _epistemic_uncertainty_pwc(freq, self._precompute_array)
+            if self.precompute:
+                if getattr(self, "_precompute_array", None) is None:
+                    self._precompute_array = np.full((2, 2), np.nan)
+                    self._interpolation_cache = {}
+                # Reproduce the rectangle a fresh query would allocate.
+                # Delaunay diagonals can change with the surrounding grid,
+                # so interpolating the entire retained table changes scores.
+                interpolation_shape = tuple(
+                    2 if maximum <= 1 else int(maximum) + 2
+                    for maximum in np.max(freq, axis=0)
+                )
+                (
+                    utilities_cand,
+                    self._precompute_array,
+                ) = _epistemic_uncertainty_pwc(
+                    freq,
+                    self._precompute_array,
+                    self._interpolation_cache,
+                    interpolation_shape,
+                )
+            else:
+                utilities_cand, _ = _epistemic_uncertainty_pwc(freq)
         elif isinstance(clf, SklearnClassifier) and isinstance(
             clf.estimator_, LogisticRegression
         ):
@@ -220,7 +230,12 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def _epistemic_uncertainty_pwc(freq, precompute_array=None):
+def _epistemic_uncertainty_pwc(
+    freq,
+    precompute_array=None,
+    interpolation_cache=None,
+    interpolation_shape=None,
+):
     """Computes the epistemic uncertainty score for a Parzen Window Classifier
     (PWC) [1]_.
 
@@ -233,6 +248,12 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
     precompute_array : np.ndarray of a quadratic shape, default=None
         Used to interpolate and speed up the calculation. Will be enlarged if
         necessary. All entries that are 'np.nan' will be filled.
+    interpolation_cache : dict or None, default=None
+        Interpolation state retained across queries by the strategy. Reused
+        while the table shape is unchanged. Existing values must not change.
+    interpolation_shape : tuple of int or None, default=None
+        Shape of the active grid rectangle. If `None`, use the entire table.
+        The remaining precomputed values are retained for subsequent queries.
 
     Returns
     -------
@@ -253,49 +274,48 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
             "problems, {} classes were given."
             "".format(freq.shape[1])
         )
-    n = freq[:, 0]
-    p = freq[:, 1]
     utilities = np.full((len(freq)), np.nan)
     if precompute_array is not None:
-        # enlarges the precompute_array array if necessary:
-        if precompute_array.shape[0] < np.max(n) + 1:
-            new_shape = (
-                int(np.max(n)) - precompute_array.shape[0] + 2,
-                precompute_array.shape[1],
-            )
-            precompute_array = np.append(
-                precompute_array, np.full(new_shape, np.nan), axis=0
-            )
-        if precompute_array.shape[1] < np.max(p) + 1:
-            new_shape = (
-                precompute_array.shape[0],
-                int(np.max(p)) - precompute_array.shape[1] + 2,
-            )
-            precompute_array = np.append(
-                precompute_array, np.full(new_shape, np.nan), axis=1
+        new_shape = [
+            int(maximum) + 2 if size < maximum + 1 else size
+            for size, maximum in zip(precompute_array.shape, np.max(freq, 0))
+        ]
+        if interpolation_shape is not None:
+            new_shape = np.maximum(new_shape, interpolation_shape)
+        padding = [
+            (0, new - old)
+            for old, new in zip(precompute_array.shape, new_shape)
+        ]
+        if any(after for _, after in padding):
+            precompute_array = np.pad(
+                precompute_array, padding, constant_values=np.nan
             )
 
         # precompute the epistemic uncertainty:
-        for N in range(precompute_array.shape[0]):
-            for P in range(precompute_array.shape[1]):
-                if np.isnan(precompute_array[N, P]):
-                    pi1 = -minimize_scalar(
-                        _pwc_ml_1,
-                        method="Bounded",
-                        bounds=(0.0, 1.0),
-                        args=(N, P),
-                    ).fun
+        for N, P in np.argwhere(np.isnan(precompute_array)):
+            pi1 = -minimize_scalar(
+                _pwc_ml_1,
+                method="Bounded",
+                bounds=(0.0, 1.0),
+                args=(N, P),
+            ).fun
 
-                    pi0 = -minimize_scalar(
-                        _pwc_ml_0,
-                        method="Bounded",
-                        bounds=(0.0, 1.0),
-                        args=(N, P),
-                    ).fun
+            pi0 = -minimize_scalar(
+                _pwc_ml_0,
+                method="Bounded",
+                bounds=(0.0, 1.0),
+                args=(N, P),
+            ).fun
 
-                    pi = np.array([pi0, pi1])
-                    precompute_array[N, P] = np.min(pi, axis=0)
-        utilities = _interpolate(precompute_array, freq)
+            pi = np.array([pi0, pi1])
+            precompute_array[N, P] = np.min(pi, axis=0)
+        interpolation_table = precompute_array
+        if interpolation_shape is not None:
+            n_rows, n_columns = interpolation_shape
+            interpolation_table = precompute_array[:n_rows, :n_columns]
+        utilities = _interpolate(
+            interpolation_table, freq, interpolation_cache
+        )
     else:
         for i, f in enumerate(freq):
             pi1 = -minimize_scalar(
@@ -317,7 +337,7 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
     return utilities, precompute_array
 
 
-def _interpolate(precompute_array, freq):
+def _interpolate(precompute_array, freq, cache=None):
     """Linear interpolation.
 
     For further information, see `scipy.interpolate.griddata`.
@@ -328,18 +348,21 @@ def _interpolate(precompute_array, freq):
         Data values. The length should be greater than int(np.max(freq) + 1).
     freq : np.ndarray of shape (n_samples, 2)
         Points at which to interpolate data.
+    cache : dict or None, default=None
+        Interpolator storage for a table whose existing values do not change.
 
     Returns
     -------
         Array of interpolated values.
     """
-    points = np.zeros(
-        (precompute_array.shape[0] * precompute_array.shape[1], 2)
-    )
-    for n in range(precompute_array.shape[0]):
-        for p in range(precompute_array.shape[1]):
-            points[n * precompute_array.shape[1] + p] = n, p
-    return griddata(points, precompute_array.flatten(), freq, method="linear")
+    cache = {} if cache is None else cache
+    if cache.get("shape") != precompute_array.shape:
+        points = np.indices(precompute_array.shape).reshape(2, -1).T
+        cache["interpolator"] = LinearNDInterpolator(
+            points, precompute_array.ravel()
+        )
+        cache["shape"] = precompute_array.shape
+    return cache["interpolator"](freq)
 
 
 def _pwc_ml_1(theta, n, p):
@@ -362,9 +385,9 @@ def _pwc_ml_1(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta**p) * ((1 - theta) ** n)) / (
-        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
-    )
+    log_likelihood = xlogy(p, theta) + xlog1py(n, -theta)
+    log_maximum = xlogy(p, p / (n + p)) + xlogy(n, n / (n + p))
+    piH = np.exp(log_likelihood - log_maximum)
     return -np.minimum(piH, 2 * theta - 1)
 
 
@@ -389,9 +412,9 @@ def _pwc_ml_0(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta**p) * ((1 - theta) ** n)) / (
-        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
-    )
+    log_likelihood = xlogy(p, theta) + xlog1py(n, -theta)
+    log_maximum = xlogy(p, p / (n + p)) + xlogy(n, n / (n + p))
+    piH = np.exp(log_likelihood - log_maximum)
     return -np.minimum(piH, 1 - 2 * theta)
 
 
@@ -410,7 +433,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
     y : np.array
         The labels of the labeled pool X.
     clf : skactiveml.classifier.SklearnClassifier
-        Only a wrapped logistic regression is supported as classifier.
+        A fitted wrapper around logistic regression.
     sample_weight : array-like of shape (n_samples,), default=None
         Sample weights for `X`, only used if `clf` is a logistic regression
         classifier.
@@ -432,12 +455,14 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
             "clf has to be a wrapped LogisticRegression "
             "classifier but \n{}\n was given.".format(clf)
         )
-    if len(clf.classes) != 2:
+    if len(clf.classes_) != 2:
         raise ValueError(
             "epistemic is only implemented for two-class "
             "problems, {} classes were given."
-            "".format(len(clf.classes))
+            "".format(len(clf.classes_))
         )
+
+    y = np.where(np.asarray(y) == clf.classes_[1], 1, -1)
 
     # Get the probability predictions.
     probas = clf.predict_proba(X_cand)
@@ -467,8 +492,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
     x0 = np.zeros((X_cand.shape[1] + 1))
 
     # Set initial epistemic scores.
-    pi1 = np.maximum(2 * probas[:, 0] - 1, 0)
-    pi0 = np.maximum(1 - 2 * probas[:, 0], 0)
+    pi1 = np.maximum(2 * probas[:, 1] - 1, 0)
+    pi0 = np.maximum(1 - 2 * probas[:, 1], 0)
 
     # Compute pi0, pi1 for every x in candidates.
     for i, x in enumerate(X_cand):
@@ -523,13 +548,12 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
                             sample_weight=sample_weight,
                             gamma=gamma,
                         ),
-                        1 - 2 * alpha_p,
+                        1 - 2 * alpha_n,
                     ),
                 )
             Qn, Qp = np.delete(Qn, 0), np.delete(Qp, -1)
 
-    utilities = np.min(np.array([pi0, pi1]), axis=0)
-    return utilities
+    return np.min(np.array([pi0, pi1]), axis=0)
 
 
 def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
@@ -546,7 +570,7 @@ def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
     X : np.ndarray
         The labeled pool used to fit the classifier.
     y : np.ndarray
-        The labels of the labeled pool X.
+        Labels of the labeled pool `X`, encoded as -1 and +1.
     sample_weight : np.ndarray of shape (n_samples,), default=None
         Sample weights for X, only used if clf is a logistic regression
         classifier.
@@ -583,7 +607,7 @@ def _loglike_logreg(w, X, y, sample_weight=None, gamma=1):
     X : array-like of shape (n_samples, n_features)
         Training data.
     y : np.ndarray of shape (n_samples,)
-        The labels of the training data X.
+        Training labels encoded as -1 and +1.
     sample_weight : array-like of shape (n_samples,) default=None
         Array of weights that are assigned to individual samples.
         If not provided, then each sample is given unit weight.
@@ -650,6 +674,9 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
 
     All rights reserved.
 
+    The full license text is distributed with scikit-activeml in
+    `LICENSES/scikit-learn/COPYING-1.0.X`.
+
     Parameters
     ----------
     w : ndarray of shape (n_features,) or (n_features + 1,)
@@ -657,7 +684,7 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
     X : array-like of shape (n_samples, n_features)
         Training data.
     y : ndarray of shape (n_samples,)
-        Array of labels.
+        Training labels encoded as -1 and +1.
     alpha : float
         Regularization parameter. alpha is equal to 1 / C.
     sample_weight : array-like of shape (n_samples,) default=None
@@ -702,6 +729,9 @@ def _intercept_dot(w, X, y):
 
     All rights reserved.
 
+    The full license text is distributed with scikit-activeml in
+    `LICENSES/scikit-learn/COPYING-1.0.X`.
+
     Parameters
     ----------
     w : ndarray of shape (n_features,) or (n_features + 1,)
@@ -709,7 +739,7 @@ def _intercept_dot(w, X, y):
     X : array-like of shape (n_samples, n_features)
         Training data.
     y : np.ndarray of shape (n_samples,)
-        Array of labels.
+        Training labels encoded as -1 and +1.
 
     Returns
     -------

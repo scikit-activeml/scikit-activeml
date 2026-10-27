@@ -63,7 +63,7 @@ try:
         hidden_dropout : float, default=0.1
             Dropout probability applied in the fusion multi-layer perceptron.
             Note that this parameter has no effect for `n_hidden_layers=0`.
-        eta : float in (0, 1), default=0.9
+        eta : float in (1/n_classes, 1), default=0.9
             Prior annotator performance, i.e., the probability of obtaining a
             correct annotation from an arbitrary annotator for an arbitrary
             sample of an arbitrary class.
@@ -90,9 +90,6 @@ try:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
-        target_type : "auto" or "single-output", default="auto"
-            Declared target type. This classifier supports only single-output
-            classification with multiple annotators.
 
         References
         ----------
@@ -129,7 +126,6 @@ try:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
-            target_type="auto",
         ):
             super(AnnotMixClassifier, self).__init__(
                 multi_annotator_module=_AnnotMixModule,
@@ -141,7 +137,6 @@ try:
                 random_state=random_state,
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
-                target_type=target_type,
             )
             self.clf_module = clf_module
             self.alpha = alpha
@@ -492,7 +487,7 @@ try:
             Number of hidden layers in the fusion multi-layer perceptron.
         hidden_dropout : float
             Dropout probability applied in the fusion multi-layer perceptron.
-        eta : float in (0, 1)
+        eta : float in (1/n_classes, 1)
             Prior annotator performance, i.e., the probability of obtaining a
             correct annotation from an arbitrary annotator for an arbitrary
             sample.

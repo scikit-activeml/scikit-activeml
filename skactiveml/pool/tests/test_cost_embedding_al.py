@@ -9,7 +9,6 @@ from skactiveml.pool._cost_embedding_al import MDSP, smacof_p
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -38,19 +37,6 @@ class TestCostEmbeddingAL(
         ]
         self._test_param("init", "classes", test_cases)
 
-    def test_nested_classes_resolve_before_capability_rejection(self):
-        strategy = CostEmbeddingAL(classes=[[0, 1, 2], [0, 1, 2]])
-        X = np.arange(8).reshape(4, 2)
-        y = np.array([[0, 1], [1, 2], [np.nan, np.nan], [np.nan, np.nan]])
-
-        with self.assertRaisesRegex(
-            ValueError,
-            "CostEmbeddingAL does not support target capability.*multi-output",
-        ):
-            strategy.query(X=X, y=y)
-
-        assert_no_query_state(self, strategy)
-
     def test_init_param_base_regressor(self):
         test_cases = [
             (1, TypeError),
@@ -69,6 +55,13 @@ class TestCostEmbeddingAL(
             (
                 np.ones((len(self.classes), len(self.classes)))
                 - np.eye(len(self.classes)),
+                None,
+            ),
+            (
+                (
+                    np.ones((len(self.classes), len(self.classes)))
+                    - np.eye(len(self.classes))
+                ).tolist(),
                 None,
             ),
         ]

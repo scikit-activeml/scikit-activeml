@@ -1,11 +1,11 @@
 import numpy as np
-from sklearn import clone
 from sklearn.utils.validation import check_array, _check_n_features
 
 from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.utils import _update_reg, conditional_expect
 
@@ -28,9 +28,6 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        regression.
 
     References
     ----------
@@ -47,12 +44,10 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         integration_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.integration_dict = integration_dict
 
@@ -95,6 +90,9 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
+        X_eval : array-like of shape (n_eval_samples, n_features), default=None
+            Evaluation data set on which the expected variance reduction is
+            estimated. If `X_eval=None`, `X` is used.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -125,28 +123,40 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(ProbabilisticRegressor,),
+        )
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
-        check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(fit_reg, "fit_reg", bool)
         if X_eval is None:
             X_eval = X
         else:
             X_eval = check_array(X_eval)
             _check_n_features(self, X_eval, reset=False)
-        if self.integration_dict is None:
-            self.integration_dict = {"method": "assume_linear"}
-        check_type(self.integration_dict, "self.integration_dict", dict)
+        integration_dict = (
+            {"method": "assume_linear"}
+            if self.integration_dict is None
+            else self.integration_dict
+        )
+        check_type(integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         old_model_variance = np.average(
             reg.predict(X_eval, return_std=True)[1] ** 2
@@ -172,7 +182,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             new_model_variance,
             reg,
             random_state=self.random_state_,
-            **self.integration_dict,
+            **integration_dict,
         )
 
         utilities_cand = old_model_variance - ex_model_variance

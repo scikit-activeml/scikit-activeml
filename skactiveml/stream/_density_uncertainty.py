@@ -3,19 +3,23 @@ from collections import deque
 from copy import copy, deepcopy
 import warnings
 import numpy as np
-from sklearn.utils import check_array, check_consistent_length, check_scalar
-from sklearn.base import clone
+from sklearn.utils import (
+    check_array,
+    check_scalar,
+    check_random_state,
+)
 from sklearn.metrics.pairwise import pairwise_distances
 
-from skactiveml.base import (
-    BudgetManager,
-    SingleAnnotatorStreamQueryStrategy,
-    SkactivemlClassifier,
-)
+from skactiveml.base import SingleAnnotatorStreamQueryStrategy
 from skactiveml.utils import (
     check_type,
     call_func,
-    check_budget_manager,
+)
+from skactiveml.utils._validation import _validate_budget_update
+from skactiveml.stream._target import _fit_and_resolve_clf_target_spec
+from skactiveml.stream._validation import (
+    _validate_X_y_sample_weight,
+    _validate_budget_manager,
 )
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
@@ -24,6 +28,44 @@ from skactiveml.stream.budgetmanager import (
     RandomBudgetManager,
     RandomVariableUncertaintyBudgetManager,
 )
+
+
+def _copy_budget_manager(budget_manager):
+    """Copy acquisition state and isolate lazily initialized random state."""
+    manager = deepcopy(budget_manager)
+    if not hasattr(manager, "random_state_") and hasattr(
+        manager, "random_state"
+    ):
+        # None would otherwise attach the copy to NumPy's global generator
+        # when its first query initializes random_state_.
+        manager.random_state = deepcopy(
+            check_random_state(manager.random_state)
+        )
+    return manager
+
+
+def _update_budget_manager(
+    budget_manager,
+    candidate,
+    queried,
+    budget_manager_param_dict,
+    index,
+    eligible,
+):
+    """Mask ineligible utilities and advance one observation."""
+    params = budget_manager_param_dict.copy()
+    if "utilities" in params:
+        params["utilities"] = (
+            np.asarray(params["utilities"])[index : index + 1]
+            if eligible
+            else np.array([np.nan])
+        )
+    call_func(
+        budget_manager.update,
+        candidates=[candidate if eligible else np.nan],
+        queried_indices=[0] if queried else [],
+        **params,
+    )
 
 
 class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
@@ -50,8 +92,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `DensityBasedBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
+        `DensityBasedSplitBudgetManager` will be used by default. The
+        budget manager will be initialized based on the following
+        conditions:
 
         - If only a `budget` is given, the default budget manager is
           initialized with the given budget.
@@ -63,7 +106,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -124,7 +167,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -135,10 +178,10 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -160,31 +203,53 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
 
-        # calculate the margin used as utillities
         predict_proba = clf.predict_proba(candidates)
-        utilities_index = np.argpartition(predict_proba, -2)[:, -2:]
-        confidence = (
-            np.take_along_axis(predict_proba, utilities_index[:, [1]], 1)
-            - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
-        ).reshape([-1])
-        utilities = 1 - confidence
-        tmp_min_dist = copy(self.min_dist_)
-        tmp_window = copy(self.window_)
+        if predict_proba.shape[1] == 1:
+            # The only class has probability one and the implicit second class
+            # has probability zero, yielding zero margin uncertainty.
+            utilities = np.zeros(len(predict_proba))
+        else:
+            utilities_index = np.argpartition(predict_proba, -2)[:, -2:]
+            confidence = (
+                np.take_along_axis(predict_proba, utilities_index[:, [1]], 1)
+                - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
+            ).reshape([-1])
+            utilities = 1 - confidence
+        # Querying leaves an initialized budget manager unchanged, so only
+        # the acquisitions simulated for later candidates need a copy.
+        budget_manager = self.budget_manager_
+        if not hasattr(budget_manager, "budget_"):
+            budget_manager = _copy_budget_manager(budget_manager)
+        tmp_min_dist = self.min_dist_
+        tmp_window = self.window_
+        self.min_dist_ = copy(tmp_min_dist)
+        self.window_ = copy(tmp_window)
         queried_indices = []
-        for t, (u, x_cand) in enumerate(zip(utilities, candidates)):
-            local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor > 0:
-                queried_indice = self.budget_manager_.query_by_utility(
-                    np.array([u])
+        try:
+            for t, (u, x_cand) in enumerate(zip(utilities, candidates)):
+                eligible = self._calculate_ldf([x_cand]) > 0
+                selected = budget_manager.query_by_utility(
+                    np.array([u if eligible else np.nan])
                 )
-                if len(queried_indice) > 0:
+                queried = eligible and len(selected) > 0
+                if queried:
                     queried_indices.append(t)
-            else:
-                self.budget_manager_.query_by_utility(np.array([np.nan]))
-            self.window_.append(x_cand)
-
-        self.min_dist_ = tmp_min_dist
-        self.window_ = tmp_window
+                if t == len(candidates) - 1:
+                    break
+                if budget_manager is self.budget_manager_:
+                    budget_manager = _copy_budget_manager(budget_manager)
+                _update_budget_manager(
+                    budget_manager,
+                    x_cand,
+                    queried,
+                    {"utilities": utilities},
+                    t,
+                    eligible=eligible,
+                )
+                self.window_.append(x_cand)
+        finally:
+            self.min_dist_ = tmp_min_dist
+            self.window_ = tmp_window
 
         if return_utilities:
             return queried_indices, utilities
@@ -204,33 +269,27 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`.
+            Optional kwargs for each single-observation budget-manager
+            update. If provided, `utilities` must align with the original
+            candidates. It is sliced into one-element arrays for the observed
+            samples. Utilities of candidates rejected by the density filter
+            are passed as NaN. Other kwargs are forwarded unchanged. Supply
+            `utilities` when the budget manager requires them for updating.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                {"random_state": random_seed},
-            )
+        candidates = check_array(candidates)
+        queried = _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
+        _validate_budget_manager(self, self._get_default_budget_manager())
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -254,20 +313,17 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             if budget_manager_param_dict is None
             else budget_manager_param_dict
         )
-        new_candidates = []
-        for x_cand in candidates:
+        for i, x_cand in enumerate(candidates):
             local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor > 0:
-                new_candidates.append(x_cand)
-            else:
-                new_candidates.append(np.nan)
+            _update_budget_manager(
+                self.budget_manager_,
+                x_cand,
+                queried[i],
+                budget_manager_param_dict,
+                i,
+                eligible=local_density_factor > 0,
+            )
             self.window_.append(x_cand)
-        call_func(
-            self.budget_manager_.update,
-            candidates=new_candidates,
-            queried_indices=queried_indices,
-            **budget_manager_param_dict,
-        )
         return self
 
     def _calculate_ldf(self, candidates):
@@ -287,7 +343,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         """
         ldf = 0
         if len(self.window_) >= 1:
-            distances = self.dist_func_(self.window_, candidates).ravel()
+            distances = self.dist_func_(
+                self.window_, candidates, **self.dist_func_dict_
+            ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
             for i in np.where(is_new_nn)[0]:
@@ -324,7 +382,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -356,32 +414,20 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        X, y, sample_weight = _validate_X_y_sample_weight(
+            X=X, y=y, sample_weight=sample_weight
+        )
+        clf, _ = _fit_and_resolve_clf_target_spec(
+            self, clf, X, y, fit_clf=fit_clf, sample_weight=sample_weight
+        )
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
             reset=reset,
             **check_candidates_params,
         )
-        X, y, sample_weight = self._validate_X_y_sample_weight(
-            X=X, y=y, sample_weight=sample_weight
-        )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
 
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                {"random_state": random_seed},
-            )
+        _validate_budget_manager(self, self._get_default_budget_manager())
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -396,7 +442,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         if not isinstance(self.dist_func_dict_, dict):
             raise TypeError("'dist_func_dict' must be a Python dictionary.")
 
-        # check density_threshold
         check_scalar(self.window_size, "window_size", int, min_val=1)
 
         if not hasattr(self, "window_"):
@@ -406,69 +451,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             self.min_dist_ = deque(maxlen=self.window_size)
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
-
-    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
-        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
-        sample_weight.
-
-        Parameters
-        ----------
-        clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-        X : array-like of shape (n_samples, n_features), default=None
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
-        fit_clf : bool, default=False
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        Returns
-        -------
-        clf : skactiveml.base.SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        """
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-        return clf
-
-    def _validate_X_y_sample_weight(self, X, y, sample_weight):
-        """Validate if X, y and sample_weight are numeric and of equal length.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        sample_weight : array-like of shape (n_samples,)
-            Weights of training samples in `X`.
-        Returns
-        -------
-        X : array-like of shape (n_samples, n_features)
-            Checked training data set.
-        y : array-like of shape (n_samples)
-            Checked labels of the input samples `X`. Converts `y` to a numpy
-            array.
-        """
-        if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
-            check_consistent_length(sample_weight, y)
-        if X is not None and y is not None:
-            X = check_array(X)
-            y = np.array(y)
-            check_consistent_length(X, y)
-        return X, y, sample_weight
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -514,8 +496,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `DensityBasedBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
+        `RandomVariableUncertaintyBudgetManager` will be used by default. The
+        budget manager will be initialized based on the following
+        conditions:
 
         - If only a `budget` is given, the default budget manager is
           initialized with the given budget.
@@ -527,7 +510,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -539,8 +522,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         RandomBudgetManager.
     CognitiveDualQueryStrategyFixUn : CognitiveDualQueryStrategy using the
         FixedUncertaintyBudgetManager.
-    CognitiveDualQueryStrategyVarUn : VariableUncertaintyBudgetManager using
-        the VariableUncertaintyBudgetManager.
+    CognitiveDualQueryStrategyVarUn : CognitiveDualQueryStrategy using the
+        VariableUncertaintyBudgetManager.
     CognitiveDualQueryStrategyRanVarUn : CognitiveDualQueryStrategy using the
         RandomVariableUncertaintyBudgetManager.
 
@@ -607,7 +590,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -618,10 +601,10 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -643,40 +626,56 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
 
-        # its the margin but used as utillities
         predict_proba = clf.predict_proba(candidates)
         confidence = np.max(predict_proba, axis=1)
         utilities = 1 - confidence
 
-        # copy variables
-        tmp_cognition_window = copy(self.cognition_window_)
-        tmp_theta = copy(self.theta_)
-        tmp_s = copy(self.s_)
-        tmp_t_x = copy(self.t_x_)
-        f = copy(self.f_)
-        min_dist = copy(self.min_dist_)
-        t = copy(self.t_)
+        budget_manager = self.budget_manager_
+        if not hasattr(budget_manager, "budget_"):
+            budget_manager = _copy_budget_manager(budget_manager)
+        density_state = {
+            name: getattr(self, name)
+            for name in (
+                "cognition_window_",
+                "theta_",
+                "s_",
+                "t_x_",
+                "f_",
+                "min_dist_",
+                "t_",
+            )
+        }
+        for name, value in density_state.items():
+            setattr(self, name, copy(value))
         queried_indices = []
-        for i, (u, x_cand) in enumerate(zip(utilities, candidates)):
-            local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor >= self.density_threshold:
-                queried_indice = self.budget_manager_.query_by_utility(
-                    np.array([u])
+        try:
+            for i, (u, x_cand) in enumerate(zip(utilities, candidates)):
+                eligible = (
+                    self._calculate_ldf([x_cand]) >= self.density_threshold
                 )
-                if len(queried_indice) > 0:
-                    queried_indices.append(i)
-            elif self.force_full_budget:
-                self.budget_manager_.query_by_utility(np.array([np.nan]))
-            self.t_ += 1
-
-        # overwrite changes
-        self.cognition_window_ = tmp_cognition_window
-        self.theta_ = tmp_theta
-        self.s_ = tmp_s
-        self.t_x_ = tmp_t_x
-        self.f_ = f
-        self.min_dist_ = min_dist
-        self.t_ = t
+                if eligible or self.force_full_budget:
+                    selected = budget_manager.query_by_utility(
+                        np.array([u if eligible else np.nan])
+                    )
+                    queried = eligible and len(selected) > 0
+                    if queried:
+                        queried_indices.append(i)
+                    if i < len(candidates) - 1:
+                        if budget_manager is self.budget_manager_:
+                            budget_manager = _copy_budget_manager(
+                                budget_manager
+                            )
+                        _update_budget_manager(
+                            budget_manager,
+                            x_cand,
+                            queried,
+                            {"utilities": utilities},
+                            i,
+                            eligible=eligible,
+                        )
+                self.t_ += 1
+        finally:
+            self.__dict__.update(density_state)
 
         if return_utilities:
             return queried_indices, utilities
@@ -696,39 +695,34 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`.
+            Optional kwargs for each single-observation budget-manager
+            update. If provided, `utilities` must align with the original
+            candidates. It is sliced into one-element arrays for the observed
+            samples. With `force_full_budget=True`, utilities of candidates
+            rejected by the density filter are passed as NaN. Otherwise,
+            these candidates are skipped. Other kwargs are forwarded
+            unchanged. Supply `utilities` when the budget manager requires
+            them for updating.
 
         Returns
         -------
         self : CognitiveDualQueryStrategy
             The query strategy returns itself, after it is updated.
         """
+        candidates = check_array(candidates)
+        queried = _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
         self._validate_force_full_budget()
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            default_budget_manager_kwargs = (
-                self._get_default_budget_manager_kwargs()
-            )
-            default_budget_manager_kwargs["random_state"] = random_seed
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                default_budget_manager_kwargs,
-            )
-        # _init_members
+        _validate_budget_manager(
+            self,
+            self._get_default_budget_manager(),
+            self._get_default_budget_manager_kwargs(),
+        )
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
         else:
@@ -761,20 +755,19 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             if budget_manager_param_dict is None
             else budget_manager_param_dict
         )
-        new_candidates = []
-        for x_cand in candidates:
+        for i, x_cand in enumerate(candidates):
             local_density_factor = self._calculate_ldf([x_cand])
-            if local_density_factor >= self.density_threshold:
-                new_candidates.append(x_cand)
-            elif self.force_full_budget:
-                new_candidates.append(np.nan)
+            eligible = local_density_factor >= self.density_threshold
+            if eligible or self.force_full_budget:
+                _update_budget_manager(
+                    self.budget_manager_,
+                    x_cand,
+                    queried[i],
+                    budget_manager_param_dict,
+                    i,
+                    eligible=eligible,
+                )
             self.t_ += 1
-        call_func(
-            self.budget_manager_.update,
-            candidates=new_candidates,
-            queried_indices=queried_indices,
-            **budget_manager_param_dict,
-        )
         return self
 
     def _calculate_ldf(self, candidates):
@@ -799,7 +792,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         theta = 0
         if len(self.cognition_window_) >= 1:
             distances = self.dist_func_(
-                self.cognition_window_, candidates
+                self.cognition_window_, candidates, **self.dist_func_dict_
             ).ravel()
             is_new_nn = distances < np.array(self.min_dist_)
             ldf = np.sum(is_new_nn)
@@ -814,7 +807,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             self.f_[t] = 1 / (self.theta_[t] + 1)
             tmp = -self.f_[t] * (t_x - self.t_x_[t])
             self.s_[t] = np.exp(tmp)
-        if len(self.cognition_window_) > self.cognition_window_size:
+        if len(self.cognition_window_) >= self.cognition_window_size:
             # remove element with the smallest memory strength
             remove_index = np.argmin(self.s_)
             self.cognition_window_.pop(remove_index)
@@ -857,7 +850,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -889,19 +882,19 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        X, y, sample_weight = _validate_X_y_sample_weight(
+            X=X, y=y, sample_weight=sample_weight
+        )
+        clf, _ = _fit_and_resolve_clf_target_spec(
+            self, clf, X, y, fit_clf=fit_clf, sample_weight=sample_weight
+        )
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
             reset=reset,
             **check_candidates_params,
         )
-        self._validate_random_state()
-        X, y, sample_weight = self._validate_X_y_sample_weight(
-            X=X, y=y, sample_weight=sample_weight
-        )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
 
-        # check density_threshold
         check_scalar(
             self.density_threshold, "density_threshold", int, min_val=0
         )
@@ -911,25 +904,11 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         self._validate_force_full_budget()
 
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            default_budget_manager_kwargs = (
-                self._get_default_budget_manager_kwargs()
-            )
-            default_budget_manager_kwargs["random_state"] = random_seed
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                self._get_default_budget_manager(),
-                default_budget_manager_kwargs,
-            )
+        _validate_budget_manager(
+            self,
+            self._get_default_budget_manager(),
+            self._get_default_budget_manager_kwargs(),
+        )
 
         if self.dist_func is None:
             self.dist_func_ = pairwise_distances
@@ -972,77 +951,13 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         """
         return {}
 
-    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
-        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
-        sample_weight.
-
-        Parameters
-        ----------
-        clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-        X : array-like of shape (n_samples, n_features), default=None
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
-        fit_clf : bool, default=False
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        Returns
-        -------
-        clf : skactiveml.base.SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        """
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-        return clf
-
     def _validate_force_full_budget(self):
-        # check force_full_budget
         check_type(self.force_full_budget, "force_full_budget", bool)
         if not hasattr(self, "budget_manager_") and not self.force_full_budget:
             warnings.warn(
                 "force_full_budget is set to False. "
                 "Therefore the full budget may not be utilised."
             )
-
-    def _validate_X_y_sample_weight(self, X, y, sample_weight):
-        """Validate if X, y and sample_weight are numeric and of equal length.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        sample_weight : array-like of shape (n_samples,)
-            Weights of training samples in `X`.
-        Returns
-        -------
-        X : array-like of shape (n_samples, n_features)
-            Checked training data set.
-        y : array-like of shape (n_samples)
-            Checked labels of the input samples `X`. Converts `y` to a numpy
-            array.
-        """
-        if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
-            check_consistent_length(sample_weight, y)
-        if X is not None and y is not None:
-            X = check_array(X)
-            y = np.array(y)
-            check_consistent_length(X, y)
-        return X, y, sample_weight
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -1082,23 +997,9 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `RandomBudgetManager` will be used by default. The budget manager
-        will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1184,23 +1085,9 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `FixedUncertaintyBudgetManager` will be used by default. The budget
-        manager will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -1298,30 +1185,17 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `VariableUncertaintyBudgetManager` will be used by default. The budget
-        manager will be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.VariableUncertaintyBudgetManager : The default budget
+        manager.
     .CognitiveDualQueryStrategy : The base class for this
         strategy.
 
@@ -1399,30 +1273,17 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
         order to query the candidate's label.
     cognition_window_size : int, default=10
         Determines the size of the cognition window.
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in the
-        stream-based active learning setting. if set to `None`,
-        `RandomBudgetManager` will be used by default.  The budget manager will
-        be initialized based on the following conditions:
-
-        - If only a `budget` is given, the default budget manager is
-          initialized with the given budget.
-        - If only a budget manager is given, use the budget manager.
-        - If both are not given, the default budget manager with the default
-          budget.
-        - If both are given, and the budget differs from
-          `budgetmanager.budget`, throw a warning and the budget manager is
-          used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.RandomVariableUncertaintyBudgetManager : The default
+        budget manager.
     .CognitiveDualQueryStrategy : The base class for this
         strategy.
 

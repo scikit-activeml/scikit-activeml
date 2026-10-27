@@ -1,21 +1,20 @@
 import numpy as np
-from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
 
 from ..classifier import ParzenWindowClassifier
-from .budgetmanager import BalancedIncrementalQuantileFilter
-from ..base import (
-    SingleAnnotatorStreamQueryStrategy,
-    SkactivemlClassifier,
-    BudgetManager,
+from ._target import _fit_and_resolve_clf_target_spec
+from ._validation import (
+    _validate_X_y_sample_weight,
+    _validate_budget_manager,
 )
+from .budgetmanager import BalancedIncrementalQuantileFilter
+from ..base import SingleAnnotatorStreamQueryStrategy
 from ..pool import cost_reduction
 from ..utils import (
-    check_type,
     check_scalar,
     call_func,
-    check_budget_manager,
 )
+from ..utils._validation import _validate_budget_update
 
 
 class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
@@ -39,13 +38,12 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         `predict_freq` function of the `clf` will be used instead. If this is
         not defined, an Exception is raised.
     metric_dict : dict, default=None
-        Any further parameters are passed directly to the kernel function. If
-        metric_dict is None and metric is 'rbf' metric_dict is set to {'gamma':
-        'mean'}.
+        Further parameters passed directly to the kernel function. With
+        `metric_dict=None` and `metric="rbf"`, queries use `{"gamma": "mean"}`.
     prior : float, default=1.0e-3
         The prior value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
-    m_max : float, default=2
+    m_max : int > 0, default=2
         The m_max value that is passed onto ProbabilisticAL (see
         `pool.ProbabilisticAL`).
     budget_manager : BudgetManager, default=None
@@ -64,7 +62,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
           used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -127,24 +125,24 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        utility_weight : array-like of shape (n_candidate_samples),
-        default=None
+        utility_weight : array-like of shape (n_candidates,), default=None
             Densities for each sample in `candidates`.
         return_utilities : bool, default=False
             If `True`, also return the `utilities` based on the query strategy.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+            The default budget manager returns a list.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -157,6 +155,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             fit_clf,
             utility_weight,
             return_utilities,
+            target_spec,
         ) = self._validate_data(
             candidates=candidates,
             clf=clf,
@@ -168,13 +167,16 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
-            if self.metric_dict is None and self.metric == "rbf":
-                self.metric_dict = {"gamma": "mean"}
+            metric_dict = (
+                {"gamma": "mean"}
+                if self.metric_dict is None and self.metric == "rbf"
+                else self.metric_dict
+            )
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
-                metric_dict=self.metric_dict,
+                metric_dict=metric_dict,
                 missing_label=clf.missing_label,
-                classes=clf.classes,
+                classes=target_spec.classes,
             )
             pwc.fit(X=X, y=y, sample_weight=sample_weight)
             n = pwc.predict_freq(candidates).sum(axis=1, keepdims=True)
@@ -207,30 +209,27 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for `budget_manager`.
+            Kwargs for `budget_manager`. The default budget manager
+            `BalancedIncrementalQuantileFilter` requires `utilities`, a
+            one-dimensional array with one value per candidate as returned by
+            `query` with `return_utilities=True`.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a budgetmanager is set
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                BalancedIncrementalQuantileFilter,
-            )
+        candidates = check_array(candidates)
+        _validate_budget_update(
+            candidates, queried_indices, budget_manager_param_dict
+        )
+        _validate_budget_manager(
+            self, BalancedIncrementalQuantileFilter, seeded=False
+        )
         budget_manager_param_dict = (
             {}
             if budget_manager_param_dict is None
@@ -271,7 +270,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Training data set used to fit the classifier.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `clf.missing_label`).
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         fit_clf : bool, default=False
@@ -306,46 +305,36 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Checked utility weights.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
+        target_spec : skactiveml.utils.TargetSpec
+            The target specification resolved through `clf`.
         """
+        X, y, sample_weight = _validate_X_y_sample_weight(X, y, sample_weight)
+        clf, target_spec = _fit_and_resolve_clf_target_spec(
+            self, clf, X, y, fit_clf=fit_clf, sample_weight=sample_weight
+        )
+        if self.metric is None and not hasattr(clf, "predict_freq"):
+            raise TypeError(
+                "clf has no predict_freq and metric was set to None"
+            )
+
         candidates, return_utilities = super()._validate_data(
             candidates,
             return_utilities,
             reset=reset,
             **check_candidates_params,
         )
-        # check if a budgetmanager is set
-
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget,
-                self.budget_manager,
-                BalancedIncrementalQuantileFilter,
-            )
-
-        X, y, sample_weight = self._validate_X_y_sample_weight(
-            X, y, sample_weight
+        _validate_budget_manager(
+            self, BalancedIncrementalQuantileFilter, seeded=False
         )
-        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates
         )
-
-        if self.metric is None and not hasattr(clf, "predict_freq"):
-            raise TypeError(
-                "clf has no predict_freq and metric was set to None"
-            )
 
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
         )
         check_scalar(self.m_max, "m_max", int, min_val=0, min_inclusive=False)
-        self._validate_random_state()
 
         return (
             candidates,
@@ -356,70 +345,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             fit_clf,
             utility_weight,
             return_utilities,
+            target_spec,
         )
-
-    def _validate_X_y_sample_weight(self, X, y, sample_weight):
-        """Validate if X, y and sample_weight are numeric and of equal length.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        sample_weight : array-like of shape (n_samples,)
-            Weights of training samples in `X`.
-        Returns
-        -------
-        X : array-like of shape (n_samples, n_features)
-            Checked training data set.
-        y : array-like of shape (n_samples)
-            Checked labels of the input samples `X`. Converts `y` to a numpy
-            array.
-        """
-        if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
-            check_consistent_length(sample_weight, y)
-        if X is not None and y is not None:
-            X = check_array(X)
-            y = np.array(y)
-            check_consistent_length(X, y)
-        return X, y, sample_weight
-
-    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
-        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
-        sample_weight.
-
-        Parameters
-        ----------
-        clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-        X : array-like of shape (n_samples, n_features), default=None
-            Training data set used to fit the classifier.
-        y : array-like of shape (n_samples,)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
-        fit_clf : bool, default=False
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        Returns
-        -------
-        clf : skactiveml.base.SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        """
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-        return clf
 
     def _validate_utility_weight(self, utility_weight, candidates):
         """Validate if utility_weight is numeric and of equal length as

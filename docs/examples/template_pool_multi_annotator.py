@@ -25,6 +25,7 @@ from skactiveml.utils import (
     MISSING_LABEL,
     majority_vote,
     is_labeled,
+    labeled_indices,
 )
 from skactiveml.visualization import (
     plot_utilities,
@@ -58,7 +59,6 @@ for i, p in enumerate(annotator_error_prob):
     y_noise = rng.binomial(1, p, len(X))
     y_annot[:, i] = y_noise ^ y_true
 y = np.full(shape=y_annot.shape, fill_value=MISSING_LABEL)
-y_mv = majority_vote(y, missing_label=MISSING_LABEL, random_state=random_state)
 # Initialise the classifier.
 clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], class_prior=1e-3, metric_dict={'gamma': 3}, random_state=random_state)"
 
@@ -75,28 +75,29 @@ artists = []
 # Active learning cycle:
 n_cycles = "$n_cycles|20"
 for c in range(n_cycles):
-    # Fit the classifier with current labels.
+    # Fit the classifier with the majority votes of the current labels.
+    y_mv = majority_vote(y, missing_label=MISSING_LABEL, random_state=0)
     clf.fit(X, y_mv)
 
     # Fit the annotation performance model
-    if np.all(np.any(is_labeled(y), axis=0)):
+    if np.all(np.any(is_labeled(y, missing_label=MISSING_LABEL), axis=0)):
         A_perf_clf = np.sum(
-            np.where(is_labeled(y), y_annot == clf.predict(X)[:, None], 0),
+            np.where(is_labeled(y, missing_label=MISSING_LABEL), y_annot == clf.predict(X)[:, None], 0),
             axis=0,
-        ) / np.sum(is_labeled(y), axis=0)
+        ) / np.sum(is_labeled(y, missing_label=MISSING_LABEL), axis=0)
     else:
         A_perf_clf = None
 
     A_perf_clf_individual = np.full(n_annotators, np.nan)
-    has_labels = np.any(is_labeled(y), axis=0)
+    has_labels = np.any(is_labeled(y, missing_label=MISSING_LABEL), axis=0)
     A_perf_clf_individual[has_labels] = np.sum(
         np.where(
-            is_labeled(y)[:, has_labels],
+            is_labeled(y, missing_label=MISSING_LABEL)[:, has_labels],
             y_annot[:, has_labels] == clf.predict(X)[:, None],
             0,
         ),
         axis=0,
-    ) / np.sum(is_labeled(y)[:, has_labels], axis=0)
+    ) / np.sum(is_labeled(y, missing_label=MISSING_LABEL)[:, has_labels], axis=0)
 
     # Query the next sample(s).
     query_idx = qs.query("$query_params")
@@ -106,15 +107,14 @@ for c in range(n_cycles):
     title = ax1.text(
         0.5,
         1.05,
-        f"Decision boundary after acquiring {c} labels\n"
+        f"Decision boundary after acquiring {len(labeled_indices(y, missing_label=MISSING_LABEL))} labels\n"
         f"Test Accuracy: {clf.score(X_test, y_true_test):.4f}",
         size=plt.rcParams["axes.titlesize"],
         ha="center",
         transform=ax1.transAxes,
     )
 
-    y_mv = majority_vote(y, random_state=0)
-    is_labeled_sample = np.any(is_labeled(y), axis=1)
+    is_labeled_sample = np.any(is_labeled(y, missing_label=MISSING_LABEL), axis=1)
     is_correctly_labeled_sample = is_labeled_sample & (y_mv == y_true)
     is_wrongly_labeled_sample = is_labeled_sample & (y_mv != y_true)
 
@@ -175,7 +175,7 @@ for c in range(n_cycles):
     ax1.set_xlabel("Feature 1")
     ax1.set_ylabel("Feature 2")
 
-    requests_per_annotator = np.sum(is_labeled(y), axis=0)
+    requests_per_annotator = np.sum(is_labeled(y, missing_label=MISSING_LABEL), axis=0)
     bar_labels = ax2.bar(
         np.arange(n_annotators),
         requests_per_annotator,

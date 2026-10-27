@@ -12,14 +12,16 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the Typical Clustering (TypiClust) query strategy
     [1]_, which clusters embeddings of both labeled and unlabeled data with
-    `n_clusters=n_labeled_samples + batch_size`, treating clusters that contain
-    labeled samples as covered. It then selects the most typical sample
-    (highest local density / smallest mean kNN distance) from up to
+    `n_clusters=min(n_labeled_samples + batch_size, n_samples)`. Clusters
+    containing labeled samples are covered. It then selects the most typical
+    sample (highest local density / smallest mean kNN distance) from up to
     `batch_size` uncovered clusters, ensuring diversity while avoiding already
     represented regions. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation is task-agnostic
     such that it can handle class labels, numerical targets, and multilabel
-    targets represented by a two-dimensional `y`.
+    targets represented by a two-dimensional `y`. Clusters without eligible
+    candidates are skipped. If no uncovered cluster remains, the batch is
+    filled uniformly from the remaining candidates.
 
     Parameters
     ----------
@@ -38,8 +40,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         The number for k-nearest-neighbors for the computation of typicality.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
-        targets must be declared explicitly.
+        single-output targets. Multi-label targets must be declared
+        explicitly.
 
     References
     ----------
@@ -71,8 +73,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
         self.n_cluster_param_name = n_cluster_param_name
@@ -104,7 +106,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Labeled candidates remain eligible and mark
+              their clusters as covered.
             - Candidate samples passed directly with shape
               `(n_candidates, n_features)` are not supported because TypiClust
               requires a mapping to samples in `X`.
@@ -124,7 +127,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan. The indexing
+            Utilities for samples outside the candidate set and samples
+            already selected in the batch are set to `np.nan`. The indexing
             refers to the samples in `X`.
         """
         target_type = self._resolve_query_target_type(y)
@@ -166,7 +170,6 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             target_type=target_type,
         )
 
-        # Determine already labeled samples.
         labeled_sample_indices = labeled_indices(
             y=y,
             missing_label=self.missing_label,
@@ -174,7 +177,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         )
 
         # Set number of clusters.
-        n_clusters = len(labeled_sample_indices) + batch_size
+        n_clusters = min(len(labeled_sample_indices) + batch_size, len(X))
         cluster_algo_dict[self.n_cluster_param_name] = n_clusters
 
         _set_random_state_if_supported(
@@ -197,6 +200,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         )
         if len(covered_cluster) > 0:
             cluster_sizes[covered_cluster] = 0
+        cluster_sizes[
+            ~np.isin(np.arange(n_clusters), cluster_labels[mapping])
+        ] = 0
 
         utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
         query_indices = []
@@ -210,15 +216,15 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
                 is_cluster = cluster_labels == cluster_id
                 uncovered_samples_mapping = np.where(is_cluster)[0]
                 typicality = _typicality(X, uncovered_samples_mapping, self.k)
+                cluster_sizes[cluster_id] = 0
             utilities[i, mapping] = typicality[mapping]
             utilities[i, query_indices] = np.nan
             idx = rand_argmax(
-                typicality[mapping], random_state=self.random_state_
+                utilities[i, mapping], random_state=self.random_state_
             )
             idx = mapping[idx[0]]
 
             query_indices = np.append(query_indices, [idx]).astype(int)
-            cluster_sizes[cluster_id] = 0
 
         if return_utilities:
             return query_indices, utilities

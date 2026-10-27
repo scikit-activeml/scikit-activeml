@@ -5,6 +5,7 @@ import numpy as np
 
 from ...base import BudgetManager
 from ...utils import check_scalar
+from ...utils._validation import _validate_budget_update
 
 
 class BalancedIncrementalQuantileFilter(BudgetManager):
@@ -28,9 +29,9 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         The window in which the number of acquisitions should stay within the
         budget. `w_tol` should be higher than 0.
     budget : float, default=None
-        Specifies the ratio of samples which are allowed to be sampled, with `0
-        <= budget <= 1`. If `budget` is `None`, it is replaced with the default
-        budget 0.1.
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
 
     References
     ----------
@@ -50,20 +51,19 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         utilities = self._validate_data(utilities)
 
-        # intialize return parameters
         queried_indices = []
 
         tmp_queried_samples_ = self.queried_samples_
@@ -73,17 +73,31 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         for i, u in enumerate(utilities):
             tmp_observed_samples_ += 1
             tmp_history_sorted_.append(u)
-            theta = np.quantile(tmp_history_sorted_, (1 - self.budget_))
+            if np.isnan(u):
+                continue
+            history = np.asarray(tmp_history_sorted_)
+            history = history[~np.isnan(history)]
+            theta = np.quantile(history, (1 - self.budget_))
 
-            min_ranking = np.min(tmp_history_sorted_)
-            max_ranking = np.max(tmp_history_sorted_)
+            min_ranking = np.min(history)
+            max_ranking = np.max(history)
             range_ranking = max_ranking - min_ranking
 
             acq_left = (
                 self.budget_ * tmp_observed_samples_ - tmp_queried_samples_
             )
-            theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
-            sample = u >= theta_bal
+            if range_ranking == 0:
+                # Treat a one-ULP overshoot of an integer target as equality,
+                # so that an exactly reached budget does not buy another
+                # label. A positive fractional target still permits an
+                # immediate acquisition.
+                budget_target = np.nextafter(
+                    self.budget_ * tmp_observed_samples_, -np.inf
+                )
+                sample = tmp_queried_samples_ < budget_target
+            else:
+                theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
+                sample = u >= theta_bal
 
             if sample:
                 tmp_queried_samples_ += 1
@@ -97,22 +111,24 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-                (n_samples, n_features)
+                (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
+        utilities : array-like of shape (n_candidates,)
+            One utility for each sample in `candidates`.
 
         Returns
         -------
         self : BalancedIncrementalQuantileFilter
             The budget manager returns itself, after it is updated.
         """
+        queried = _validate_budget_update(
+            candidates, queried_indices, {"utilities": utilities}
+        )
         self._validate_data(np.array([0]))
-
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
 
         self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
@@ -125,13 +141,13 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
         utilities = super()._validate_data(utilities)
@@ -140,7 +156,6 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             self.w_tol, "w_tol", (float, int), min_val=0, min_inclusive=False
         )
 
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):

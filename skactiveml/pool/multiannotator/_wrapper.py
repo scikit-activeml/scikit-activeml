@@ -1,4 +1,5 @@
 from inspect import signature, Parameter
+import warnings
 
 import numpy as np
 from scipy.stats import rankdata
@@ -8,10 +9,6 @@ from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
 )
-from .._target import (
-    _collect_declared_authorities,
-    _resolve_estimator_target_spec,
-)
 from ...utils import (
     rand_argmax,
     check_type,
@@ -20,11 +17,6 @@ from ...utils import (
     check_random_state,
     check_scalar,
     check_equal_missing_label,
-    resolve_target_spec,
-)
-from ...utils._target import (
-    _check_target_spec_capability,
-    _has_no_class_evidence,
 )
 
 
@@ -52,10 +44,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. The outer target matrix is resolved as
-        single-output classification with multiple annotators before its
-        aggregated vector is resolved for `strategy`.
     """
 
     def __init__(
@@ -64,12 +52,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         y_aggregate=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.strategy = strategy
         self.y_aggregate = y_aggregate
@@ -100,8 +86,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            that `y[i, j]` contains the label annotated by annotator `j` for
+            sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             See parameter `annotators`.
@@ -152,7 +138,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
               with a different distribution for each sample.
         return_utilities : bool, default=False
             If `True`, also returns the utilities based on the query strategy.
-        n_annotators_per_sample : int or array-like, default=1
+        n_annotators_per_sample : int or array-like of int, default=1
             - If `n_annotators_per_sample` is an int, the value indicates
               the number of annotators that are preferably assigned to a
               candidate sample, selected by the query_strategy.
@@ -201,91 +187,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         """
 
         outer_target_spec = self._resolve_target_spec(y)
-
-        # Preflight the aggregate and wrapped strategy before base validation
-        # commits public query state.
-        check_type(
-            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
-        )
-        check_equal_missing_label(
-            self.strategy.missing_label, self.missing_label
-        )
-
-        uses_default_aggregate = self.y_aggregate is None
-        y_aggregate = (
-            majority_vote if uses_default_aggregate else self.y_aggregate
-        )
-        if not callable(y_aggregate):
-            raise TypeError(
-                f"`self.y_aggregate` must be callable. "
-                f"`self.y_aggregate` is of type {type(y_aggregate)}"
-            )
-
-        n_free_params = len(
-            list(
-                filter(
-                    lambda x: x.default == Parameter.empty,
-                    signature(y_aggregate).parameters.values(),
-                )
-            )
-        )
-        if n_free_params != 1:
-            raise TypeError(
-                f"The number of free parameters of the callable has to "
-                f"equal one. "
-                f"The number of free parameters is {n_free_params}."
-            )
-
-        if uses_default_aggregate:
-            # Majority voting preserves the outer class vocabulary and always
-            # produces one value per sample. A fixed local seed preflights the
-            # aggregate without consuming query randomness.
-            preflight_aggregated_y = majority_vote(y, random_state=0)
-        else:
-            preflight_aggregated_y = y_aggregate(np.asarray(y))
-
-        strategy_target_type = getattr(self.strategy, "target_type", "auto")
-        try:
-            aggregate_target_spec = resolve_target_spec(
-                preflight_aggregated_y,
-                task="classification",
-                target_type=strategy_target_type,
-                annotation_type="single-annotator",
-                classes=(
-                    None
-                    if outer_target_spec is None
-                    else outer_target_spec.classes
-                ),
-                missing_label=self.missing_label,
-            )
-        except ValueError:
-            # Preserve cycle-zero acquisition for class-agnostic wrapped
-            # strategies without inventing a class vocabulary.
-            lacks_class_evidence = (
-                outer_target_spec is None
-                and _has_no_class_evidence(
-                    preflight_aggregated_y,
-                    strategy_target_type,
-                    "single-annotator",
-                    self.missing_label,
-                )
-            )
-            if not lacks_class_evidence:
-                raise
-            aggregate_target_spec = None
-        if aggregate_target_spec is not None and hasattr(
-            self.strategy, "_target_capabilities"
-        ):
-            _check_target_spec_capability(
-                type(self.strategy).__name__,
-                aggregate_target_spec,
-                self.strategy._target_capabilities,
-            )
-        for estimator in self._collect_target_authorities(query_kwargs):
-            _resolve_estimator_target_spec(
-                self.strategy, estimator, preflight_aggregated_y
-            )
-
         (
             X,
             y,
@@ -309,11 +210,48 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         )
 
         random_state = self.random_state_
-        y_sq = (
-            majority_vote(y, random_state=random_state)
-            if uses_default_aggregate
-            else preflight_aggregated_y
+
+        check_type(
+            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
         )
+        check_equal_missing_label(
+            self.strategy.missing_label, self.missing_label
+        )
+
+        if self.y_aggregate is None:
+
+            def y_aggregate(y):
+                return majority_vote(
+                    y,
+                    missing_label=self.missing_label_,
+                    random_state=random_state,
+                )
+
+        else:
+            y_aggregate = self.y_aggregate
+
+        if not callable(y_aggregate):
+            raise TypeError(
+                f"`self.y_aggregate` must be callable. "
+                f"`self.y_aggregate` is of type {type(y_aggregate)}"
+            )
+
+        n_free_params = len(
+            list(
+                filter(
+                    lambda x: x.default == Parameter.empty,
+                    signature(y_aggregate).parameters.values(),
+                )
+            )
+        )
+        if n_free_params != 1:
+            raise TypeError(
+                f"The number of free parameters of the callable has to "
+                f"equal one. "
+                f"The number of free parameters is {n_free_params}."
+            )
+
+        y_sq = y_aggregate(y)
 
         n_selectable_candidates = len(X_cand)
         n_candidates = len(candidates) if candidates is not None else len(X)
@@ -323,11 +261,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         batch_size_sq = min(batch_size, X_cand.shape[0])
 
         # check n_annotators_per_sample and set pref_n_annotators
-        if isinstance(n_annotators_per_sample, (int, np.int_)):
+        if isinstance(n_annotators_per_sample, (int, np.integer)):
             check_scalar(
                 n_annotators_per_sample,
                 name="n_annotators_per_sample",
-                target_type=int,
+                target_type=(int, np.integer),
                 min_val=1,
             )
             pref_n_annotators = n_annotators_per_sample * np.ones(
@@ -335,7 +273,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
         elif _is_arraylike(n_annotators_per_sample):
             pref_n_annotators = check_array(
-                n_annotators_per_sample, ensure_2d=False
+                n_annotators_per_sample, ensure_2d=False, dtype=None
             )
 
             if pref_n_annotators.ndim != 1:
@@ -344,6 +282,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                     f"1 but, it is of dim {pref_n_annotators.ndim}"
                 )
             else:
+                for i, preference in enumerate(pref_n_annotators.tolist()):
+                    check_scalar(
+                        preference,
+                        name=f"n_annotators_per_sample[{i}]",
+                        target_type=(int, np.integer),
+                        min_val=1,
+                    )
                 pref_length = pref_n_annotators.shape[0]
                 if pref_length > batch_size_sq:
                     pref_n_annotators = pref_n_annotators[:batch_size_sq]
@@ -419,9 +364,24 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 [np.argwhere(mapping == i)[0, 0] for i in qs_indices]
             )
 
+        sample_indices = np.asarray(sample_indices, dtype=int)
+        effective_sample_batch_size = len(sample_indices)
+        pref_n_annotators = pref_n_annotators[:effective_sample_batch_size]
+        annotator_utilities = annotator_utilities[:effective_sample_batch_size]
+        pair_capacity = int(np.sum(A_cand[sample_indices]))
+        effective_pair_batch_size = min(batch_size, pair_capacity)
+        if effective_pair_batch_size < batch_size:
+            warnings.warn(
+                f"'batch_size={batch_size}' is larger than the number of "
+                "sample-annotator pairs available for the samples selected "
+                f"by `strategy`. Instead, 'batch_size="
+                f"{effective_pair_batch_size}' was set.",
+                stacklevel=2,
+            )
+
         re_val = self._query_annotators(
             A_cand,
-            batch_size,
+            effective_pair_batch_size,
             sample_utilities,
             annotator_utilities,
             return_utilities,
@@ -433,7 +393,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             return re_val
         elif return_utilities:
             w_indices, w_utilities = re_val
-            utilities = np.full((batch_size, n_samples, n_annotators), np.nan)
+            utilities = np.full(
+                (effective_pair_batch_size, n_samples, n_annotators), np.nan
+            )
             utilities[:, mapping, :] = w_utilities
             indices = np.zeros_like(w_indices)
             indices[:, 0] = mapping[w_indices[:, 0]]
@@ -445,18 +407,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             indices[:, 0] = mapping[w_indices[:, 0]]
             indices[:, 1] = w_indices[:, 1]
             return indices
-
-    def _collect_target_authorities(self, query_kwargs):
-        """Discover the target authorities among the query arguments.
-
-        Discovery is restricted to the roles `self.strategy` declares, so that
-        a query argument holding an estimator for an auxiliary problem is never
-        mistaken for a semantic authority for `y`. See
-        `skactiveml.pool._target._collect_declared_authorities`.
-        """
-        return _collect_declared_authorities(
-            self.strategy._target_authority_params, query_kwargs
-        )
 
     def _query_annotators(
         self,
@@ -519,9 +469,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         sample_indices,
         random_state,
     ):
-        nan_indices = np.argwhere(np.isnan(candidate_utilities))
+        nan_mask = np.isnan(candidate_utilities)
+        negative_inf_mask = np.isneginf(candidate_utilities)
+        negative_inf_mask[np.arange(len(sample_indices)), sample_indices] = (
+            False
+        )
 
-        candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = -np.inf
+        candidate_utilities[nan_mask] = -np.inf
 
         # force selected sample indices to have the maximum utility
         for i in range(len(sample_indices)):
@@ -536,7 +490,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             candidate_utilities[:, rand_permutation], method="ordinal", axis=1
         ).astype(float)
 
-        candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = np.nan
+        candidate_utilities[negative_inf_mask] = -np.inf
+        candidate_utilities[nan_mask] = np.nan
 
         annotator_utilities[:, ~A] = np.nan
 

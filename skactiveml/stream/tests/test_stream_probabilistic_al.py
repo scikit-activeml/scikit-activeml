@@ -1,9 +1,11 @@
+from copy import deepcopy
 import unittest
 
 import numpy as np
-from sklearn.naive_bayes import GaussianNB
+from sklearn.base import clone
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.stream import StreamProbabilisticAL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorStreamQueryStrategy,
@@ -35,12 +37,60 @@ class TestStreamProbabilisticAL(
         self.update_params = {
             "candidates": np.array([[1, 2]]),
             "queried_indices": [],
-            "budget_manager_param_dict": {"utilities": 0.0},
+            "budget_manager_param_dict": {"utilities": [0.0]},
         }
+
+    def test_query_preserves_constructor_parameters(self):
+        super().test_query_preserves_constructor_parameters()
+        for metric_dict in [None, {}, {"gamma": 0.5}]:
+            super().test_query_preserves_constructor_parameters(
+                init_param_overrides={
+                    "metric": "rbf",
+                    "metric_dict": metric_dict,
+                }
+            )
+
+    def test_query_metric_defaults_and_kernel_change(self):
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        y = np.array([0, 1, np.nan, np.nan])
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(X, y)
+        query_kwargs = dict(
+            X=X,
+            y=y,
+            clf=clf,
+            fit_clf=False,
+            return_utilities=True,
+            candidates=X[2:],
+        )
+        for metric_dict in [None, {}, {"gamma": 0.5}]:
+            with self.subTest(metric_dict=metric_dict):
+                qs = StreamProbabilisticAL(
+                    metric="rbf", metric_dict=metric_dict, random_state=0
+                )
+                reference = StreamProbabilisticAL(
+                    metric="rbf",
+                    random_state=0,
+                    metric_dict=(
+                        {"gamma": "mean"}
+                        if metric_dict is None
+                        else deepcopy(metric_dict)
+                    ),
+                ).query(**query_kwargs)
+                for _ in range(2):
+                    indices, utilities = qs.query(**query_kwargs)
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
+                if metric_dict is None:
+                    qs.set_params(metric="linear")
+                    indices, utilities = qs.query(**query_kwargs)
+                    reference = StreamProbabilisticAL(
+                        metric="linear", random_state=0
+                    ).query(**query_kwargs)
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), TypeError),
             (ParzenWindowClassifier(), None),
         ]
@@ -77,6 +127,61 @@ class TestStreamProbabilisticAL(
         return super().test_query(
             expected_output, expected_utilities, budget_manager_param_dict
         )
+
+    def test_cold_start_tied_utilities_obey_budget(self):
+        candidates = np.arange(100)[:, np.newaxis]
+        clf = ParzenWindowClassifier(classes=self.classes).fit(
+            [[0]], [MISSING_LABEL]
+        )
+        qs = StreamProbabilisticAL(budget=0.1)
+        expected_output = np.arange(0, 100, 10)
+
+        for _ in range(2):
+            queried_indices, utilities = qs.query(
+                candidates=candidates, clf=clf, return_utilities=True
+            )
+            np.testing.assert_array_equal(queried_indices, expected_output)
+            self.assertEqual(len(np.unique(utilities)), 1)
+            qs.update(
+                candidates=candidates,
+                queried_indices=queried_indices,
+                budget_manager_param_dict={"utilities": utilities},
+            )
+
+        self.assertEqual(qs.budget_manager_.observed_samples_, 200)
+        self.assertEqual(qs.budget_manager_.queried_samples_, 20)
+
+    def test_query_accepts_fitted_multiannotator_classifier(self):
+        X = self.query_default_params_clf["X"]
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        pwc = ParzenWindowClassifier(classes=self.classes)
+        multi_clf = AnnotatorEnsembleClassifier(
+            estimators=[("pwc_0", clone(pwc)), ("pwc_1", clone(pwc))],
+            voting="soft",
+            classes=self.classes,
+        ).fit(X, np.column_stack([y, y]))
+        self._assert_query_rejects_clf(multi_clf, y, TypeError, "predict_freq")
+
+        results = [
+            StreamProbabilisticAL(metric="rbf", random_state=0).query(
+                candidates=X,
+                clf=clf,
+                X=X,
+                y=y,
+                fit_clf=False,
+                return_utilities=True,
+            )
+            for clf in (clone(pwc).fit(X, y), multi_clf)
+        ]
+        np.testing.assert_array_equal(results[0][0], results[1][0])
+        np.testing.assert_allclose(results[0][1], results[1][1])
+
+    def test_query_refitting_respects_wrapped_class_vocabulary(self):
+        test = super().test_query_refitting_respects_wrapped_class_vocabulary
+        for metric in (None, "rbf"):
+            with self.subTest(metric=metric):
+                self.init_default_params["metric"] = metric
+                test()
 
     def test_query_param_utility_weight(self):
         test_cases = []

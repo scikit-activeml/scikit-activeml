@@ -4,29 +4,31 @@ from copy import deepcopy
 import inspect
 
 import numpy as np
+from sklearn import clone
 from sklearn.datasets import load_breast_cancer
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
-from skactiveml.regressor import SklearnRegressor
+from skactiveml.regressor import SklearnRegressor, NICKernelRegressor
 from skactiveml.pool import (
     SubSamplingWrapper,
     ParallelUtilityEstimationWrapper,
-    DiscriminativeAL,
     QueryByCommittee,
     UncertaintySampling,
     RandomSampling,
+    CoreSet,
+    ProbCover,
+    MonteCarloEER,
+    ValueOfInformationEER,
+    ExpectedModelOutputChange,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import (
-    assert_no_query_state,
-    assert_attributes_unchanged,
-)
+from skactiveml.tests.utils import assert_attributes_unchanged
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
@@ -34,6 +36,27 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 class DummyNonQueryStrategy:
     def query(self, **kwargs):
         pass
+
+
+def _aligned_kwargs_setting():
+    """Return samples, labels, and a classifier for weighted queries."""
+    X = np.array(
+        [
+            [-2.0, 0.0],
+            [-1.0, 1.0],
+            [1.0, 0.0],
+            [2.0, 1.0],
+            [0.0, 1.0],
+            [-1.5, 2.0],
+            [1.5, -2.0],
+            [0.5, 0.5],
+            [-0.5, -1.0],
+        ]
+    )
+    y = np.full(len(X), MISSING_LABEL)
+    y[0], y[1], y[2] = 0.0, 1.0, 0.0
+    clf = ParzenWindowClassifier(classes=[0, 1])
+    return X, y, clf
 
 
 class TestSubSamplingWrapper(
@@ -83,8 +106,6 @@ class TestSubSamplingWrapper(
             "random_state": 0,
             "missing_label": MISSING_LABEL,
         }
-        # The wrapped strategy is estimator-backed, so that the multi-label
-        # fixture carries a class vocabulary the wrapper must preserve.
         init_default_params_multilabel = {
             "query_strategy": UncertaintySampling(random_state=0),
             "max_candidates": 20,
@@ -159,7 +180,6 @@ class TestSubSamplingWrapper(
                                 ValueError, "outside `classes`"
                             ):
                                 qs.query(X, query_y, clf=clf, **kwargs)
-                            assert_no_query_state(self, qs)
                         else:
                             indices = qs.query(X, query_y, clf=clf, **kwargs)
                             samples = (
@@ -178,7 +198,6 @@ class TestSubSamplingWrapper(
         wrapped = UncertaintySampling(method="entropy")
         wrapper = SubSamplingWrapper(query_strategy=wrapped)
 
-        self.assertEqual(wrapper.target_type, "auto")
         self.assertEqual(
             wrapper._target_capabilities, wrapped._target_capabilities
         )
@@ -193,7 +212,7 @@ class TestSubSamplingWrapper(
             restricted_wrapper._target_capabilities,
         )
 
-    def test_ambiguous_targets_fail_before_wrapper_state(self):
+    def test_wrapped_strategy_reports_ambiguous_targets(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
             [
@@ -208,8 +227,6 @@ class TestSubSamplingWrapper(
 
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             wrapper.query(X, y)
-
-        assert_no_query_state(self, wrapper)
 
     def test_fitted_estimator_semantics_reach_wrapped_strategy(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
@@ -251,151 +268,24 @@ class TestSubSamplingWrapper(
         self.assertEqual(utilities.shape, (1, len(X)))
         self.assertTrue(np.isnan(utilities[0, :2]).all())
 
-        conflicting = SubSamplingWrapper(
-            query_strategy=UncertaintySampling(),
-            max_candidates=4,
-            target_type="single-output",
-        )
-        with self.assertRaisesRegex(ValueError, "conflicts"):
-            conflicting.query(X, y_query, clf=clf, fit_clf=False)
-        assert_no_query_state(self, conflicting)
-
-    def test_fitted_estimator_vocabulary_fails_before_wrapper_state(self):
-        X = np.arange(12, dtype=float).reshape(6, 2)
-        y_fit = np.array(
-            [
-                [0.0, 1.0],
-                [1.0, 0.0],
-                [0.0, 0.0],
-                [1.0, 1.0],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-            ]
-        )
-        clf = SklearnClassifier(
-            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
-        ).fit(X, y_fit)
-        y_query = y_fit.copy()
-        y_query[0, 0] = 2.0
+    def test_query_does_not_reuse_wrapped_query_state(self):
+        X = np.random.RandomState(0).uniform(size=(20, 2))
+        y = np.full(len(X), MISSING_LABEL)
+        y[:2] = [0, 1]
         wrapper = SubSamplingWrapper(
-            query_strategy=UncertaintySampling(),
-            max_candidates=4,
+            ProbCover(n_classes=2, deltas=[0.35], random_state=0),
+            max_candidates=0.5,
+            exclude_non_subsample=True,
             random_state=0,
         )
-
-        with self.assertRaisesRegex(ValueError, "outside `classes\\[0\\]`"):
-            wrapper.query(X, y_query, clf=clf, fit_clf=False)
-
-        assert_no_query_state(self, wrapper)
-
-    def test_conflicting_fitted_estimators_fail_before_wrapper_state(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        clf_01 = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
-            X, [0, 1, 0, 1]
-        )
-        clf_02 = SklearnClassifier(GaussianNB(), classes=[0, 2]).fit(
-            X, [0, 2, 0, 2]
-        )
-        wrapper = SubSamplingWrapper(
-            query_strategy=QueryByCommittee(), max_candidates=2
-        )
-
-        with self.assertRaisesRegex(ValueError, "conflicting target"):
-            wrapper.query(
-                X,
-                np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
-                ensemble=[clf_01, clf_02],
-                fit_ensemble=False,
+        for cycle in range(3):
+            query_idx = wrapper.query(X, y)
+            np.testing.assert_array_equal(
+                query_idx, clone(wrapper).query(X, y)
             )
+            y[query_idx] = cycle % 2
 
-        assert_no_query_state(self, wrapper)
-
-    def test_explicit_estimator_target_types_conflict_before_query(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array(
-            [
-                [0, 1],
-                [1, 0],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-            ]
-        )
-        wrapper = SubSamplingWrapper(
-            query_strategy=QueryByCommittee(),
-            max_candidates=2,
-            target_type="multi-label",
-        )
-        clf = SklearnClassifier(
-            GaussianNB(), classes=[0, 1], target_type="single-output"
-        )
-
-        with self.assertRaisesRegex(
-            ValueError, "target declaration conflicts"
-        ):
-            wrapper.query(X, y, ensemble=clf, fit_ensemble=False)
-
-        assert_no_query_state(self, wrapper)
-
-    def test_classifier_and_regressor_estimators_conflict_before_query(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
-        wrapper = SubSamplingWrapper(
-            query_strategy=QueryByCommittee(), max_candidates=2
-        )
-        estimators = [
-            SklearnClassifier(GaussianNB(), classes=[0, 1]),
-            SklearnRegressor(RandomForestRegressor(random_state=0)),
-        ]
-
-        with self.assertRaisesRegex(
-            ValueError, "conflicting classification and regression"
-        ):
-            wrapper.query(X, y, ensemble=estimators, fit_ensemble=False)
-
-        assert_no_query_state(self, wrapper)
-
-    def test_reordered_estimator_class_vocabularies_are_equivalent(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
-        # The same class vocabulary declared in a different order describes the
-        # same targets, so wrapping must not change the selected candidates.
-        estimators = [
-            SklearnClassifier(GaussianNB(), classes=[1, 0]),
-            SklearnClassifier(GaussianNB(), classes=[0, 1]),
-        ]
-        wrapper = SubSamplingWrapper(
-            query_strategy=QueryByCommittee(random_state=0),
-            max_candidates=4,
-            random_state=0,
-        )
-
-        np.testing.assert_array_equal(
-            wrapper.query(X, y, ensemble=estimators),
-            QueryByCommittee(random_state=0).query(X, y, ensemble=estimators),
-        )
-
-    def test_wrapper_rejects_unsupported_explicit_target_type(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array(
-            [
-                [0, 1],
-                [1, 0],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-            ]
-        )
-        wrapper = SubSamplingWrapper(
-            query_strategy=QueryByCommittee(),
-            target_type="multi-label",
-            max_candidates=2,
-        )
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
-            wrapper.query(X, y, ensemble=None)
-
-        assert_no_query_state(self, wrapper)
-
-    def test_resolved_target_type_reaches_auto_and_nested_strategies(self):
+    def test_multilabel_targets_reach_nested_strategies(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
             [
@@ -404,22 +294,6 @@ class TestSubSamplingWrapper(
                 *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
             ]
         )
-        wrapped = RandomSampling(random_state=0)
-        direct = SubSamplingWrapper(
-            query_strategy=wrapped,
-            max_candidates=4,
-            target_type="multi-label",
-            random_state=0,
-        )
-
-        direct_idx, direct_utilities = direct.query(
-            X, y, return_utilities=True
-        )
-
-        self.assertIn(direct_idx[0], [2, 3, 4, 5])
-        self.assertTrue(np.isnan(direct_utilities[0, :2]).all())
-        self.assertEqual(wrapped.target_type, "auto")
-
         nested = SubSamplingWrapper(
             query_strategy=SubSamplingWrapper(
                 query_strategy=RandomSampling(
@@ -437,157 +311,6 @@ class TestSubSamplingWrapper(
 
         self.assertIn(nested_idx[0], [2, 3, 4, 5])
         self.assertTrue(np.isnan(nested_utilities[0, :2]).all())
-
-    def test_target_type_declarations_conflict_before_query(self):
-        X = np.arange(12, dtype=float).reshape(6, 2)
-        y = np.array(
-            [
-                [0.0, 1.0],
-                [1.0, 0.0],
-                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
-            ]
-        )
-        wrapper = SubSamplingWrapper(
-            query_strategy=RandomSampling(target_type="single-output"),
-            max_candidates=4,
-            target_type="multi-label",
-        )
-
-        with self.assertRaisesRegex(
-            ValueError, "target declaration conflicts"
-        ):
-            wrapper.query(X, y)
-
-        assert_no_query_state(self, wrapper)
-
-    def test_wrapper_without_estimator_argument_resolves_declarations(self):
-        X = np.arange(12, dtype=float).reshape(6, 2)
-        y = np.array(
-            [
-                [0.0, 1.0],
-                [1.0, 0.0],
-                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
-            ]
-        )
-        wrapper = SubSamplingWrapper(
-            query_strategy=RandomSampling(target_type="multi-label"),
-            max_candidates=4,
-            random_state=0,
-        )
-
-        target_type = wrapper._resolve_wrapped_target_type(y, {})
-
-        self.assertEqual(target_type, "multi-label")
-        self.assertEqual(wrapper.query(X, y).shape, (1,))
-
-    def test_estimator_like_argument_is_no_target_authority(self):
-        X = np.arange(24, dtype=float).reshape(12, 2)
-        y_discriminator = np.array([0.0, 1.0] + [MISSING_LABEL] * 10)
-        # The discriminator separates labeled from unlabeled samples such that
-        # its target semantics do not describe `y`.
-        discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
-            X, y_discriminator
-        )
-        y = np.array(
-            [[0.0, 1.0], [1.0, 0.0]]
-            + [[MISSING_LABEL, MISSING_LABEL] for _ in range(10)]
-        )
-        wrapper = SubSamplingWrapper(
-            query_strategy=DiscriminativeAL(random_state=0),
-            max_candidates=4,
-            target_type="multi-label",
-            random_state=0,
-        )
-
-        self.assertEqual(
-            wrapper._collect_target_authorities(
-                {"discriminator": discriminator}
-            ),
-            [],
-        )
-        query_indices = wrapper.query(X, y, discriminator=discriminator)
-
-        self.assertNotIn(query_indices[0], [0, 1])
-
-    def test_estimator_authorities_are_collected_deterministically(self):
-        clf_0 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        clf_1 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        clf_2 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        wrapper = SubSamplingWrapper(query_strategy=QueryByCommittee())
-
-        authorities = wrapper._collect_target_authorities(
-            {
-                "ensemble": [clf_1, clf_2, clf_1],
-                "clf": clf_0,
-                "discriminator": SklearnClassifier(
-                    GaussianNB(), classes=[0, 1]
-                ),
-                "fit_clf": False,
-                "fit_ensemble": False,
-                "sample_weight": None,
-            }
-        )
-
-        self.assertEqual(
-            [id(a) for a in authorities],
-            [id(clf_0), id(clf_1), id(clf_2)],
-        )
-
-    def test_authority_params_delegate_to_wrapped_strategy(self):
-        wrapped = DiscriminativeAL()
-        nested = SubSamplingWrapper(
-            query_strategy=SubSamplingWrapper(query_strategy=wrapped)
-        )
-
-        self.assertEqual(
-            nested._target_authority_params, wrapped._target_authority_params
-        )
-        self.assertNotIn("discriminator", wrapped._target_authority_params)
-        self.assertEqual(SubSamplingWrapper()._target_authority_params, ())
-
-    def test_conflicting_estimator_vocabularies_fail_before_query(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array([0.0, 1.0, MISSING_LABEL, MISSING_LABEL])
-        wrapper = SubSamplingWrapper(
-            query_strategy=QueryByCommittee(random_state=0),
-            max_candidates=2,
-            random_state=0,
-        )
-        conflicting = [
-            SklearnClassifier(GaussianNB(), classes=[0, 1]),
-            SklearnClassifier(GaussianNB(), classes=[0, 2]),
-        ]
-
-        with self.assertRaisesRegex(ValueError, "class vocabularies"):
-            wrapper.query(X, y, ensemble=conflicting, fit_ensemble=True)
-        assert_no_query_state(self, wrapper)
-
-        agreeing = [
-            SklearnClassifier(GaussianNB(), classes=[0, 1]),
-            SklearnClassifier(GaussianNB(), classes=[0, 1]),
-        ]
-        query_indices = wrapper.query(
-            X, y, ensemble=agreeing, fit_ensemble=True
-        )
-
-        self.assertIn(query_indices[0], [2, 3])
-
-    def test_cyclic_wrapper_chain_terminates(self):
-        inner = SubSamplingWrapper(query_strategy=RandomSampling())
-        outer = SubSamplingWrapper(
-            query_strategy=inner, target_type="multi-label"
-        )
-        inner.query_strategy = outer
-
-        declarations = outer._collect_target_declarations()
-
-        self.assertEqual(
-            declarations,
-            [
-                ("multi-label", "SubSamplingWrapper"),
-                ("auto", "SubSamplingWrapper"),
-            ],
-        )
 
     def test_init_param_max_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -641,6 +364,426 @@ class TestSubSamplingWrapper(
             (func_invalid, TypeError),
         ]
         self._test_param("init", "embed_samples_func", test_cases)
+
+    def test_query_param_sample_weight_aligned_to_samples(self):
+        X, y, clf = _aligned_kwargs_setting()
+        sample_weight = np.linspace(0.2, 2.0, len(X))
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        for candidates in [None, candidate_indices, X[candidate_indices]]:
+            results = []
+            for exclude_non_subsample in [False, True]:
+                qs = SubSamplingWrapper(
+                    UncertaintySampling(random_state=0),
+                    max_candidates=3,
+                    exclude_non_subsample=exclude_non_subsample,
+                    random_state=0,
+                )
+                results.append(
+                    qs.query(
+                        X=X,
+                        y=y,
+                        candidates=candidates,
+                        clf=deepcopy(clf),
+                        sample_weight=sample_weight,
+                        return_utilities=True,
+                    )
+                )
+            np.testing.assert_array_equal(results[0][0], results[1][0])
+            np.testing.assert_allclose(results[0][1], results[1][1])
+
+    def test_query_param_weights_aligned_to_candidates(self):
+        X, y, clf = _aligned_kwargs_setting()
+        candidates = X[unlabeled_indices(y, MISSING_LABEL)]
+        weights = np.linspace(0.5, 3.0, len(candidates))
+        for query_strategy, name in [
+            (UncertaintySampling(random_state=0), "utility_weight"),
+            (MonteCarloEER(random_state=0), "sample_weight_candidates"),
+        ]:
+            qs = SubSamplingWrapper(
+                deepcopy(query_strategy),
+                max_candidates=len(candidates),
+                random_state=0,
+            )
+            indices, utilities = qs.query(
+                X=X,
+                y=y,
+                candidates=candidates,
+                clf=deepcopy(clf),
+                return_utilities=True,
+                **{name: weights},
+            )
+            expected_indices, expected_utilities = deepcopy(
+                query_strategy
+            ).query(
+                X=X,
+                y=y,
+                candidates=candidates,
+                clf=deepcopy(clf),
+                return_utilities=True,
+                **{name: weights},
+            )
+            np.testing.assert_array_equal(indices, expected_indices)
+            np.testing.assert_allclose(utilities, expected_utilities)
+
+    def test_query_param_utility_weight_aligned_to_samples(self):
+        X, y, clf = _aligned_kwargs_setting()
+        utility_weight = np.linspace(0.5, 3.0, len(X))
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        for candidates in [None, candidate_indices]:
+            results = []
+            for exclude_non_subsample in [False, True]:
+                qs = SubSamplingWrapper(
+                    UncertaintySampling(random_state=0),
+                    max_candidates=3,
+                    exclude_non_subsample=exclude_non_subsample,
+                    random_state=0,
+                )
+                results.append(
+                    qs.query(
+                        X=X,
+                        y=y,
+                        candidates=candidates,
+                        clf=deepcopy(clf),
+                        utility_weight=utility_weight,
+                        return_utilities=True,
+                    )
+                )
+            np.testing.assert_array_equal(results[0][0], results[1][0])
+            np.testing.assert_allclose(results[0][1], results[1][1])
+
+    def test_query_param_aligned_kwargs_leave_caller_arrays(self):
+        X, y, clf = _aligned_kwargs_setting()
+        candidates = X[unlabeled_indices(y, MISSING_LABEL)]
+        sample_weight = np.linspace(0.2, 2.0, len(X))
+        utility_weight = np.linspace(0.5, 3.0, len(candidates))
+        expected_sample_weight = sample_weight.copy()
+        expected_utility_weight = utility_weight.copy()
+        qs = SubSamplingWrapper(
+            UncertaintySampling(random_state=0),
+            max_candidates=3,
+            exclude_non_subsample=True,
+            random_state=0,
+        )
+        qs.query(
+            X=X,
+            y=y,
+            candidates=candidates,
+            clf=deepcopy(clf),
+            sample_weight=sample_weight,
+            utility_weight=utility_weight,
+        )
+        np.testing.assert_array_equal(sample_weight, expected_sample_weight)
+        np.testing.assert_array_equal(utility_weight, expected_utility_weight)
+
+    def test_query_param_aligned_kwargs_of_wrong_length(self):
+        X, y, clf = _aligned_kwargs_setting()
+        qs = SubSamplingWrapper(
+            UncertaintySampling(random_state=0),
+            max_candidates=3,
+            exclude_non_subsample=True,
+            random_state=0,
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            "sample_weight",
+            qs.query,
+            X=X,
+            y=y,
+            clf=deepcopy(clf),
+            sample_weight=np.ones(len(X) - 2),
+        )
+
+    def test_query_param_aligned_kwargs_of_subset_length(self):
+        X, y, clf = _aligned_kwargs_setting()
+        n_labeled = int((~np.isnan(y)).sum())
+        max_candidates = 3
+        candidates = X[unlabeled_indices(y, MISSING_LABEL)]
+        test_cases = [
+            (
+                UncertaintySampling,
+                candidates,
+                False,
+                "utility_weight",
+                max_candidates,
+            ),
+            (
+                MonteCarloEER,
+                candidates,
+                False,
+                "sample_weight_candidates",
+                max_candidates,
+            ),
+            (
+                UncertaintySampling,
+                None,
+                True,
+                "sample_weight",
+                n_labeled + max_candidates,
+            ),
+            (
+                UncertaintySampling,
+                None,
+                True,
+                "utility_weight",
+                n_labeled + max_candidates,
+            ),
+            (
+                UncertaintySampling,
+                candidates,
+                True,
+                "sample_weight",
+                n_labeled,
+            ),
+        ]
+        for qs_class, candidates, exclude, name, n_values in test_cases:
+            with self.subTest(
+                name=name,
+                candidates=np.ndim(candidates),
+                exclude_non_subsample=exclude,
+            ):
+                qs = SubSamplingWrapper(
+                    qs_class(random_state=0),
+                    max_candidates=max_candidates,
+                    exclude_non_subsample=exclude,
+                    random_state=0,
+                )
+                self.assertRaisesRegex(
+                    ValueError,
+                    name,
+                    qs.query,
+                    X=X,
+                    y=y,
+                    candidates=candidates,
+                    clf=deepcopy(clf),
+                    **{name: np.ones(n_values)},
+                )
+
+    def test_query_param_candidates_embedded_like_samples(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+                [1.5, -2.0],
+                [0.5, 0.5],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0.0, 1.0
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        embed_samples_funcs = [
+            lambda x: x[:, :1],
+            lambda x: x + 5.0,
+            lambda x: x * np.array([1.0, 10.0]),
+        ]
+        strategies = [
+            (
+                UncertaintySampling(random_state=0),
+                {"clf": ParzenWindowClassifier(classes=[0, 1])},
+            ),
+            (CoreSet(random_state=0), {}),
+        ]
+        for query_strategy, query_kwargs in strategies:
+            for embed_samples_func in embed_samples_funcs:
+                for candidates in [
+                    None,
+                    candidate_indices,
+                    X[candidate_indices],
+                ]:
+                    for exclude_non_subsample in [False, True]:
+                        init_params = {
+                            "max_candidates": 3,
+                            "exclude_non_subsample": exclude_non_subsample,
+                            "random_state": 0,
+                        }
+                        qs = SubSamplingWrapper(
+                            deepcopy(query_strategy),
+                            embed_samples_func=embed_samples_func,
+                            **init_params,
+                        )
+                        indices, utilities = qs.query(
+                            X=X,
+                            y=y,
+                            candidates=candidates,
+                            return_utilities=True,
+                            **deepcopy(query_kwargs),
+                        )
+                        if candidates is None or candidates.ndim == 1:
+                            expected_candidates = candidates
+                        else:
+                            expected_candidates = embed_samples_func(
+                                candidates
+                            )
+                        qs_expected = SubSamplingWrapper(
+                            deepcopy(query_strategy), **init_params
+                        )
+                        expected_indices, expected_utilities = (
+                            qs_expected.query(
+                                X=embed_samples_func(X),
+                                y=y,
+                                candidates=expected_candidates,
+                                return_utilities=True,
+                                **deepcopy(query_kwargs),
+                            )
+                        )
+                        np.testing.assert_array_equal(
+                            indices, expected_indices
+                        )
+                        np.testing.assert_allclose(
+                            utilities, expected_utilities
+                        )
+
+    def test_query_param_X_eval_embedded_like_samples(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+                [1.5, -2.0],
+                [0.5, 0.5],
+            ]
+        )
+        X_eval = np.array([[3.0, 3.0], [-3.0, -3.0], [0.5, 2.0]])
+        y_class = np.full(len(X), MISSING_LABEL)
+        y_class[0], y_class[1] = 0.0, 1.0
+        y_reg = np.full(len(X), np.nan)
+        y_reg[0], y_reg[1] = 0.3, 1.7
+        embed_samples_funcs = [
+            lambda x: x[:, :1],
+            lambda x: x + 5.0,
+            lambda x: x * np.array([1.0, 10.0]),
+        ]
+        strategies = [
+            (
+                MonteCarloEER(random_state=0),
+                y_class,
+                {"clf": ParzenWindowClassifier(classes=[0, 1])},
+            ),
+            (
+                ExpectedModelOutputChange(random_state=0),
+                y_reg,
+                {"reg": NICKernelRegressor()},
+            ),
+        ]
+        for query_strategy, y, query_kwargs in strategies:
+            for embed_samples_func in embed_samples_funcs:
+                for exclude_non_subsample in [False, True]:
+                    init_params = {
+                        "max_candidates": 3,
+                        "exclude_non_subsample": exclude_non_subsample,
+                        "random_state": 0,
+                    }
+                    qs = SubSamplingWrapper(
+                        deepcopy(query_strategy),
+                        embed_samples_func=embed_samples_func,
+                        **init_params,
+                    )
+                    indices, utilities = qs.query(
+                        X=X,
+                        y=y,
+                        X_eval=X_eval,
+                        return_utilities=True,
+                        **deepcopy(query_kwargs),
+                    )
+                    qs_expected = SubSamplingWrapper(
+                        deepcopy(query_strategy), **init_params
+                    )
+                    expected_indices, expected_utilities = qs_expected.query(
+                        X=embed_samples_func(X),
+                        y=y,
+                        X_eval=embed_samples_func(X_eval),
+                        return_utilities=True,
+                        **deepcopy(query_kwargs),
+                    )
+                    np.testing.assert_array_equal(indices, expected_indices)
+                    np.testing.assert_allclose(utilities, expected_utilities)
+
+    def test_query_param_X_eval_leaves_caller_array(self):
+        X, y, clf = _aligned_kwargs_setting()
+        X_eval = np.array([[3.0, 3.0], [-3.0, -3.0]])
+        expected_X_eval = X_eval.copy()
+        qs = SubSamplingWrapper(
+            MonteCarloEER(random_state=0),
+            max_candidates=3,
+            embed_samples_func=lambda x: x * np.array([1.0, 10.0]),
+            random_state=0,
+        )
+        qs.query(X=X, y=y, clf=deepcopy(clf), X_eval=X_eval)
+        np.testing.assert_array_equal(X_eval, expected_X_eval)
+
+    def test_query_param_embed_samples_func_preserving_dimensions(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0.0, 1.0
+        embed_samples_funcs = [
+            (lambda x: x[:, 0], "X"),
+            (lambda x: x[:, 0] if len(x) < len(X) else x[:, :1], "candidates"),
+        ]
+        for embed_samples_func, name in embed_samples_funcs:
+            qs = SubSamplingWrapper(
+                UncertaintySampling(random_state=0),
+                max_candidates=2,
+                embed_samples_func=embed_samples_func,
+                random_state=0,
+            )
+            self.assertRaisesRegex(
+                ValueError,
+                f"embedding for `{name}`",
+                qs.query,
+                X=X,
+                y=y,
+                candidates=X[2:],
+                clf=ParzenWindowClassifier(classes=[0, 1]),
+            )
+
+    def test_query_param_embed_samples_func_preserving_samples(self):
+        X = np.array(
+            [
+                [-2.0, 0.0],
+                [-1.0, 1.0],
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0],
+                [-1.5, 2.0],
+            ]
+        )
+        y = np.full(len(X), MISSING_LABEL)
+        y[0], y[1] = 0.0, 1.0
+        for embed_samples_func in [
+            lambda x: x[:-1],
+            lambda x: np.vstack([x, x]),
+        ]:
+            qs = SubSamplingWrapper(
+                UncertaintySampling(random_state=0),
+                max_candidates=2,
+                embed_samples_func=embed_samples_func,
+                random_state=0,
+            )
+            for candidates in [None, X[2:]]:
+                self.assertRaisesRegex(
+                    ValueError,
+                    "`embed_samples_func` returned",
+                    qs.query,
+                    X=X,
+                    y=y,
+                    candidates=candidates,
+                    clf=ParzenWindowClassifier(classes=[0, 1]),
+                )
 
     def test_query_param_query_kwargs(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -773,9 +916,6 @@ class TestParallelUtilityEstimationWrapper(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
     supports_multilabel_batch_variation = False
-    # This wrapper parallelizes one-sample utility estimates and deliberately
-    # rejects larger batches; its wrapped strategies retain their own batch
-    # reproducibility coverage.
     reproducibility_batch_size = 1
 
     def setUp(self):
@@ -817,8 +957,6 @@ class TestParallelUtilityEstimationWrapper(
                 "query_strategy": QueryByCommittee(random_state=0),
                 "n_jobs": 2,
             },
-            # The wrapped strategy is estimator-backed, so that the multi-label
-            # fixture carries a class vocabulary the wrapper must preserve.
             init_default_params_multilabel={
                 "query_strategy": UncertaintySampling(random_state=0),
                 "n_jobs": 2,
@@ -850,12 +988,11 @@ class TestParallelUtilityEstimationWrapper(
         wrapped = RandomSampling(target_type="multi-label")
         wrapper = ParallelUtilityEstimationWrapper(query_strategy=wrapped)
 
-        self.assertEqual(wrapper.target_type, "auto")
         self.assertEqual(
             wrapper._target_capabilities, wrapped._target_capabilities
         )
 
-    def test_ambiguous_targets_fail_before_wrapper_state(self):
+    def test_wrapped_strategy_reports_ambiguous_targets(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
             [
@@ -871,37 +1008,7 @@ class TestParallelUtilityEstimationWrapper(
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             wrapper.query(X, y)
 
-        assert_no_query_state(self, wrapper)
-
-    def test_fitted_estimator_vocabulary_fails_before_wrapper_state(self):
-        X = np.arange(12, dtype=float).reshape(6, 2)
-        y_fit = np.array(
-            [
-                [0.0, 1.0],
-                [1.0, 0.0],
-                [0.0, 0.0],
-                [1.0, 1.0],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-            ]
-        )
-        clf = SklearnClassifier(
-            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
-        ).fit(X, y_fit)
-        y_query = y_fit.copy()
-        y_query[0, 0] = 2.0
-        wrapper = ParallelUtilityEstimationWrapper(
-            query_strategy=UncertaintySampling(),
-            n_jobs=1,
-            random_state=0,
-        )
-
-        with self.assertRaisesRegex(ValueError, "outside `classes\\[0\\]`"):
-            wrapper.query(X, y_query, clf=clf, fit_clf=False)
-
-        assert_no_query_state(self, wrapper)
-
-    def test_resolved_target_type_reaches_auto_strategy(self):
+    def test_multilabel_targets_reach_wrapped_strategy(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
             [
@@ -910,11 +1017,11 @@ class TestParallelUtilityEstimationWrapper(
                 *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
             ]
         )
-        wrapped = RandomSampling(random_state=0)
         wrapper = ParallelUtilityEstimationWrapper(
-            query_strategy=wrapped,
+            query_strategy=RandomSampling(
+                target_type="multi-label", random_state=0
+            ),
             n_jobs=1,
-            target_type="multi-label",
             random_state=0,
         )
 
@@ -922,7 +1029,6 @@ class TestParallelUtilityEstimationWrapper(
 
         self.assertIn(query_idx[0], [2, 3, 4, 5])
         self.assertTrue(np.isnan(utilities[0, :2]).all())
-        self.assertEqual(wrapped.target_type, "auto")
 
     def test_init_param_query_strategy(self):
         test_cases = [
@@ -991,10 +1097,6 @@ class TestParallelUtilityEstimationWrapper(
             self.assertEqual(len(q_sub), 1)
 
     def test_query_fewer_candidates_than_jobs(self):
-        # With `n_jobs=-1`, the candidates are split across all available
-        # CPUs. Fewer candidates than CPUs must not produce an empty chunk,
-        # which would ask the wrapped strategy to select from an exhausted
-        # candidate pool and contribute no utilities.
         query_params = deepcopy(self.query_default_params_clf)
         candidates = unlabeled_indices(
             query_params["y"], self.init_default_params["missing_label"]
@@ -1012,6 +1114,111 @@ class TestParallelUtilityEstimationWrapper(
         self.assertIn(query_indices[0], candidates)
         self.assertEqual(utilities.shape, (1, len(query_params["X"])))
         self.assertEqual(int((~np.isnan(utilities[0])).sum()), len(candidates))
+
+    def test_query_param_weights_match_direct_query(self):
+        X, y, clf = _aligned_kwargs_setting()
+        candidate_indices = unlabeled_indices(y, MISSING_LABEL)
+        candidate_samples = X[candidate_indices]
+        test_cases = [
+            (UncertaintySampling, None, "utility_weight", len(X)),
+            (UncertaintySampling, candidate_indices, "utility_weight", len(X)),
+            (
+                UncertaintySampling,
+                candidate_samples,
+                "utility_weight",
+                len(candidate_samples),
+            ),
+            (
+                MonteCarloEER,
+                candidate_samples,
+                "sample_weight_candidates",
+                len(candidate_samples),
+            ),
+        ]
+        for qs_class, candidates, name, n_weights in test_cases:
+            query_params = {
+                "X": X,
+                "y": y,
+                "candidates": candidates,
+                "return_utilities": True,
+                name: np.linspace(0.5, 3.0, n_weights),
+            }
+            expected_indices, expected_utilities = qs_class(
+                random_state=0
+            ).query(clf=deepcopy(clf), **query_params)
+            for n_jobs in [1, 2]:
+                with self.subTest(
+                    qs_class=qs_class.__name__,
+                    candidates=np.ndim(candidates),
+                    n_jobs=n_jobs,
+                ):
+                    qs = ParallelUtilityEstimationWrapper(
+                        qs_class(random_state=0),
+                        n_jobs=n_jobs,
+                        random_state=0,
+                    )
+                    indices, utilities = qs.query(
+                        clf=deepcopy(clf), **query_params
+                    )
+                    np.testing.assert_array_equal(indices, expected_indices)
+                    np.testing.assert_allclose(utilities, expected_utilities)
+
+    def test_query_index_candidates_match_direct_query(self):
+        X, y, clf = _aligned_kwargs_setting()
+        test_cases = [
+            (ValueOfInformationEER, None),
+            (ValueOfInformationEER, [0, 3, 5, 7]),
+            (MonteCarloEER, [0, 3, 5, 7]),
+        ]
+        for qs_class, candidates in test_cases:
+            query_params = {
+                "X": X,
+                "y": y,
+                "candidates": candidates,
+                "return_utilities": True,
+            }
+            expected_indices, expected_utilities = qs_class(
+                random_state=0
+            ).query(clf=deepcopy(clf), **query_params)
+            for n_jobs in [1, 2]:
+                with self.subTest(
+                    qs_class=qs_class.__name__,
+                    candidates=candidates,
+                    n_jobs=n_jobs,
+                ):
+                    qs = ParallelUtilityEstimationWrapper(
+                        qs_class(random_state=0),
+                        n_jobs=n_jobs,
+                        random_state=0,
+                    )
+                    indices, utilities = qs.query(
+                        clf=deepcopy(clf), **query_params
+                    )
+                    np.testing.assert_array_equal(indices, expected_indices)
+                    np.testing.assert_allclose(utilities, expected_utilities)
+
+    def test_query_param_weights_of_wrong_length(self):
+        X, y, clf = _aligned_kwargs_setting()
+        candidates = X[unlabeled_indices(y, MISSING_LABEL)]
+        for n_weights in [len(X), len(candidates) // 2]:
+            for qs_class, name in [
+                (UncertaintySampling, "utility_weight"),
+                (MonteCarloEER, "sample_weight_candidates"),
+            ]:
+                with self.subTest(name=name, n_weights=n_weights):
+                    qs = ParallelUtilityEstimationWrapper(
+                        qs_class(random_state=0), n_jobs=2
+                    )
+                    self.assertRaisesRegex(
+                        ValueError,
+                        name,
+                        qs.query,
+                        X=X,
+                        y=y,
+                        candidates=candidates,
+                        clf=deepcopy(clf),
+                        **{name: np.ones(n_weights)},
+                    )
 
     def test_query_batch_variation(self):
         # The strategy does not support `batch_size > 1` (see documentation)

@@ -30,9 +30,6 @@ from ._validation import (
     check_budget_manager,
     check_indices,
     check_n_features,
-    _check_callable,
-    _check_forward_outputs,
-    _has_nested_classes,
 )
 
 __all__ = [
@@ -64,9 +61,6 @@ __all__ = [
     "check_indices",
     "simple_batch",
     "check_n_features",
-    "_check_callable",
-    "_check_forward_outputs",
-    "_has_nested_classes",
     "TargetSpec",
     "resolve_target_spec",
 ]

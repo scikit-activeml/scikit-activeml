@@ -8,11 +8,11 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 import numpy as np
-from sklearn.base import clone
 from sklearn.datasets import make_blobs
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
     MISSING_LABEL,
+    is_labeled,
 )
 
 
@@ -21,7 +21,31 @@ class Dummy:
         pass
 
 
-class TemplateEstimator:
+class _TemplateEstimatorFitContract:
+    """Shared fitting return-value contract for classifiers and regressors."""
+
+    def test_fit_returns_self(self):
+        estimator, fit_params = self._make_fit_contract_estimator()
+        for call in range(2):
+            with self.subTest(call=call):
+                self.assertIs(estimator.fit(**deepcopy(fit_params)), estimator)
+
+    def test_partial_fit_returns_self(self, replace_init_params=None):
+        estimator, fit_params = self._make_fit_contract_estimator()
+        if replace_init_params is not None:
+            estimator.set_params(**deepcopy(replace_init_params))
+        if not hasattr(estimator, "partial_fit"):
+            self.skipTest(
+                "The configured estimator does not support partial_fit."
+            )
+        for call in range(2):
+            with self.subTest(call=call):
+                self.assertIs(
+                    estimator.partial_fit(**deepcopy(fit_params)), estimator
+                )
+
+
+class TemplateEstimator(_TemplateEstimatorFitContract):
     def setUp(
         self,
         estimator_class,
@@ -67,6 +91,12 @@ class TemplateEstimator:
             self.estimator_class.predict,
             "predict",
             self.predict_default_params,
+        )
+
+    def _make_fit_contract_estimator(self):
+        return (
+            self.estimator_class(**deepcopy(self.init_default_params)),
+            self.fit_default_params,
         )
 
     def test_init_param_missing_label(
@@ -319,15 +349,18 @@ class TemplateEstimator:
 
 
 class TemplateSkactivemlClassifier(TemplateEstimator):
-    # Error expected when fitting on non-integral float class labels. Wrappers
-    # forwarding the declared class labels to a `scikit-learn` estimator have
-    # to report the estimator's rejection of such a continuous target.
+    # Error expected when fitting on non-integral float class labels.
     non_integral_classes_error = None
 
     def _has_multilabel_defaults(self):
         return self.fit_default_params_multilabel is not None
 
     def test_init_param_target_type(self):
+        if (
+            "target_type"
+            not in inspect.signature(self.estimator_class).parameters
+        ):
+            return
         self._test_param(
             "init",
             "target_type",
@@ -335,7 +368,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 ("auto", None),
                 ("single-output", None),
                 ("multi-label", ValueError),
-                ("multi-output", ValueError),
                 ("invalid", ValueError),
             ],
         )
@@ -349,22 +381,13 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             estimator.target_spec_.target_type,
             estimator.target_spec_.annotation_type,
         )
-        self.assertEqual(estimator.target_type, "auto")
         self.assertIn(capability, estimator._target_capabilities)
         self.assertEqual(capability[0], "classification")
-        self.assertNotEqual(capability[1], "multi-output")
 
     def test_predict_dtype_matches_class_dtype(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that `predict` returns the declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, so integer classes combined with the default
-        `missing_label=np.nan` decode to `float64`. Predictions never carry
-        `missing_label` and must therefore be narrowed back, so that they
-        remain usable where the declared class labels are expected.
-        """
+        """Check that `predict` returns the declared class dtype."""
         init_params = deepcopy(self.init_default_params)
         init_params["classes"] = [0, 1]
         init_params["missing_label"] = np.nan
@@ -472,7 +495,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            # id_offset=5,
         )
 
         test_cases = [
@@ -564,7 +586,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            # id_offset=4,
         )
 
     def test_fit_param_X(self, test_cases=None):
@@ -677,6 +698,32 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 replace_fit_params=replace_fit_params,
             )
 
+    def test_fit_with_one_observed_class(self):
+        init_params = deepcopy(self.init_default_params)
+        fit_params = deepcopy(self.fit_default_params)
+        y = np.asarray(fit_params["y"])
+        is_lbld = is_labeled(y, missing_label=init_params["missing_label"])
+        if init_params.get("classes") is None:
+            init_params["classes"] = np.unique(y[is_lbld]).tolist()
+        classes = init_params["classes"]
+        fit_params["y"] = np.where(is_lbld, classes[-1], y)
+        X = self.predict_default_params["X"]
+        for method in ["fit", "partial_fit"]:
+            estimator = self.estimator_class(**deepcopy(init_params))
+            if not hasattr(estimator, method):
+                continue
+            with self.subTest(method=method):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self._call_with_target(estimator, method, fit_params)
+                    P = np.asarray(estimator.predict_proba(X))
+                    y_pred = estimator.predict(X)
+                self.assertEqual(P.shape, (len(X), len(classes)))
+                self.assertTrue(np.isfinite(P).all())
+                self.assertTrue((P >= 0).all())
+                np.testing.assert_allclose(P.sum(axis=1), 1, rtol=1e-6)
+                self.assertTrue(np.isin(y_pred, classes).all())
+
     def test_param_test_availability(self):
         not_test = ["self"]
         check_test_param_test_availability(
@@ -706,6 +753,33 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         fit_params["y"] = y_invalid
         with self.assertRaises(ValueError):
             self._call_with_target(estimator, "fit", fit_params)
+
+    def test_fit_multilabel_with_constant_outputs(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        y = np.asarray(fit_params["y"])
+        is_lbld = is_labeled(
+            y,
+            missing_label=init_params["missing_label"],
+            target_type="multi-label",
+        )
+        fit_params["y"] = np.where(is_lbld[:, None], y[is_lbld][0], y)
+        X = predict_params["X"]
+        for method in ["fit", "partial_fit"]:
+            estimator = self.estimator_class(**deepcopy(init_params))
+            if not hasattr(estimator, method):
+                continue
+            with self.subTest(method=method):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self._call_with_target(estimator, method, fit_params)
+                    P = np.asarray(estimator.predict_proba(X))
+                    y_pred = estimator.predict(X)
+                self.assertEqual(P.shape, (len(X), len(estimator.classes_)))
+                self.assertTrue(((P >= 0) & (P <= 1)).all())
+                self._assert_multilabel_predictions(y_pred, estimator.classes_)
 
     def test_fit_param_sample_weight_multilabel(self):
         if not self._has_multilabel_defaults():
@@ -754,36 +828,17 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         self.assertAlmostEqual(estimator.score(X, y_true), expected_score)
 
 
-class TemplateMultiAnnotatorClassifier:
-    """Shared resolved-target contract for multi-annotator classifiers."""
+class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
+    """Shared fitting and target contracts for multi-annotator classifiers."""
 
-    def test_init_param_target_type(self):
-        for target_type, error in [
-            ("auto", None),
-            ("single-output", None),
-            ("multi-label", ValueError),
-            ("multi-output", ValueError),
-            ("invalid", ValueError),
-        ]:
-            with self.subTest(target_type=target_type):
-                estimator = clone(
-                    self.target_contract_estimator_factory()
-                ).set_params(target_type=target_type)
-                if error is None:
-                    estimator.fit(**deepcopy(self.target_contract_fit_params))
-                else:
-                    with self.assertRaises(error):
-                        estimator.fit(
-                            **deepcopy(self.target_contract_fit_params)
-                        )
+    def _make_fit_contract_estimator(self):
+        return (
+            self.target_contract_estimator_factory(),
+            self.target_contract_fit_params,
+        )
 
     def test_predict_dtype_matches_class_dtype(self):
-        """Check that `predict` returns the declared class dtype.
-
-        Multi-annotator classifiers decode their predictions through the
-        same label encoder as single-annotator ones, so their predictions
-        are narrowed back to the declared class dtype as well.
-        """
+        """Check that `predict` returns the declared class dtype."""
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
         estimator.fit(**fit_params)
@@ -796,7 +851,6 @@ class TemplateMultiAnnotatorClassifier:
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
 
-        self.assertEqual(estimator.target_type, "auto")
         self.assertEqual(
             estimator._target_capabilities,
             frozenset(
@@ -816,16 +870,75 @@ class TemplateMultiAnnotatorClassifier:
             estimator.target_spec_.annotation_type, "multi-annotator"
         )
 
-        unsupported = clone(estimator).set_params(target_type="multi-label")
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            unsupported.fit(**fit_params)
-        self.assertFalse(hasattr(unsupported, "target_spec_"))
-        self.assertFalse(hasattr(unsupported, "classes_"))
+    def test_fit_with_one_observed_class(self):
+        estimator = self.target_contract_estimator_factory()
+        fit_params = deepcopy(self.target_contract_fit_params)
+        y = np.asarray(fit_params["y"])
+        is_lbld = is_labeled(y, missing_label=estimator.missing_label)
+        if estimator.classes is None:
+            estimator.set_params(classes=np.unique(y[is_lbld]).tolist())
+        classes = estimator.classes
+        fit_params["y"] = np.where(is_lbld, classes[-1], y)
+        X = fit_params["X"]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            estimator.fit(**fit_params)
+            P = np.asarray(estimator.predict_proba(X))
+            y_pred = estimator.predict(X)
+        self.assertEqual(P.shape, (len(X), len(classes)))
+        self.assertTrue(np.isfinite(P).all())
+        self.assertTrue((P >= 0).all())
+        np.testing.assert_allclose(P.sum(axis=1), 1, rtol=1e-6)
+        self.assertTrue(np.isin(y_pred, classes).all())
 
 
 class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
+    def test_fit_param_sample_weight(
+        self,
+        test_cases=None,
+        replace_init_params=None,
+        replace_fit_params=None,
+    ):
+        n_samples = len(self.fit_default_params["y"])
+        mixed_weights = np.ones(n_samples)
+        mixed_weights[0] = -1
+        cancelling_weights = np.zeros(n_samples)
+        cancelling_weights[0], cancelling_weights[-1] = -1, 1
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (-np.ones(n_samples), ValueError),
+            (mixed_weights, ValueError),
+            (cancelling_weights, ValueError),
+            (np.zeros(n_samples), None),
+        ]
+        super().test_fit_param_sample_weight(
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+    def test_fit_param_sample_weight_multilabel(self):
+        super().test_fit_param_sample_weight_multilabel()
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, _ = self._get_multilabel_params()
+        y = np.asarray(fit_params["y"])
+        for shape in [(len(y),), y.shape]:
+            with self.subTest(sample_weight_shape=shape):
+                weights = np.zeros(shape)
+                estimator = self.estimator_class(**init_params)
+                self._call_with_target(
+                    estimator, "fit", fit_params, sample_weight=weights
+                )
+                weights.flat[-1] = -1
+                with self.assertRaisesRegex(
+                    ValueError, "sample_weight.*non-negative"
+                ):
+                    self._call_with_target(
+                        estimator, "fit", fit_params, sample_weight=weights
+                    )
+
     def test_init_param_class_prior(self):
         test_cases = []
         test_cases += [
@@ -834,6 +947,8 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             ([], ValueError),
             ([0, 1], None),
             ([0], ValueError),
+            (np.inf, ValueError),
+            ([0, np.inf], ValueError),
         ]
         replace_init_params = {
             "classes": ["tokyo", "paris"],
@@ -850,10 +965,15 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+        if self._has_multilabel_defaults():
+            init_params, fit_params, _ = self._get_multilabel_params()
+            init_params["class_prior"] = np.inf
+            estimator = self.estimator_class(**init_params)
+            with self.assertRaises(ValueError):
+                self._call_with_target(estimator, "fit", fit_params)
 
     def test_param_test_availability(self):
         not_test = ["self"]
-        # Check if predict_freq is being tested.
         check_test_param_test_availability(
             self, self.estimator_class.predict_freq, "predict_freq", not_test
         )
@@ -884,7 +1004,6 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
         )
 
     def test_sample_proba(self):
-        # Setup test cases.
         X, y_full = make_blobs(n_samples=200, centers=4, random_state=0)
         classes = np.unique(y_full)
         pwc = self.estimator_class(
@@ -900,12 +1019,10 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             pwc.fit(X, y)
 
             for n_samples in [1, 10]:
-                # Check shape of probabilities.
                 P_sampled = pwc.sample_proba(X, n_samples=n_samples)
                 shape_Expected = [n_samples, len(X), len(classes)]
                 np.testing.assert_array_equal(P_sampled.shape, shape_Expected)
 
-                # Check normalization of probabilities.
                 P_sums = P_sampled.sum(axis=-1)
                 P_sums_expected = np.ones_like(P_sums)
                 np.testing.assert_allclose(P_sums, P_sums_expected)
@@ -938,24 +1055,15 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(1.2, None)]
-        # TODO: check_missing_label is only used to check if missing_label
-        # is correct but strings are therfore also accepted
-        # after fixing this issue add test below again.
-        # ("nan", TypeError),
+        test_cases += [("nan", TypeError)]
         super().test_init_param_missing_label(test_cases)
 
-    def test_init_param_target_type(self):
+        n_samples = len(self.fit_default_params["X"])
         self._test_param(
             "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("multi-output", ValueError),
-                ("multi-label", ValueError),
-                ("invalid", ValueError),
-            ],
+            "missing_label",
+            [(1.2, None)],
+            replace_fit_params={"y": [1.2] + [1.0] * (n_samples - 1)},
         )
 
     def test_fitted_target_spec_is_single_output_regression(self):
@@ -977,12 +1085,7 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
     def test_predict_returns_one_dimensional_targets(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that `predict` describes one target value per sample.
-
-        A single-output regression target is described by one value per
-        sample. A wrapped estimator may emit a column instead, which every
-        consumer indexing predictions by sample then misreads.
-        """
+        """Check that `predict` describes one target value per sample."""
         init_params = deepcopy(self.init_default_params)
         if replace_init_params is not None:
             init_params.update(deepcopy(replace_init_params))
@@ -1025,19 +1128,16 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
         )
-        # TODO: Test schould throw a TypeError
-        # Wrapper classes are failing because of
-        # "numpy.core._exceptions._UFuncNoLoopError: ufunc 'add' did not
-        # contain a loop with signature matching types
-        # (dtype('<U32'), dtype('<U32')) -> None"
 
-        # test_cases = [([1.0, "nan", 0.9], None)]
-        replace_init_params = {"missing_label": "nan"}
+        n_samples = len(self.fit_default_params["X"])
         self._test_param(
             "fit",
             "y",
-            test_cases,
-            replace_init_params=replace_init_params,
+            [
+                ([np.nan] * n_samples, TypeError),
+                ([1.0] * (n_samples - 1) + ["nan"], TypeError),
+            ],
+            replace_init_params={"missing_label": "nan"},
         )
 
 
@@ -1058,7 +1158,6 @@ class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):
 
     def test_param_test_availability(self):
         not_test = ["self"]
-        # Check if predict_target_distribution is being tested.
         check_test_param_test_availability(
             self,
             self.estimator_class.predict_target_distribution,

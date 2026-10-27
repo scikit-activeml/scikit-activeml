@@ -32,6 +32,33 @@ class TestKLDivergenceMaximization(
             query_default_params_reg=query_default_params_reg,
         )
 
+    def test_query_effective_defaults_match_explicit_parameters(self):
+        query_kwargs = deepcopy(self.query_default_params_reg)
+        effective_defaults = {
+            "integration_dict_target_val": {"method": "assume_linear"},
+            "integration_dict_cross_entropy": {
+                "method": "gauss_hermite",
+                "n_integration_samples": 10,
+            },
+        }
+        reference = KLDivergenceMaximization(
+            random_state=0, **effective_defaults
+        ).query(
+            **query_kwargs,
+            return_utilities=True,
+        )
+        for explicit in [False, True]:
+            with self.subTest(explicit=explicit):
+                parameters = deepcopy(effective_defaults) if explicit else {}
+                qs = KLDivergenceMaximization(random_state=0, **parameters)
+                for _ in range(2):
+                    indices, utilities = qs.query(
+                        **query_kwargs,
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
+
     def test_init_param_integration_dict_target_val(self):
         test_cases = [
             ({"method": "assume_linear"}, None),

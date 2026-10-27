@@ -1,32 +1,254 @@
 import inspect
+import numbers
+from collections.abc import Mapping, Sequence
+
 import numpy as np
+from sklearn import clone
 
 from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
 
-def assert_no_query_state(test_case, strategy):
-    """Assert that semantic query failure did not commit public state."""
-    for attribute in (
-        "n_features_in_",
-        "missing_label_",
-        "random_state_",
-    ):
-        test_case.assertFalse(
-            hasattr(strategy, attribute),
-            msg=(
-                f"{type(strategy).__name__} committed query state "
-                f"`{attribute}` after semantic failure."
-            ),
+def state_difference(actual, expected, name="state"):
+    """Describe the first difference between two object states.
+
+    The comparison is recursive and by value, with NaNs counting as equal.
+    Objects without attributes and without value equality, e.g., functions,
+    count as equal.
+
+    Parameters
+    ----------
+    actual : object
+        The state to check, e.g. the estimator a query was given.
+    expected : object
+        The state to check against, e.g. a copy taken before the query.
+    name : str, default="state"
+        Name of the compared state, used to root the reported path.
+
+    Returns
+    -------
+    difference : str or None
+        Human-readable description of the first difference found, naming the
+        path to it, or `None` if both states are equal.
+    """
+    return _state_difference(actual, expected, name, set())
+
+
+def assert_state_unchanged(test_case, actual, expected, name="state", msg=""):
+    """Assert that two object states are equal by value.
+
+    Parameters
+    ----------
+    test_case : unittest.TestCase
+        The test case reporting the failure.
+    actual : object
+        The state to check, e.g. the estimator a query was given.
+    expected : object
+        The state to check against, e.g. a copy taken before the query.
+    name : str, default="state"
+        Name of the compared state, used to root the reported path.
+    msg : str, default=""
+        Message prefixed to the reported difference.
+    """
+    difference = state_difference(actual, expected, name=name)
+    test_case.assertIsNone(
+        difference, msg=f"{msg} {difference}" if msg else difference
+    )
+
+
+def _state_difference(actual, expected, path, seen):
+    """Return the first difference between two states, or `None`."""
+    if actual is expected:
+        return None
+    if type(actual) is not type(expected):
+        return (
+            f"`{path}` changed type from `{type(expected).__name__}` to "
+            f"`{type(actual).__name__}`."
         )
+    pair = (id(actual), id(expected))
+    if pair in seen:
+        return None
+    seen.add(pair)
+
+    if isinstance(actual, (str, bytes)):
+        return _compare_values(actual == expected, actual, expected, path)
+    if isinstance(actual, np.random.RandomState):
+        return _state_difference(
+            actual.get_state(), expected.get_state(), f"{path}.state", seen
+        )
+    if isinstance(actual, np.random.Generator):
+        return _state_difference(
+            actual.bit_generator.state,
+            expected.bit_generator.state,
+            f"{path}.bit_generator.state",
+            seen,
+        )
+    if isinstance(actual, np.ndarray):
+        return _array_difference(actual, expected, path, seen)
+    if isinstance(actual, (numbers.Number, np.bool_)):
+        return _compare_values(
+            _scalars_equal(actual, expected), actual, expected, path
+        )
+    if isinstance(actual, Mapping):
+        return _mapping_difference(actual, expected, path, seen)
+    if isinstance(actual, (set, frozenset)):
+        return _compare_values(actual == expected, actual, expected, path)
+    if isinstance(actual, Sequence):
+        return _sequence_difference(actual, expected, path, seen)
+
+    attributes = _attribute_state(actual)
+    expected_attributes = _attribute_state(expected)
+    if attributes is not None or expected_attributes is not None:
+        return _mapping_difference(
+            attributes or {}, expected_attributes or {}, path, seen
+        )
+    if type(actual).__eq__ is not object.__eq__:
+        return _compare_values(
+            _equal_or_identical(actual, expected), actual, expected, path
+        )
+    return None
+
+
+def _array_difference(actual, expected, path, seen):
+    """Return the first difference between two arrays, or `None`."""
+    if actual.shape != expected.shape:
+        return (
+            f"`{path}` changed shape from {expected.shape} to {actual.shape}."
+        )
+    if actual.dtype != expected.dtype:
+        return (
+            f"`{path}` changed dtype from `{expected.dtype}` to "
+            f"`{actual.dtype}`."
+        )
+    if actual.dtype.kind == "O":
+        for index, (value, expected_value) in enumerate(
+            zip(actual.ravel(), expected.ravel())
+        ):
+            difference = _state_difference(
+                value, expected_value, f"{path}.ravel()[{index}]", seen
+            )
+            if difference is not None:
+                return difference
+        return None
+    equal = _elementwise_equal(actual, expected)
+    if equal is None:
+        return _compare_values(
+            _equal_or_identical(actual, expected), actual, expected, path
+        )
+    if equal.all():
+        return None
+    index = np.unravel_index(np.argmax(~equal), equal.shape)
+    position = "".join(f"[{axis}]" for axis in index)
+    return (
+        f"`{path}{position}` changed from {expected[index]!r} to "
+        f"{actual[index]!r}."
+    )
+
+
+def _elementwise_equal(actual, expected):
+    """Compare two arrays element by element, treating `nan` as equal."""
+    try:
+        with np.errstate(invalid="ignore"):
+            equal = np.asarray(actual == expected)
+        if actual.dtype.kind in "fc":
+            equal = equal | (np.isnan(actual) & np.isnan(expected))
+    except (TypeError, ValueError):
+        return None
+    if equal.dtype != bool or equal.shape != actual.shape:
+        return None
+    return equal
+
+
+def _mapping_difference(actual, expected, path, seen):
+    """Return the first difference between two mappings, or `None`."""
+    missing = [key for key in expected if key not in actual]
+    if missing:
+        return f"`{_key_path(path, missing[0])}` is missing."
+    added = [key for key in actual if key not in expected]
+    if added:
+        return f"`{_key_path(path, added[0])}` was added."
+    for key in expected:
+        difference = _state_difference(
+            actual[key], expected[key], _key_path(path, key), seen
+        )
+        if difference is not None:
+            return difference
+    return None
+
+
+def _sequence_difference(actual, expected, path, seen):
+    """Return the first difference between two sequences, or `None`."""
+    if len(actual) != len(expected):
+        return (
+            f"`{path}` changed length from {len(expected)} to {len(actual)}."
+        )
+    for index, (value, expected_value) in enumerate(zip(actual, expected)):
+        difference = _state_difference(
+            value, expected_value, f"{path}[{index}]", seen
+        )
+        if difference is not None:
+            return difference
+    return None
+
+
+def _key_path(path, key):
+    """Extend a state path by a mapping key or an attribute name."""
+    if isinstance(key, str) and key.isidentifier():
+        return f"{path}.{key}"
+    return f"{path}[{key!r}]"
+
+
+def _attribute_state(obj):
+    """Return the attributes holding an object's state, or `None`."""
+    state = getattr(obj, "__dict__", None)
+    if state:
+        return dict(state)
+    try:
+        state = obj.__getstate__()
+    except (AttributeError, TypeError):
+        return None
+    return dict(state) if isinstance(state, Mapping) and state else None
+
+
+def _scalars_equal(actual, expected):
+    """Compare two numbers, treating `nan` as equal to `nan`."""
+    try:
+        actual_nan, expected_nan = bool(np.isnan(actual)), bool(
+            np.isnan(expected)
+        )
+    except (TypeError, ValueError):
+        return _equal_or_identical(actual, expected)
+    if actual_nan or expected_nan:
+        return actual_nan and expected_nan
+    return _equal_or_identical(actual, expected)
+
+
+def _equal_or_identical(actual, expected):
+    """Compare two values by `==`, falling back to identity."""
+    try:
+        return bool(actual == expected)
+    except Exception:
+        return actual is expected
+
+
+def _compare_values(equal, actual, expected, path):
+    """Report a value difference unless the two values are equal."""
+    if equal:
+        return None
+    return (
+        f"`{path}` changed from {_short_repr(expected)} to "
+        f"{_short_repr(actual)}."
+    )
+
+
+def _short_repr(value, limit=120):
+    """Return a repr short enough for an assertion message."""
+    text = repr(value)
+    return text if len(text) <= limit else f"{text[:limit - 3]}..."
 
 
 def assert_predicts_class_dtype(test_case, y_pred, classes):
     """Assert that predictions carry the declared class dtype.
-
-    The label encoder decodes into a dtype that can also represent
-    `missing_label`, so predictions must be narrowed back to the dtype of
-    the declared classes to stay usable where those labels are expected.
 
     Parameters
     ----------
@@ -49,6 +271,49 @@ def assert_predicts_class_dtype(test_case, y_pred, classes):
         expected_dtype,
         msg="`predict` must return the declared class dtype.",
     )
+
+
+def assert_committee_label_invariance(test_case, strategy):
+    """Check committee class identity across signed and unsigned integers."""
+    X = np.array([[0.0], [1.0]])
+    candidates = np.array([[0.2], [0.7]])
+    results = []
+    for offset, dtypes in (
+        (0, (np.int64, np.int64)),
+        (10, (np.int64, np.int64)),
+        (10, (np.int64, np.uint64)),
+        (10, (np.uint64, np.int64)),
+    ):
+        members = []
+        for i, (dtype, gamma) in enumerate(zip(dtypes, (1, 20))):
+            classes = np.array([offset, offset + 1], dtype=dtype)
+            y = classes if i == 0 else classes[::-1]
+            members.append(
+                ParzenWindowClassifier(
+                    classes=classes,
+                    metric_dict={"gamma": gamma},
+                    random_state=0,
+                ).fit(X, y)
+            )
+        results.append(
+            clone(strategy).query(
+                X,
+                members[0].classes_,
+                ensemble=members,
+                fit_ensemble=False,
+                candidates=candidates,
+                batch_size=2,
+                return_utilities=True,
+            )
+        )
+    indices, utilities = results[0]
+    test_case.assertGreater(np.max(utilities[0]), 0)
+    for dtypes, (other_indices, other_utilities) in zip(
+        ("signed", "mixed", "reversed"), results[1:]
+    ):
+        with test_case.subTest(dtypes=dtypes):
+            np.testing.assert_array_equal(other_indices, indices)
+            np.testing.assert_allclose(other_utilities, utilities)
 
 
 def assert_attributes_unchanged(
@@ -77,55 +342,12 @@ def assert_attributes_unchanged(
             test_case.assertIs(estimator.__dict__[name], value)
 
 
-def assert_fit_failure_is_transactional(
-    test_case, estimator, action, expected_error, expected_message
-):
-    """Assert that a rejected fit raises as expected and commits no state.
-
-    This is the counterpart of `assert_no_query_state` for a fit, and is
-    strictly stronger: it compares the full `__dict__` by identity rather than
-    three named absences, so it holds for an already fitted estimator as well
-    as an unfitted one, and a same-valued replacement object fails it.
-
-    Comparing by identity is also its one blind spot: an estimator holding
-    fitted state that its fit updates in place, e.g. a sliding window, passes
-    this assertion while carrying mutated contents. Assert those contents
-    separately.
-
-    Parameters
-    ----------
-    test_case : unittest.TestCase
-        The test case reporting the failure.
-    estimator : object
-        The estimator whose fit is expected to be rejected. It is snapshotted
-        here, so a caller that mutated it beforehand still gets the full
-        identity comparison over every attribute. There is deliberately no
-        `ignored` parameter for that reason: it could only weaken the
-        comparison.
-    action : callable
-        Zero-argument callable performing the rejected fit.
-    expected_error : type
-        Exception type the rejection is expected to raise.
-    expected_message : str
-        Pattern the raised message is expected to match.
-    """
-    attributes_before = dict(estimator.__dict__)
-
-    with test_case.assertRaisesRegex(expected_error, expected_message):
-        action()
-
-    assert_attributes_unchanged(test_case, estimator, attributes_before)
-
-
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
-    kwargs_var_keyword = []
-    # Get kwargs variables
     kwargs_var_keyword = list(
         filter(lambda p: p.kind == p.VAR_KEYWORD, func_params.values())
     )
 
-    # Test if each required key except for kwargs is included.
     if param_dict is not None:
         for key, val in func_params.items():
             if (
@@ -149,13 +371,11 @@ def check_positional_args(func, func_name, param_dict, kwargs_name=None):
 def check_test_param_test_availability(
     class_, func, func_name, not_test, logic_test=True
 ):
-    # Get func parameters.
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = list(
         filter(lambda p: p.kind == p.VAR_KEYWORD, func_params.values())
     )
 
-    # Check func parameters.
     for param, val in func_params.items():
         if param in not_test or val in kwargs_var_keyword:
             continue
@@ -166,7 +386,6 @@ def check_test_param_test_availability(
                 msg=f"'{test_func_name}()' missing in {class_.__class__}",
             )
     if logic_test:
-        # Check if func is being tested.
         with class_.subTest(msg=f"test_{func_name}"):
             class_.assertTrue(
                 hasattr(class_, f"test_{func_name}"),

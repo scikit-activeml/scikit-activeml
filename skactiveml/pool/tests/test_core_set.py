@@ -55,6 +55,52 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         ]
         self._test_param("init", "metric_dict", test_cases)
 
+    def test_query_param_candidates(self):
+        super().test_query_param_candidates()
+
+        X = np.arange(4).reshape(-1, 1)
+        for target_type in ["single-output", "multi-label"]:
+            for labels in [[0, 1, 0, 1], [0, np.nan, 0, 1]]:
+                y = np.array(labels, dtype=float)
+                if target_type == "multi-label":
+                    y = np.column_stack([y, y])
+                for candidates in [[0, 1], np.arange(4)]:
+                    with self.subTest(
+                        target_type=target_type,
+                        labels=labels,
+                        candidates=candidates,
+                    ):
+                        indices, utilities = CoreSet(
+                            random_state=0, target_type=target_type
+                        ).query(
+                            X,
+                            y,
+                            candidates=candidates,
+                            batch_size=len(candidates),
+                            return_utilities=True,
+                        )
+                        np.testing.assert_array_equal(
+                            np.sort(indices), candidates
+                        )
+                        distances = np.zeros(4)
+                        if np.isnan(labels[1]):
+                            distances[1] = 1
+                        expected = np.full(4, np.nan)
+                        expected[candidates] = distances[candidates]
+                        np.testing.assert_allclose(utilities[0], expected)
+                        for i, idx in enumerate(indices):
+                            self.assertTrue(np.isfinite(utilities[i, idx]))
+                            self.assertTrue(
+                                np.isnan(utilities[i, indices[:i]]).all()
+                            )
+                        self.assertTrue(
+                            np.isnan(
+                                utilities[
+                                    :, ~np.isin(np.arange(4), candidates)
+                                ]
+                            ).all()
+                        )
+
     def test_query(self):
         # test case 1: with the same random state the init pick up
         # is the same
@@ -221,7 +267,7 @@ class TestKGreedyCenter(unittest.TestCase):
             k_greedy_center,
             X=self.X,
             y=self.y,
-            target_type="multi-output",
+            target_type="invalid",
         )
 
     def test_param_batch_size(self):
@@ -242,6 +288,22 @@ class TestKGreedyCenter(unittest.TestCase):
         self.assertRaises(
             ValueError, k_greedy_center, X=self.X, y=self.y, mapping="string"
         )
+        X, y = np.arange(4).reshape(-1, 1), [0, 1, 0, 1]
+        for mapping in [[0.5, 1], [-1, 1], [True, False], [0, 4]]:
+            with self.subTest(mapping=mapping):
+                self.assertRaises(
+                    ValueError, k_greedy_center, X=X, y=y, mapping=mapping
+                )
+        for mapping in [[0, 1], [0.0, 1.0]]:
+            with self.subTest(mapping=mapping):
+                indices, utilities = k_greedy_center(
+                    X=X, y=y, mapping=mapping, batch_size=2, random_state=0
+                )
+                np.testing.assert_array_equal(np.sort(indices), [0, 1])
+                expected = np.full((2, 4), np.nan)
+                expected[:, [0, 1]] = 0
+                expected[1, indices[0]] = np.nan
+                np.testing.assert_allclose(utilities, expected)
 
     def test_param_n_new_cand(self):
         self.assertRaises(

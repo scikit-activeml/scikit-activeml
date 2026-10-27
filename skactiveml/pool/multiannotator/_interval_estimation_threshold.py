@@ -7,6 +7,7 @@ from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
 )
+from ...utils._label_dtype import _as_label_array
 from ...utils._target import _check_target_spec_capability
 from ...pool._uncertainty_sampling import uncertainty_scores
 from ...utils import (
@@ -53,25 +54,23 @@ class IntervalEstimationAnnotModel(BaseEstimator):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     alpha : float, interval=(0, 1), default=0.05
-        Half of the confidence level for student's t-distribution.
+        Significance level of the confidence interval based on Student's
+        t-distribution, i.e., the confidence level is `1 - alpha`.
     mode : 'lower' or 'mean' or 'upper', default='upper'
         Mode of the estimated annotation performance.
     random_state : None or int or numpy.random.RandomState, default=None
         The random state used for deciding on majority vote labels in case of
         ties.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This estimator supports only single-output
-        classification with multiple annotators.
 
     Attributes
     ----------
-    n_annotators_: int
+    n_annotators_ : int
         Number of annotators.
     A_perf_ : ndarray, shape (n_annotators, 3)
         Estimated annotation performances (i.e., labeling accuracies), where
-        `A_cand[i, 0]` indicates the lower bound, `A_cand[i, 1]` indicates the
-        mean, and `A_cand[i, 2]` indicates the upper bound of the estimation
-        labeling accuracy.
+        `A_perf_[i, 0]` indicates the lower bound, `A_perf_[i, 1]` indicates
+        the mean, and `A_perf_[i, 2]` indicates the upper bound of the
+        estimated labeling accuracy.
     target_spec_ : skactiveml.utils.TargetSpec
         Resolved target semantics established during fitting.
 
@@ -89,14 +88,12 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         alpha=0.05,
         mode="upper",
         random_state=None,
-        target_type="auto",
     ):
         self.classes = classes
         self.missing_label = missing_label
         self.alpha = alpha
         self.mode = mode
         self.random_state = random_state
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -122,12 +119,13 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         self : IntervalEstimationAnnotModel object
             The fitted annotator model.
         """
-        y_array = np.asarray(y)
-        check_missing_label(self.missing_label, target_type=y_array.dtype)
+        y_array = _as_label_array(y)
+        check_missing_label(
+            self.missing_label, target_type=y_array.dtype, name="y"
+        )
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=self.target_type,
             annotation_type="multi-annotator",
             classes=self.classes,
             missing_label=self.missing_label,
@@ -135,6 +133,13 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         _check_target_spec_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
+        if (
+            sample_weight is not None
+            and np.shape(sample_weight) != y_array.shape
+        ):
+            raise ValueError(
+                "`sample_weight` must have the same shape as `y`."
+            )
         # Check whether alpha is float in (0, 1).
         check_scalar(
             x=self.alpha,
@@ -160,12 +165,12 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         )
 
         # Number of annotators.
-        self.n_annotators_ = y.shape[1]
+        self.n_annotators_ = y_array.shape[1]
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         self.A_perf_ = np.zeros((self.n_annotators_, 3))
         for a_idx in range(self.n_annotators_):
             is_correct = np.equal(
-                y_mv[is_lbld[:, a_idx]], y[is_lbld[:, a_idx], a_idx]
+                y_mv[is_lbld[:, a_idx]], y_array[is_lbld[:, a_idx], a_idx]
             )
             is_correct = np.concatenate((is_correct, [0, 1]))
             mean = np.mean(is_correct)
@@ -218,11 +223,14 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
     or greater than an adaptive threshold.
     The features to be labeled are chosen by using uncertainty sampling with
     a least confidence score.
-    The strategy assumes all annotators to be available and is not defined
-    otherwise. To deal with this case nonetheless value-annotator pairs are
-    first ranked according to the amount of annotators available for the given
-    value in `candidates` and are than ranked according to
-    `IntervalEstimationThreshold`.
+    The strategy assumes all annotators are available for each candidate
+    sample. Samples with any unavailable annotator are excluded from selection.
+    By default, only fully unlabeled samples are candidates. Samples with
+    partial annotations can be used for training, but are not selected again
+    by default.
+    Explicit candidates and availability masks define the query pool directly.
+    Callers must ensure that it represents previously unqueried samples to
+    follow the workflow in [1]_.
 
     Parameters
     ----------
@@ -230,12 +238,12 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         Parameter for specifying the adaptive threshold used for annotator
         selection.
     alpha : float, interval=(0, 1), default=0.05
-        Half of the confidence level for student's t-distribution.
+        Significance level of the confidence interval based on Student's
+        t-distribution, i.e., the confidence level is `1 - alpha`.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification with multiple annotators.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
 
     References
     ----------
@@ -250,12 +258,10 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         alpha=0.05,
         random_state=None,
         missing_label=MISSING_LABEL,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.epsilon = epsilon
         self.alpha = alpha
@@ -282,9 +288,10 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
-            including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            including missing annotations indicated by `self.missing_label`),
+            meaning that `y[i, j]` contains the label from annotator `j` for
+            sample `i`.
+            Partially annotated samples are supported as training data.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -292,42 +299,42 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             `sample_weight`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
-            See parameter `annotators`.
+            Candidate samples to query. Explicit candidates define the query
+            pool independently of missing labels in `y`. See `annotators` for
+            the supported representations and availability restrictions.
         annotators : None or array-like of shape (n_avl_annotators), dtype=int\
                 or array-like of shape (n_candidates, n_annotators),\
                 default=None
-            - If candidate samples and annotators are not specified, i.e.,
-              `candidates=None`, `annotators=None` the unlabeled target values,
-              `y`, are the candidates annotator-sample-pairs.
-            - If candidate samples and available annotators are specified:
-              The annotator-sample-pairs, for which the sample is a candidate
-              sample and the annotator is an available annotator are considered
-              as candidate annotator-sample-pairs.
-            - If `candidates` is None, all samples of `X` are considered as
-              candidate samples. In this case `n_candidates` equals `len(X)`.
+            A candidate is eligible only if all annotators are available for
+            it. Availability determines eligibility before the performance
+            threshold selects which annotators to query.
+
+            - If `candidates=None` and `annotators=None`, only fully unlabeled
+              rows of `y` are eligible.
+            - If `candidates=None` and `annotators` is specified, all samples
+              of `X` are candidates and `n_candidates` equals `len(X)`.
+              The supplied availability replaces the missing-label mask.
             - If `candidates` is of shape `(n_candidates,)` and of type int,
               `candidates` is considered as the indices of the sample
               candidates in `(X, y)`.
             - If `candidates` is of shape (n_candidates, n_features), the
               sample candidates are directly given in `candidates` (not
-              necessarily contained in `X`). This is not supported by all query
-              strategies.
-            - If `annotators` is `None`, all annotators are considered as
-              available annotators.
+              necessarily contained in `X`).
+            - If `annotators=None` and candidates are explicitly specified,
+              all annotators are considered available.
             - If `annotators` is of shape (n_avl_annotators), and of type int,
               `annotators` is considered as the indices of the available
-              annotators.
+              annotators. A strict subset leaves no eligible samples.
             - If `annotators` is a boolean array of shape `(n_candidates,
-              n_annotators)` the annotator-sample-pairs, for which the sample
-              is a candidate sample and the boolean matrix has entry `True` are
-              considered as candidate annotator-sample pairs.
+              n_annotators)`, a sample is eligible only if all entries in its
+              row are `True`.
         sample_weight : array-like, (n_samples, n_annotators), default=None
             It contains the weights of the training samples' class labels.
             It must have the same shape as `y`.
-        batch_size : 'adaptive' or int, default=1
-            The number of samples to be selected in one AL cycle. If 'adaptive'
-            is set, the `batch_size` is determined based on the annotation
-            performances and the parameter `epsilon`.
+        batch_size : 'adaptive' or int, default='adaptive'
+            The number of sample-annotator pairs selected in one AL cycle.
+            If 'adaptive' is set, the `batch_size` is determined based on the
+            annotation performances and the parameter `epsilon`.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
@@ -366,28 +373,18 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         )
         if query_target_spec is None:
             clf._resolve_target_spec(y)
+        elif fit_clf:
+            _check_target_spec_capability(
+                type(clf).__name__,
+                query_target_spec,
+                clf._target_capabilities,
+            )
+        elif hasattr(clf, "target_spec_"):
+            _check_classifier_prediction_contract(
+                clf.target_spec_, query_target_spec
+            )
         else:
-            classifier_target_type = getattr(clf, "target_type", "auto")
-            if classifier_target_type != "auto" and (
-                classifier_target_type != query_target_spec.target_type
-            ):
-                raise ValueError(
-                    "The classifier's explicit `target_type` conflicts with "
-                    "IntervalEstimationThreshold's resolved outer target "
-                    "specification."
-                )
-            if fit_clf:
-                _check_target_spec_capability(
-                    type(clf).__name__,
-                    query_target_spec,
-                    clf._target_capabilities,
-                )
-            elif hasattr(clf, "target_spec_"):
-                _check_classifier_prediction_contract(
-                    clf.target_spec_, query_target_spec
-                )
-            else:
-                clf._resolve_target_spec(y, classes=query_target_spec.classes)
+            clf._resolve_target_spec(y, classes=query_target_spec.classes)
 
         # base check
         (
@@ -434,7 +431,9 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         )
 
         n_annotators = y.shape[1]
-        # Check whether unlabeled data exists
+
+        # IEThresh requires all annotators to be available for a candidate.
+        # With default candidates, this retains only fully unlabeled samples.
         A_cand = np.repeat(
             np.all(A_cand, axis=1).reshape(-1, 1), n_annotators, axis=1
         )
@@ -465,7 +464,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             missing_label=clf.missing_label,
             alpha=self.alpha,
             mode="upper",
-            target_type=self.target_type,
+            random_state=self.random_state_,
         )
 
         ie_model.fit(X=X, y=y, sample_weight=sample_weight)

@@ -356,8 +356,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertRaises(ValueError, qs.query, **query_params)
 
     def test_query_distinct_indices_per_batch(self):
-        # A pool whose candidates take only two distinct feature values must
-        # not lead to a sample being selected twice within one batch.
         X, y = self._duplicated_pool()
         clf = SklearnClassifier(LogisticRegression(), classes=self.classes)
         for random_state in range(30):
@@ -367,8 +365,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             self.assertEqual(len(np.unique(query_indices)), 6)
 
     def test_query_utilities_are_sampling_distributions(self):
-        # Each row of `utilities` is the sampling distribution of the
-        # respective round, i.e., its `nansum` is one.
         X, y = self._duplicated_pool()
         clf = SklearnClassifier(LogisticRegression(), classes=self.classes)
         _, utilities = Badge(random_state=0).query(
@@ -386,8 +382,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         np.testing.assert_allclose(np.nansum(utilities_2, axis=1), 1)
 
     def test_query_origin_is_no_permanent_center(self):
-        # Candidates near the origin of the feature space must not be
-        # suppressed once the remaining clusters have been covered.
         cluster_a = np.array(
             [[10.0, 10.0], [10.5, 9.5], [9.5, 10.5], [10.2, 10.2]]
         )
@@ -411,8 +405,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             X, y, clf, batch_size=4, return_utilities=True
         )
 
-        # Once the two outer clusters have been sampled from, the uncovered
-        # cluster near the origin carries the largest utilities.
         cluster_c_indices = np.arange(10, 14)
         self.assertGreater(
             np.nanmin(utilities[2, cluster_c_indices]),
@@ -421,8 +413,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertTrue(np.isin(query_indices, cluster_c_indices).any())
 
     def test_query_matches_reference_kmeanspp(self):
-        # The factorized computation agrees per round with the reference
-        # semantics evaluated on explicitly materialized gradient embeddings.
         X, y_true = make_blobs(
             n_samples=300, centers=5, n_features=8, random_state=0
         )
@@ -476,9 +466,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             )
 
     def test_query_zero_gradient_embeddings(self):
-        # If all gradient embeddings are zero, e.g., for the one-hot
-        # probabilities of a single-class cold start, all remaining samples
-        # are equally likely and the first one is drawn at random.
         X = np.random.RandomState(42).choice(5, size=(10, 2)).astype(float)
         y = np.hstack([[0], np.full(9, MISSING_LABEL)])
         clf = SklearnClassifier(LogisticRegression(), classes=self.classes)
@@ -506,7 +493,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertTrue(np.isfinite(utilities[0, :2]).all())
 
     def test_query_candidates_as_sample_matrix(self):
-        # Candidates that are given as a sample matrix are indexed directly.
         random_state = np.random.RandomState(3)
         X = random_state.rand(20, 4)
         y = np.hstack([[0, 1], np.full(18, MISSING_LABEL)])
@@ -528,8 +514,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         np.testing.assert_allclose(np.nansum(utilities, axis=1), 1)
 
     def test_query_clf_embedding(self):
-        # With `clf_embedding_flag_name`, the sampling distribution is built
-        # on the returned embeddings instead of on `X`.
         X = np.random.RandomState(7).rand(30, 3)
         y = np.hstack([[0, 1], np.full(28, MISSING_LABEL)])
         clf = SklearnClassifierCosineEmbedding(
@@ -563,8 +547,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             norms_2_emb / norms_2_emb.sum(),
             rtol=1e-9,
         )
-        # The distribution built on `X` differs, such that the embeddings are
-        # indeed the ones being used.
         self.assertFalse(
             np.allclose(
                 utilities[0, unlbld_mapping], norms_2_X / norms_2_X.sum()

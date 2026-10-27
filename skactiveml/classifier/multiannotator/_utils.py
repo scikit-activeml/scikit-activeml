@@ -111,7 +111,6 @@ try:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
-            target_type="auto",
         ):
             super(_SkorchMultiAnnotatorClassifier, self).__init__(
                 module=multi_annotator_module,
@@ -122,7 +121,6 @@ try:
                 random_state=random_state,
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
-                target_type=target_type,
             )
             self.clf_module = clf_module
             self.n_annotators = n_annotators
@@ -153,7 +151,7 @@ try:
               `_SkorchMultiAnnotatorClassifier` object fitted on the training
               data.
             """
-            super().fit(X, y, **fit_params)
+            return super().fit(X, y, **fit_params)
 
         def partial_fit(self, X, y, **fit_params):
             """Fit the module without re-initialization.
@@ -181,7 +179,7 @@ try:
               `_SkorchMultiAnnotatorClassifier` object fitted on the training
               data.
             """
-            super().partial_fit(X, y, **fit_params)
+            return super().partial_fit(X, y, **fit_params)
 
         def _net_parts(self, X, y):
             # Check module parameters.
@@ -300,8 +298,7 @@ try:
             kwargs : dict
                 Keyword arguments consumed by `_validate_data`.
             """
-            vd_kwargs = super()._validate_data_kwargs()
-            return vd_kwargs
+            return super()._validate_data_kwargs()
 
         @abstractmethod
         def _build_neural_net_param_overrides(self, X, y):

@@ -27,11 +27,7 @@ class TestMixtureModelClassifier(
         self.y_ml = np.array([[0, 1], [0, 1], [1, 0], [1, 0]], dtype=float)
         init_default_params_multilabel = {
             "classes": [[0, 1], [0, 1]],
-            # `np.nan` widens the label encoder past the class dtype, so the
-            # narrowing of multi-label predictions is actually exercised.
             "missing_label": np.nan,
-            # A multi-label fit cannot derive the number of components from
-            # a single class vocabulary, so the mixture model is given.
             "mixture_model": GaussianMixture(n_components=2, random_state=0),
         }
         fit_default_params_multilabel = {"X": self.X_ml, "y": self.y_ml}
@@ -131,15 +127,13 @@ class TestMixtureModelClassifier(
         )
         np.testing.assert_array_equal([[0, 1, 2]], cmm.F_components_)
 
-    def test_multilabel_requires_explicit_mixture_before_fitted_state(self):
+    def test_multilabel_requires_explicit_mixture(self):
         cmm = MixtureModelClassifier(
             classes=[[0, 1], [0, 1]], target_type="multi-label"
         )
 
         with self.assertRaisesRegex(ValueError, "mixture_model.*multi-label"):
             cmm.fit([[0], [1]], [[0, 1], [1, 0]])
-
-        self.assertFalse(any(name.endswith("_") for name in vars(cmm)))
 
     def test_multilabel_predictions_in_both_weight_modes(self):
         X = np.array([[-0.1], [0.0], [0.1]])
@@ -365,3 +359,49 @@ class TestMixtureModelClassifier(
         )
         y = cmm.predict(self.fit_default_params["X"])
         np.testing.assert_array_equal(["paris", "paris", "paris"], y)
+
+    def test_similarities_support_all_covariance_types(self):
+        X = np.array([[-2.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [2.0, 1.0]])
+        X_query = np.vstack([X, [0.3, 0.8]])
+        for mixture_type in (GaussianMixture, BayesianGaussianMixture):
+            for covariance_type in ("full", "tied", "diag", "spherical"):
+                for multilabel in (False, True):
+                    with self.subTest(
+                        mixture=mixture_type,
+                        covariance=covariance_type,
+                        multilabel=multilabel,
+                    ):
+                        y = np.array([0, 0, 1, 1])
+                        clf = MixtureModelClassifier(
+                            mixture_type(
+                                n_components=2,
+                                covariance_type=covariance_type,
+                                random_state=0,
+                            ),
+                            weight_mode="similarities",
+                            classes=[[0, 1], [0, 1]] if multilabel else [0, 1],
+                        ).fit(
+                            X, np.column_stack([y, 1 - y]) if multilabel else y
+                        )
+                        model = clf.mixture_model_
+                        similarities = []
+                        for j in range(model.n_components):
+                            covariance = model.covariances_
+                            if covariance_type != "tied":
+                                covariance = covariance[j]
+                            if covariance_type == "diag":
+                                covariance = np.diag(covariance)
+                            elif covariance_type == "spherical":
+                                covariance = np.eye(X.shape[1]) * covariance
+                            delta = X_query - model.means_[j]
+                            squared_distance = np.sum(
+                                delta * np.linalg.solve(covariance, delta.T).T,
+                                axis=1,
+                            )
+                            similarities.append(
+                                np.exp(-np.sqrt(squared_distance))
+                            )
+                        expected = np.tensordot(
+                            np.array(similarities).T, clf.F_components_, axes=1
+                        )
+                        assert_allclose(clf.predict_freq(X_query), expected)

@@ -1,10 +1,10 @@
 import numpy as np
-from sklearn import clone
 
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 
 from skactiveml.pool.utils import (
     _update_reg,
@@ -43,9 +43,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Random state for candidate selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        regression.
 
     References
     ----------
@@ -64,12 +61,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         integration_dict_cross_entropy=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.integration_dict_target_val = integration_dict_target_val
         self.integration_dict_cross_entropy = integration_dict_cross_entropy
@@ -144,12 +139,26 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(ProbabilisticRegressor,),
         )
-
-        check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(fit_reg, "fit_reg", bool)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
 
         X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
         if len(X_eval) == 0:
@@ -157,31 +166,34 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 "The training data contains no unlabeled " "data."
             )
 
-        if self.integration_dict_target_val is None:
-            self.integration_dict_target_val = {"method": "assume_linear"}
-
-        if self.integration_dict_cross_entropy is None:
-            self.integration_dict_cross_entropy = {
-                "method": "gauss_hermite",
-                "n_integration_samples": 10,
-            }
-        check_type(
-            self.integration_dict_target_val, "self.integration_dict", dict
+        integration_dict_target_val = (
+            {"method": "assume_linear"}
+            if self.integration_dict_target_val is None
+            else self.integration_dict_target_val
         )
+
+        integration_dict_cross_entropy = (
+            {"method": "gauss_hermite", "n_integration_samples": 10}
+            if self.integration_dict_cross_entropy is None
+            else self.integration_dict_cross_entropy
+        )
+        check_type(integration_dict_target_val, "self.integration_dict", dict)
         check_type(
-            self.integration_dict_cross_entropy, "self.integration_dict", dict
+            integration_dict_cross_entropy, "self.integration_dict", dict
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
-
         utilities_cand = self._kullback_leibler_divergence(
-            X_eval, X_cand, mapping, reg, X, y, sample_weight=sample_weight
+            X_eval,
+            X_cand,
+            mapping,
+            reg,
+            X,
+            y,
+            integration_dict_target_val=integration_dict_target_val,
+            integration_dict_cross_entropy=integration_dict_cross_entropy,
+            sample_weight=sample_weight,
         )
 
         if mapping is None:
@@ -198,7 +210,16 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _kullback_leibler_divergence(
-        self, X_eval, X_cand, mapping, reg, X, y, sample_weight=None
+        self,
+        X_eval,
+        X_cand,
+        mapping,
+        reg,
+        X,
+        y,
+        integration_dict_target_val,
+        integration_dict_cross_entropy,
+        sample_weight=None,
     ):
         """Calculates the expected Kullback-Leibler divergence over the
         evaluation set if each candidate sample where to be labeled.
@@ -219,6 +240,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
+        integration_dict_target_val : dict
+            Effective integration parameters for potential target values.
+        integration_dict_cross_entropy : dict
+            Effective integration parameters for cross entropy.
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
 
@@ -247,18 +272,16 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                     X_eval,
                     reg_new,
                     reg,
-                    integration_dict=self.integration_dict_cross_entropy,
+                    integration_dict=integration_dict_cross_entropy,
                     random_state=self.random_state_,
                 )
             )
             return cross_ent - entropy_post
 
-        kl_div = conditional_expect(
+        return conditional_expect(
             X_cand,
             new_kl_divergence,
             reg,
             random_state=self.random_state_,
-            **self.integration_dict_target_val,
+            **integration_dict_target_val,
         )
-
-        return kl_div
