@@ -23,7 +23,7 @@ from ..utils import (
     check_equal_missing_label,
     check_scalar,
 )
-from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
+from ..utils._label_dtype import _as_label_array, _common_label_dtype
 from ..utils._target import _check_refit_capability
 from ._target import _resolve_estimator_target_spec
 
@@ -330,7 +330,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         member_classes = [np.asarray(est.classes_) for est in est_arr]
         classes = np.unique(
             np.concatenate(
-                member_classes, dtype=_lossless_decode_dtype(member_classes)
+                member_classes, dtype=_common_label_dtype(member_classes)
             )
         )
         probas = np.zeros((len(est_arr), len(X_cand), len(classes)))

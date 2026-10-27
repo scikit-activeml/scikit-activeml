@@ -184,13 +184,15 @@ class TestSingleOutputContract(_ContractCase):
             "contains `missing_label=1`",
             scope=CLASSES,
         ),
+        Row([0, 1.5], np.nan, [0, 1.5], None, "", skip=("SklearnClassifier",)),
         Row(
-            [0, 1.5],
-            np.nan,
-            [0.0, 1.5],
+            ["cat", 1],
+            None,
+            ["cat", 1],
             TypeError,
-            "must contain one label family",
+            "mixes strings and numbers",
             scope=CLASSES,
+            skip=("is_unlabeled", "RandomSampling"),
         ),
         Row(
             None,
@@ -241,19 +243,13 @@ class TestSingleOutputContract(_ContractCase):
 
     def test_inferring_a_float_vocabulary_from_mixed_numbers(self):
         y = [0, 1.5] * REPEATS
-        for targets in (y, np.asarray(y)):
+        for targets in (y, np.asarray(y), np.asarray(y, dtype=object)):
             target_spec = resolve_target_spec(
                 targets, task="classification", missing_label=np.nan
             )
             self.assertEqual(target_spec.classes, (0.0, 1.5))
             ParzenWindowClassifier(missing_label=np.nan).fit(
                 _samples(targets), targets
-            )
-        with self.assertRaisesRegex(TypeError, "one label family"):
-            resolve_target_spec(
-                np.asarray(y, dtype=object),
-                task="classification",
-                missing_label=np.nan,
             )
 
 
@@ -328,9 +324,15 @@ class TestMultiLabelContract(_ContractCase):
             [[0, 1], [0.0, 1.0]],
             np.nan,
             [[0, 1], [np.nan, np.nan]],
-            ValueError,
-            "one dtype across all label outputs",
-            scope=CLASSES,
+            None,
+            "",
+        ),
+        Row(
+            [["no", "yes"], [0, 1]],
+            None,
+            [["no", 1], [None, None]],
+            TypeError,
+            "either all strings or all",
         ),
         Row(
             [[0, 1, 2], [0, 1]],
@@ -404,6 +406,13 @@ class TestRegressionContract(_ContractCase):
             skip=("RandomSampling", "is_unlabeled"),
         ),
         RegressionRow(None, [0, np.nan, None], ValueError, "contains NaN"),
+        RegressionRow(
+            np.nan,
+            [True, False],
+            TypeError,
+            "numerical labels",
+            skip=("RandomSampling", "is_unlabeled"),
+        ),
     )
 
     def test_rows(self):
@@ -573,104 +582,3 @@ class TestMissingLabelContract(_ContractCase):
                         classes=classes,
                         missing_label=missing_label,
                     )
-
-
-class TestClassIdentityRoundTrip(_ContractCase):
-    """Exact class identity across the encode-fit-predict round trip.
-
-    Well-separated Parzen samples have known class probabilities, allowing
-    exact comparisons with the original labels. Exercise both direct and
-    wrapped classifiers.
-    """
-
-    LARGE_LABELS = [2**53, 2**53 + 1]
-
-    def test_raw_list_fit_preserves_integer_class_identity(self):
-        for labels in (
-            [2**53, 2**53 + 1],
-            [2**63, 2**63 + 1],
-        ):
-            for wrapped in (False, True):
-                for declared in (False, True):
-                    with self.subTest(
-                        labels=repr(labels), wrapped=wrapped, declared=declared
-                    ):
-                        classes = labels if declared else None
-                        clf = ParzenWindowClassifier(classes=classes)
-                        if wrapped:
-                            clf = SklearnClassifier(clf, classes=classes)
-                        clf.fit([[0.0], [100.0], [50.0]], [*labels, np.nan])
-                        self.assertEqual(
-                            clf.predict([[0.0], [100.0]]).tolist(), labels
-                        )
-
-    def test_raw_list_multilabel_fit_preserves_integer_class_identity(self):
-        labels = self.LARGE_LABELS
-        clf = ParzenWindowClassifier(classes=[labels, labels])
-        clf.fit(
-            [[0.0], [100.0], [50.0]],
-            [[labels[0], labels[0]], [labels[1], labels[1]], [np.nan, np.nan]],
-        )
-        self.assertEqual(
-            clf.predict([[0.0], [100.0]]).tolist(),
-            [[labels[0], labels[0]], [labels[1], labels[1]]],
-        )
-
-    def test_predictions_preserve_large_integer_class_identity(self):
-        for classes in (
-            np.array([2**53, 2**53 + 1], dtype=np.int64),
-            np.array([-(2**63), 2**63 - 1], dtype=np.int64),
-            np.array([2**64 - 2, 2**64 - 1], dtype=np.uint64),
-        ):
-            for wrapped in (False, True):
-                for cost_matrix in (None, [[1, 0], [0, 1]]):
-                    with self.subTest(
-                        classes=repr(classes),
-                        wrapped=wrapped,
-                        cost_matrix=cost_matrix,
-                    ):
-                        X = np.array([[0.0], [100.0]])
-                        estimator = ParzenWindowClassifier(classes=classes)
-                        clf = (
-                            SklearnClassifier(estimator, classes=classes)
-                            if wrapped
-                            else estimator
-                        )
-                        clf.set_params(cost_matrix=cost_matrix)
-                        clf.fit(X, classes)
-                        np.testing.assert_array_equal(
-                            clf.predict_proba(X), np.eye(2)
-                        )
-                        predicted = clf.predict(X)
-                        self.assertEqual(predicted.dtype, classes.dtype)
-                        self.assertEqual(
-                            predicted.tolist(),
-                            (
-                                classes.tolist()
-                                if cost_matrix is None
-                                else classes[::-1].tolist()
-                            ),
-                        )
-
-    def test_multilabel_predictions_preserve_large_integer_class_identity(
-        self,
-    ):
-        for classes in (
-            np.array([2**53, 2**53 + 1], dtype=np.int64),
-            np.array([2**64 - 2, 2**64 - 1], dtype=np.uint64),
-        ):
-            for wrapped in (False, True):
-                with self.subTest(classes=repr(classes), wrapped=wrapped):
-                    y = np.column_stack([classes, classes[::-1]])
-                    clf = ParzenWindowClassifier(classes=[classes, classes])
-                    if wrapped:
-                        clf = SklearnClassifier(
-                            MultiOutputClassifier(
-                                ParzenWindowClassifier(classes=classes)
-                            ),
-                            classes=[classes, classes],
-                        )
-                    clf.fit([[0.0], [100.0]], y)
-                    predicted = clf.predict([[0.0], [100.0]])
-                    self.assertEqual(predicted.dtype, y.dtype)
-                    self.assertEqual(predicted.tolist(), y.tolist())

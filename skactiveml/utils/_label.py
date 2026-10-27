@@ -1,16 +1,13 @@
 import numpy as np
 
 from ._label_dtype import (
-    _LABELS,
-    _NUMERICAL_LABELS,
-    _TASK_AGNOSTIC_LABELS,
     _as_label_array,
-    _check_missing_label_for_family,
+    _check_missing_label_for_kind,
     _check_missing_label_value,
+    _dtype_kind,
     _missing_label_kind,
     _matches_missing_label,
-    _missing_mask_and_family,
-    _target_type_family,
+    _missing_mask_and_kind,
 )
 
 MISSING_LABEL = np.nan
@@ -46,23 +43,23 @@ def is_unlabeled(
         - If `target_type="multi-label"`, `is_unlbld` is of shape
           `(n_samples,)`.
     """
-    role = _LABELS if target_type == "multi-label" else _TASK_AGNOSTIC_LABELS
-    return _is_unlabeled_with_role(
-        y,
-        missing_label=missing_label,
-        target_type=target_type,
-        role=role,
+    return _checked_unlabeled_mask(
+        y, missing_label=missing_label, target_type=target_type
     )
 
 
-def _is_unlabeled_with_role(
+def _checked_unlabeled_mask(
     y,
     missing_label=MISSING_LABEL,
     *,
     target_type="single-output",
-    role,
+    numerical=False,
 ):
-    """Return the missing mask after role-specific label validation."""
+    """Return the missing mask after checking the labels.
+
+    `numerical=True` additionally requires real numbers other than Boolean
+    values, as regression labels.
+    """
     check_missing_label(missing_label)
     if target_type == "auto":
         raise ValueError(
@@ -101,11 +98,8 @@ def _is_unlabeled_with_role(
             "`y` must be two-dimensional when `target_type='multi-label'`."
         )
 
-    is_missing, _ = _missing_mask_and_family(
-        y,
-        missing_label,
-        name="y",
-        role=role,
+    is_missing, _ = _missing_mask_and_kind(
+        y, missing_label, name="y", numerical=numerical
     )
 
     if target_type == "single-output":
@@ -178,27 +172,26 @@ def _check_labels(
     target_type : "single-output" or "multi-label", default="single-output"
         The resolved target type.
     task : "classification" or "regression", default="classification"
-        The prediction task the labels describe. Numerical labels may mix
-        integer and floating-point values but are neither categories nor
-        strings.
+        The prediction task the labels describe. Regression labels must be
+        real numbers other than Boolean values.
 
     Raises
     ------
     TypeError
-        If the labels are outside the label contract, mix label kinds, or
-        are incompatible with `missing_label`.
+        If the labels are outside the label contract, mix strings and
+        numbers, or are incompatible with `missing_label`.
     ValueError
-        If an observed label is nonfinite or an integer beyond 64 bits.
+        If an observed label is nonfinite.
     """
     if task not in {"classification", "regression"}:
         raise ValueError(
             "`task` must be either 'classification' or 'regression'."
         )
-    _is_unlabeled_with_role(
+    _checked_unlabeled_mask(
         y,
         missing_label=missing_label,
         target_type=target_type,
-        role=_NUMERICAL_LABELS if task == "regression" else _LABELS,
+        numerical=task == "regression",
     )
 
 
@@ -219,11 +212,7 @@ def _observed_numerical_labels(y, missing_label):
     y_observed : numpy.ndarray of shape (n_observed,)
         The observed labels as `float64` values.
     """
-    is_lbld = ~_is_unlabeled_with_role(
-        y,
-        missing_label,
-        role=_NUMERICAL_LABELS,
-    )
+    is_lbld = ~_checked_unlabeled_mask(y, missing_label, numerical=True)
     observed = _as_label_array(y)[is_lbld]
     return is_lbld, np.asarray(observed, dtype=float)
 
@@ -315,10 +304,10 @@ def check_missing_label(missing_label, target_type=None, name=None):
         Value to represent a missing label.
     target_type : numpy.dtype or Type or tuple, default=None
         The dtype or scalar type of the labels `missing_label` has to fit. If
-        `None`, only `missing_label` itself is checked. A dtype carrying no
-        label family, such as `object`, constrains no missing label. The
-        label-mask functions then check the missing label against the values
-        they see.
+        `None`, only `missing_label` itself is checked. A dtype of neither
+        strings nor numbers, such as `object`, constrains no missing label.
+        The label-mask functions then check the missing label against the
+        values they see.
     name : str, default=None
         The name of the variable to which `missing_label` is not compatible.
         The name will be printed in error messages if it is not None.
@@ -326,16 +315,16 @@ def check_missing_label(missing_label, target_type=None, name=None):
     Raises
     ------
     TypeError
-        If `missing_label` is no supported missing label, or belongs to another
-        label family than `target_type`.
+        If `missing_label` is no supported missing label, or is a string for
+        numeric labels or a number for string labels.
     ValueError
-        If `missing_label` is infinite or an integer beyond 64 bits.
+        If `missing_label` is infinite.
     """
     if target_type is None:
         _check_missing_label_value(missing_label)
         return
-    _check_missing_label_for_family(
-        missing_label, _target_type_family(target_type), name=name
+    _check_missing_label_for_kind(
+        missing_label, _dtype_kind(target_type), name=name
     )
 
 

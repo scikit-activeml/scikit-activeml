@@ -72,11 +72,8 @@ Label and Missing-Value Contract
 This contract defines which class vocabularies, labels, and missing labels
 are valid. It applies consistently to classifiers, regressors, the label
 encoder, label aggregation, the public label helpers, and query strategies.
-Its guiding principle is predictability over flexibility: a rule is preferred
-if users can anticipate its outcome without knowing implementation details
-and if developers can enforce it in one place. Flexibility that only holds for
-some estimators is not part of the contract; explicit object arrays retain
-their value-by-value type information as described below.
+Its rules are deliberately simple: labels are strings or real numbers, and
+rare combinations of inputs are not handled separately.
 
 Three distinct concepts determine whether an input is valid:
 
@@ -100,120 +97,74 @@ Three distinct concepts determine whether an input is valid:
 Supported Values and Missing Labels
 -----------------------------------
 
-Each class vocabulary contains one family: Boolean values, integers, finite
-floating-point values, or Unicode strings. Integer values must fit a common
-signed or unsigned integer dtype of at most 64 bits. Floating-point values may
-use ``float16``, ``float32``, or ``float64``, including ordinary Python
-``float`` values. Python and NumPy scalar equivalents are accepted.
+The contract consists of seven rules:
 
-Complex numbers, integers requiring more than 64 bits, extended-precision
-floats, bytes, arbitrary numeric objects, and nested objects are outside this
-contract. Neither ``None`` nor nonfinite numbers are categories. Object arrays
-remain valid storage if their entries satisfy these rules; object storage alone
-does not grant support for additional scalar types.
-
-A declared ``classes`` argument is checked value by value. It is short, and its
-exact types define the dtype of predictions. For example, ``classes=[0, 1.5]``
-is rejected because it mixes integers and floating-point values, while
-``classes=[0.0, 1.5]`` is accepted.
+1. **Conversion.** Lists and tuples follow NumPy's conversion, so ``[0, 1.5]``
+   becomes a floating-point array. The exception is a list that NumPy would
+   turn into strings, such as ``["cat", np.nan]`` or ``["a", 1]``. It becomes
+   an object array instead, so its values are checked as they are, and a NaN
+   marker cannot become the class ``"nan"``. Arrays are taken as they are.
+2. **Values.** Labels and classes are strings or real numbers. Boolean values,
+   integers, and floating-point values are all numbers and may be mixed.
+   Mixing strings and numbers raises a ``TypeError``, as do complex numbers,
+   bytes, datetimes, and timedeltas.
+3. **Vocabularies.** A class vocabulary is one-dimensional, unique, and
+   finite, and it contains neither ``None`` nor the missing label. Classes are
+   unique by value, so ``[0, 0.0]`` contains a duplicate.
+4. **Missing labels.** String labels accept ``None`` or a string as the
+   missing label. Numeric labels accept ``None``, ``np.nan``, or a finite
+   number. Numeric ``np.nan`` never matches the string ``"nan"``.
+5. **Multi-label.** Each row is fully labeled or fully missing, every output
+   is binary, and the outputs are either all strings or all numbers.
+6. **Regression.** Labels are finite real numbers other than Boolean values.
+7. **Dtypes.** Predictions use the dtype of ``classes_``. Labels with missing
+   entries are stored in NumPy's common dtype of the classes and the missing
+   label, or in ``object`` for ``missing_label=None``.
 
 .. doctest::
 
    >>> import numpy as np
    >>> from skactiveml.classifier import ParzenWindowClassifier
-   >>> family_X = np.zeros((3, 1))
-   >>> family_y = np.array([0, np.nan, 1.5])
-   >>> ParzenWindowClassifier(classes=[0, 1.5]).fit(family_X, family_y)
+   >>> label_X = np.zeros((3, 1))
+   >>> label_y = np.array([0, np.nan, 1.5])
+   >>> label_clf = ParzenWindowClassifier(classes=[0, 1.5])
+   >>> label_clf.fit(label_X, label_y).classes_.tolist()
+   [0.0, 1.5]
+   >>> ParzenWindowClassifier(classes=["cat", 1]).fit(label_X, label_y)
    Traceback (most recent call last):
        ...
-   TypeError: `classes` must contain one label family, but mixes integer and floating-point values. ...
-   >>> family_clf = ParzenWindowClassifier(classes=[0.0, 1.5])
-   >>> family_clf.fit(family_X, family_y).classes_.tolist()
-   [0.0, 1.5]
+   TypeError: `classes` mixes strings and numbers. ...
 
-Observed labels ``y`` are judged by their array representation. A Python list
-or tuple generally follows the NumPy conversion rules, so ``y=[0, 1.5]``
-becomes a floating-point array, and with ``classes=None`` the inferred
-vocabulary is ``(0.0, 1.5)``. The one exception is a lossy conversion: if
-NumPy would round an integer, as for ``[2**53, 2**53 + 1, np.nan]``, or turn a
-non-string value into a string, the conversion uses object storage instead,
-so that every supported scalar keeps its value and its family. The family
-rules then apply to the preserved values. Likewise, inferring from
-``np.array([0.0, 1.0])`` yields
-floating-point classes even though the values are integral. Only object arrays
-are inspected value by value, because their dtype carries no information about
-the values they hold. Thus an explicit object array containing integer and
-floating-point entries mixes classification families and is rejected, even
-where ordinary NumPy conversion of the same list produces one floating-point
-array. The same holds for the Boolean and integer families: the list
-``[False, 2]`` becomes an integer array and is accepted, whereas
-``np.array([False, 2], dtype=object)`` mixes families and is rejected.
-Ordinary label arrays are not scanned entry by entry. The large-integer case
-of the lossless fallback is described in :ref:`label-storage`. If the dtype of
-predictions matters, declare ``classes`` explicitly.
-
-Numeric missing labels use the supported real scalar types above. NaN is
-permitted specifically as a missing label, while infinities are rejected
-both as missing labels and as labels.
-
-.. list-table:: Missing-label compatibility
-   :header-rows: 1
-   :widths: 36 12 14 20 18
-
-   * - Observed labels
-     - ``None``
-     - ``np.nan``
-     - Finite numeric missing label
-     - String missing label
-   * - Numeric or Boolean categories
-     - Yes
-     - Yes
-     - Yes
-     - No
-   * - String categories
-     - Yes
-     - No
-     - No
-     - Yes
-   * - Numerical labels
-     - Yes
-     - Yes
-     - Yes
-     - No
+Observed labels ``y`` are judged by their array representation, so inferring
+the classes from ``np.array([0.0, 1.0])`` yields floating-point classes even
+though the values are integral. If the dtype of predictions matters, declare
+``classes`` explicitly.
 
 For classification, the missing label must also be absent from every class
 vocabulary. For example, ``classes=[0, 1]`` with ``missing_label=1`` is
 invalid: ``1`` cannot mean both a known category and an unknown label. An
-empty or entirely missing ``y`` provides no evidence about the label family;
-a declared vocabulary supplies it. A classification consumer that must infer
-a vocabulary, such as the target resolver or the label encoder, therefore
-rejects an entirely missing ``y`` when ``classes=None``.
+empty or entirely missing ``y`` does not show whether the labels are strings
+or numbers; a declared vocabulary does. A classification consumer that must
+infer a vocabulary, such as the target resolver or the label encoder,
+therefore rejects an entirely missing ``y`` when ``classes=None``.
 
 Single-output Classification Examples
 -------------------------------------
 
 Every nonmissing label must match a declared class by value. Numeric labels
 may use a wider storage dtype to accommodate missing values: ``0.0`` matches
-the declared integer class ``0``, but the string ``"0"`` does not. This does
-not permit a mixed-family declaration such as ``classes=[0, 1.0]``.
-
-Boolean labels match integer classes by value, and integer labels match
-Boolean classes the same way, because both families describe the same
-categories: ``True`` is the declared integer class ``1``. A Boolean/integer
-mixture within one ``y`` or one ``classes``, such as
-``np.array([False, 2], dtype=object)`` or ``classes=[False, 1]``, is
-rejected as any other family mixture is. Predictions use the declared class
-dtype, so the class vocabulary decides which of the two families is
-returned. Note that a floating-point missing label would convert
-``np.array([True, np.nan, False])`` to a floating-point array, which is then
-judged by the floating-point rule above. The following example therefore uses
-object storage with ``missing_label=None`` to keep the Boolean values.
+the declared integer class ``0``, but the string ``"0"`` does not. Boolean
+labels are numbers as well, so ``True`` matches the declared class ``1``.
+Predictions use the declared class dtype. Note that a floating-point missing
+label would convert ``np.array([True, np.nan, False])`` to a floating-point
+array. The following example therefore uses object storage with
+``missing_label=None`` to keep the Boolean values.
 
 .. doctest::
 
    >>> bool_y = np.array([True, None, False], dtype=object)
    >>> bool_clf = ParzenWindowClassifier(classes=[0, 1], missing_label=None)
-   >>> bool_clf.fit(family_X, bool_y).predict(family_X).dtype
+   >>> bool_clf.fit(label_X, bool_y).predict(label_X).dtype
    dtype('int64')
 
 In the following tables, ``NaN`` denotes numeric ``np.nan``.
@@ -229,7 +180,7 @@ In the following tables, ``NaN`` denotes numeric ``np.nan``.
    * - ``[0, 1]``
      - ``NaN``
      - ``[0, NaN, 1]``
-     - Accept: missing entries do not mix class families.
+     - Accept: missing entries are not labels.
    * - ``[0, 1]``
      - ``-2.5``
      - ``[0, -2.5, 1]``
@@ -241,7 +192,11 @@ In the following tables, ``NaN`` denotes numeric ``np.nan``.
    * - ``[0, 1]``
      - ``None``
      - ``[True, None, False]``
-     - Accept: Boolean labels match integer classes by value.
+     - Accept: Boolean labels match numeric classes by value.
+   * - ``[0, 1.5]``
+     - ``NaN``
+     - ``[0, 1.5]``
+     - Accept: integers and floating-point values are both numbers.
    * - ``["cat", "dog"]``
      - ``"?"``
      - ``["cat", "?", "dog"]``
@@ -254,10 +209,10 @@ In the following tables, ``NaN`` denotes numeric ``np.nan``.
      - ``1``
      - ``[0, 1]``
      - Reject: the missing label is also a class.
-   * - ``[0, 1.5]``
-     - ``NaN``
-     - ``[0, 1.5]``
-     - Reject: mixed integer/float declaration. Declare ``[0.0, 1.5]`` instead.
+   * - ``["cat", 1]``
+     - ``None``
+     - ``["cat", 1]``
+     - Reject: strings and numbers are mixed.
    * - ``None``
      - ``NaN``
      - ``[0, 1.5]``
@@ -282,25 +237,20 @@ one.
 .. doctest::
 
    >>> nan_y = np.array([0.0, np.nan, 1.0])
-   >>> ParzenWindowClassifier(missing_label=None).fit(family_X, nan_y)
+   >>> ParzenWindowClassifier(missing_label=None).fit(label_X, nan_y)
    Traceback (most recent call last):
        ...
-   ValueError: `y` contains NaN, which is only valid as the configured `missing_label`. ...
+   ValueError: `y` contains NaN, which is only valid as the configured `missing_label`.
 
 Multi-label Classification Examples
 -----------------------------------
 
 For ``target_type="multi-label"``, each output has exactly two classes, and
-each sample has one value per output. All output vocabularies must share one
-dtype kind: Boolean, signed integer, unsigned integer, floating-point, or
-Unicode string. Different widths within a kind and different binary
-vocabularies are allowed. One array stores all outputs of a sample, so mixed
-kinds would be coerced to a common dtype, e.g., the integer ``0`` of one
-output could be returned as the string ``"0"``. Following the principle of
-predictability over flexibility, the contract forbids mixed kinds across
-outputs outright, even where a lossless common dtype exists. A signed integer
-vocabulary beside an unsigned integer vocabulary is therefore rejected, even
-if their individual values fit.
+each sample has one value per output. One array stores all outputs of a
+sample, so the vocabularies of all outputs must be either all strings or all
+numbers. Otherwise, NumPy would turn the numbers into strings, e.g., the
+integer ``0`` of one output into the string ``"0"``. Numeric vocabularies may
+differ in dtype, and different binary vocabularies are allowed.
 
 One missing label is shared across all outputs. The complete-row rule
 applies: the label vector of a sample must be fully observed or fully
@@ -331,7 +281,11 @@ supported.
    * - ``[[0, 1], [0.0, 1.0]]``
      - ``NaN``
      - ``[0, 1.0]``
-     - Reject: integer and floating-point output vocabularies.
+     - Accept: integer and floating-point vocabularies are both numeric.
+   * - ``[["no", "yes"], [0, 1]]``
+     - ``None``
+     - ``["no", 1]``
+     - Reject: string and numeric vocabularies.
    * - ``[[0, 1, 2], [0, 1]]``
      - ``NaN``
      - ``[0, 1]``
@@ -350,10 +304,8 @@ Regression Examples
 -------------------
 
 Regression has no class vocabulary: the target specification has
-``classes=None``, and no class vocabulary may be supplied. Labels are
-numerical. Unlike classification labels and class vocabularies, regression
-labels may mix integer and floating-point families. Nonmissing labels must be
-finite real numbers of the supported numeric types.
+``classes=None``, and no class vocabulary may be supplied. Nonmissing labels
+must be finite real numbers other than Boolean values.
 
 .. list-table:: Regression outcomes, with no class vocabulary
    :header-rows: 1
@@ -364,7 +316,7 @@ finite real numbers of the supported numeric types.
      - Outcome
    * - ``NaN``
      - ``[0, 1.5, NaN]``
-     - Accept: mixed integer/float labels.
+     - Accept: integer and floating-point labels.
    * - ``None``
      - ``[0, 1.5, None]``
      - Accept: numerical labels with a missing entry.
@@ -377,14 +329,14 @@ finite real numbers of the supported numeric types.
    * - ``None``
      - ``[0, NaN, None]``
      - Reject: NaN is not the configured missing label.
+   * - ``NaN``
+     - ``[True, False]``
+     - Reject: Boolean values are not numerical labels.
 
 The public label helpers :func:`~skactiveml.utils.is_labeled` and
-:func:`~skactiveml.utils.is_unlabeled` are task-agnostic. For single-output
-targets they accept values valid for either classification or regression.
-Consequently, an object array mixing integers and floating-point values is
-accepted as possible regression data, while a Boolean/integer mixture is
-rejected because it is valid for neither task. Consumers that know the task
-apply the stricter classification or regression rule separately.
+:func:`~skactiveml.utils.is_unlabeled` are task-agnostic. They check the rules
+that classification and regression share. Consumers that know the task apply
+the stricter regression rule separately.
 
 .. doctest::
 
@@ -395,10 +347,10 @@ apply the stricter classification or regression rule separately.
    ...     np.array([0, 1.5, None], dtype=object), missing_label=None
    ... )
    array([False, False,  True])
-   >>> is_unlabeled(np.array([False, 2], dtype=object))
+   >>> is_unlabeled(["cold", 2])
    Traceback (most recent call last):
        ...
-   TypeError: `y` must contain one label family, ...
+   TypeError: `y` mixes strings and numbers. ...
 
 Regression cannot detect a collision between a numeric missing label and an
 intended label: with ``missing_label=-1``, every ``-1`` denotes missing.
@@ -412,7 +364,7 @@ incompatible with numerical labels instead of denoting the NaN among them.
    >>> is_unlabeled(np.array([0.0, np.nan, 1.0]), missing_label="nan")
    Traceback (most recent call last):
        ...
-   TypeError: `missing_label='nan'` is a string and is not compatible with the floating-point labels in `y`. ...
+   TypeError: `missing_label='nan'` is a string and is not compatible with the numeric labels in `y`. ...
    >>> is_unlabeled(np.array([0.0, np.nan, 1.0]), missing_label=np.nan)
    array([False,  True, False])
 
@@ -439,44 +391,25 @@ vocabularies.
    >>> dtype_clf.predict(dtype_X).dtype == dtype_clf.classes_.dtype
    True
 
-Floating-point storage is lossless only for integers that ``float64``
-represents exactly. Above ``2**53``, adjacent integer identifiers may become
-the same floating-point value. When constructing an array containing large
-integer identifiers and ``np.nan``, use ``dtype=object`` to preserve both the
-identifiers and the missing label. Label validation and the label encoder
-preserve exact integers in Python lists by choosing object storage when
-needed; they cannot recover precision already lost in an array constructed by
-the caller.
+``float64`` represents integers exactly only up to ``2**53``, so integer
+labels above ``2**53`` are not supported.
+
+By default, ``inverse_transform`` of the label encoder decodes into the dtype
+that also holds the configured missing label. With
+``prefer_class_dtype=True``, fully observed labels are decoded into the class
+dtype instead. Integer classes with ``missing_label=None``, for example, use
+object storage for missing entries but keep their integer dtype for fully
+observed labels.
 
 .. doctest::
 
    >>> from skactiveml.utils import ExtLabelEncoder
-   >>> large_classes = [2**53, 2**53 + 1]
-   >>> large_y = np.array([*large_classes, np.nan], dtype=object)
-   >>> large_encoder = ExtLabelEncoder(classes=large_classes).fit(large_y)
-   >>> large_encoder.transform(large_y).tolist()
-   [0, 1, -1]
-   >>> large_encoder.transform([*large_classes, np.nan]).tolist()
-   [0, 1, -1]
-   >>> large_encoder.inverse_transform([0, 1], prefer_class_dtype=True).tolist()
-   [9007199254740992, 9007199254740993]
-
-Mixed NumPy signed and unsigned integer scalars are normalized to a lossless
-common integer dtype before sorting, so their identity is preserved as well.
-
-.. doctest::
-
-   >>> scalar_classes = [np.int64(2**53), np.uint64(2**53 + 1)]
-   >>> scalar_encoder = ExtLabelEncoder(classes=scalar_classes).fit([])
-   >>> scalar_encoder.classes_.tolist()
-   [9007199254740992, 9007199254740993]
-
-By default, ``inverse_transform`` decodes into a lossless dtype that also
-accommodates the configured missing label. With ``prefer_class_dtype=True``,
-fully observed labels are decoded into the lossless common class dtype instead.
-Integer classes with ``None``, or large integer classes with ``np.nan``, can
-therefore use object storage for missing entries while fully observed decoding
-uses the class dtype.
+   >>> encoder = ExtLabelEncoder(classes=[0, 1], missing_label=None)
+   >>> encoder = encoder.fit([0, None])
+   >>> encoder.inverse_transform([0, -1]).tolist()
+   [0, None]
+   >>> encoder.inverse_transform([0, 1], prefer_class_dtype=True).dtype
+   dtype('int64')
 
 Explicit Multi-label Classification
 ===================================
@@ -683,9 +616,9 @@ vocabulary is normalized to the same canonical order used by fitted
    >>> assert spec.classes == (("absent", "present"), ("no", "yes"))
 
 The following checks show the multi-label rules of the
-:ref:`label-contract` during resolution: mixed dtype kinds across outputs, an
-output with fewer than two observed classes and no declared vocabulary, and a
-partially observed row are rejected.
+:ref:`label-contract` during resolution: strings in one output beside numbers
+in another, an output with fewer than two observed classes and no declared
+vocabulary, and a partially observed row are rejected.
 
 .. doctest::
 
@@ -700,7 +633,7 @@ partially observed row are rejected.
    ... )
    Traceback (most recent call last):
    ...
-   ValueError:
+   TypeError:
 
 .. doctest::
 

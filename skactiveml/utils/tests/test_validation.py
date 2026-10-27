@@ -248,6 +248,20 @@ class TestValidation(unittest.TestCase):
             missing_label=-1,
         )
 
+    def test_check_classifier_params_compares_classes_without_rounding(self):
+        for classes, missing_label in (
+            (np.array([1.0, 2.0], dtype=np.float32), 1.00000001),
+            (np.array([16777216.0, 1.0], dtype=np.float32), 16777217),
+        ):
+            with self.subTest(missing_label=missing_label):
+                check_classifier_params(classes, missing_label)
+        with self.assertRaisesRegex(
+            ValueError, "contains `missing_label=1.0`"
+        ):
+            check_classifier_params(
+                np.array([1.0, 2.0], dtype=np.float32), 1.0
+            )
+
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=["2", 1, 2])
@@ -263,30 +277,29 @@ class TestValidation(unittest.TestCase):
             check_classes([iter([0, 1]), [0, 1]])
         self.assertIsNone(check_classes(None))
 
-    def test_check_classes_reports_the_declared_label_family(self):
-        cases = [
-            ([False, True], "bool"),
-            ([0, 1], "int"),
-            ([2**64 - 2, 2**64 - 1], "int"),
-            ([0.0, 1.5], "float"),
-            (["cat", "dog"], "str"),
-            ([["no", "yes"], ["off", "always"]], ("str", "str")),
-        ]
-        for classes, families in cases:
+    def test_check_classes_accepts_strings_or_numbers(self):
+        for classes in (
+            [False, True],
+            [0, 1.5],
+            [False, 2],
+            ["cat", "dog"],
+            [["no", "yes"], ["off", "always"]],
+            [[0, 1], [0.0, 1.0]],
+        ):
             with self.subTest(classes=classes):
-                self.assertEqual(check_classes(classes), families)
+                self.assertIsNone(check_classes(classes))
+        with self.assertRaisesRegex(TypeError, "all strings or all numbers"):
+            check_classes([["no", "yes"], [0, 1]])
 
     def test_check_classes_rejects_values_that_are_no_categories(self):
         cases = [
-            ([0, 1.5], TypeError, "one label family"),
-            ([False, 2], TypeError, "one label family"),
-            ([True, 1], TypeError, "one label family"),
+            ([True, 1], ValueError, "Duplicate entries"),
+            ([0, 0.0], ValueError, "Duplicate entries"),
             ([0.0, np.inf], ValueError, "infinite value"),
             ([0.0, np.nan], ValueError, "contains NaN"),
-            ([1, 2**70], ValueError, "64-bit integer dtype"),
-            ([-1, 2**64 - 1], ValueError, "64-bit integer dtype"),
-            ([1 + 2j, 3 + 0j], TypeError, "unsupported scalar label type"),
-            ([b"cat", b"dog"], TypeError, "unsupported scalar label type"),
+            (["cat", 1], TypeError, "mixes strings and numbers"),
+            ([1 + 2j, 3 + 0j], TypeError, "unsupported type"),
+            ([b"cat", b"dog"], TypeError, "unsupported type"),
         ]
         for classes, error, message in cases:
             with self.subTest(classes=classes):

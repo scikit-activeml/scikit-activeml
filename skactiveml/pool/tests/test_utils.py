@@ -17,7 +17,11 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.datasets import make_blobs
 
 from skactiveml.base import SkactivemlRegressor
-from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SklearnClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
@@ -138,6 +142,57 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         np.testing.assert_array_equal(
             id_clf.predict(np.arange(2)), ["cat", "dog"]
         )
+
+    def test_hypothetical_labels_keep_their_class(self):
+        X = np.array([[0.0], [0.2], [1.0], [1.2]])
+        cases = (
+            (np.array([0, 0, -1, -1]), -1, [0, 0.5], [0, 0.5]),
+            (
+                np.array([1, 1, np.nan, np.nan], dtype=np.float32),
+                np.nan,
+                [0.1, 1.0],
+                [1.0, 0.1],
+            ),
+        )
+        for (y, missing_label, classes, y_fit), inherited in product(
+            cases, [False, True]
+        ):
+            with self.subTest(dtype=y.dtype, inherited=inherited):
+                clf = ParzenWindowClassifier(
+                    classes=classes, missing_label=missing_label
+                )
+                if inherited:
+                    clf = SlidingWindowClassifier(
+                        clf, missing_label=missing_label
+                    )
+                id_clf = IndexClassifierWrapper(
+                    clf, X, y, missing_label=missing_label
+                )
+                id_clf.fit([0, 2], y=y_fit)
+                np.testing.assert_array_equal(id_clf.predict([2]), y_fit[1:])
+
+    def test_narrow_label_dtypes_accept_a_representable_missing_label(self):
+        X = np.linspace(0, 1, 3).reshape(-1, 1)
+        for y, missing_label in (
+            (np.array([0, 1, np.nan], dtype=np.float32), np.nan),
+            (np.array([0, 1, -1], dtype=np.int8), -1),
+        ):
+            with self.subTest(dtype=y.dtype):
+                clf = ParzenWindowClassifier(
+                    classes=[0, 1], missing_label=missing_label
+                )
+                id_clf = IndexClassifierWrapper(
+                    clf, X, y, missing_label=missing_label
+                )
+                id_clf.fit(np.arange(3))
+
+                np.testing.assert_array_equal(
+                    is_unlabeled(id_clf.y, missing_label=missing_label),
+                    [False, False, True],
+                )
+                np.testing.assert_array_equal(
+                    id_clf.predict(np.arange(2)), [0, 1]
+                )
 
     def test_string_labels_reject_a_truncated_missing_label(self):
         X = np.linspace(0, 1, 2).reshape(-1, 1)
@@ -1260,13 +1315,6 @@ class TestFunctions(unittest.TestCase):
         _, y_appended = _update_X_y(X[:2], y_int[:2], 0.75, X_update=X[2])
 
         np.testing.assert_array_equal(y_mapped, y_appended)
-
-        y_large = np.array([2**53, 2**53 + 1, -1])
-
-        _, y_new = _update_X_y(np.zeros((3, 1)), y_large, 0.5, idx_update=2)
-
-        self.assertEqual(y_new.dtype, np.dtype(object))
-        self.assertEqual(y_new.tolist(), [2**53, 2**53 + 1, 0.5])
 
     def test_update_X_y_ranks_integer_and_float_targets_equally(self):
         X = np.random.RandomState(9).normal(size=(6, 1))

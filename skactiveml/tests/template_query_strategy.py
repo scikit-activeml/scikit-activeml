@@ -1057,9 +1057,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
         qs = self.qs_class(**init_params)
 
-        with self.assertRaisesRegex(
-            ValueError, "one dtype across all label outputs"
-        ):
+        with self.assertRaisesRegex(TypeError, "all strings or all"):
             qs.query(**query_params)
 
     def _multilabel_custom_vocabulary_params(self, vocabularies):
@@ -1878,43 +1876,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
     def test_query_param_clf(self, test_cases=None):
         self.query_default_params_clf["fit_clf"] = True
         self._model_comparison(test_cases=test_cases, model_type="clf")
-
-    def test_query_refitting_preserves_large_integer_labels(self):
-        query_params = self._stream_clf_query_params()
-        if query_params is None:
-            return
-
-        X = np.arange(3.0).reshape(-1, 1)
-        query_params.update(
-            X=X,
-            candidates=[[0.0], [0.5], [1.0]],
-            return_utilities=True,
-        )
-        for labels, classes in (
-            ([2**53, 2**53 + 1], None),
-            ([2**53 + 1, 2**53 + 2], [2**53 + 1, 2**53 + 2]),
-        ):
-            with self.subTest(classes=classes):
-                y = [*labels, np.nan]
-                clf = ParzenWindowClassifier(classes=classes, random_state=0)
-                prefit = clone(clf).fit(X, y)
-                np.testing.assert_array_equal(prefit.classes_, labels)
-                init_params = deepcopy(self.init_default_params)
-                if "classes" in init_params:
-                    init_params["classes"] = labels
-                query_params.update(clf=prefit, y=y, fit_clf=False)
-                expected_indices, expected_utilities = self.qs_class(
-                    **deepcopy(init_params)
-                ).query(**query_params)
-                query_params.update(clf=clf, fit_clf=True)
-                actual_indices, actual_utilities = self.qs_class(
-                    **deepcopy(init_params)
-                ).query(**query_params)
-
-                np.testing.assert_array_equal(actual_indices, expected_indices)
-                np.testing.assert_allclose(
-                    actual_utilities, expected_utilities
-                )
 
     def test_query_param_reg(self, test_cases=None):
         query_params = inspect.signature(self.qs_class.query).parameters

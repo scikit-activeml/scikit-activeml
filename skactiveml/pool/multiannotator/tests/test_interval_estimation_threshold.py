@@ -71,7 +71,7 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
                 model = IntervalEstimationAnnotModel(
                     classes=[0, 1], missing_label=missing
                 )
-                with self.assertRaisesRegex(TypeError, "scalar"):
+                with self.assertRaisesRegex(TypeError, "unsupported type"):
                     model.fit([[0.0], [1.0], [2.0]], y)
 
     def test_init_param_missing_label(self):
@@ -139,12 +139,6 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
             self.X, self.y.tolist(), sample_weight=self.sample_weight
         )
         np.testing.assert_array_equal(ie_model_list.A_perf_, ie_model.A_perf_)
-
-    def test_fit_keeps_large_integer_labels_of_lists(self):
-        a = 2**53
-        y = [[a, a + 1, a + 1], [a, a, a + 1], [np.nan] * 3]
-        ie_model = IntervalEstimationAnnotModel().fit(np.zeros((3, 1)), y)
-        np.testing.assert_array_equal(ie_model.A_perf_[:, 1], [0.5, 0.75, 0.5])
 
     def test_predict_proba(self):
         for i, m in enumerate(["lower", "mean", "upper"]):

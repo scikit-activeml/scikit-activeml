@@ -409,31 +409,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
 
         assert_predicts_class_dtype(self, y_pred, estimator.classes_)
 
-    def test_fit_rejects_class_identities_beyond_64_bits(
-        self, replace_init_params=None, replace_fit_params=None
-    ):
-        """Check that class identifiers beyond 64 bits are rejected."""
-        labels = [2**200, 2**200 + 1]
-        for declared in (False, True):
-            with self.subTest(declared=declared):
-                init_params = deepcopy(self.init_default_params)
-                init_params["classes"] = labels if declared else None
-                init_params["missing_label"] = np.nan
-                if replace_init_params is not None:
-                    init_params.update(deepcopy(replace_init_params))
-
-                fit_params = deepcopy(self.fit_default_params)
-                fit_params["y"] = [*labels, np.nan]
-                fit_params["X"] = np.zeros((3, 1))
-                if replace_fit_params is not None:
-                    fit_params.update(deepcopy(replace_fit_params))
-
-                estimator = self.estimator_class(**init_params)
-                with self.assertRaisesRegex(
-                    ValueError, "does not fit a 64-bit integer dtype"
-                ):
-                    self._call_with_target(estimator, "fit", fit_params)
-
     def _get_multilabel_params(self):
         if not self._has_multilabel_defaults():
             return None, None, None
@@ -1164,27 +1139,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             ],
             replace_init_params={"missing_label": "nan"},
         )
-
-    def test_fit_rejects_numerical_labels_beyond_64_bits(
-        self, replace_init_params=None, replace_fit_params=None
-    ):
-        """Check that numerical labels beyond 64 bits are rejected."""
-        n_samples = len(self.fit_default_params["X"])
-        init_params = deepcopy(self.init_default_params)
-        init_params["missing_label"] = np.nan
-        if replace_init_params is not None:
-            init_params.update(deepcopy(replace_init_params))
-
-        fit_params = deepcopy(self.fit_default_params)
-        fit_params["y"] = [2**200] * (n_samples - 1) + [np.nan]
-        if replace_fit_params is not None:
-            fit_params.update(deepcopy(replace_fit_params))
-
-        estimator = self.estimator_class(**init_params)
-        with self.assertRaisesRegex(
-            ValueError, "does not fit a 64-bit integer dtype"
-        ):
-            estimator.fit(**fit_params)
 
 
 class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):

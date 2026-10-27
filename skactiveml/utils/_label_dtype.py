@@ -1,428 +1,209 @@
-"""Lossless representations of class labels and missing labels."""
-
-from numbers import Integral
+"""Representations and checks of class labels and missing labels."""
 
 import numpy as np
 
 _NO_MISSING_LABEL = object()
 
-# Label families in the order error messages name them.
-_FAMILY_ORDER = ("bool", "int", "float", "str")
-
-_FAMILY_DESCRIPTIONS = {
-    "bool": "Boolean",
-    "int": "integer",
-    "float": "floating-point",
-    "str": "string",
-}
-
-_VOCABULARY = "vocabulary"
-_LABELS = "labels"
-_NUMERICAL_LABELS = "numerical labels"
-_TASK_AGNOSTIC_LABELS = "task-agnostic labels"
-
-_FAMILY_KINDS = {
-    "bool": "numeric",
-    "int": "numeric",
-    "float": "numeric",
-    "str": "str",
-}
-
-_DTYPE_KIND_FAMILIES = {
-    "b": "bool",
-    "i": "int",
-    "u": "int",
-    "f": "float",
-    "U": "str",
-}
-
-_SUPPORTED_LABELS = (
-    "Labels must be Boolean values, integers or finite floating-point "
-    "values of at most 64 bits, or strings."
-)
-
-_STORABLE_INTEGERS = (
-    "Integers must be representable as `int64` or as `uint64`."
-)
-
-_INT64_MIN = -(2**63)
-_INT64_MAX = 2**63 - 1
-_UINT64_MAX = 2**64 - 1
-
-# Exact types whose entries are checked per type. `np.longdouble` is left out:
-# a second rejected type besides `None` could change which error is raised.
-_GROUPED_TYPES = frozenset(
-    [bool, int, float, str, type(None)]
-    + [np.bool_, np.str_, np.float16, np.float32, np.float64]
-    + [np.dtype(code).type for code in np.typecodes["AllInteger"]]
-)
-
-# Short arrays, such as class vocabularies, are faster to check entry by entry.
-_MIN_GROUPED_SIZE = 64
+_SUPPORTED_LABELS = "Labels must be strings or real numbers."
 
 
 def _as_label_array(y):
-    """Convert target sequences without rounding integers or stringifying them.
+    """Convert labels to an array without turning numbers into strings.
 
     Parameters
     ----------
     y : array-like
-        Original targets. Existing arrays retain their dtype and values.
-        Precision already lost by a caller cannot be recovered.
+        Original labels. Existing arrays retain their dtype and values.
 
     Returns
     -------
     y_array : numpy.ndarray
-        The ordinary NumPy representation when lossless, otherwise an object
-        array built from the original values. Shape validation is left to the
-        caller.
+        The ordinary NumPy representation, or an object array of the original
+        values if NumPy would turn values other than strings into strings,
+        e.g., for `["cat", np.nan]`. Shape validation is left to the caller.
     """
     result = np.asarray(y)
-    if not isinstance(y, (list, tuple)) or result.dtype.kind not in "fcSU":
-        return result
-    if result.dtype.kind == "f":
-        # Strictly below this boundary all integers are exactly representable.
-        # The boundary itself takes the slow path, because an integer just
-        # above it can round down onto it. NaNs, which commonly mark missing
-        # labels, take the fast path.
-        integer_limit = 2 ** (np.finfo(result.dtype).nmant + 1)
-        if np.all(np.isnan(result) | (np.abs(result) < integer_limit)):
-            return result
-    original = np.asarray(y, dtype=object)
-    if result.dtype.kind in "fc":
-        # Python int/float equality does not promote the integer to float.
-        # NumPy scalar equality would mask the precision loss being checked.
-        for value, converted in zip(original.flat, result.flat):
-            if isinstance(value, Integral) and int(value) != converted.item():
-                return original
-    else:
-        string_type = str if result.dtype.kind == "U" else bytes
-        if any(not isinstance(value, string_type) for value in original.flat):
+    if isinstance(y, (list, tuple)) and result.dtype.kind == "U":
+        original = np.asarray(y, dtype=object)
+        if not all(isinstance(value, str) for value in original.flat):
             return original
     return result
 
 
-def _as_class_vocabulary_array(classes, *, name="classes"):
-    """Convert one class vocabulary without changing its label family.
+def _as_class_vocabulary_array(classes):
+    """Convert one class vocabulary to an array.
 
     Parameters
     ----------
     classes : iterable of scalar labels
-        One validated or not-yet-validated class vocabulary.
-    name : str, default="classes"
-        Name used in validation errors.
+        One class vocabulary.
 
     Returns
     -------
     classes_array : numpy.ndarray of shape (n_classes,)
-        A lossless ordinary array suitable for ``LabelEncoder``.
+        The vocabulary as converted by `_as_label_array`.
     """
-    values = list(classes)
-    exact = np.asarray(values, dtype=object)
-    family = _label_family(exact, name=name, role=_VOCABULARY)
-    result = np.asarray(values)
-
-    if family == "int" and result.dtype.kind not in "iu":
-        integer_values = [int(value) for value in values]
-        dtype = np.uint64 if max(integer_values) > _INT64_MAX else np.int64
-        result = np.asarray(integer_values, dtype=dtype)
-    return result
+    return _as_label_array(list(classes))
 
 
-def _lossless_decode_dtype(vocabularies, missing_label=_NO_MISSING_LABEL):
-    """Choose a common dtype without changing class or missing-label values.
+def _common_label_dtype(arrays, missing_label=_NO_MISSING_LABEL):
+    """Choose one dtype for labels and, optionally, the missing label.
 
     Parameters
     ----------
-    vocabularies : sequence of numpy.ndarray
-        One-dimensional arrays of class labels.
-    missing_label : scalar, optional
+    arrays : sequence of array-like
+        Arrays of labels.
+    missing_label : scalar or str or None, optional
         Also represent this missing label if supplied. Omission selects a
-        class-only dtype. Explicitly passing `None` includes that value.
+        label-only dtype. Explicitly passing `None` includes that value.
 
     Returns
     -------
     dtype : numpy.dtype
-        The promoted dtype if lossless, otherwise `object`.
+        NumPy's common dtype, or `object` for `None` and for strings mixed
+        with numbers.
     """
-    arrays = list(vocabularies)
+    dtypes = [np.asarray(array).dtype for array in arrays]
     if missing_label is not _NO_MISSING_LABEL:
-        arrays.append(np.asarray([missing_label]))
-    dtype = np.result_type(*[array.dtype for array in arrays])
-    if dtype.kind == "O":
-        return dtype
-    for array in arrays:
-        if array.dtype == dtype:
-            continue
-        if array.dtype.kind in "biufc" and dtype.kind in "biufc":
-            with np.errstate(invalid="ignore", over="ignore"):
-                converted = array.astype(dtype)
-                if dtype.kind == "c" and array.dtype.kind != "c":
-                    # Real inputs acquire an exactly zero imaginary part.
-                    # Discard that part explicitly before casting back, so
-                    # this check does not emit ComplexWarning.
-                    converted = converted.real
-                restored = converted.astype(array.dtype)
-            if np.array_equal(
-                array, restored, equal_nan=array.dtype.kind in "fc"
-            ):
-                continue
-        elif array.dtype.kind == dtype.kind and dtype.kind in "SU":
-            continue
+        dtypes.append(np.asarray([missing_label]).dtype)
+    kinds = {dtype.kind for dtype in dtypes}
+    if "O" in kinds or ("U" in kinds and len(kinds) > 1):
         return np.dtype(object)
-    return dtype
+    return np.result_type(*dtypes)
 
 
-def _dtype_family(dtype, *, name):
-    """Return the label family a NumPy dtype belongs to.
-
-    Parameters
-    ----------
-    dtype : numpy.dtype
-        The dtype of a label array.
-    name : str
-        The name of the checked variable, used in error messages.
-
-    Returns
-    -------
-    family : "bool" or "int" or "float" or "str"
-        The label family of `dtype`.
-
-    Raises
-    ------
-    TypeError
-        If `dtype` is outside the label contract, e.g. complex, bytes, or an
-        extended-precision float.
-    """
-    family = _DTYPE_KIND_FAMILIES.get(dtype.kind)
-    if family is None or (dtype.kind in "iuf" and dtype.itemsize > 8):
-        raise TypeError(
-            f"`{name}` has the unsupported label dtype '{dtype}'. "
-            f"{_SUPPORTED_LABELS}"
-        )
-    return family
-
-
-def _scalar_label_family(value, *, name):
-    """Return the label family of one scalar entry of an object array.
+def _missing_mask_and_kind(y, missing_label, *, name, numerical=False):
+    """Locate missing labels and check the observed ones.
 
     Parameters
     ----------
-    value : object
-        One entry of an object array.
-    name : str
-        The name of the checked variable, used in error messages.
-
-    Returns
-    -------
-    family : "bool" or "int" or "float" or "str"
-        The label family of `value`.
-
-    Raises
-    ------
-    TypeError
-        If `value` is not a supported scalar label. Whether its value is
-        storable is decided by `_check_object_values`, once the families of
-        the entries are known to agree.
-    """
-    # Boolean values are their own family, even though `bool` subclasses
-    # `int` and `np.bool_` compares equal to `0` and `1`.
-    if isinstance(value, (bool, np.bool_)):
-        return "bool"
-    if isinstance(value, (int, np.integer)):
-        return "int"
-    if isinstance(value, (float, np.floating)):
-        if np.dtype(type(value)).itemsize > 8:
-            raise TypeError(
-                f"`{name}` contains the extended-precision float "
-                f"'{type(value).__name__}'. {_SUPPORTED_LABELS}"
-            )
-        return "float"
-    if isinstance(value, str):
-        return "str"
-    if value is None:
-        raise TypeError(
-            f"`{name}` contains `None`, which is only valid as the configured "
-            "`missing_label`. Pass `missing_label=None` to mark these "
-            "entries as missing."
-        )
-    raise TypeError(
-        f"`{name}` contains the unsupported scalar label type "
-        f"'{type(value).__name__}'. {_SUPPORTED_LABELS}"
-    )
-
-
-def _group_by_type(flat):
-    """Locate the entries of each exact type in a flat object array.
-
-    Parameters
-    ----------
-    flat : numpy.ndarray of shape (n_entries,) and dtype object
-        The entries to group.
-
-    Returns
-    -------
-    groups : dict or None
-        The Boolean mask of the entries of each exact type, or `None` if the
-        entries are to be checked one by one.
-    """
-    if flat.size < _MIN_GROUPED_SIZE:
-        return None
-    types = list(map(type, flat))
-    distinct = dict.fromkeys(types)
-    if not distinct.keys() <= _GROUPED_TYPES:
-        return None
-    if len(distinct) == 1:
-        return {types[0]: np.ones(flat.shape, dtype=bool)}
-    codes = {value_type: code for code, value_type in enumerate(distinct)}
-    type_codes = np.fromiter(
-        map(codes.__getitem__, types), dtype=np.intp, count=flat.size
-    )
-    return {
-        value_type: type_codes == code for value_type, code in codes.items()
-    }
-
-
-def _scan_object_labels(y, missing_label, *, name):
-    """Locate the missing labels and the label families of an object array.
-
-    Parameters
-    ----------
-    y : numpy.ndarray of dtype object
+    y : numpy.ndarray
         Labels including missing values.
     missing_label : scalar or str or None
-        The configured missing label, or `_NO_MISSING_LABEL` if the values
-        cannot contain one, e.g. a declared class vocabulary.
+        Value to represent a missing label, or `_NO_MISSING_LABEL` if `y`
+        cannot contain one, e.g., a class vocabulary.
     name : str
         The name of the checked variable, used in error messages.
+    numerical : bool, default=False
+        Whether the labels must be real numbers other than Boolean values.
 
     Returns
     -------
     is_missing : numpy.ndarray of shape `y.shape`
-        Boolean mask locating `missing_label`.
-    families : set of str
-        The label families observed among the remaining entries.
-    """
-    flat = y.ravel()
-    # Numeric missing labels other than NaN need exact scalar comparisons.
-    by_type = (
-        missing_label is _NO_MISSING_LABEL
-        or missing_label is None
-        or isinstance(missing_label, str)
-        or _is_nan_missing_label(missing_label)
-    )
-    groups = _group_by_type(flat) if by_type else None
-    if groups is not None:
-        is_missing = np.zeros(flat.shape, dtype=bool)
-        families = set()
-        for value_type, mask in groups.items():
-            if missing_label is None and value_type is type(None):
-                is_missing[mask] = True
-            elif isinstance(missing_label, str) and issubclass(
-                value_type, str
-            ):
-                # A plain str would be compared without its trailing NULs.
-                is_missing[mask] = flat[mask] == np.asarray(
-                    missing_label, dtype=object
-                )
-            elif _is_nan_missing_label(missing_label) and issubclass(
-                value_type, (float, np.floating)
-            ):
-                is_missing[mask] = np.isnan(flat[mask].astype(value_type))
-            observed = mask & ~is_missing
-            if observed.any():
-                families.add(
-                    _scalar_label_family(flat[observed.argmax()], name=name)
-                )
-        return is_missing.reshape(y.shape), families
-    is_missing = []
-    families = set()
-    for value in y.flat:
-        matches = _matches_missing_label(value, missing_label)
-        is_missing.append(matches)
-        if not matches:
-            families.add(_scalar_label_family(value, name=name))
-    return np.asarray(is_missing, dtype=bool).reshape(y.shape), families
-
-
-def _check_object_values(values, families, *, name):
-    """Check that the entries of an object array are storable labels.
-
-    Parameters
-    ----------
-    values : numpy.ndarray of dtype object
-        The observed entries of an object array.
-    families : set of str
-        The label families found among them.
-    name : str
-        The name of the checked variable, used in error messages.
-
-    Raises
-    ------
-    ValueError
-        If an integer is beyond 64 bits or a float is nonfinite.
-    """
-    if "int" in families:
-        _check_integer_labels(values, name=name)
-    if "float" in families:
-        floats = [
-            value
-            for value in values.flat
-            if isinstance(value, (float, np.floating))
-        ]
-        _check_finite_labels(np.asarray(floats, dtype=float), name=name)
-
-
-def _combine_families(families, *, name, role):
-    """Reduce label families to the one family the values describe.
-
-    Parameters
-    ----------
-    families : set of str
-        The label families found among the values.
-    name : str
-        The name of the checked variable, used in error messages.
-    role : "vocabulary" or "labels" or "numerical labels" or \
-            "task-agnostic labels"
-        The role the values play in the label contract.
-
-    Returns
-    -------
-    family : "bool" or "int" or "float" or "str" or None
-        The common family, or `None` if `families` is empty because no value
-        provides evidence about it.
+        Boolean mask locating `missing_label` in `y`.
+    kind : "str" or "number" or None
+        The kind of the observed labels, or `None` if `y` holds none.
 
     Raises
     ------
     TypeError
-        If the families cannot be combined.
+        If an observed label is neither a string nor a real number, if the
+        observed labels mix strings and numbers, or if they are incompatible
+        with `missing_label`.
+    ValueError
+        If an observed number is nonfinite.
     """
-    if not families:
-        return None
-    if role == _NUMERICAL_LABELS:
-        unsupported = families - {"int", "float"}
-        if unsupported:
+    if missing_label is not _NO_MISSING_LABEL:
+        _check_missing_label_value(missing_label)
+    if y.dtype.kind == "O":
+        # Entries of other types may not compare with the missing label as
+        # scalars, so they are rejected before the comparison.
+        for value_type in dict.fromkeys(map(type, y.flat)):
+            if value_type is not type(None):
+                _kind_of_type(value_type, name=name)
+        is_missing = _object_missing_mask(y, missing_label)
+        observed = y[~is_missing]
+        types = dict.fromkeys(map(type, observed))
+    else:
+        is_missing = _typed_missing_mask(y, missing_label)
+        observed = y[~is_missing]
+        types = [y.dtype.type] if observed.size else []
+    kind = _kind_of_types(types, name=name, numerical=numerical)
+    if missing_label is not _NO_MISSING_LABEL:
+        _check_missing_label_for_kind(missing_label, kind, name=name)
+    if kind == "number" and observed.dtype.kind in "fO":
+        _check_finite_labels(observed, name=name)
+    return is_missing, kind
+
+
+def _kind_of_types(types, *, name, numerical=False):
+    """Return whether the types of observed labels are strings or numbers.
+
+    Parameters
+    ----------
+    types : iterable of type
+        The scalar types of the observed labels.
+    name : str
+        The name of the checked variable, used in error messages.
+    numerical : bool, default=False
+        Whether the labels must be real numbers other than Boolean values.
+
+    Returns
+    -------
+    kind : "str" or "number" or None
+        The kind of the labels, or `None` if `types` is empty.
+    """
+    kinds = set()
+    for value_type in types:
+        kinds.add(_kind_of_type(value_type, name=name))
+        if numerical and issubclass(value_type, (str, bool, np.bool_)):
             raise TypeError(
-                f"`{name}` must contain numerical labels, "
-                f"but contains {_describe_families(unsupported)} values."
+                f"`{name}` must contain numerical labels, but contains "
+                f"values of type '{value_type.__name__}'."
             )
-        return "float"
-    if role == _TASK_AGNOSTIC_LABELS and families <= {"int", "float"}:
-        return "float"
-    if len(families) == 1:
-        return next(iter(families))
-    detail = (
-        "Boolean values, integers, floating-point values, and strings "
-        "are separate families."
-    )
+    if len(kinds) > 1:
+        raise TypeError(
+            f"`{name}` mixes strings and numbers. Labels must be either all "
+            "strings or all real numbers."
+        )
+    return kinds.pop() if kinds else None
+
+
+def _kind_of_type(value_type, *, name):
+    """Return whether a scalar type of labels holds strings or numbers.
+
+    Parameters
+    ----------
+    value_type : type
+        The scalar type of a label.
+    name : str
+        The name of the checked variable, used in error messages.
+
+    Returns
+    -------
+    kind : "str" or "number"
+        The kind of labels of type `value_type`.
+
+    Raises
+    ------
+    TypeError
+        If `value_type` is neither a string nor a real number type.
+    """
+    if issubclass(value_type, str):
+        return "str"
+    if _is_number_type(value_type):
+        return "number"
+    if value_type is type(None):
+        raise TypeError(
+            f"`{name}` contains `None`, which is only valid as the "
+            "configured `missing_label`."
+        )
     raise TypeError(
-        f"`{name}` must contain one label family, but mixes "
-        f"{_describe_families(families)} values. {detail}"
+        f"`{name}` contains values of the unsupported type "
+        f"'{value_type.__name__}'. {_SUPPORTED_LABELS}"
     )
 
 
-def _label_family(values, *, name, role=_VOCABULARY):
-    """Return the one label family of a class vocabulary or of labels.
+def _is_number_type(value_type):
+    """Return whether a scalar type holds real numbers."""
+    # NumPy's timedelta64 subclasses its integer type.
+    return issubclass(
+        value_type, (int, float, np.bool_, np.integer, np.floating)
+    ) and not issubclass(value_type, np.timedelta64)
+
+
+def _label_kind(values, *, name):
+    """Return whether class labels or observed labels are strings or numbers.
 
     Parameters
     ----------
@@ -430,130 +211,20 @@ def _label_family(values, *, name, role=_VOCABULARY):
         Class labels or observed labels, without missing values.
     name : str
         The name of the checked variable, used in error messages.
-    role : "vocabulary" or "labels" or "numerical labels", \
-            default="vocabulary"
-        The role `values` play in the label contract, which decides how
-        strictly their families have to agree.
 
     Returns
     -------
-    family : "bool" or "int" or "float" or "str" or None
-        The label family, or `None` if `values` is empty and therefore
-        provides no evidence about it.
-
-    Raises
-    ------
-    TypeError
-        If the values are outside the label contract or mix families.
-    ValueError
-        If an integer is beyond 64 bits or a float is nonfinite.
+    kind : "str" or "number" or None
+        The kind of the labels, or `None` if `values` is empty.
     """
-    values = np.asarray(values)
-    if values.size == 0:
-        return None
-    if values.dtype.kind == "O":
-        _, families = _scan_object_labels(values, _NO_MISSING_LABEL, name=name)
-        _check_object_values(values, families, name=name)
-        return _combine_families(families, name=name, role=role)
-    family = _dtype_family(values.dtype, name=name)
-    if family == "float":
-        _check_finite_labels(values, name=name)
-    return _combine_families({family}, name=name, role=role)
-
-
-def _check_missing_label_value(missing_label):
-    """Check that a missing label is a supported scalar value.
-
-    Parameters
-    ----------
-    missing_label : scalar or str or None
-        Value to represent a missing label.
-
-    Raises
-    ------
-    TypeError
-        If `missing_label` is neither a supported real number, nor a string,
-        nor `None`.
-    ValueError
-        If `missing_label` is infinite or an integer beyond 64 bits.
-    """
-    if missing_label is None or isinstance(missing_label, str):
-        return
-    if isinstance(missing_label, (bool, np.bool_)):
-        raise TypeError(_missing_label_value_message(missing_label))
-    if isinstance(missing_label, (int, np.integer)):
-        if isinstance(missing_label, int) and not (
-            _INT64_MIN <= missing_label <= _UINT64_MAX
-        ):
-            raise ValueError(
-                f"`missing_label={missing_label}` does not fit a 64-bit "
-                f"integer dtype. {_STORABLE_INTEGERS}"
-            )
-        return
-    if isinstance(missing_label, (float, np.floating)):
-        if np.dtype(type(missing_label)).itemsize > 8:
-            raise TypeError(_missing_label_value_message(missing_label))
-        if np.isinf(missing_label):
-            raise ValueError(
-                f"`missing_label={missing_label}` must be finite. NaN marks "
-                "a missing label; an infinity is neither a label nor a "
-                "missing one."
-            )
-        return
-    raise TypeError(_missing_label_value_message(missing_label))
-
-
-def _check_missing_label_for_family(
-    missing_label, family, *, name=None, description=None
-):
-    """Check that a missing label is compatible with a label family.
-
-    Parameters
-    ----------
-    missing_label : scalar or str or None
-        Value to represent a missing label.
-    family : "bool" or "int" or "float" or "str" or None
-        The label family the missing label has to fit, or `None` if no value
-        provides evidence about it.
-    name : str, default=None
-        The name of the variable holding the labels, used in error messages.
-    description : str, default=None
-        How the labels are named in error messages. Defaults to the
-        description of `family`. The roles that merge families pass how
-        their labels are named, so that a message names those labels rather
-        than the family the compatibility decision was made for.
-
-    Raises
-    ------
-    TypeError
-        If the missing label and the labels belong to different families.
-    ValueError
-        If `missing_label` is infinite or an integer beyond 64 bits.
-    """
-    _check_missing_label_value(missing_label)
-    if missing_label is None or family is None:
-        return
-    name = "target object" if name is None else str(name)
-    if description is None:
-        description = _FAMILY_DESCRIPTIONS[family]
-    missing_label_is_string = isinstance(missing_label, str)
-    if family == "str":
-        if not missing_label_is_string:
-            raise TypeError(
-                f"`missing_label={missing_label!r}` is a number and is not "
-                f"compatible with the string labels in `{name}`. Use a "
-                "string missing label or `None` instead."
-            )
-    elif missing_label_is_string:
-        raise TypeError(
-            f"`missing_label={missing_label!r}` is a string and is not "
-            f"compatible with the {description} labels in `{name}`. Use "
-            "`np.nan`, a numeric missing label, or `None` instead."
-        )
+    _, kind = _missing_mask_and_kind(
+        np.asarray(values), _NO_MISSING_LABEL, name=name
+    )
+    return kind
 
 
 def _check_compatible_kinds(observed, declared, *, name):
-    """Check that observed labels and declared classes share one label kind.
+    """Check that observed labels and declared classes share one kind.
 
     Parameters
     ----------
@@ -567,9 +238,9 @@ def _check_compatible_kinds(observed, declared, *, name):
     Raises
     ------
     TypeError
-        If the labels and the classes belong to different label kinds.
+        If one of them holds strings and the other numbers.
     """
-    observed_kind = _label_kind(np.asarray(observed), name="y")
+    observed_kind = _label_kind(observed, name="y")
     declared_kind = _label_kind(
         np.asarray(list(declared), dtype=object), name=name
     )
@@ -579,27 +250,81 @@ def _check_compatible_kinds(observed, declared, *, name):
         )
 
 
-def _label_kind(values, *, name):
-    """Return the coarse kind observed labels and declared classes share.
+def _check_missing_label_value(missing_label):
+    """Check that a missing label is a supported scalar value.
 
     Parameters
     ----------
-    values : array-like
-        Class labels or observed labels, without missing values.
-    name : str
-        The name of the checked variable, used in error messages.
+    missing_label : scalar or str or None
+        Value to represent a missing label.
 
-    Returns
-    -------
-    kind : "bool" or "numeric" or "str" or None
-        The label kind, or `None` if `values` provides no evidence about it.
+    Raises
+    ------
+    TypeError
+        If `missing_label` is neither a real number other than a Boolean
+        value, nor a string, nor `None`.
+    ValueError
+        If `missing_label` is infinite.
     """
-    family = _label_family(values, name=name, role=_LABELS)
-    return None if family is None else _FAMILY_KINDS[family]
+    if missing_label is None or isinstance(missing_label, str):
+        return
+    if isinstance(missing_label, (bool, np.bool_)) or not _is_number_type(
+        type(missing_label)
+    ):
+        raise TypeError(
+            f"`missing_label` has type '{type(missing_label).__name__}', but "
+            "must be a real number, a string, `np.nan`, or `None`."
+        )
+    if isinstance(missing_label, (float, np.floating)) and np.isinf(
+        missing_label
+    ):
+        raise ValueError(
+            f"`missing_label={missing_label}` must be finite. NaN marks "
+            "a missing label; an infinity is neither a label nor a "
+            "missing one."
+        )
 
 
-def _target_type_family(target_type):
-    """Map the dtype or scalar type of labels to their label family.
+def _check_missing_label_for_kind(missing_label, kind, *, name=None):
+    """Check that a missing label is compatible with a kind of labels.
+
+    Parameters
+    ----------
+    missing_label : scalar or str or None
+        Value to represent a missing label.
+    kind : "str" or "number" or None
+        The kind of the labels, or `None` if no label provides evidence
+        about it.
+    name : str, default=None
+        The name of the variable holding the labels, used in error messages.
+
+    Raises
+    ------
+    TypeError
+        If the missing label is a number and the labels are strings, or the
+        other way around.
+    """
+    _check_missing_label_value(missing_label)
+    if missing_label is None or kind is None:
+        return
+    name = "target object" if name is None else str(name)
+    if kind == "str" and not isinstance(missing_label, str):
+        raise TypeError(
+            f"`missing_label={missing_label!r}` is a number and is not "
+            f"compatible with the string labels in `{name}`. Use a string "
+            "missing label or `None` instead, and mark the missing entries "
+            "with it."
+        )
+    if kind == "number" and isinstance(missing_label, str):
+        raise TypeError(
+            f"`missing_label={missing_label!r}` is a string and is not "
+            f"compatible with the numeric labels in `{name}`. Use `np.nan`, "
+            "a numeric missing label, or `None` instead."
+        )
+
+
+def _dtype_kind(target_type):
+    """Map the dtype or scalar type of labels to their kind.
 
     Parameters
     ----------
@@ -608,149 +333,83 @@ def _target_type_family(target_type):
 
     Returns
     -------
-    family : "bool" or "int" or "float" or "str" or None
-        The label family, or `None` if `target_type` constrains no missing
-        label.
+    kind : "str" or "number" or None
+        The kind of the labels, or `None` if `target_type` constrains no
+        missing label, e.g., `object`.
     """
     try:
         dtype = np.dtype(target_type)
     except TypeError:
         return None
-    if dtype.kind == "S":
+    if dtype.kind in "SU":
         return "str"
-    return _DTYPE_KIND_FAMILIES.get(dtype.kind)
-
-
-def _missing_mask_and_family(y, missing_label, *, name, role=_LABELS):
-    """Locate missing labels and check the family of the observed ones.
-
-    Parameters
-    ----------
-    y : numpy.ndarray
-        Labels including missing values.
-    missing_label : scalar or str or None
-        Value to represent a missing label.
-    name : str
-        The name of the checked variable, used in error messages.
-    role : "labels" or "numerical labels" or "task-agnostic labels", \
-            default="labels"
-        The role the values of `y` play in the label contract.
-
-    Returns
-    -------
-    is_missing : numpy.ndarray of shape `y.shape`
-        Boolean mask locating `missing_label` in `y`.
-    family : "bool" or "int" or "float" or "str" or None
-        The label family of the observed labels, or `None` if `y` holds no
-        observed label.
-
-    Raises
-    ------
-    TypeError
-        If the labels are outside the label contract, mix families, or are
-        incompatible with `missing_label`.
-    ValueError
-        If an observed integer is beyond 64 bits or an observed float is
-        nonfinite.
-    """
-    _check_missing_label_value(missing_label)
-    if y.dtype.kind == "O":
-        is_missing, families = _scan_object_labels(y, missing_label, name=name)
-        _check_object_values(y[~is_missing], families, name=name)
-        family = _combine_families(families, name=name, role=role)
-        _check_missing_label_for_family(
-            missing_label,
-            family,
-            name=name,
-            description=_describe_observed_families(families),
-        )
-        return is_missing, family
-
-    is_missing = _typed_missing_mask(y, missing_label)
-    if is_missing.all():
-        _check_missing_label_for_family(missing_label, None, name=name)
-        return is_missing, None
-
-    observed_family = _dtype_family(y.dtype, name=name)
-    family = _combine_families({observed_family}, name=name, role=role)
-    _check_missing_label_for_family(
-        missing_label,
-        family,
-        name=name,
-        description=_FAMILY_DESCRIPTIONS[observed_family],
-    )
-    if y.dtype.kind == "f":
-        _check_finite_labels(y[~is_missing], name=name)
-    return is_missing, family
+    return "number" if dtype.kind in "biuf" else None
 
 
 def _typed_missing_mask(y, missing_label):
-    """Locate a missing label in an array without coercing its values.
+    """Locate a missing label in an array of a non-object dtype.
 
     Parameters
     ----------
     y : numpy.ndarray
         Labels of a non-object dtype, including missing values.
     missing_label : scalar or str or None
-        Value to represent a missing label.
+        Value to represent a missing label, or `_NO_MISSING_LABEL`.
 
     Returns
     -------
     is_missing : numpy.ndarray of shape `y.shape`
         Boolean mask locating `missing_label` in `y`.
     """
-    if missing_label is None:
-        return np.zeros(y.shape, dtype=bool)
-    if _is_nan_missing_label(missing_label):
+    if isinstance(missing_label, str):
+        if y.dtype.kind == "U":
+            return y == missing_label
+    elif _is_nan_missing_label(missing_label):
         if y.dtype.kind == "f":
             return np.isnan(y)
-        return np.zeros(y.shape, dtype=bool)
-    if isinstance(missing_label, str) != (y.dtype.kind == "U"):
-        return np.zeros(y.shape, dtype=bool)
-    if isinstance(missing_label, str):
-        return y == missing_label
-    comparison_dtype = _lossless_decode_dtype([y], missing_label)
-    return y.astype(comparison_dtype, copy=False) == missing_label
+    elif (
+        missing_label is not None
+        and missing_label is not _NO_MISSING_LABEL
+        and y.dtype.kind in "biuf"
+    ):
+        # A Python scalar would be cast to the dtype of `y`, so that, e.g.,
+        # the missing label 16777217 would match the `float32` label
+        # 16777216.
+        return y == np.asarray(missing_label)
+    return np.zeros(y.shape, dtype=bool)
 
 
-def _matches_missing_label(value, missing_label):
-    """Check whether one scalar entry of an object array is missing.
+def _object_missing_mask(values, missing_label):
+    """Locate a missing label among the entries of an object array.
 
     Parameters
     ----------
-    value : object
-        One entry of an object array, not necessarily a supported label.
+    values : numpy.ndarray of dtype object
+        Labels including missing values.
     missing_label : scalar or str or None
-        The configured missing label, or `_NO_MISSING_LABEL` if the values
-        cannot contain one.
+        Value to represent a missing label, or `_NO_MISSING_LABEL`.
 
     Returns
     -------
-    matches : bool
-        Whether `value` is the configured missing label.
+    is_missing : numpy.ndarray of shape `values.shape`
+        Boolean mask locating `missing_label` in `values`. Numeric NaN
+        matches neither the string `"nan"` nor `None`.
     """
-    if missing_label is _NO_MISSING_LABEL:
-        return False
-    if missing_label is None:
-        return value is None
     if _is_nan_missing_label(missing_label):
-        return isinstance(value, (float, np.floating)) and bool(
-            np.isnan(value)
-        )
-    if isinstance(missing_label, str):
-        return isinstance(value, str) and value == missing_label
-    if not isinstance(
-        value, (bool, np.bool_, int, np.integer, float, np.floating)
-    ):
-        return False
-    # Object arrays retain NumPy scalars, whose equality promotes integers to
-    # floats and can thereby merge a large label onto the missing label. Python
-    # scalars compare exactly across integers and floats.
-    return _python_scalar(value) == _python_scalar(missing_label)
+        # NaN is the only supported label that differs from itself.
+        return values != values
+    return values == missing_label
+
+
+def _matches_missing_label(value, missing_label):
+    """Check whether one scalar value is the configured missing label."""
+    values = np.empty(1, dtype=object)
+    values[0] = value
+    return bool(_object_missing_mask(values, missing_label)[0])
 
 
 def _holds_missing_label(values, missing_label):
-    """Check whether an array can store the missing label without loss.
+    """Check whether the dtype of labels also holds the missing label.
 
     Parameters
     ----------
@@ -762,14 +421,21 @@ def _holds_missing_label(values, missing_label):
     Returns
     -------
     holds_missing_label : bool
-        Whether `values.dtype` represents both the labels and the missing
-        label.
+        Whether `missing_label`, stored in `values.dtype`, is still
+        recognized as the missing label, e.g., `np.nan` in `float32` or `-1`
+        in `int8`, but not `0.1` in `float32`.
     """
-    return _lossless_decode_dtype([values], missing_label) == values.dtype
+    try:
+        stored = np.array([missing_label], dtype=values.dtype)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if stored.dtype.kind == "O":
+        return True
+    return bool(_typed_missing_mask(stored, missing_label)[0])
 
 
 def _missing_label_kind(missing_label):
-    """Return the label kind a missing label belongs to.
+    """Return the kind of labels a missing label can mark as missing.
 
     Parameters
     ----------
@@ -778,13 +444,13 @@ def _missing_label_kind(missing_label):
 
     Returns
     -------
-    kind : "numeric" or "str" or None
+    kind : "number" or "str" or None
         The kind of labels `missing_label` can mark a missing one of, or
         `None` if it can mark one of every kind.
     """
     if missing_label is None:
         return None
-    return "str" if isinstance(missing_label, str) else "numeric"
+    return "str" if isinstance(missing_label, str) else "number"
 
 
 def _is_nan_missing_label(missing_label):
@@ -794,71 +460,13 @@ def _is_nan_missing_label(missing_label):
     )
 
 
-def _python_scalar(value):
-    """Return the Python scalar equivalent of a NumPy scalar."""
-    return value.item() if isinstance(value, np.generic) else value
-
-
-def _check_integer_labels(values, *, name):
-    """Check that the integers among object entries fit a 64-bit dtype.
-
-    Parameters
-    ----------
-    values : numpy.ndarray of dtype object
-        The observed entries of an object array.
-    name : str
-        The name of the checked variable, used in error messages.
-
-    Raises
-    ------
-    ValueError
-        If no signed or unsigned 64-bit integer dtype holds every integer.
-    """
-    flat = values.ravel()
-    groups = _group_by_type(flat)
-    if groups is None:
-        integers = [
-            _python_scalar(value)
-            for value in values.flat
-            if isinstance(value, (int, np.integer))
-            and not isinstance(value, (bool, np.bool_))
-        ]
-    else:
-        integers = []
-        for value_type, mask in groups.items():
-            if issubclass(value_type, (int, np.integer)) and not issubclass(
-                value_type, (bool, np.bool_)
-            ):
-                group = flat[mask]
-                if value_type is not int:
-                    group = group.astype(value_type)
-                integers += [
-                    _python_scalar(group.min()),
-                    _python_scalar(group.max()),
-                ]
-    if not integers:
-        return
-    smallest, largest = min(integers), max(integers)
-    if smallest < _INT64_MIN or largest > _UINT64_MAX:
-        outside = smallest if smallest < _INT64_MIN else largest
-        raise ValueError(
-            f"`{name}` contains the integer {outside}, which does not fit a "
-            f"64-bit integer dtype. {_STORABLE_INTEGERS}"
-        )
-    if smallest < 0 and largest > _INT64_MAX:
-        raise ValueError(
-            f"`{name}` contains the integers {smallest} and {largest}, which "
-            f"do not fit one 64-bit integer dtype. {_STORABLE_INTEGERS}"
-        )
-
-
 def _check_finite_labels(values, *, name):
-    """Check that floating-point labels are finite.
+    """Check that numeric labels are finite.
 
     Parameters
     ----------
     values : numpy.ndarray
-        Floating-point labels without missing values.
+        Numeric labels without missing values.
     name : str
         The name of the checked variable, used in error messages.
 
@@ -867,58 +475,16 @@ def _check_finite_labels(values, *, name):
     ValueError
         If any value is NaN or infinite.
     """
+    values = np.asarray(values, dtype=float)
     is_finite = np.isfinite(values)
     if is_finite.all():
         return
     if np.isnan(values[~is_finite]).any():
         raise ValueError(
             f"`{name}` contains NaN, which is only valid as the configured "
-            "`missing_label`. Pass `missing_label=np.nan` to mark these "
-            "entries as missing."
+            "`missing_label`."
         )
     raise ValueError(
         f"`{name}` contains an infinite value, which is neither a label nor "
         "a missing label."
-    )
-
-
-def _describe_observed_families(families):
-    """Name the label families found among observed labels.
-
-    Parameters
-    ----------
-    families : set of str
-        The label families found among the observed labels.
-
-    Returns
-    -------
-    description : str or None
-        How the observed labels are named in an error message, or `None` if
-        `families` is empty, because no observed label is then there to be
-        incompatible with a missing label.
-    """
-    if not families:
-        return None
-    if families == {"int", "float"}:
-        return "numerical"
-    return _describe_families(families)
-
-
-def _describe_families(families):
-    """Name label families in a stable order for an error message."""
-    described = [
-        _FAMILY_DESCRIPTIONS[family]
-        for family in _FAMILY_ORDER
-        if family in families
-    ]
-    if len(described) == 1:
-        return described[0]
-    return ", ".join(described[:-1]) + f" and {described[-1]}"
-
-
-def _missing_label_value_message(missing_label):
-    """Describe an unsupported missing label."""
-    return (
-        f"`missing_label` has type '{type(missing_label).__name__}', but "
-        "must be a number of at most 64 bits, a string, `np.nan`, or `None`."
     )

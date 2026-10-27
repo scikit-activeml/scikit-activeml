@@ -87,20 +87,6 @@ class TestTargetSpec(unittest.TestCase):
             (("no", "yes"), ("cold", "warm")),
         )
 
-    def test_normalization_preserves_mixed_numpy_integer_scalars(self):
-        classes = [np.int64(2**53), np.uint64(2**53 + 1)]
-        target_spec = resolve_target_spec(
-            classes,
-            task="classification",
-            classes=classes,
-            missing_label=np.nan,
-        )
-
-        self.assertEqual(
-            [int(value) for value in target_spec.classes],
-            [2**53, 2**53 + 1],
-        )
-
     def test_rejects_nonfinite_classes(self):
         for classes in ((np.nan, 1.0), (np.inf, 1.0)):
             with self.subTest(classes=classes):
@@ -118,17 +104,6 @@ class TestTargetSpec(unittest.TestCase):
                         classes=classes,
                         missing_label=-1,
                     )
-
-    def test_rejects_duplicate_nan_classes_before_normalization(self):
-        duplicate_nan_classes = (float("nan"), float("nan"))
-
-        with self.assertRaisesRegex(ValueError, "Duplicate entries"):
-            TargetSpec(
-                task="classification",
-                target_type="multi-label",
-                annotation_type="single-annotator",
-                classes=(duplicate_nan_classes,),
-            )
 
     def test_equality_and_hashing_handle_empty_and_different_vocabularies(
         self,
@@ -163,7 +138,7 @@ class TestTargetSpec(unittest.TestCase):
         self.assertNotEqual(classification, other_classification)
         self.assertFalse(classification == object())
 
-    def test_equality_and_hashing_preserve_class_dtype_kinds(self):
+    def test_equality_and_hashing_compare_classes_by_value(self):
         def multilabel_spec(classes):
             return TargetSpec(
                 task="classification",
@@ -174,8 +149,6 @@ class TestTargetSpec(unittest.TestCase):
 
         integer = multilabel_spec(((0, 1), (0, 1)))
         floating = multilabel_spec(((0.0, 1.0), (0.0, 1.0)))
-        boolean = multilabel_spec(((False, True), (False, True)))
-
         narrow_integer = multilabel_spec(
             (
                 np.array([0, 1], dtype=np.int8),
@@ -183,11 +156,10 @@ class TestTargetSpec(unittest.TestCase):
             )
         )
 
+        self.assertEqual(integer, floating)
         self.assertEqual(integer, narrow_integer)
-        self.assertEqual(hash(integer), hash(narrow_integer))
-        self.assertNotEqual(integer, floating)
-        self.assertNotEqual(integer, boolean)
-        self.assertEqual(len({integer, floating, boolean}), 3)
+        self.assertEqual(hash(integer), hash(floating))
+        self.assertEqual(len({integer, floating, narrow_integer}), 1)
 
     def test_rejects_unresolved_or_unknown_semantic_values(self):
         invalid_specs = [
@@ -324,9 +296,7 @@ class TestResolveTargetSpec(unittest.TestCase):
         self.assertEqual(target_spec.classes, ((0, 1), (0, 1)))
 
     def test_rejects_unsupported_inferred_class_types(self):
-        with self.assertRaisesRegex(
-            TypeError, "unsupported scalar label type"
-        ):
+        with self.assertRaisesRegex(TypeError, "unsupported type"):
             resolve_target_spec(
                 [date(2020, 1, 1), date(2020, 1, 2)],
                 task="classification",
@@ -444,17 +414,12 @@ class TestResolveTargetSpec(unittest.TestCase):
                 missing_label=None,
             )
 
-    def test_declared_numeric_membership_is_lossless(self):
+    def test_declared_numeric_membership_compares_values(self):
         for classes, value, accepted in (
             ([0, 1], 0.0, True),
             ([0, 1], 0.5, False),
-            ([2**53, 2**53 + 1], float(2**53), True),
-            ([2**53 + 1, 2**53 + 2], float(2**53), False),
-            ([float(2**53), float(2**53 + 2)], np.int64(2**53 + 1), False),
-            ([-(2**63), -(2**63) + 1], float(-(2**63)), True),
-            ([2**63 - 2, 2**63 - 1], float(2**63), False),
-            ([2**64 - 2, 2**64 - 1], float(2**64), False),
-            ([2**64 - 2, 2**64 - 1], np.uint64(2**64 - 1), True),
+            ([0.0, 1.5], np.int64(0), True),
+            ([False, True], 1, True),
         ):
             for target_type in ("single-output", "multi-label"):
                 if target_type == "single-output":
@@ -662,23 +627,18 @@ class TestResolveTargetSpec(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             target_spec.target_type = "auto"
 
-    def test_multilabel_rejects_heterogeneous_output_dtypes(self):
+    def test_multilabel_rejects_string_and_numeric_outputs(self):
         y = np.empty((2, 2), dtype=object)
         y[:] = [["no", 0], ["yes", 1]]
-        # The platform decides the width of a default integer.
-        int_dtype = str(np.asarray([0, 1]).dtype)
-        bool_dtype = str(np.asarray([False, True]).dtype)
 
-        for classes, dtypes in (
-            ((("no", "yes"), (0, 1)), ("<U3", int_dtype)),
-            ((("no", "yes"), (0.0, 1.0)), ("<U3", "float64")),
-            (((0, 1), (0.0, 1.0)), (int_dtype, "float64")),
-            (((False, True), (0, 1)), (bool_dtype, int_dtype)),
+        for classes in (
+            (("no", "yes"), (0, 1)),
+            (("no", "yes"), (0.0, 1.0)),
         ):
             with self.subTest(classes=classes):
                 with self.assertRaisesRegex(
-                    ValueError, "one dtype across all label outputs"
-                ) as raised:
+                    TypeError, "all strings or all numbers"
+                ):
                     resolve_target_spec(
                         y,
                         task="classification",
@@ -686,31 +646,20 @@ class TestResolveTargetSpec(unittest.TestCase):
                         classes=classes,
                         missing_label=None,
                     )
-                message = str(raised.exception)
-                for output_idx, dtype in enumerate(dtypes):
-                    self.assertIn(dtype, message)
-                    self.assertIn(f"output {output_idx}", message)
 
-    def test_multilabel_names_every_offending_output_dtype(self):
-        y = np.empty((2, 3), dtype=object)
-        y[:] = [[0, 0, "no"], [1, 1, "yes"]]
+    def test_multilabel_accepts_numeric_outputs_of_different_dtypes(self):
+        y = np.array([[0, 0.0], [1, 1.0]])
 
-        with self.assertRaisesRegex(
-            ValueError, "one dtype across all label outputs"
-        ) as raised:
-            resolve_target_spec(
-                y,
-                task="classification",
-                target_type="multi-label",
-                classes=((0, 1), (0, 1), ("no", "yes")),
-                missing_label=None,
-            )
-
-        message = str(raised.exception)
-        self.assertIn("outputs 0, 1", message)
-        self.assertIn("output 2", message)
-        self.assertIn(str(np.asarray([0, 1]).dtype), message)
-        self.assertIn("<U3", message)
+        for classes in (((0, 1), (0.0, 1.0)), ((False, True), (0, 1))):
+            with self.subTest(classes=classes):
+                target_spec = resolve_target_spec(
+                    y,
+                    task="classification",
+                    target_type="multi-label",
+                    classes=classes,
+                    missing_label=None,
+                )
+                self.assertEqual(target_spec.classes, ((0, 1), (0, 1)))
 
     def test_multilabel_accepts_homogeneous_output_dtypes(self):
         y = np.array([["no", "maybe"], ["yes", "definitely"]])
@@ -746,7 +695,7 @@ class TestResolveTargetSpec(unittest.TestCase):
         y = np.empty((2, 2), dtype=object)
         y[:] = [["no", 0], ["yes", 1]]
 
-        with self.assertRaisesRegex(TypeError, "one label family"):
+        with self.assertRaisesRegex(TypeError, "mixes strings and numbers"):
             resolve_target_spec(
                 y,
                 task="classification",

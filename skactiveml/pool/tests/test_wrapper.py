@@ -212,15 +212,6 @@ class TestSubSamplingWrapper(
             restricted_wrapper._target_capabilities,
         )
 
-    def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
-        init_params, query_params = self._multilabel_custom_vocabulary_params(
-            self._multilabel_heterogeneous_vocabularies()
-        )
-        qs = self.qs_class(**init_params)
-
-        with self.assertRaisesRegex(TypeError, "one label family"):
-            qs.query(**query_params)
-
     def test_wrapped_strategy_reports_ambiguous_targets(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
@@ -1000,15 +991,6 @@ class TestParallelUtilityEstimationWrapper(
         self.assertEqual(
             wrapper._target_capabilities, wrapped._target_capabilities
         )
-
-    def test_query_multilabel_rejects_heterogeneous_vocabularies(self):
-        init_params, query_params = self._multilabel_custom_vocabulary_params(
-            self._multilabel_heterogeneous_vocabularies()
-        )
-        qs = self.qs_class(**init_params)
-
-        with self.assertRaisesRegex(TypeError, "one label family"):
-            qs.query(**query_params)
 
     def test_wrapped_strategy_reports_ambiguous_targets(self):
         X = np.arange(12, dtype=float).reshape(6, 2)

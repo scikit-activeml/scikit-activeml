@@ -22,7 +22,7 @@ from .exceptions import MappingError, _ExhaustedCandidatePool
 from .utils._label_dtype import (
     _as_class_vocabulary_array,
     _as_label_array,
-    _lossless_decode_dtype,
+    _common_label_dtype,
 )
 from .utils._target import (
     _check_target_capability,
@@ -1494,8 +1494,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             The dtype of the declared class labels.
         """
         if self.target_spec_.target_type == "multi-label":
-            return _lossless_decode_dtype(self.classes_)
-        return _lossless_decode_dtype([self.classes_])
+            return _common_label_dtype(self.classes_)
+        return _common_label_dtype([self.classes_])
 
     def _decode_class_labels(self, y_enc):
         """Decode encoded class labels into the declared class dtype.

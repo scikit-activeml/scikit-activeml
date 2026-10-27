@@ -11,7 +11,7 @@ from ._label_dtype import (
     _as_class_vocabulary_array,
     _as_label_array,
     _check_compatible_kinds,
-    _lossless_decode_dtype,
+    _common_label_dtype,
 )
 from ._label_encoder import ExtLabelEncoder
 
@@ -84,7 +84,7 @@ def ext_confusion_matrix(
         raise ValueError(
             "'normalize' must be one of {'true', 'pred', 'all', " "None}."
         )
-    label_dtype = _lossless_decode_dtype([y_true, y_pred.ravel()])
+    label_dtype = _common_label_dtype([y_true, y_pred.ravel()])
     y = np.concatenate(
         (y_true[:, np.newaxis], y_pred), axis=1, dtype=label_dtype
     )

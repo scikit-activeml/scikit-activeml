@@ -17,8 +17,8 @@ from ..base import (
 )
 from ..classifier import ParzenWindowClassifier
 from ..utils._label_dtype import (
+    _common_label_dtype,
     _holds_missing_label,
-    _lossless_decode_dtype,
 )
 from ..utils import (
     MISSING_LABEL,
@@ -196,6 +196,13 @@ class IndexClassifierWrapper:
                 f"in the dtype '{self.y.dtype}' of `y`. Pass `y` in a dtype "
                 "holding both the labels and the missing label, e.g. "
                 "`float` for integer labels beside `np.nan`, or `object`."
+            )
+        # Hypothetical labels are cast to the dtype of `self.y` as well, so it
+        # must also hold the classes, e.g., the class `0.5` beside integers.
+        classes = getattr(self.clf, "classes_", self.clf._declared_classes)
+        if classes is not None:
+            self.y = self.y.astype(
+                _common_label_dtype([self.y, classes]), copy=False
             )
         check_equal_missing_label(self.clf.missing_label, self.missing_label_)
 
@@ -845,7 +852,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
 
     # Widen the labels before assigning: writing a fractional hypothetical
     # target into an integer array would truncate it.
-    dtype = _lossless_decode_dtype([y, y_update])
+    dtype = _common_label_dtype([y, y_update])
 
     if idx_update is not None:
         if isinstance(idx_update, (int, np.integer)):

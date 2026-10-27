@@ -11,8 +11,6 @@ from ._label_dtype import (
     _as_class_vocabulary_array,
     _as_label_array,
     _check_compatible_kinds,
-    _lossless_decode_dtype,
-    _python_scalar,
 )
 from ._validation import (
     _has_nested_classes,
@@ -21,7 +19,7 @@ from ._validation import (
 )
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True)
 class TargetSpec:
     """Immutable description of resolved target semantics.
 
@@ -37,6 +35,8 @@ class TargetSpec:
         The normalized immutable class vocabulary for classification, or
         `None` for regression. Single-output classification stores one tuple.
         Multi-label classification stores one binary tuple per label output.
+        Specifications compare classes by value, so `(0, 1)` equals
+        `(0.0, 1.0)`.
     """
 
     task: str
@@ -93,46 +93,6 @@ class TargetSpec:
         object.__setattr__(target_spec, "annotation_type", annotation_type)
         object.__setattr__(target_spec, "classes", classes)
         return target_spec
-
-    def __eq__(self, other):
-        if not isinstance(other, TargetSpec):
-            return NotImplemented
-        return (
-            self.task == other.task
-            and self.target_type == other.target_type
-            and self.annotation_type == other.annotation_type
-            and _class_vocabulary_identity_key(self.classes)
-            == _class_vocabulary_identity_key(other.classes)
-        )
-
-    def __hash__(self):
-        return hash(
-            (
-                self.task,
-                self.target_type,
-                self.annotation_type,
-                _class_vocabulary_identity_key(self.classes),
-            )
-        )
-
-
-def _class_vocabulary_identity_key(classes):
-    """Return the value-and-dtype-kind identity of normalized classes.
-
-    Target specifications preserve a declaration's dtype kind even when
-    Python considers its values equal, such as integer ``0`` and floating
-    ``0.0``. Width differences within one kind remain immaterial.
-    """
-    if classes is None:
-        return None
-    return tuple(
-        (
-            _class_vocabulary_identity_key(value)
-            if isinstance(value, tuple)
-            else (np.asarray(value).dtype.kind, value)
-        )
-        for value in classes
-    )
 
 
 def _validate_target_semantics(
@@ -535,24 +495,13 @@ def _check_target_capability(component, capability, capabilities):
 
 
 def _normalize_class_vocabulary(declared, observed, name):
-    classes_array = _as_class_vocabulary_array(declared, name=name.strip("`"))
+    classes_array = _as_class_vocabulary_array(declared)
     classes_array = LabelEncoder().fit(classes_array).classes_
-    normalized = tuple(classes_array)
-    _check_compatible_kinds(observed, normalized, name=name)
-    observed = np.asarray(observed)
-    comparison_dtype = _lossless_decode_dtype([observed, classes_array])
-    if comparison_dtype.kind == "O":
-        known = tuple(_python_scalar(value) for value in normalized)
-        all_known = all(_python_scalar(value) in known for value in observed)
-    else:
-        all_known = np.isin(
-            observed.astype(comparison_dtype, copy=False),
-            classes_array.astype(comparison_dtype, copy=False),
-        ).all()
-    if not all_known:
+    _check_compatible_kinds(observed, classes_array, name=name)
+    if not np.isin(np.asarray(observed), classes_array).all():
         raise ValueError(
             f"`y` contains labels outside {name}. All observed labels must "
             "belong to the class vocabulary, whether declared explicitly "
             "or inferred during fitting."
         )
-    return normalized
+    return tuple(classes_array)

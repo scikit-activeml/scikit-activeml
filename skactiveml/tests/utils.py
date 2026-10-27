@@ -280,9 +280,9 @@ def assert_committee_label_invariance(test_case, strategy):
     results = []
     for offset, dtypes in (
         (0, (np.int64, np.int64)),
-        (2**53, (np.int64, np.int64)),
-        (2**53, (np.int64, np.uint64)),
-        (2**53, (np.uint64, np.int64)),
+        (10, (np.int64, np.int64)),
+        (10, (np.int64, np.uint64)),
+        (10, (np.uint64, np.int64)),
     ):
         members = []
         for i, (dtype, gamma) in enumerate(zip(dtypes, (1, 20))):

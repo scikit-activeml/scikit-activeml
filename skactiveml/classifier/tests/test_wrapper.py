@@ -1728,13 +1728,12 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             ]
         return y
 
-    def test_fit_rejects_heterogeneous_output_vocabularies(self):
+    def test_fit_rejects_string_and_numeric_output_vocabularies(self):
         y = self._multilabel_object_targets((("no", "yes"), (0, 1)))
 
         for classes in (
             [["no", "yes"], [0, 1]],
             [["no", "yes"], [0.0, 1.0]],
-            [[0, 1], [0.0, 1.0]],
         ):
             with self.subTest(classes=classes):
                 clf = SklearnClassifier(
@@ -1744,9 +1743,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
                     missing_label=None,
                 )
 
-                with self.assertRaisesRegex(
-                    ValueError, "one dtype across all label outputs"
-                ):
+                with self.assertRaisesRegex(TypeError, "all strings or all"):
                     clf.fit(self.X_ml, y)
 
     def test_fit_accepts_homogeneous_non_numeric_vocabularies(self):
@@ -2893,21 +2890,6 @@ class TestSlidingWindowClassifier(
         if replace_init_params is not None:
             init_params.update(replace_init_params)
         super().test_predict_dtype_matches_class_dtype(
-            replace_init_params=init_params,
-            replace_fit_params=replace_fit_params,
-        )
-
-    def test_fit_rejects_class_identities_beyond_64_bits(
-        self, replace_init_params=None, replace_fit_params=None
-    ):
-        init_params = {
-            "estimator": SklearnClassifier(
-                GaussianProcessClassifier(), missing_label=np.nan
-            )
-        }
-        if replace_init_params is not None:
-            init_params.update(replace_init_params)
-        super().test_fit_rejects_class_identities_beyond_64_bits(
             replace_init_params=init_params,
             replace_fit_params=replace_fit_params,
         )
