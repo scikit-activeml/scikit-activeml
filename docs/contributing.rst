@@ -241,14 +241,14 @@ Query Strategies
 
 All query strategies inherit from the abstract superclass
 ``skactiveml.base.QueryStrategy``, which is implemented in ``skactiveml/base.py``.
-This superclass inherits from ``sklearn.base.Estimator``. Its optional
+This superclass inherits from scikit-learn's ``BaseEstimator``. Its optional
 ``random_state`` parameter controls reproducibility, and the abstract ``query``
 method enforces the implementation of the sample-selection logic.
 
-Target semantics and compatibility
+Target Semantics and Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Target data has an explicit public contract. Read the
+Labels and target semantics have an explicit public contract. Read the
 :doc:`target_semantics` reference before changing estimators, query strategies,
 label helpers, or multi-annotator components. In particular:
 
@@ -265,9 +265,9 @@ label helpers, or multi-annotator components. In particular:
   fitted target specification; query strategies resolve each query and do not
   retain a last-query specification;
 - add tests for every supported target combination and for invalid or
-  unsupported combinations, including ambiguous two-dimensional targets and
+  unsupported combinations, including ambiguous two-dimensional labels and
   complete-row requirements for multi-label data;
-- operate on encoded targets for multi-label data, because each label output
+- operate on encoded labels for multi-label data, because each label output
   may declare its own binary class vocabulary, e.g.
   ``[["no", "yes"], ["off", "on"]]``. A pool strategy test supplying
   ``query_default_params_clf_multilabel`` runs the shared custom class
@@ -499,7 +499,7 @@ Returns:
 
 .. _general-advice-2:
 
-General advice
+General Advice
 ''''''''''''''
 
 The ``query`` method must not change the internal state of the ``query``
@@ -544,7 +544,7 @@ Required Parameters:
 
 .. _general-advice-3:
 
-General advice
+General Advice
 ''''''''''''''
 
 The ``update`` method checks ``candidates`` and ``queried_indices`` with
@@ -716,7 +716,7 @@ Required Parameters:
 |                                   | indicated by self.MISSING_LABEL), |
 |                                   | meaning that ``y[i, j]`` contains |
 |                                   | the label annotated by annotator  |
-|                                   | ``i`` for sample ``j``.           |
+|                                   | ``j`` for sample ``i``.           |
 +-----------------------------------+-----------------------------------+
 | ``candidates``, optional          | If ``candidates`` is ``None``,    |
 |                                   | the samples from ``(X, y)``, for  |
@@ -807,7 +807,7 @@ Returns:
 
 .. _general-advice-6:
 
-General advice
+General Advice
 ''''''''''''''
 
 Use ``self._validate_data`` (implemented in the superclass).
@@ -893,12 +893,14 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the class labels of the training    |
-|                                   | samples. Missing labels are represented by   |
-|                                   | the attribute ``missing_label``. Usually,    |
-|                                   | ``y`` is a column array except for multi-    |
-|                                   | annotator classifiers, which expect a matrix |
-|                                   | with columns for each annotator.             |
+| ``y``                             | Class labels of the training samples, with   |
+|                                   | ``missing_label`` for missing labels. For    |
+|                                   | single-output classification, ``y`` has the  |
+|                                   | shape ``(n_samples,)``, and for multi-label  |
+|                                   | classification ``(n_samples, n_outputs)``.   |
+|                                   | Multi-annotator classifiers expect           |
+|                                   | ``(n_samples, n_annotators)``. See           |
+|                                   | :doc:`target_semantics`.                     |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | class labels. Must have the same shape as    |
@@ -915,7 +917,7 @@ Returns:
 
 .. _general-advice-7:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
@@ -952,11 +954,11 @@ Returns:
 
 .. _general-advice-8:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
-Check parameter ``X`` regarding its shape, i.e., use superclass method
-``self._check_n_features`` to ensure a correct number of features. Check
+Check parameter ``X`` regarding its shape, i.e., use ``check_n_features`` from
+``skactiveml.utils`` to ensure a correct number of features. Check
 that the classifier has been fitted. If the classifier is a
 ``skactiveml.base.ClassFrequencyEstimator``, this method is already
 implemented in the superclass.
@@ -986,7 +988,7 @@ Returns:
 
 .. _general-advice-9:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass through
@@ -1025,7 +1027,7 @@ Returns:
 
 .. _general-advice-10:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass. If the
@@ -1057,7 +1059,7 @@ Standard regressor implementations are part of the subpackage
 +-------------------+---------------------------------------------------------+
 | ``fit``           | Method to fit the regressor for given training data.    |
 +-------------------+---------------------------------------------------------+
-| ``predict``       | Method predicting the target values for samples.        |
+| ``predict``       | Method predicting the labels for samples.               |
 +-------------------+---------------------------------------------------------+
 
 .. _init-3:
@@ -1088,15 +1090,13 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the target values of the training   |
-|                                   | samples. Missing labels are represented by   |
-|                                   | the attribute ``missing_label``. Usually,    |
-|                                   | ``y`` is a column array except for multi-    |
-|                                   | target regressors, which expect a matrix     |
-|                                   | with columns for each target type.           |
+| ``y``                             | Labels of the training samples, of shape     |
+|                                   | ``(n_samples,)``, with ``missing_label`` for |
+|                                   | missing labels. Regressors reject labels     |
+|                                   | with several columns.                        |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
-|                                   | targets. Must have the same shape as ``y``.  |
+|                                   | labels. Must have the same shape as ``y``.   |
 +-----------------------------------+----------------------------------------------+
 
 Returns:
@@ -1109,7 +1109,7 @@ Returns:
 
 .. _general-advice-11:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
@@ -1138,14 +1138,14 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``y_pred``                        | The estimated targets per sample, |
+| ``y_pred``                        | The estimated labels per sample,  |
 |                                   | as an array of shape              |
 |                                   | ``(n_samples,)``.                 |
 +-----------------------------------+-----------------------------------+
 
 .. _general-advice-12:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Check parameter ``X`` regarding its shape, i.e., use method
@@ -1167,7 +1167,7 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples for which predictions are made.      |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the true target values for each     |
+| ``y``                             | Contains the true labels for each            |
 |                                   | sample.                                      |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Defines the importance of each sample when   |
@@ -1183,7 +1183,7 @@ Returns:
 |                                   |  regarding ``y``.                 |
 +-----------------------------------+-----------------------------------+
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass. If the

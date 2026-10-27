@@ -463,7 +463,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     Notes
     -----
     The learned classes of a pre-fitted `estimator` are reconciled with the
-    declared ones by class identity. Declared `classes` may extend the learned
+    declared ones by value. Declared `classes` may extend the learned
     class vocabulary with zero-filled probability columns, but they can neither
     reinterpret learned classes nor change the number of predicted outputs. A
     flat `classes_` published together with fitted multi-label metadata, e.g.,
@@ -1431,7 +1431,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     def _normalize_single_output_proba(self, P, n_samples):
         """Align single-output probabilities to `classes_` and validate them.
 
-        The columns are mapped by class identity. Declared classes the
+        The columns are mapped to the classes by value. Declared classes the
         estimator never learned receive zero-filled columns.
 
         Parameters
