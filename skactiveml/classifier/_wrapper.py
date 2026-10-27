@@ -1867,6 +1867,16 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 sample_weight = sample_weight[is_lbld]
             else:
                 sample_weight = None
+        if (
+            fit_func == "partial_fit"
+            and len(X)
+            and len(self.X_train_)
+            and X.shape[1:] != np.shape(self.X_train_[0])
+        ):
+            raise ValueError(
+                f"`X` has samples of shape {X.shape[1:]}, but the sliding "
+                f"window holds samples of shape {np.shape(self.X_train_[0])}."
+            )
         # reset the window if fit is called otherwise extend the window with
         # the given data
         if fit_func == "fit":
