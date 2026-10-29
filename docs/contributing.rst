@@ -297,7 +297,8 @@ label helpers, or multi-annotator components. In particular:
 
 - Resolve the target meaning with
   :func:`~skactiveml.utils.resolve_target_spec`. Do not infer it from the
-  array shape or the values alone.
+  array shape or the values alone. Only label masks may use the shape, e.g.,
+  a wrapper treats each row of a two-dimensional ``y`` as one sample.
 - Declare the exact target combinations a component supports in its
   ``_target_capabilities``.
 - Override ``_declared_classes`` in a classifier wrapper that takes its
@@ -361,7 +362,9 @@ For typical class parameters, we use standard names:
 |                              | similar to scikit-learn.                     |
 +------------------------------+----------------------------------------------+
 | ``target_type``              | The declared target type, ``"auto"`` by      |
-|                              | default. See :doc:`target_semantics`.        |
+|                              | default, only for components that interpret  |
+|                              | the labels themselves. See                   |
+|                              | :doc:`target_semantics`.                     |
 +------------------------------+----------------------------------------------+
 | ``prior``, optional          | Prior probabilities for the distribution in  |
 |                              | probabilistic strategies.                    |
@@ -434,16 +437,15 @@ General Advice
 
 Use the ``self._validate_data`` method (implemented in the superclass) exactly
 once for structural validation of the query inputs ``X`` and ``y``. Target
-resolution is a separate semantic step and may intentionally precede
-``self._validate_data`` so that invalid or unsupported target semantics fail
-before estimator fitting or query-state initialization. If the strategy takes
-one estimator that it may refit, use ``_fit_and_resolve_estimator_target_spec``
-from ``skactiveml/pool/_target.py``. It validates the estimator and returns the
-estimator to use, i.e., a fitted clone if requested, e.g., via
-``fit_clf=True``, with the resolved target specification. Calculate utilities
-via an extra public function. Use the ``simple_batch`` function from ``utils``
-to determine the query indices and set the utilities in naive batch query
-strategies.
+resolution is a separate semantic step and may precede
+``self._validate_data``, e.g., to pass the resolved target type to it. If the
+strategy takes one estimator that it may refit, use
+``_fit_and_resolve_estimator_target_spec`` from ``skactiveml/pool/_target.py``.
+It validates the estimator and returns the estimator to use, i.e., a fitted
+clone if requested, e.g., via ``fit_clf=True``, with the resolved target
+specification. Calculate utilities via an extra public function. Use the
+``simple_batch`` function from ``utils`` to determine the query indices and set
+the utilities in naive batch query strategies.
 
 .. _testing-1:
 
@@ -558,10 +560,9 @@ the optional parameters ``X``, ``y``, ``sample_weight``, and ``fit_clf``. Use
 ``self._validate_data`` from the superclass, and check ``X`` and ``y`` only
 once. Call ``_validate_X_y_sample_weight`` from
 ``skactiveml/stream/_validation.py``, followed by
-``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``,
-before ``super()._validate_data`` and ``_validate_budget_manager``. Invalid
-inputs must fail before query state is set. The target helper returns
-``(clf, target_spec)``, with a fitted clone when ``fit_clf=True``.
+``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``.
+The target helper returns ``(clf, target_spec)``, with a fitted clone when
+``fit_clf=True``.
 
 When adapting subclasses written for version 1.0.1, replace overrides of
 ``_validate_clf`` and ``_validate_X_y_sample_weight`` with validation in the
@@ -929,7 +930,9 @@ annotators are implemented in the subpackage
 | ``random_state``, optional        | Ensures reproducibility (cf. scikit-learn).  |
 +-----------------------------------+----------------------------------------------+
 | ``target_type``, optional         | The declared target type, ``"auto"`` by      |
-|                                   | default. See :doc:`target_semantics`.        |
+|                                   | default, only for classifiers that support   |
+|                                   | multi-label targets. See                     |
+|                                   | :doc:`target_semantics`.                     |
 +-----------------------------------+----------------------------------------------+
 
 .. _fit-1:
@@ -1127,9 +1130,6 @@ Required Parameters:
 | ``random_state``, optional        | Ensures reproducibility (cf. scikit-learn).  |
 +-----------------------------------+----------------------------------------------+
 | ``missing_label``, optional       | Value representing a missing label.          |
-+-----------------------------------+----------------------------------------------+
-| ``target_type``, optional         | The declared target type, ``"auto"`` by      |
-|                                   | default. See :doc:`target_semantics`.        |
 +-----------------------------------+----------------------------------------------+
 
 .. _fit-2:

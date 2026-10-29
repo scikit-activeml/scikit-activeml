@@ -8,7 +8,6 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 import numpy as np
-from sklearn.base import clone
 from sklearn.datasets import make_blobs
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
@@ -350,15 +349,18 @@ class TemplateEstimator(_TemplateEstimatorFitContract):
 
 
 class TemplateSkactivemlClassifier(TemplateEstimator):
-    # Error expected when fitting on non-integral float class labels. Wrappers
-    # forwarding the declared class labels to a `scikit-learn` estimator have
-    # to report the estimator's rejection of such a continuous target.
+    # Error expected when fitting on non-integral float class labels.
     non_integral_classes_error = None
 
     def _has_multilabel_defaults(self):
         return self.fit_default_params_multilabel is not None
 
     def test_init_param_target_type(self):
+        if (
+            "target_type"
+            not in inspect.signature(self.estimator_class).parameters
+        ):
+            return
         self._test_param(
             "init",
             "target_type",
@@ -366,7 +368,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 ("auto", None),
                 ("single-output", None),
                 ("multi-label", ValueError),
-                ("multi-output", ValueError),
                 ("invalid", ValueError),
             ],
         )
@@ -380,22 +381,13 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             estimator.target_spec_.target_type,
             estimator.target_spec_.annotation_type,
         )
-        self.assertEqual(estimator.target_type, "auto")
         self.assertIn(capability, estimator._target_capabilities)
         self.assertEqual(capability[0], "classification")
-        self.assertNotEqual(capability[1], "multi-output")
 
     def test_predict_dtype_matches_class_dtype(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that `predict` returns the declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, so integer classes combined with the default
-        `missing_label=np.nan` decode to `float64`. Predictions never carry
-        `missing_label` and must therefore be narrowed back, so that they
-        remain usable where the declared class labels are expected.
-        """
+        """Check that `predict` returns the declared class dtype."""
         init_params = deepcopy(self.init_default_params)
         init_params["classes"] = [0, 1]
         init_params["missing_label"] = np.nan
@@ -416,40 +408,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         y_pred = np.asarray(estimator.predict(**predict_params))
 
         assert_predicts_class_dtype(self, y_pred, estimator.classes_)
-
-    def test_fit_rejects_class_identities_beyond_64_bits(
-        self, replace_init_params=None, replace_fit_params=None
-    ):
-        """Check that class identifiers beyond 64 bits are rejected.
-
-        An integer wider than a 64-bit dtype has no lossless storage, so the
-        contract rejects it instead of letting NumPy promote it to `float64`
-        and merge distinct identifiers onto one value. The rejection happens
-        in the shared validation chokepoint, before any estimator arithmetic,
-        so it holds whether the vocabulary is declared or inferred from `y`,
-        and the message names the offending integer rather than surfacing as
-        an opaque failure further in.
-        """
-        labels = [2**200, 2**200 + 1]
-        for declared in (False, True):
-            with self.subTest(declared=declared):
-                init_params = deepcopy(self.init_default_params)
-                init_params["classes"] = labels if declared else None
-                init_params["missing_label"] = np.nan
-                if replace_init_params is not None:
-                    init_params.update(deepcopy(replace_init_params))
-
-                fit_params = deepcopy(self.fit_default_params)
-                fit_params["y"] = [*labels, np.nan]
-                fit_params["X"] = np.zeros((3, 1))
-                if replace_fit_params is not None:
-                    fit_params.update(deepcopy(replace_fit_params))
-
-                estimator = self.estimator_class(**init_params)
-                with self.assertRaisesRegex(
-                    ValueError, "does not fit a 64-bit integer dtype"
-                ):
-                    self._call_with_target(estimator, "fit", fit_params)
 
     def _get_multilabel_params(self):
         if not self._has_multilabel_defaults():
@@ -879,33 +837,8 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
             self.target_contract_fit_params,
         )
 
-    def test_init_param_target_type(self):
-        for target_type, error in [
-            ("auto", None),
-            ("single-output", None),
-            ("multi-label", ValueError),
-            ("multi-output", ValueError),
-            ("invalid", ValueError),
-        ]:
-            with self.subTest(target_type=target_type):
-                estimator = clone(
-                    self.target_contract_estimator_factory()
-                ).set_params(target_type=target_type)
-                if error is None:
-                    estimator.fit(**deepcopy(self.target_contract_fit_params))
-                else:
-                    with self.assertRaises(error):
-                        estimator.fit(
-                            **deepcopy(self.target_contract_fit_params)
-                        )
-
     def test_predict_dtype_matches_class_dtype(self):
-        """Check that `predict` returns the declared class dtype.
-
-        Multi-annotator classifiers decode their predictions through the
-        same label encoder as single-annotator ones, so their predictions
-        are narrowed back to the declared class dtype as well.
-        """
+        """Check that `predict` returns the declared class dtype."""
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
         estimator.fit(**fit_params)
@@ -918,7 +851,6 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
         estimator = self.target_contract_estimator_factory()
         fit_params = deepcopy(self.target_contract_fit_params)
 
-        self.assertEqual(estimator.target_type, "auto")
         self.assertEqual(
             estimator._target_capabilities,
             frozenset(
@@ -937,14 +869,6 @@ class TemplateMultiAnnotatorClassifier(_TemplateEstimatorFitContract):
         self.assertEqual(
             estimator.target_spec_.annotation_type, "multi-annotator"
         )
-
-        unsupported = clone(estimator).set_params(target_type="multi-label")
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            unsupported.fit(**fit_params)
-        self.assertFalse(hasattr(unsupported, "target_spec_"))
-        self.assertFalse(hasattr(unsupported, "classes_"))
 
     def test_fit_with_one_observed_class(self):
         estimator = self.target_contract_estimator_factory()
@@ -1142,19 +1066,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             replace_fit_params={"y": [1.2] + [1.0] * (n_samples - 1)},
         )
 
-    def test_init_param_target_type(self):
-        self._test_param(
-            "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("multi-output", ValueError),
-                ("multi-label", ValueError),
-                ("invalid", ValueError),
-            ],
-        )
-
     def test_fitted_target_spec_is_single_output_regression(self):
         estimator = self.estimator_class(**self.init_default_params)
 
@@ -1174,12 +1085,7 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
     def test_predict_returns_one_dimensional_targets(
         self, replace_init_params=None, replace_fit_params=None
     ):
-        """Check that `predict` describes one target value per sample.
-
-        A single-output regression target is described by one value per
-        sample. A wrapped estimator may emit a column instead, which every
-        consumer indexing predictions by sample then misreads.
-        """
+        """Check that `predict` describes one target value per sample."""
         init_params = deepcopy(self.init_default_params)
         if replace_init_params is not None:
             init_params.update(deepcopy(replace_init_params))
@@ -1233,34 +1139,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
             ],
             replace_init_params={"missing_label": "nan"},
         )
-
-    def test_fit_rejects_numerical_labels_beyond_64_bits(
-        self, replace_init_params=None, replace_fit_params=None
-    ):
-        """Check that numerical labels beyond 64 bits are rejected.
-
-        Regression labels are numerical, so an integer wider than a
-        64-bit dtype cannot be stored without NumPy promoting it to
-        `float64`. The contract rejects it in the shared validation
-        chokepoint, naming the offending integer, rather than letting the
-        silently rounded value reach the arithmetic a regressor performs.
-        """
-        n_samples = len(self.fit_default_params["X"])
-        init_params = deepcopy(self.init_default_params)
-        init_params["missing_label"] = np.nan
-        if replace_init_params is not None:
-            init_params.update(deepcopy(replace_init_params))
-
-        fit_params = deepcopy(self.fit_default_params)
-        fit_params["y"] = [2**200] * (n_samples - 1) + [np.nan]
-        if replace_fit_params is not None:
-            fit_params.update(deepcopy(replace_fit_params))
-
-        estimator = self.estimator_class(**init_params)
-        with self.assertRaisesRegex(
-            ValueError, "does not fit a 64-bit integer dtype"
-        ):
-            estimator.fit(**fit_params)
 
 
 class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):

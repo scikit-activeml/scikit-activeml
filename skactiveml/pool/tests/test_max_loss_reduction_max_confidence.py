@@ -164,8 +164,6 @@ class TestMaxLossReductionMaxConfidence(
             )
 
         utility_mock.assert_called_once()
-        # The query passes canonical positive-class probabilities of the
-        # candidates and the discriminator's label-cardinality predictions.
         probas = recorded["probas"]
         self.assertIsInstance(probas, np.ndarray)
         self.assertEqual(probas.shape, (len(self.unld_idx), 2))
@@ -176,7 +174,6 @@ class TestMaxLossReductionMaxConfidence(
         self.assertTrue(
             np.isin(recorded["n_positive_labels"], [0, 1, 2]).all()
         )
-        # The returned acquisition scores drive utilities and selection.
         np.testing.assert_allclose(
             utilities[0, self.unld_idx], acquisition_scores
         )
@@ -243,9 +240,6 @@ class TestMaxLossReductionMaxConfidence(
         self.assertTrue(np.isfinite(utilities[0, self.unld_idx]).all())
 
     def test_query_multilabel_list_probas(self):
-        # Regression test: `MultiOutputClassifier` natively returns a list of
-        # binary probability matrices, which used to reach the boolean label
-        # mask unchanged for `proba_format="list"`.
         clf = SklearnClassifier(
             estimator=MultiOutputClassifier(GaussianNB()),
             classes=[[0, 1], [0, 1]],
@@ -279,8 +273,6 @@ class TestMaxLossReductionMaxConfidence(
                 )
 
     def test_query_array_native_estimator_matches_list_format(self):
-        # `OneVsRestClassifier` natively returns an array, so the wrapper has
-        # to translate it into the list format and MMC must consume both.
         results = []
         for proba_format in ["array", "list"]:
             clf = SklearnClassifier(
@@ -410,8 +402,6 @@ class TestMaxLossReductionMaxConfidenceFunction(unittest.TestCase):
         self.assertEqual(utilities.shape, (0,))
 
     def test_binary_probability_matrices(self):
-        # The documented list of per-output binary probability matrices is
-        # canonicalized to the same positive-class probabilities.
         probas = np.array([[0.9, 0.2, 0.6], [0.1, 0.4, 0.3]])
         probas_list = [
             np.column_stack([1 - probas[:, j], probas[:, j]])

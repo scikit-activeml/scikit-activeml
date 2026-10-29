@@ -52,7 +52,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         The metric must be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
         class counts, so it must not be negative for the given data.
-        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this.
         `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
         so only for some data, and `'additive_chi2'` never does because it
         is non-positive by construction. A `'precomputed'` matrix and a

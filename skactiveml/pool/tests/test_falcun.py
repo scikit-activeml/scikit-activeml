@@ -22,11 +22,7 @@ class _FixedMultilabelClassifier(SkactivemlClassifier):
         classes=((0, 1), (0, 1), (0, 1), (0, 1)),
         missing_label=MISSING_LABEL,
     ):
-        super().__init__(
-            classes=classes,
-            missing_label=missing_label,
-            target_type="multi-label",
-        )
+        super().__init__(classes=classes, missing_label=missing_label)
         self.probas = probas
 
     @property

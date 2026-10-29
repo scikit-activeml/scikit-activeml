@@ -43,9 +43,6 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. Expected-error-reduction strategies support
-        only single-output classification.
 
     References
     ----------
@@ -67,12 +64,10 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.cost_matrix = cost_matrix
         self.enforce_mapping = enforce_mapping
@@ -558,9 +553,6 @@ class MonteCarloEER(ExpectedErrorReduction):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None,d efault=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. MonteCarloEER supports only single-output
-        classification.
 
     References
     ----------
@@ -575,14 +567,12 @@ class MonteCarloEER(ExpectedErrorReduction):
         subtract_current=False,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             enforce_mapping=False,
             cost_matrix=cost_matrix,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.method = method
         self.subtract_current = subtract_current
@@ -697,9 +687,6 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. ValueOfInformationEER supports only
-        single-output classification.
 
     References
     ----------
@@ -723,14 +710,12 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         normalize=False,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             enforce_mapping=True,
             cost_matrix=cost_matrix,
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.consider_unlabeled = consider_unlabeled
         self.consider_labeled = consider_labeled
@@ -899,13 +884,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
                 probs, probs, self.cost_matrix_, w_eval[idx_unlabeled]
             )
 
-        if self.normalize:
-            if norm == 0:
-                return 0.0
-            else:
-                return err / norm
-        else:
+        if not self.normalize:
             return err
+        return err / norm if norm else 0.0
 
     def _precompute_and_fit_clf(
         self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf

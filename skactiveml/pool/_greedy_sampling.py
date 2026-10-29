@@ -44,7 +44,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Random state for candidate selection.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
 
     References
@@ -74,8 +74,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.metric = metric
         self.metric_dict = metric_dict
 
@@ -238,10 +238,6 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. A fitted regressor's target specification is
-        authoritative when available. Only single-output regression is
-        supported.
 
     References
     ----------
@@ -259,12 +255,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         n_GSx_samples=1,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.method = method
         self.x_metric = x_metric
@@ -344,7 +338,6 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        # Resolve through the regressor before acquisition state is changed.
         reg, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             reg,
@@ -523,8 +516,8 @@ def _greedy_sampling(
                             X_norm_squared=norms.reshape(-1)[start:stop],
                         )
             distances = _measure_distance(sample_indices, **chunk_args)
-            # Keep the original column-wise summation order, including ties,
-            # while chunking candidates instead of the summed sample axis.
+            # Chunk the candidates rather than the summed sample axis to keep
+            # the column-wise summation order.
             if len(X_cand) == 1:
                 initial_utilities[start:stop] = -np.sum(distances, axis=1)
             else:

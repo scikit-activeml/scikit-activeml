@@ -27,11 +27,7 @@ class TestMixtureModelClassifier(
         self.y_ml = np.array([[0, 1], [0, 1], [1, 0], [1, 0]], dtype=float)
         init_default_params_multilabel = {
             "classes": [[0, 1], [0, 1]],
-            # `np.nan` widens the label encoder past the class dtype, so the
-            # narrowing of multi-label predictions is actually exercised.
             "missing_label": np.nan,
-            # A multi-label fit cannot derive the number of components from
-            # a single class vocabulary, so the mixture model is given.
             "mixture_model": GaussianMixture(n_components=2, random_state=0),
         }
         fit_default_params_multilabel = {"X": self.X_ml, "y": self.y_ml}
@@ -131,15 +127,13 @@ class TestMixtureModelClassifier(
         )
         np.testing.assert_array_equal([[0, 1, 2]], cmm.F_components_)
 
-    def test_multilabel_requires_explicit_mixture_before_fitted_state(self):
+    def test_multilabel_requires_explicit_mixture(self):
         cmm = MixtureModelClassifier(
             classes=[[0, 1], [0, 1]], target_type="multi-label"
         )
 
         with self.assertRaisesRegex(ValueError, "mixture_model.*multi-label"):
             cmm.fit([[0], [1]], [[0, 1], [1, 0]])
-
-        self.assertFalse(any(name.endswith("_") for name in vars(cmm)))
 
     def test_multilabel_predictions_in_both_weight_modes(self):
         X = np.array([[-0.1], [0.0], [0.1]])

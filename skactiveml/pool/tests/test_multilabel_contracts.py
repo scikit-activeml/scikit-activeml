@@ -1,38 +1,9 @@
 """Inventories of the multi-label contracts of pool strategies.
 
-`SklearnClassifier.proba_format` decides which of the two public multi-label
-probability representations a query strategy observes:
-
-- `"array"` yields one `(n_samples, n_outputs)` matrix of positive-class
-  probabilities, and
-- `"list"` yields one aligned `(n_samples, 2)` matrix per output.
-
-This representation is independent of the native output of the wrapped
-estimator, e.g. `MultiOutputClassifier` returns a list natively while
-`OneVsRestClassifier` returns an array. Every strategy that declares
-multi-label support and consumes probabilities must therefore canonicalize
-them via `_canonicalize_multilabel_probas` before any indexing, sorting,
-distance, or utility arithmetic.
-
-The tests below keep the inventory of multi-label-capable pool strategies
-complete and assert that each probability consumer is covered by the shared
-contract test `test_query_multilabel_proba_format_contract` of
-`TemplatePoolQueryStrategy`.
-
-A strategy added to the inventory below must also be classified by whether its
-multi-label behavior extends a method published for single-output
-classification. A strategy that extends one declares the extension and names
-the reference it extends in its own class docstring; a strategy citing a
-natively multi-label method carries no such notice. The two partitions do not
-coincide: the buckets below separate strategies by probability consumption,
-while that classification separates them by whether the cited method covers
-multi-label targets natively.
-
-The same template also checks that multi-label strategies operate on encoded
-targets rather than assuming raw labels are numeric or equal to `{0, 1}`. The
-custom-vocabulary inventory below records which strategy tests use the default
-fixture and which provide a specialized fixture for auxiliary acquisition
-inputs.
+Strategies consuming multi-label probabilities must accept both
+`proba_format` values of `SklearnClassifier`, i.e., `"array"` and `"list"`.
+The inventories below keep the shared template tests of
+`TemplatePoolQueryStrategy` applied to every multi-label capable strategy.
 """
 
 import importlib
@@ -97,8 +68,7 @@ def _collect_pool_template_test_cases():
     return tuple(test_cases)
 
 
-# Strategies consuming multi-label probabilities of the given classifier. They
-# must accept both public probability formats.
+# Strategies consuming multi-label probabilities of the given classifier.
 MULTILABEL_PROBA_CONSUMERS = frozenset(
     {
         Badge,
@@ -110,8 +80,7 @@ MULTILABEL_PROBA_CONSUMERS = frozenset(
     }
 )
 
-# Strategies consuming multi-label predictions only, i.e., they are unaffected
-# by the probability format.
+# Strategies consuming multi-label predictions only.
 MULTILABEL_PREDICTION_CONSUMERS = frozenset(
     {
         DropQuery,
@@ -119,7 +88,7 @@ MULTILABEL_PREDICTION_CONSUMERS = frozenset(
     }
 )
 
-# label mask only, i.e., they never call `predict_proba` of a multi-label
+# Strategies using only the sample representations and the label mask.
 MULTILABEL_ESTIMATOR_FREE = frozenset(
     {
         CoreSet,
@@ -132,8 +101,7 @@ MULTILABEL_ESTIMATOR_FREE = frozenset(
     }
 )
 
-# Wrappers inheriting their target capabilities, and therefore this contract,
-# from the wrapped query strategy.
+# Wrappers inheriting their target capabilities from the wrapped strategy.
 MULTILABEL_DELEGATING_WRAPPERS = frozenset(
     {
         ParallelUtilityEstimationWrapper,
@@ -244,10 +212,6 @@ class TestMultilabelProbaFormatContract(unittest.TestCase):
                     )
 
     def test_multilabel_inventory_matches_probability_consumption(self):
-        # A malformed output count must surface as a clear validation error
-        # for every inventoried probability consumer, and must stay unnoticed
-        # by every strategy inventoried as not consuming probabilities. This
-        # keeps a misfiled strategy from passing the inventory silently.
         test_cases = _multilabel_test_cases_by_strategy()
         non_consumers = (
             MULTILABEL_PREDICTION_CONSUMERS | MULTILABEL_ESTIMATOR_FREE
@@ -319,15 +283,13 @@ DEFAULT_VOCABULARY_FIXTURE = frozenset(
     }
 )
 
-# Test cases providing their own fixture, with the reason why the default one
-# cannot cover the acquisition path in question.
+# Test cases providing their own fixture, with the reason.
 SPECIALIZED_VOCABULARY_FIXTURE = {
     "TestUHerding": "needs logits and a multi-element temperature grid to "
     "reach per-output calibration",
 }
 
-# The shared contract tests of `TemplatePoolQueryStrategy` that no test case
-# may replace, because doing so would silently drop the contract.
+# Shared tests of `TemplatePoolQueryStrategy` that no test case may replace.
 CONTRACT_TEST_NAMES = (
     "test_query_multilabel_custom_class_vocabularies",
     "test_query_multilabel_invalid_rows",
@@ -361,9 +323,6 @@ class _AnyOutputCountTestCase(TemplatePoolQueryStrategy):
 
 class TestMultilabelVocabularyContract(unittest.TestCase):
     def test_string_vocabularies_are_distinct_and_canonical(self):
-        # The contract requires one distinct vocabulary per label output, each
-        # ordered such that its second entry is the positive class, i.e. the
-        # class whose probability column the strategies consume.
         for n_outputs in range(1, 5):
             with self.subTest(n_outputs=n_outputs):
                 vocabularies = _AnyOutputCountTestCase(

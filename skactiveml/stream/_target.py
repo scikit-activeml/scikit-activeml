@@ -1,8 +1,6 @@
 """Shared target resolution helpers for stream-based query strategies.
 
-A stream query strategy does not resolve its labels `y` itself. The classifier
-passed to `query` is the target authority, and these helpers resolve its
-target specification for the strategy.
+The classifier passed to `query` determines the target specification.
 """
 
 import numpy as np
@@ -11,14 +9,16 @@ from sklearn.base import clone
 from ..base import SkactivemlClassifier
 from ..utils import check_type, resolve_target_spec
 from ..utils._target import (
+    _check_refit_capability,
     _check_target_matches_spec,
     _check_target_spec_capability,
+    _declared_target_type,
     _predicted_target_spec,
 )
 from ..utils._validation import _has_nested_classes
 
 
-def _resolve_clf_target_spec(strategy, clf, y, *, checked_target_spec=None):
+def _resolve_clf_target_spec(strategy, clf, y):
     """Resolve the target specification `clf` is the authority for.
 
     Parameters
@@ -30,9 +30,6 @@ def _resolve_clf_target_spec(strategy, clf, y, *, checked_target_spec=None):
     y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
             None
         Labels of the training data set, if any.
-    checked_target_spec : skactiveml.utils.TargetSpec or None, default=None
-        The target specification `y` was already checked against before
-        fitting `clf`.
 
     Returns
     -------
@@ -64,7 +61,7 @@ def _resolve_clf_target_spec(strategy, clf, y, *, checked_target_spec=None):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=getattr(clf, "target_type", "auto"),
+            target_type=_declared_target_type(y, clf),
             annotation_type="single-annotator",
             classes=classes,
             missing_label=clf.missing_label,
@@ -72,7 +69,7 @@ def _resolve_clf_target_spec(strategy, clf, y, *, checked_target_spec=None):
         clf_target_spec = target_spec
     else:
         target_spec = _predicted_target_spec(clf_target_spec)
-        if y is not None and target_spec != checked_target_spec:
+        if y is not None:
             _check_target_matches_spec(
                 y, target_spec, missing_label=clf.missing_label
             )
@@ -117,17 +114,12 @@ def _fit_and_resolve_clf_target_spec(
     """
     check_type(clf, "clf", SkactivemlClassifier)
     check_type(fit_clf, "fit_clf", bool)
-    checked_target_spec = None
     if fit_clf:
-        # Resolving may commit lazily resolved state that would change the
-        # fit, so the declarations are checked on a separate clone.
-        checked_target_spec = _resolve_clf_target_spec(strategy, clone(clf), y)
+        _check_refit_capability(clf)
         clf = clone(clf)
         if sample_weight is None:
             clf = clf.fit(X, y)
         else:
             clf = clf.fit(X, y, sample_weight)
-    target_spec = _resolve_clf_target_spec(
-        strategy, clf, y, checked_target_spec=checked_target_spec
-    )
+    target_spec = _resolve_clf_target_spec(strategy, clf, y)
     return clf, target_spec

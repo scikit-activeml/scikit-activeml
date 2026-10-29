@@ -92,7 +92,7 @@ class TestProbabilisticAL(
                     np.testing.assert_array_equal(indices, reference[0])
                     np.testing.assert_allclose(utilities, reference[1])
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection()
 
     def test_query_candidate_mapping_matches_closed_form(self):

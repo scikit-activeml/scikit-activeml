@@ -275,7 +275,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         budget_manager_param_dict : dict, default=None
             Optional kwargs for each single-observation budget-manager
             update. If provided, `utilities` must align with the original
-            candidates; it is sliced into one-element arrays for the observed
+            candidates. It is sliced into one-element arrays for the observed
             samples. Utilities of candidates rejected by the density filter
             are passed as NaN. Other kwargs are forwarded unchanged. Supply
             `utilities` when the budget manager requires them for updating.
@@ -701,7 +701,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         budget_manager_param_dict : dict, default=None
             Optional kwargs for each single-observation budget-manager
             update. If provided, `utilities` must align with the original
-            candidates; it is sliced into one-element arrays for the observed
+            candidates. It is sliced into one-element arrays for the observed
             samples. With `force_full_budget=True`, utilities of candidates
             rejected by the density filter are passed as NaN. Otherwise,
             these candidates are skipped. Other kwargs are forwarded

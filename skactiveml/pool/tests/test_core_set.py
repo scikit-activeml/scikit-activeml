@@ -267,7 +267,7 @@ class TestKGreedyCenter(unittest.TestCase):
             k_greedy_center,
             X=self.X,
             y=self.y,
-            target_type="multi-output",
+            target_type="invalid",
         )
 
     def test_param_batch_size(self):

@@ -13,7 +13,6 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 
@@ -48,19 +47,6 @@ class TestRegressionTreeBasedAL(
         ]
         self._test_param("init", "method", test_cases)
 
-    def test_init_param_target_type(self):
-        self._test_param(
-            "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("multi-output", ValueError),
-                ("multi-label", ValueError),
-                ("invalid", ValueError),
-            ],
-        )
-
     def test_query_uses_fitted_regressor_target_spec(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
@@ -74,7 +60,7 @@ class TestRegressionTreeBasedAL(
 
         self.assertIn(query_idx[0], [4, 5])
 
-    def test_fitted_target_shape_failure_precedes_acquisition_state(self):
+    def test_fitted_target_shape_failure_is_rejected(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.arange(12, dtype=float).reshape(6, 2)
         reg = SklearnRegressor(
@@ -84,38 +70,6 @@ class TestRegressionTreeBasedAL(
 
         with self.assertRaisesRegex(ValueError, "Single-output regression"):
             strategy.query(X, y, reg, fit_reg=False)
-
-        assert_no_query_state(self, strategy)
-
-    def test_strategy_target_type_errors_are_semantic(self):
-        X = np.arange(12, dtype=float).reshape(-1, 2)
-        y = np.arange(6, dtype=float)
-        reg = SklearnRegressor(
-            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
-        ).fit(X, y)
-
-        with self.assertRaisesRegex(ValueError, "must be one of"):
-            RegressionTreeBasedAL(target_type="invalid").query(
-                X, y, reg, fit_reg=False
-            )
-        with self.assertRaisesRegex(ValueError, "requires classification"):
-            RegressionTreeBasedAL(target_type="multi-label").query(
-                X, y, reg, fit_reg=False
-            )
-
-    def test_unfitted_regressor_declaration_conflict_precedes_state(self):
-        X = np.arange(12, dtype=float).reshape(-1, 2)
-        y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
-        reg = SklearnRegressor(
-            DecisionTreeRegressor(min_samples_leaf=2, random_state=0),
-            target_type="multi-output",
-        )
-        strategy = RegressionTreeBasedAL(target_type="single-output")
-
-        with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
-            strategy.query(X, y, reg, fit_reg=False)
-
-        assert_no_query_state(self, strategy)
 
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []

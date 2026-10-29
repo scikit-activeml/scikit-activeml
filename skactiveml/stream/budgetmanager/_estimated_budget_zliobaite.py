@@ -205,7 +205,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         check_classes(self.classes)
         # The threshold below divides by the number of classes, so a nested
-        # vocabulary would silently make it the number of label outputs.
+        # vocabulary would make it the number of label outputs.
         _check_class_vocabulary_structure("single-output", self.classes)
         return utilities
 

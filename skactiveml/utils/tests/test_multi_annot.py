@@ -7,16 +7,11 @@ from skactiveml.utils import ext_confusion_matrix
 
 
 class TestMultiAnnot(unittest.TestCase):
-    def test_ext_confusion_matrix_preserves_large_integer_labels(self):
+    def test_ext_confusion_matrix_accepts_containers_and_missing_labels(self):
         expected = np.array(
             [[[0, 1], [0, 0]], [[1, 0], [1, 0]], [[0, 0], [0, 0]]]
         )
-        for labels in (
-            [2**53, 2**53 + 1],
-            [-(2**53) - 1, -(2**53)],
-            [2**63 - 2, 2**63 - 1],
-            [2**64 - 2, 2**64 - 1],
-        ):
+        for labels in ([3, 7], [-7, -3], [0.5, 1.5]):
             for missing_label in (np.nan, None, -1):
                 predictions = [
                     [labels[1], labels[0], missing_label],
@@ -51,24 +46,24 @@ class TestMultiAnnot(unittest.TestCase):
                                 ),
                             )
 
-    def test_ext_confusion_matrix_preserves_mixed_numeric_array_dtypes(self):
+    def test_ext_confusion_matrix_accepts_mixed_numeric_array_dtypes(self):
         cases = [
             (
-                np.array([2**63 - 1, 0], dtype=np.int64),
-                np.array([2**63, 0], dtype=np.uint64),
-                [0, 2**63 - 1, 2**63],
+                np.array([7, 0], dtype=np.int64),
+                np.array([8, 0], dtype=np.uint64),
+                [0, 7, 8],
                 [[[1, 0, 0], [0, 0, 1], [0, 0, 0]]],
             ),
             (
-                np.array([2**53 + 1, 0], dtype=np.int64),
+                np.array([3, 0], dtype=np.int64),
                 np.array([0.0, 0.0]),
-                [0, 2**53 + 1],
+                [0, 3],
                 [[[1, 0], [1, 0]]],
             ),
             (
-                np.array([2**53, 2**53 + 1], dtype=np.int64),
+                np.array([3, 7], dtype=np.int64),
                 np.array([np.nan, np.nan]),
-                [2**53, 2**53 + 1],
+                [3, 7],
                 [[[0, 0], [0, 0]]],
             ),
         ]
@@ -94,6 +89,15 @@ class TestMultiAnnot(unittest.TestCase):
         actual = ext_confusion_matrix([0, 0, 1], [0, 1, 1], classes=[0])
 
         np.testing.assert_array_equal(actual, [[[1]]])
+
+    def test_ext_confusion_matrix_keeps_unobserved_fractional_classes(self):
+        actual = ext_confusion_matrix(
+            [0, 1, 1], [[0, 1], [1, 1], [1, 0]], classes=[0.5, 1]
+        )
+
+        np.testing.assert_array_equal(
+            actual, [[[0, 0], [0, 2]], [[0, 0], [0, 1]]]
+        )
 
     def test_ext_confusion_matrix_order_with_missing_annotator_labels(self):
         y_true = np.array([0, 0, 0, 1, 1, 1, 1])

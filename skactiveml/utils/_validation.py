@@ -1,7 +1,6 @@
 import copy
 import warnings
 from collections.abc import Iterator
-import numbers
 import numpy as np
 
 from inspect import Parameter, signature
@@ -20,10 +19,9 @@ from ._label import (
 )
 from ._label_dtype import (
     _as_class_vocabulary_array,
-    _check_missing_label_for_family,
     _is_nan_missing_label,
-    _label_family,
-    _matches_missing_label,
+    _label_kind,
+    _missing_mask_and_kind,
 )
 
 
@@ -180,17 +178,17 @@ def _check_1d_class_list(c, name="classes"):
 
     Returns
     -------
-    family : "bool" or "int" or "float" or "str"
-        The label family the vocabulary declares.
+    kind : "str" or "number"
+        Whether the vocabulary holds strings or numbers.
 
     Raises
     ------
     TypeError
-        If `c` is not iterable, contains unhashable or unsupported label
-        types, or mixes label families.
+        If `c` is not iterable, contains values other than strings and real
+        numbers, or mixes strings and numbers.
     ValueError
         If `c` is empty, not one-dimensional, contains duplicate labels, or
-        contains a value that is no category, e.g. a nonfinite number.
+        contains a nonfinite number.
     """
     if not _is_nonstring_iterable(c):
         raise TypeError(f"`{name}` must be iterable. Got {type(c)}.")
@@ -204,35 +202,10 @@ def _check_1d_class_list(c, name="classes"):
     if arr.size == 0:
         raise ValueError(f"`{name}` must be non-empty.")
 
-    # NaN compares unequal to itself, so repeated NaNs are counted rather
-    # than detected as duplicate set entries.
-    values = arr.tolist()
-    nan_count = sum(
-        isinstance(value, numbers.Number) and bool(value != value)
-        for value in values
-    )
-    if nan_count > 1:
+    kind = _label_kind(arr, name=name)
+    if len(set(arr.tolist())) != arr.size:
         raise ValueError(f"Duplicate entries in `{name}`.")
-
-    try:
-        n_unique = len(set(values))
-    except TypeError as e:
-        raise TypeError(
-            f"`{name}` must contain hashable scalar labels "
-            f"(strings or numbers)."
-        ) from e
-
-    # A declared vocabulary is short and its exact types define the dtype of
-    # predictions, so it is checked value by value rather than through the
-    # dtype its values would be converted to. The family is reported before
-    # any duplicate, because values of different families compare equal
-    # across them: `True` is no duplicate of the integer class `1` but a
-    # mixture with it.
-    family = _label_family(arr, name=name)
-
-    if n_unique != arr.size:
-        raise ValueError(f"Duplicate entries in `{name}`.")
-    return family
+    return kind
 
 
 def _check_probas_are_valid(probas, is_multilabel, hint=""):
@@ -376,66 +349,6 @@ def _canonicalize_multilabel_probas(
     return probas
 
 
-def _check_homogeneous_output_dtypes(classes):
-    """Check that every output declares classes of one dtype kind.
-
-    Parameters
-    ----------
-    classes : sequence of array-like
-        One class vocabulary per output.
-
-    Raises
-    ------
-    ValueError
-        If the outputs do not share one dtype kind. The message names every
-        output and the dtype it declares, grouped by kind so that a single
-        deviating output stands out.
-    """
-    dtypes = [
-        _as_class_vocabulary_array(
-            classes_i, name=f"classes[{output_idx}]"
-        ).dtype
-        for output_idx, classes_i in enumerate(classes)
-    ]
-
-    outputs_per_kind = {}
-    for output_idx, dtype in enumerate(dtypes):
-        outputs_per_kind.setdefault(dtype.kind, []).append((output_idx, dtype))
-    if len(outputs_per_kind) <= 1:
-        return
-
-    # Binary vocabularies describe label outputs, as target resolution reads
-    # them, whereas wider ones describe recognized multi-output semantics.
-    outputs = (
-        "label outputs"
-        if all(len(classes_i) == 2 for classes_i in classes)
-        else "outputs"
-    )
-    described = " and ".join(
-        _describe_dtype_group(group) for group in outputs_per_kind.values()
-    )
-    raise ValueError(
-        f"Class vocabularies must declare one dtype across all {outputs}, "
-        f"because one array holds every output. Got {described}."
-    )
-
-
-def _describe_dtype_group(group):
-    """Describe the outputs sharing one dtype kind for an error message."""
-    output_indices = [output_idx for output_idx, _ in group]
-    dtype_names = sorted({str(dtype) for _, dtype in group})
-    quoted = ", ".join(repr(name) for name in dtype_names)
-    label = "dtype" if len(dtype_names) == 1 else "dtypes"
-    return f"{label} {quoted} for {_describe_outputs(output_indices)}"
-
-
-def _describe_outputs(output_indices):
-    """Name one or more outputs for an error message."""
-    if len(output_indices) == 1:
-        return f"output {output_indices[0]}"
-    return "outputs " + ", ".join(str(idx) for idx in output_indices)
-
-
 def check_classes(classes):
     """Check whether class labels follow the label and missing-value contract.
 
@@ -444,30 +357,27 @@ def check_classes(classes):
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
         The classes labels (single output setting), or a list of arrays of
-        class labels (multioutput setting).
-
-    Returns
-    -------
-    families : str or tuple of str or None
-        The label family each vocabulary declares, i.e. `"bool"`, `"int"`,
-        `"float"`, or `"str"`. One family per output for a multioutput
-        setting, and `None` if `classes` is `None`.
+        class labels (multi-label setting).
     """
     if classes is None:
-        return None
+        return
 
     if not _is_nonstring_iterable(classes):
         raise TypeError(f"`classes` is not iterable. Got {type(classes)}.")
 
     if _has_nested_classes(classes):
-        outer = list(classes)
-        families = tuple(
+        kinds = {
             _check_1d_class_list(c, name=f"classes[{i}]")
-            for i, c in enumerate(outer)
-        )
-        _check_homogeneous_output_dtypes(outer)
-        return families
-    return _check_1d_class_list(classes, name="classes")
+            for i, c in enumerate(classes)
+        }
+        if len(kinds) > 1:
+            raise TypeError(
+                "The class vocabularies of all label outputs must be either "
+                "all strings or all numbers, because one array holds every "
+                "output."
+            )
+    else:
+        _check_1d_class_list(classes, name="classes")
 
 
 def check_classifier_params(classes, missing_label, cost_matrix=None):
@@ -478,16 +388,16 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
         The classes labels (single output setting), or a list of arrays of
-        class labels (multioutput setting).
+        class labels (multi-label setting).
     missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label. In the case of a multioutput
+        Value to represent a missing label. In the case of a multi-label
         setting, we expect that the missing label is identical across all
-        tasks.
+        outputs.
     cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost matrix to quantify costs of misclassifications.
 
         - Checked only for single output.
-        - Must be `None` for multioutput.
+        - Must be `None` for multi-label.
     """
     check_missing_label(missing_label)
 
@@ -499,7 +409,7 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
             )
         return
 
-    families = check_classes(classes)
+    check_classes(classes)
 
     has_nested_classes = _has_nested_classes(classes)
 
@@ -510,47 +420,42 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
                 "`cost_matrix` must be `None` when `classes` contains "
                 "per-output vocabularies."
             )
-        outer = list(classes)
-        for i, c in enumerate(outer):
-            _check_vocabulary_missing_label(
-                c, missing_label, families[i], f"classes[{i}]"
-            )
+        for i, c in enumerate(classes):
+            _check_vocabulary_missing_label(c, missing_label, f"classes[{i}]")
     else:
-        _check_vocabulary_missing_label(
-            classes, missing_label, families, "classes"
-        )
+        _check_vocabulary_missing_label(classes, missing_label, "classes")
         if cost_matrix is not None:
             check_cost_matrix(
                 cost_matrix=cost_matrix, n_classes=len(list(classes))
             )
 
 
-def _check_vocabulary_missing_label(classes, missing_label, family, name):
+def _check_vocabulary_missing_label(classes, missing_label, name):
     """Check that a missing label fits a vocabulary without being a class.
 
     Parameters
     ----------
     classes : array-like of shape (n_classes,)
-        One output's class vocabulary.
+        One output's validated class vocabulary.
     missing_label : scalar or string or np.nan or None
         Value to represent a missing label.
-    family : "bool" or "int" or "float" or "str"
-        The label family `classes` declares.
     name : str
         The name of the vocabulary, used in error messages.
 
     Raises
     ------
     TypeError
-        If the missing label belongs to another label family than the
-        classes.
+        If the missing label is a number and the classes are strings, or the
+        other way around.
     ValueError
         If the missing label is one of the classes, so that one value would
         mean both a known category and an unknown label.
     """
-    _check_missing_label_for_family(missing_label, family, name=name)
     values = list(classes)
-    if any(_matches_missing_label(value, missing_label) for value in values):
+    is_missing, _ = _missing_mask_and_kind(
+        _as_class_vocabulary_array(values), missing_label, name=name
+    )
+    if is_missing.any():
         raise ValueError(
             f"`{name}={values}` contains `missing_label={missing_label}`."
         )
@@ -680,8 +585,7 @@ def check_X_y(
     ensure_all_finite=True,
     ensure_2d=True,
     allow_nd=False,
-    target_type="single-output",
-    multi_output="deprecated",
+    multi_output=False,
     allow_nan=None,
     ensure_min_samples=1,
     ensure_min_features=1,
@@ -692,10 +596,9 @@ def check_X_y(
     """Input validation for standard estimators. Adjusted from `sklearn` [1]_.
 
     Checks X and y for consistent length and enforces `X` to be at least 2D.
-    Targets are one-dimensional unless a multi-label or multi-output
-    `target_type` is specified. By default, `X` is checked to be non-empty and
-    containing only finite values. NaN admission in targets is controlled by
-    `allow_nan`.
+    `y` is one-dimensional unless `multi_output=True`. By default, `X` is
+    checked to be non-empty and containing only finite values. NaN admission
+    in `y` is controlled by `allow_nan`.
     If the dtype of `X` is object, attempt converting to float, raising on
     failure.
 
@@ -748,16 +651,9 @@ def check_X_y(
         Whether to raise a value error if X is not 2D.
     allow_nd : boolean, default=False
         Whether to allow X.ndim > 2.
-    target_type : "single-output" or "multi-label" or "multi-output", \
-            default="single-output"
-        Resolved target type controlling target-array dimensionality.
-    multi_output : boolean, default="deprecated"
-        Deprecated. Use `target_type` instead: `multi_output=True` maps to
-        `target_type="multi-label"` and `multi_output=False` to
-        `target_type="single-output"`. Passing it emits a `FutureWarning`, and
-        the legacy value is ignored unless `target_type` is `"single-output"`.
-        Note that `target_type="multi-label"` requires a two-dimensional `y`,
-        whereas `multi_output=True` also accepted a one-dimensional one.
+    multi_output : boolean, default=False
+        Whether to allow a two-dimensional `y`, e.g., for multi-label
+        targets. If False, `y` is validated as a vector.
     allow_nan : boolean, default=None
         Whether to allow np.nan in y. If None, NaN is allowed when
         `missing_label` is NaN. This does not change the configured
@@ -807,19 +703,6 @@ def check_X_y(
        Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
        Res., 12:2825–2830, 2011.
     """
-    if multi_output != "deprecated":
-        warnings.warn(
-            "`multi_output` is deprecated and will be removed in a future "
-            "release. Use `target_type='multi-label'` for multi-label "
-            "targets, `target_type='multi-output'` for multi-output targets, "
-            "and `target_type='single-output'` otherwise. `multi_output=True` "
-            "maps to `target_type='multi-label'`, which requires a "
-            "two-dimensional `y`.",
-            FutureWarning,
-            stacklevel=2,
-        )
-        if multi_output and target_type == "single-output":
-            target_type = "multi-label"
     if allow_nan is None:
         allow_nan = _is_nan_missing_label(missing_label)
     if X is not None:
@@ -838,16 +721,7 @@ def check_X_y(
             estimator=estimator,
         )
     if y is not None:
-        if target_type not in {
-            "single-output",
-            "multi-label",
-            "multi-output",
-        }:
-            raise ValueError(
-                "`target_type` must be one of {'single-output', "
-                "'multi-label', 'multi-output'}."
-            )
-        if target_type in {"multi-label", "multi-output"}:
+        if multi_output:
             y = check_array(
                 y,
                 accept_sparse="csr",
@@ -855,16 +729,6 @@ def check_X_y(
                 ensure_2d=False,
                 dtype=None,
             )
-            if y.ndim != 2:
-                raise ValueError(
-                    f"`target_type='{target_type}'` requires a "
-                    "two-dimensional `y`."
-                )
-            if target_type == "multi-output" and y.shape[1] < 2:
-                raise ValueError(
-                    "`target_type='multi-output'` requires `y` with at least "
-                    "two target columns."
-                )
         else:
             y = column_or_1d(y, warn=True)
             assert_all_finite(y, allow_nan=allow_nan)

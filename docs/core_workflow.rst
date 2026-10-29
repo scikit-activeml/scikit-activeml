@@ -312,9 +312,10 @@ Multi-label Classification
 --------------------------
 
 In multi-label classification, ``y`` has one column per binary label output.
-Declare ``target_type="multi-label"`` explicitly on both the classifier and
-the query strategy. Each query requests a complete label vector. Every row of
-``y`` must be fully labeled or fully missing.
+Declare ``target_type="multi-label"`` explicitly on the classifier. The query
+strategy takes the target type from the classifier. Each query requests a
+complete label vector. Every row of ``y`` must be fully labeled or fully
+missing.
 
 .. doctest::
 
@@ -333,9 +334,7 @@ the query strategy. Each query requests a complete label vector. Every row of
    ...     target_type="multi-label",
    ...     random_state=0,
    ... )
-   >>> qs = UncertaintySampling(
-   ...     method="entropy", target_type="multi-label", random_state=0
-   ... )
+   >>> qs = UncertaintySampling(method="entropy", random_state=0)
    >>> _ = clf.fit(X, y)
    >>> for cycle in range(5):
    ...     query_idx = qs.query(X=X, y=y, clf=clf, fit_clf=False)

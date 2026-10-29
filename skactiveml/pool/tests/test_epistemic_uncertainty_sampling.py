@@ -59,7 +59,7 @@ class TestEpistemicUncertaintySampling(
             query_default_params_clf=query_default_params_clf,
         )
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection()
 
     def test_init_param_precompute(self, test_cases=None):

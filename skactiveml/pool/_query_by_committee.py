@@ -23,7 +23,8 @@ from ..utils import (
     check_equal_missing_label,
     check_scalar,
 )
-from ..utils._label_dtype import _as_label_array, _lossless_decode_dtype
+from ..utils._label_dtype import _as_label_array, _common_label_dtype
+from ..utils._target import _check_refit_capability
 from ._target import _resolve_estimator_target_spec
 
 
@@ -93,9 +94,6 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports single-output
-        classification and regression.
 
     References
     ----------
@@ -136,12 +134,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.method = method
         self.eps = eps
@@ -293,6 +289,11 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 results = np.array(
                     [learner.predict(X_cand) for learner in est_arr]
                 )
+                if results.ndim != 2:
+                    raise ValueError(
+                        "The members of `ensemble` must predict single-output "
+                        "regression values."
+                    )
             else:
                 results = sample_func(X_cand, **sample_dict).T
             utilities_cand = np.std(results, axis=0)
@@ -329,7 +330,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         member_classes = [np.asarray(est.classes_) for est in est_arr]
         classes = np.unique(
             np.concatenate(
-                member_classes, dtype=_lossless_decode_dtype(member_classes)
+                member_classes, dtype=_common_label_dtype(member_classes)
             )
         )
         probas = np.zeros((len(est_arr), len(X_cand), len(classes)))
@@ -486,9 +487,7 @@ def _check_ensemble(
             )
             # Fit the ensemble.
             if fit_ensemble:
-                _resolve_estimator_target_spec(
-                    strategy, clone(ensemble), y, missing_label_checked=True
-                )
+                _check_refit_capability(ensemble)
                 if sample_weight is None:
                     ensemble = clone(ensemble).fit(X, y)
                 else:
@@ -533,8 +532,8 @@ def _check_ensemble(
                     for est in ensemble.estimators_
                 ]
                 if not fit_ensemble:
-                    # Predicting votes can advance a member's random state;
-                    # isolate fitted members to preserve the caller's state.
+                    # Predicting votes can advance a member's random state, so
+                    # fitted members are copied.
                     est_arr = copy.deepcopy(est_arr)
                 for i, est in enumerate(est_arr):
                     check_is_fitted(
@@ -569,17 +568,14 @@ def _check_ensemble(
                     "is array-like."
                 )
             est_arr = copy.deepcopy(list(ensemble))
-            # Check every member before fitting any of them. A refit member
-            # resolves from its declarations, as an unfitted clone does.
+            # Check every member before fitting any of them.
             for i, est in enumerate(est_arr):
                 check_type(est, f"ensemble[{i}]", estimator_type)
                 check_equal_missing_label(
                     est.missing_label, strategy.missing_label
                 )
                 if fit_ensemble:
-                    _resolve_estimator_target_spec(
-                        strategy, clone(est), y, missing_label_checked=True
-                    )
+                    _check_refit_capability(est)
 
             for i in range(len(est_arr)):
                 # Fit the ensemble.

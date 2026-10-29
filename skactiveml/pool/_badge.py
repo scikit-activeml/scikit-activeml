@@ -71,10 +71,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output and
-        multi-label classification. A fitted classifier's target specification
-        is authoritative when available.
 
     References
     ----------
@@ -92,13 +88,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         clf_embedding_flag_name=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         self.clf_embedding_flag_name = clf_embedding_flag_name
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
     @property
@@ -199,7 +193,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Resolve through the classifier before acquisition state is changed.
         clf, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             clf,
@@ -241,10 +234,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
 
-        # `candidates` is authoritative, i.e., an index array is taken as
-        # given, such that labeled samples remain candidates, e.g., to relabel
-        # them or to recompute their utilities. For `candidates=None`,
-        # `mapping` already refers to the unlabeled samples only.
+        # Explicit index candidates may include labeled samples. For
+        # `candidates=None`, `mapping` refers to the unlabeled samples only.
         if mapping is not None:
             cand_mapping = mapping
         else:
@@ -294,13 +285,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         query_indices = []
         query_indices_in_cand = []
         # In the first round, `d_2` holds the squared gradient norms, which
-        # only serve to determine the first center. Afterwards, it is replaced
-        # by the squared distances to that center, such that the origin does
-        # not act as a permanent ghost center in the running minimum.
+        # only determine the first center. Afterwards, it holds the squared
+        # distances to the nearest selected center.
         d_2 = g_norm_2.copy()
         for i in range(batch_size):
-            # Zeroing the distances of the already selected centers gives them
-            # zero probability, so that they cannot be drawn a second time.
+            # Selected centers cannot be drawn again.
             d_2[query_indices_in_cand] = 0
             d_2_sum = d_2.sum()
             if d_2_sum > 0:
@@ -328,9 +317,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
             # Squared distance to the newest center via the factorization:
             # `||g_i - g_c||^2 = ||g_i||^2 + ||g_c||^2
-            #  - 2 * <q_i, q_c> * <v_i, v_c>`. Rounding may produce tiny
-            # negative values, which are rejected by `choice(p=...)`, such
-            # that they are clipped.
+            #  - 2 * <q_i, q_c> * <v_i, v_c>`. Negative rounding errors are
+            # clipped, because `choice(p=...)` rejects them.
             if i + 1 < batch_size:
                 cross = (Q @ Q[idx_in_cand]) * (V @ V[idx_in_cand])
                 d_2_new = g_norm_2 + g_norm_2[idx_in_cand] - 2 * cross

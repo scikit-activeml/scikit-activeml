@@ -84,12 +84,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         the number of label outputs. Only the callability of the reduction is
         validated at runtime, so a violating reduction silently changes the
         acquisition scale.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. Single-output classification is always supported.
-        Multi-label classification is supported only when `cost_matrix=None`
-        and `method` is `"least_confident"`, `"margin_sampling"`, or
-        `"entropy"`. A fitted classifier's target specification is
-        authoritative when available.
 
     References
     ----------
@@ -116,12 +110,10 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.method = method
         self.cost_matrix = cost_matrix
@@ -556,7 +548,7 @@ def expected_average_precision(classes, probas):
             omitted = np.arange(start, stop)
             g = np.zeros((len(omitted), n_samples))
             f = np.zeros_like(g)
-            # Preserve the base cases in equations (17) and (18) of [1].
+            # Base cases of equations (17) and (18) of [1].
             g[:, 0] = 1
             f[:, 0] = 1
             for n in range(1, n_samples):

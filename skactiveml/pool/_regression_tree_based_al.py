@@ -52,9 +52,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
     max_iter_representativity : int, default=5
         Maximum number of optimisation iterations.
         Only used if `method='representativity'`.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        regression.
 
     References
     ----------
@@ -69,12 +66,10 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         max_iter_representativity=5,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.method = method
         self.max_iter_representativity = max_iter_representativity
@@ -156,8 +151,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Validate the estimator and target semantics before acquisition state
-        # is created by the general query-strategy validation.
         check_type(reg, "reg", SklearnRegressor)
         check_type(reg.estimator, "reg.estimator", DecisionTreeRegressor)
         check_equal_missing_label(reg.missing_label, self.missing_label)

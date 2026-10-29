@@ -30,7 +30,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
         `sklearn.metrics.pairwise.pairwise_kernels`, or `'precomputed'`.
         Its values weight the training targets, so it must not be negative
         for the given data.
-        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this.
         `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
         so only for some data, and `'additive_chi2'` never does because it
         is non-positive by construction. Prediction raises a `ValueError`
@@ -50,9 +50,6 @@ class NICKernelRegressor(ProbabilisticRegressor):
     random_state : int, RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This estimator supports only single-output
-        regression.
     """
 
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
@@ -67,12 +64,10 @@ class NICKernelRegressor(ProbabilisticRegressor):
         nu_0=2.5,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.kappa_0 = kappa_0
         self.nu_0 = nu_0
@@ -346,7 +341,7 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
         `sklearn.metrics.pairwise.pairwise_kernels`, or `'precomputed'`.
         Its values weight the training targets, so it must not be negative
         for the given data.
-        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this;
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this.
         `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
         so only for some data, and `'additive_chi2'` never does because it
         is non-positive by construction. Prediction raises a `ValueError`
@@ -358,9 +353,6 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This estimator supports only single-output
-        regression.
 
     Notes
     -----
@@ -375,12 +367,10 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
         metric_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
             metric=metric,
             metric_dict=metric_dict,
             kappa_0=0,

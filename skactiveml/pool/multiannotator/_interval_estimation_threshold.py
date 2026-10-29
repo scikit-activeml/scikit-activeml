@@ -61,9 +61,6 @@ class IntervalEstimationAnnotModel(BaseEstimator):
     random_state : None or int or numpy.random.RandomState, default=None
         The random state used for deciding on majority vote labels in case of
         ties.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This estimator supports only single-output
-        classification with multiple annotators.
 
     Attributes
     ----------
@@ -91,14 +88,12 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         alpha=0.05,
         mode="upper",
         random_state=None,
-        target_type="auto",
     ):
         self.classes = classes
         self.missing_label = missing_label
         self.alpha = alpha
         self.mode = mode
         self.random_state = random_state
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -131,7 +126,6 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=self.target_type,
             annotation_type="multi-annotator",
             classes=self.classes,
             missing_label=self.missing_label,
@@ -250,9 +244,6 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         The random state to use.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification with multiple annotators.
 
     References
     ----------
@@ -267,12 +258,10 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         alpha=0.05,
         random_state=None,
         missing_label=MISSING_LABEL,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.epsilon = epsilon
         self.alpha = alpha
@@ -384,28 +373,18 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         )
         if query_target_spec is None:
             clf._resolve_target_spec(y)
+        elif fit_clf:
+            _check_target_spec_capability(
+                type(clf).__name__,
+                query_target_spec,
+                clf._target_capabilities,
+            )
+        elif hasattr(clf, "target_spec_"):
+            _check_classifier_prediction_contract(
+                clf.target_spec_, query_target_spec
+            )
         else:
-            classifier_target_type = getattr(clf, "target_type", "auto")
-            if classifier_target_type != "auto" and (
-                classifier_target_type != query_target_spec.target_type
-            ):
-                raise ValueError(
-                    "The classifier's explicit `target_type` conflicts with "
-                    "IntervalEstimationThreshold's resolved outer target "
-                    "specification."
-                )
-            if fit_clf:
-                _check_target_spec_capability(
-                    type(clf).__name__,
-                    query_target_spec,
-                    clf._target_capabilities,
-                )
-            elif hasattr(clf, "target_spec_"):
-                _check_classifier_prediction_contract(
-                    clf.target_spec_, query_target_spec
-                )
-            else:
-                clf._resolve_target_spec(y, classes=query_target_spec.classes)
+            clf._resolve_target_spec(y, classes=query_target_spec.classes)
 
         # base check
         (
@@ -486,7 +465,6 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             alpha=self.alpha,
             mode="upper",
             random_state=self.random_state_,
-            target_type=self.target_type,
         )
 
         ie_model.fit(X=X, y=y, sample_weight=sample_weight)

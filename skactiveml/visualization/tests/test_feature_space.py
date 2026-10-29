@@ -40,10 +40,7 @@ from skactiveml.visualization import (
     plot_stream_training_data,
     plot_stream_decision_boundary,
 )
-from skactiveml.visualization._feature_space import (
-    _general_plot_utilities,
-    _resolve_utility_target_type,
-)
+from skactiveml.visualization._feature_space import _general_plot_utilities
 
 # PDF rasterization differs slightly across supported Matplotlib versions.
 IMAGE_COMPARE_TOL = 6.0
@@ -689,9 +686,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_plot_utilities_multilabel_prediction_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
-        qs = LabelCardinalityInconsistency(
-            target_type="multi-label", random_state=0
-        )
+        qs = LabelCardinalityInconsistency(random_state=0)
         _, ax = plt.subplots()
 
         returned_ax = plot_utilities(
@@ -710,9 +705,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_plot_utilities_multilabel_probability_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
-        qs = MaxLossReductionMaxConfidence(
-            target_type="multi-label", random_state=0
-        )
+        qs = MaxLossReductionMaxConfidence(random_state=0)
         discriminator = ParzenWindowClassifier(random_state=0)
         _, ax = plt.subplots()
 
@@ -777,10 +770,9 @@ class TestFeatureSpace(unittest.TestCase):
         y[:15, 0] = X[:15, 0]
         reg = SklearnRegressor(
             DecisionTreeRegressor(random_state=0),
-            target_type="auto",
             random_state=0,
         ).fit(X, y)
-        qs = MappingOnlyRegressionStrategy(target_type="auto", random_state=0)
+        qs = MappingOnlyRegressionStrategy(random_state=0)
         feature_bound = [X.min(axis=0), X.max(axis=0)]
         _, ax = plt.subplots()
 
@@ -850,8 +842,6 @@ class TestFeatureSpace(unittest.TestCase):
             res=5,
         )
 
-        # A sample is a candidate as soon as one annotator still owes a label
-        # for it, which includes sample 0.
         np.testing.assert_array_equal(
             qs.candidates_, np.concatenate([[0], np.arange(15, len(X))])
         )
@@ -914,14 +904,6 @@ class TestFeatureSpace(unittest.TestCase):
 
                 self.assertEqual(returned_axes.shape, (1,))
                 self.assertIsInstance(returned_axes[0], plt.Axes)
-
-    def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
-        qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
-
-        self.assertEqual(
-            _resolve_utility_target_type(qs, self.y_active_multi, {}),
-            "single-output",
-        )
 
     def test_plot_utilities_rejects_annotator_options_for_multilabel(self):
         y = np.column_stack([self.y_active, self.y_active])

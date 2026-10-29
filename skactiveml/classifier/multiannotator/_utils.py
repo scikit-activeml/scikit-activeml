@@ -111,7 +111,6 @@ try:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
-            target_type="auto",
         ):
             super(_SkorchMultiAnnotatorClassifier, self).__init__(
                 module=multi_annotator_module,
@@ -122,7 +121,6 @@ try:
                 random_state=random_state,
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
-                target_type=target_type,
             )
             self.clf_module = clf_module
             self.n_annotators = n_annotators

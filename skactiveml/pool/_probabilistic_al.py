@@ -46,9 +46,6 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         `metric_dict=None` and `metric="rbf"`, queries use `{"gamma": "mean"}`.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification.
 
     References
     ----------
@@ -65,12 +62,10 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         metric=None,
         metric_dict=None,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict
@@ -282,9 +277,9 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
     m_list = np.sum(l_vec_list, axis=1)
     n_l_vecs = len(l_vec_list)
 
-    # Each count vector follows one vector with one fewer observation. This
-    # lets us evaluate B(alpha + l) / B(alpha) using the beta recurrence,
-    # without evaluating either (potentially underflowing) beta function.
+    # Each count vector extends one with one fewer observation, so
+    # B(alpha + l) / B(alpha) follows from the beta recurrence without
+    # evaluating either (potentially underflowing) beta function.
     l_indices = {tuple(l_vec): i for i, l_vec in enumerate(l_vec_list)}
     added_classes = np.argmax(l_vec_list > 0, axis=1)
     predecessors = np.zeros(n_l_vecs, dtype=int)
@@ -303,8 +298,7 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
         stop = min(start + chunk_size, n_samples)
         k = k_vec_list[start:stop]
         k_l = k[:, None, :] + l_vec_list
-        # Preserve the decision rule: the prior affects the expectation,
-        # but is not added when choosing the predicted class.
+        # The prior affects the expectation but not the predicted class.
         y_hats = (
             np.argmax(k_l, axis=2) if C is None else np.argmin(k_l @ C, axis=2)
         )

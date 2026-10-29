@@ -39,9 +39,6 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification.
 
     References
     ----------
@@ -55,12 +52,10 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         lmbda=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.lmbda = lmbda
 

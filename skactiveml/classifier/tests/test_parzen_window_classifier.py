@@ -26,8 +26,6 @@ class TestParzenWindowClassifier(
         self.y_ml = np.array([[0, 1], [0, 1], [1, 0], [1, 0]], dtype=float)
         init_default_params_multilabel = {
             "classes": [[0, 1], [0, 1]],
-            # `np.nan` widens the label encoder past the class dtype, so the
-            # narrowing of multi-label predictions is actually exercised.
             "missing_label": np.nan,
         }
         fit_default_params_multilabel = {"X": self.X_ml, "y": self.y_ml}

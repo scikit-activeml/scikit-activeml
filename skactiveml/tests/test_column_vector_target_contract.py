@@ -40,58 +40,41 @@ class TestColumnVectorTargetContract(unittest.TestCase):
     def test_classifier_backed_query_accepts_single_output_column_vector(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.array([[0], [1], [-1], [-1]])
+        classifier = ParzenWindowClassifier(
+            classes=[0, 1], missing_label=-1, random_state=0
+        )
+        strategy = UncertaintySampling(missing_label=-1, random_state=0)
 
-        for target_type in ["auto", "single-output"]:
-            with self.subTest(target_type=target_type):
-                classifier = ParzenWindowClassifier(
-                    classes=[0, 1],
-                    missing_label=-1,
-                    random_state=0,
-                    target_type="auto",
-                )
-                strategy = UncertaintySampling(
-                    missing_label=-1,
-                    random_state=0,
-                    target_type=target_type,
-                )
+        with self.assertWarns(DataConversionWarning):
+            query_indices = strategy.query(X, y, classifier, batch_size=1)
 
-                with self.assertWarns(DataConversionWarning):
-                    query_indices = strategy.query(
-                        X, y, classifier, batch_size=1
-                    )
+        self.assertEqual(query_indices.shape, (1,))
 
-                self.assertEqual(query_indices.shape, (1,))
-
-    def test_sliding_window_classifier_warns_for_single_output_column(self):
+    def test_column_vector_is_single_output_without_multilabel_support(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.array([[0], [1], [-1], [-1]])
         classifier = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(
-                classes=[0, 1], missing_label=-1, random_state=0
-            ),
-            classes=[0, 1],
+            estimator=ParzenWindowClassifier(missing_label=-1),
             missing_label=-1,
             random_state=0,
-            target_type="single-output",
         )
 
         with self.assertWarns(DataConversionWarning):
-            classifier.fit(X, y)
+            query_indices = UncertaintySampling(missing_label=-1).query(
+                X, y, classifier
+            )
+        self.assertEqual(query_indices.shape, (1,))
 
-        self.assertEqual(classifier.target_spec_.target_type, "single-output")
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            UncertaintySampling(missing_label=-1).query(
+                X, y, ParzenWindowClassifier(missing_label=-1)
+            )
 
     def test_regressor_accepts_single_output_column_vector(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.array([[0.5], [1.5], [np.nan], [np.nan]])
 
-        for target_type in ["auto", "single-output"]:
-            with self.subTest(target_type=target_type):
-                regressor = NICKernelRegressor(
-                    random_state=0,
-                    target_type=target_type,
-                ).fit(X, y)
+        regressor = NICKernelRegressor(random_state=0).fit(X, y)
 
-                self.assertEqual(
-                    regressor.target_spec_.target_type, "single-output"
-                )
-                self.assertEqual(regressor.predict(X[:1]).shape, (1,))
+        self.assertEqual(regressor.target_spec_.target_type, "single-output")
+        self.assertEqual(regressor.predict(X[:1]).shape, (1,))

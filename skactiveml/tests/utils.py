@@ -8,61 +8,13 @@ from sklearn import clone
 from ..classifier import ParzenWindowClassifier
 from ..pool import uncertainty_scores
 
-QUERY_STATE_ATTRIBUTES = (
-    "n_features_in_",
-    "missing_label_",
-    "random_state_",
-)
-
-STREAM_QUERY_STATE_ATTRIBUTES = (
-    "n_features_in_",
-    "random_state_",
-    "budget_",
-    "budget_manager_",
-)
-
-
-def assert_no_query_state(
-    test_case, strategy, attributes=QUERY_STATE_ATTRIBUTES
-):
-    """Assert that semantic query failure did not commit public state.
-
-    Parameters
-    ----------
-    test_case : unittest.TestCase
-        The test case providing the assertion.
-    strategy : skactiveml query strategy
-        The query strategy whose `query` failed.
-    attributes : iterable of str, default=QUERY_STATE_ATTRIBUTES
-        The attributes a failed query must not have committed. Stream query
-        strategies pass `STREAM_QUERY_STATE_ATTRIBUTES` instead, because they
-        commit other state.
-    """
-    for attribute in attributes:
-        test_case.assertFalse(
-            hasattr(strategy, attribute),
-            msg=(
-                f"{type(strategy).__name__} committed query state "
-                f"`{attribute}` after semantic failure."
-            ),
-        )
-
 
 def state_difference(actual, expected, name="state"):
     """Describe the first difference between two object states.
 
-    The comparison is recursive and by value: objects are compared through
-    their attributes, mappings and sequences element by element, and numeric
-    arrays and scalars with equal-NaN semantics, so that two states holding
-    `nan` in the same place count as equal. Random generators are compared
-    through their drawn-from state, so that an advanced generator counts as a
-    difference.
-
-    Objects are only comparable when they have the same type. An object the
-    recursion cannot decompose falls back on `==` where its type defines one,
-    and counts as equal otherwise, because two copies of a state without
-    attributes and without value equality, e.g. a function, are
-    indistinguishable here.
+    The comparison is recursive and by value, with NaNs counting as equal.
+    Objects without attributes and without value equality, e.g., functions,
+    count as equal.
 
     Parameters
     ----------
@@ -298,10 +250,6 @@ def _short_repr(value, limit=120):
 def assert_predicts_class_dtype(test_case, y_pred, classes):
     """Assert that predictions carry the declared class dtype.
 
-    The label encoder decodes into a dtype that can also represent
-    `missing_label`, so predictions must be narrowed back to the dtype of
-    the declared classes to stay usable where those labels are expected.
-
     Parameters
     ----------
     test_case : unittest.TestCase
@@ -332,9 +280,9 @@ def assert_committee_label_invariance(test_case, strategy):
     results = []
     for offset, dtypes in (
         (0, (np.int64, np.int64)),
-        (2**53, (np.int64, np.int64)),
-        (2**53, (np.int64, np.uint64)),
-        (2**53, (np.uint64, np.int64)),
+        (10, (np.int64, np.int64)),
+        (10, (np.int64, np.uint64)),
+        (10, (np.uint64, np.int64)),
     ):
         members = []
         for i, (dtype, gamma) in enumerate(zip(dtypes, (1, 20))):
@@ -392,46 +340,6 @@ def assert_attributes_unchanged(
     for name, value in attributes_before.items():
         if name not in ignored:
             test_case.assertIs(estimator.__dict__[name], value)
-
-
-def assert_fit_failure_is_transactional(
-    test_case, estimator, action, expected_error, expected_message
-):
-    """Assert that a rejected fit raises as expected and commits no state.
-
-    This is the counterpart of `assert_no_query_state` for a fit, and is
-    strictly stronger: it compares the full `__dict__` by identity rather than
-    three named absences, so it holds for an already fitted estimator as well
-    as an unfitted one, and a same-valued replacement object fails it.
-
-    Comparing by identity is also its one blind spot: an estimator holding
-    fitted state that its fit updates in place, e.g. a sliding window, passes
-    this assertion while carrying mutated contents. Assert those contents
-    separately.
-
-    Parameters
-    ----------
-    test_case : unittest.TestCase
-        The test case reporting the failure.
-    estimator : object
-        The estimator whose fit is expected to be rejected. It is snapshotted
-        here, so a caller that mutated it beforehand still gets the full
-        identity comparison over every attribute. There is deliberately no
-        `ignored` parameter for that reason: it could only weaken the
-        comparison.
-    action : callable
-        Zero-argument callable performing the rejected fit.
-    expected_error : type
-        Exception type the rejection is expected to raise.
-    expected_message : str
-        Pattern the raised message is expected to match.
-    """
-    attributes_before = dict(estimator.__dict__)
-
-    with test_case.assertRaisesRegex(expected_error, expected_message):
-        action()
-
-    assert_attributes_unchanged(test_case, estimator, attributes_before)
 
 
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):

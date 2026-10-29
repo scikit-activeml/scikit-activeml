@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import simple_batch
+from ..utils import MISSING_LABEL, simple_batch
 
 
 class RandomSampling(SingleAnnotatorPoolQueryStrategy):
@@ -19,9 +19,20 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
         Random state for candidate selection.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
     """
+
+    def __init__(
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
+    ):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
+        self.target_type = target_type
 
     @property
     def _target_capabilities(self):

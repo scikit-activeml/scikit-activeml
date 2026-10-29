@@ -57,8 +57,8 @@ class DummySkactivemlClassifier(SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.probas = probas
 
     def fit(self, X, y, sample_weight=None):
@@ -247,10 +247,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
         self.assertEqual(query_indices.shape, (0,))
 
     def test_guard_does_not_rewrap_a_republished_query(self):
-        # A strategy may republish the `query` it inherits under its own name.
-        # That function already carries the guard, so guarding it again would
-        # wrap it twice and warn about an exhausted pool for a query that has
-        # already answered it.
         class ParentStrategy(DummySingleAnnotatorPoolQueryStrategy):
             pass
 
@@ -268,8 +264,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
         self.assertEqual(query_indices.shape, (0,))
 
     def test_guard_covers_a_query_published_through_a_descriptor(self):
-        # `match_signature` publishes `query` as a descriptor, which stays in
-        # place while the function it binds carries the guard.
         class DescriptorPublishingStrategy(SingleAnnotatorPoolQueryStrategy):
             @match_signature("query_strategy", "query")
             def query(
@@ -305,8 +299,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
                 query = property(lambda self: None)
 
     def test_guard_preserves_an_abstract_query(self):
-        # The guard wraps `query` while the class is created, i.e., before the
-        # abstract methods are collected, so it must not hide abstractness.
         for base in (
             SingleAnnotatorPoolQueryStrategy,
             MultiAnnotatorPoolQueryStrategy,
@@ -800,23 +792,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
             multi_annotator_clf.target_spec_.annotation_type, "multi-annotator"
         )
 
-    def test_partial_fit_rejects_changed_multilabel_dtype_kind(self):
-        X = np.arange(4).reshape(2, 2)
-        y = np.array([[0, 2], [1, 3]])
-        clf = DummySkactivemlClassifier(
-            classes=((0, 1), (2, 3)),
-            missing_label=-1,
-            target_type="multi-label",
-        )
-        clf.partial_fit(X, y)
-        established_spec = clf.target_spec_
-
-        clf.classes = ((0.0, 1.0), (2.0, 3.0))
-        with self.assertRaisesRegex(ValueError, "cannot change"):
-            clf.partial_fit(X, y.astype(float))
-
-        self.assertIs(clf.target_spec_, established_spec)
-
     def test_public_fit_validates_weights_and_orders_cost_matrix(self):
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, 1])
@@ -930,8 +905,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         np.testing.assert_array_equal(clf.predict(X), y)
 
     def test_predict_dtype_matches_class_dtype(self):
-        # `missing_label=np.nan` widens the label encoder to `float64`, so
-        # the decoded labels must be narrowed back to the class dtype.
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, np.nan])
         clf = DummySkactivemlClassifier(
@@ -944,7 +917,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         y_pred = clf.predict(X)
 
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
-        # The decoded labels are usable where class labels are expected.
         np.testing.assert_array_equal(np.array(["a", "b"])[y_pred], ["a", "b"])
 
     def test_predict_dtype_matches_class_dtype_multilabel(self):
@@ -963,7 +935,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
 
     def test_predict_dtype_preserves_extra_outputs(self):
-        # Only the class labels are narrowed; extra outputs are untouched.
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, np.nan])
         extra = np.array([[0.5], [0.5]], dtype=np.float32)
@@ -1010,18 +981,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
 
         clf.fit(X, y)
         self.assertEqual(clf.score(X, y), 0.5)
-
-    def test_multi_output_is_rejected_before_fitted_state(self):
-        X = np.arange(4).reshape(2, 2)
-        y = np.array([[2, 1], [1, 0]])
-        clf = DummySkactivemlClassifier(
-            classes=[[0, 1, 2], [0, 1]],
-            missing_label=-1,
-            target_type="multi-output",
-        )
-        with self.assertRaisesRegex(ValueError, "Supported capabilities"):
-            clf.fit(X, y)
-        self.assertFalse(hasattr(clf, "target_spec_"))
 
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):

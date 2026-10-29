@@ -97,10 +97,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         `n_dropout_samples`. A scale-preserving reduction therefore keeps the
         resulting rate in `[0, 1]`, but the multi-label path does not restrict
         the threshold to that interval.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output and
-        multi-label classification. A fitted classifier's target specification
-        is authoritative when available.
 
 
     References
@@ -122,7 +118,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         random_state=None,
         multilabel_aggregation_fn=np.mean,
         disagreement_threshold=0.5,
-        target_type="auto",
     ):
         self.dropout_rate = dropout_rate
         self.n_dropout_samples = n_dropout_samples
@@ -135,7 +130,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
 
     @property
@@ -206,7 +200,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-        # Resolve through the classifier before acquisition state is changed.
         clf, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             clf,
@@ -219,12 +212,8 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             estimator_types=(SkactivemlClassifier,),
         )
         if not fit_clf:
-            # A refitted classifier is already a clone, whereas a prefitted
-            # one is the caller's object. `predict` draws from its
-            # `random_state_` to break ties, so predicting on it would leave
-            # the caller with an advanced classifier. Only the generator is
-            # copied: a deep copy would duplicate the whole fitted model on
-            # every query, and the dropout predictions read the rest.
+            # `predict` draws from `random_state_` to break ties. Copy only the
+            # generator, so that the caller's classifier is not advanced.
             clf = copy(clf)
             clf.random_state_ = deepcopy(clf.random_state_)
         is_multilabel = target_spec.target_type == "multi-label"

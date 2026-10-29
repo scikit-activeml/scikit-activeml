@@ -31,10 +31,7 @@ from skactiveml.pool import (
     UncertaintySampling,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
-from skactiveml.tests.utils import (
-    assert_no_query_state,
-    assert_state_unchanged,
-)
+from skactiveml.tests.utils import assert_state_unchanged
 from skactiveml.utils import majority_vote
 
 
@@ -215,28 +212,20 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                             np.all(self.y_matrix[tuple(results[1][0].T)] == -1)
                         )
 
-    def test_rejections_precede_query_state(self):
+    def test_rejections(self):
         strategy = UncertaintySampling(missing_label=-1, random_state=0)
-        wrappers = [
-            strategy,
-            SubSamplingWrapper(strategy, max_candidates=4, missing_label=-1),
-        ]
         invalid_y = self.y.copy()
         invalid_y[0] = 3
         cases = [
             (self.y_matrix, {}, "one-dimensional or a column vector"),
             (invalid_y, {}, "outside `classes`"),
-            (self.y, {"target_type": "multi-label"}, "conflicts"),
             (self.y, {"missing_label": np.nan}, "must be equal"),
         ]
-        for wrapper, (y, init_params, error) in product(wrappers, cases):
-            with self.subTest(wrapper=wrapper, error=error):
-                wrapper = clone(wrapper).set_params(**init_params)
+        for y, init_params, error in cases:
+            with self.subTest(error=error):
+                qs = clone(strategy).set_params(**init_params)
                 with self.assertRaisesRegex(ValueError, error):
-                    wrapper.query(self.X, y, clf=self.multi_clf, fit_clf=False)
-                assert_no_query_state(self, wrapper)
-                if isinstance(wrapper, SubSamplingWrapper):
-                    assert_no_query_state(self, wrapper.query_strategy)
+                    qs.query(self.X, y, clf=self.multi_clf, fit_clf=False)
 
     def test_refitting_multiannotator_classifier_still_rejected(self):
         strategy = UncertaintySampling(missing_label=-1)
@@ -271,7 +260,6 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                 ValueError, "_PredictionClassifier does not support"
             ):
                 strategy.query(self.X, self.y, self.multi_clf, fit_clf=False)
-            assert_no_query_state(self, strategy)
 
     def test_committee_refitting_rejected_before_any_fit(self):
         annotator_ensemble = AnnotatorEnsembleClassifier(
@@ -327,7 +315,6 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                         ensemble,
                         fit_ensemble=True,
                     )
-                assert_no_query_state(self, strategy)
                 if isinstance(ensemble, (list, tuple)):
                     for member, original in zip(ensemble, original_state):
                         assert_state_unchanged(self, member, original)
@@ -411,29 +398,6 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                 )
                 np.testing.assert_array_equal(actual[0], expected[0])
                 np.testing.assert_allclose(actual[1], expected[1])
-
-    def test_conflicting_fitted_vocabularies_still_rejected(self):
-        for classes in ((0, 1, 3), (0.0, 1.0, 2.0)):
-            with self.subTest(classes=classes):
-                y = self.y_matrix.copy()
-                y[y == 2] = classes[2]
-                clf = _PredictionClassifier(
-                    "multi-annotator", classes=classes
-                ).fit(self.X, y)
-                strategy = SubSamplingWrapper(
-                    QueryByCommittee(missing_label=-1),
-                    max_candidates=4,
-                    missing_label=-1,
-                )
-                with self.assertRaisesRegex(ValueError, "conflicting target"):
-                    strategy.query(
-                        self.X,
-                        self.y,
-                        ensemble=[self.single_clf, clf],
-                        fit_ensemble=False,
-                    )
-                assert_no_query_state(self, strategy)
-                assert_no_query_state(self, strategy.query_strategy)
 
     def test_annotator_ensemble_members_form_committee(self):
         y_matrix = np.column_stack([self.y, np.roll(self.y, 1)])
@@ -528,7 +492,7 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                     self.assertIs(clf.target_spec_, original_spec)
                     assert_state_unchanged(self, clf, original_state)
 
-    def test_empty_trained_committee_rejected_before_query_state(self):
+    def test_empty_trained_committee_is_rejected(self):
         pwc = ParzenWindowClassifier(classes=[0, 1, 2], missing_label=-1)
         base = AnnotatorEnsembleClassifier(
             estimators=[("pwc_0", clone(pwc)), ("pwc_1", clone(pwc))],
@@ -547,7 +511,6 @@ class TestFittedMultiannotatorTargets(unittest.TestCase):
                         NotFittedError, "member.*not fitted"
                     ):
                         strategy.query(self.X, self.y, clf, fit_ensemble=False)
-                    assert_no_query_state(self, strategy)
                     assert_state_unchanged(self, clf, original_state)
 
 

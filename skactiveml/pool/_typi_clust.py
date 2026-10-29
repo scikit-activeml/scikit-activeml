@@ -40,7 +40,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         The number for k-nearest-neighbors for the computation of typicality.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
+        unambiguous one-dimensional targets. Two-dimensional multi-label
         targets must be declared explicitly.
 
     References
@@ -73,8 +73,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
         self.n_cluster_param_name = n_cluster_param_name

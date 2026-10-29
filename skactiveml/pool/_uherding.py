@@ -44,9 +44,8 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     proposal in [1]_. For resolved multi-label targets, the temperature-scaled
     probabilities are the per-output sigmoids `expit(logits / tau)` with the
     per-output temperature `tau` instead of a softmax, whenever logits are
-    available, and the per-label uncertainty of
-    the label output `j` is computed by `method` from its positive-class
-    probability `p_j` alone
+    available, and the per-label uncertainty of the label output `j` is
+    computed by `method` from its positive-class probability `p_j` alone
     (cf. `uncertainty_scores`). `multilabel_aggregation_fn` reduces these
     per-label scores along the label axis to the uncertainty weight of one
     sample, which then scales that sample's coverage gains. The coverage
@@ -131,10 +130,6 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         supported, because its result grows with the number of label outputs.
         Only the callability of the reduction is validated at runtime, so a
         violating reduction silently changes the acquisition scale.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. The strategy supports single-output and
-        multi-label classification. A fitted classifier's target specification
-        is authoritative when available.
 
     References
     ----------
@@ -158,12 +153,10 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.method = method
         self.predict_proba_dict = predict_proba_dict
@@ -270,7 +263,6 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`,
               `utilities` refers to the indexing in `candidates`.
         """
-        # Resolve through the classifier before acquisition state is changed.
         clf_eval, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             clf,
@@ -303,9 +295,8 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                     "`temperatures` must contain only positive values."
                 )
 
-        # Calibration fits clones on the single-annotator query labels, even
-        # when the supplied classifier is already fitted. Fixed temperatures
-        # require predictions only and do not need this training capability.
+        # Temperature calibration fits clones of `clf`, even if
+        # `fit_clf=False`.
         if not np.isscalar(temperatures) and len(temperatures) > 1:
             _check_target_spec_capability(
                 f"{type(clf).__name__} for {type(self).__name__} "
@@ -491,8 +482,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         is_multilabel = target_spec.target_type == "multi-label"
         n_outputs = len(target_spec.classes) if is_multilabel else None
 
-        # A scalar or length-one `temperatures` is one fixed temperature shared
-        # by every output, so no calibration split or refit is required.
+        # A single temperature requires no calibration.
         if np.isscalar(temperatures):
             return float(temperatures)
         if len(temperatures) == 1:
@@ -555,8 +545,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
 
         # Select temperature by iterating over all candidates and selecting
         # the one with the lowest expected calibration error. For a multi-label
-        # target, the shared candidate grid is searched independently per
-        # output, yielding one selected temperature per output.
+        # target, each output gets its own temperature.
         if is_multilabel:
             y_val_encoded = self._encode_multilabel_targets(
                 y_val, target_spec=target_spec
@@ -596,13 +585,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     def _encode_multilabel_targets(self, y_observed, target_spec):
         """Encode observed multi-label targets via the resolved vocabularies.
 
-        Each label output may use its own binary class vocabulary, e.g.
-        `[["no", "yes"], ["off", "on"]]`, so raw observations are not
-        necessarily numeric. Calibration compares an observation to the
-        positive-class probability of its output and therefore requires the
-        encoded target, where `1` denotes the second class of the resolved,
-        i.e. canonically ordered, vocabulary. That is exactly the class whose
-        probability and logit column the acquisition logic consumes.
+        Calibration compares an observation to the positive-class probability
+        of its output, so `1` has to denote the second class of the resolved
+        vocabulary.
 
         Parameters
         ----------
@@ -816,10 +801,8 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         Helper function reducing a collection of pairwise distances to a
         positive RBF scale `sigma`.
 
-        Degenerate collections, i.e., `None`, empty ones, and ones without any
-        finite positive entry, admit no estimable scale. Such pools, e.g., a
-        cold start with a single candidate or identical representations, are a
-        valid acquisition state and fall back to `sigma=1.0`.
+        Collections without any finite positive entry, e.g., at a cold start
+        with a single candidate, fall back to `sigma=1.0`.
         """
         fallback = 1.0
         if distances is None:

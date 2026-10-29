@@ -11,7 +11,7 @@ from ._label_dtype import (
     _as_class_vocabulary_array,
     _as_label_array,
     _check_compatible_kinds,
-    _lossless_decode_dtype,
+    _common_label_dtype,
 )
 from ._label_encoder import ExtLabelEncoder
 
@@ -84,7 +84,7 @@ def ext_confusion_matrix(
         raise ValueError(
             "'normalize' must be one of {'true', 'pred', 'all', " "None}."
         )
-    label_dtype = _lossless_decode_dtype([y_true, y_pred.ravel()])
+    label_dtype = _common_label_dtype([y_true, y_pred.ravel()])
     y = np.concatenate(
         (y_true[:, np.newaxis], y_pred), axis=1, dtype=label_dtype
     )
@@ -96,10 +96,9 @@ def ext_confusion_matrix(
     if classes is None:
         class_indices = np.arange(len(le.classes_))
     else:
-        # Validate the requested report labels independently from the observed
-        # class vocabulary. Unlike estimator vocabularies, their order defines
-        # the rows and columns of the returned matrices, and they may be a
-        # strict subset of the observed labels.
+        # Validate the requested labels separately, because they define the
+        # order of the rows and columns and may be a subset of the observed
+        # labels.
         ExtLabelEncoder(classes=classes, missing_label=missing_label).fit([])
         report_classes = _as_class_vocabulary_array(classes)
         _check_compatible_kinds(y_true, report_classes, name="classes")
