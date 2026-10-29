@@ -28,7 +28,6 @@ from ..utils._label_dtype import _as_class_vocabulary_array, _as_label_array
 from ..utils._target import (
     _check_target_capability,
     _check_target_spec_capability,
-    _declared_target_type,
 )
 from ..utils._wrapper_state import _resolve_own_fitted_attribute
 from ..utils import (
@@ -463,7 +462,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     Notes
     -----
     The learned classes of a pre-fitted `estimator` are reconciled with the
-    declared ones by class identity. Declared `classes` may extend the learned
+    declared ones by value. Declared `classes` may extend the learned
     class vocabulary with zero-filled probability columns, but they can neither
     reinterpret learned classes nor change the number of predicted outputs. A
     flat `classes_` published together with fitted multi-label metadata, e.g.,
@@ -550,7 +549,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=_declared_target_type(y, self),
+            target_type=self.target_type,
             annotation_type="single-annotator",
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
@@ -1431,7 +1430,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     def _normalize_single_output_proba(self, P, n_samples):
         """Align single-output probabilities to `classes_` and validate them.
 
-        The columns are mapped by class identity. Declared classes the
+        The columns are mapped to the classes by value. Declared classes the
         estimator never learned receive zero-filled columns.
 
         Parameters
@@ -1867,6 +1866,16 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 sample_weight = sample_weight[is_lbld]
             else:
                 sample_weight = None
+        if (
+            fit_func == "partial_fit"
+            and len(X)
+            and len(self.X_train_)
+            and X.shape[1:] != np.shape(self.X_train_[0])
+        ):
+            raise ValueError(
+                f"`X` has samples of shape {X.shape[1:]}, but the sliding "
+                f"window holds samples of shape {np.shape(self.X_train_[0])}."
+            )
         # reset the window if fit is called otherwise extend the window with
         # the given data
         if fit_func == "fit":

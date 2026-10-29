@@ -12,7 +12,6 @@ from ..utils._target import (
     _check_refit_capability,
     _check_target_matches_spec,
     _check_target_spec_capability,
-    _declared_target_type,
     _predicted_target_spec,
 )
 from ..utils._validation import _has_nested_classes
@@ -61,7 +60,7 @@ def _resolve_clf_target_spec(strategy, clf, y):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type=_declared_target_type(y, clf),
+            target_type=getattr(clf, "target_type", "auto"),
             annotation_type="single-annotator",
             classes=classes,
             missing_label=clf.missing_label,

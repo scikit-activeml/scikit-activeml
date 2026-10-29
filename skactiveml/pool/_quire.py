@@ -173,12 +173,17 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                     "The kernel matrix 'K' must have the shape "
                     "(n_samples, n_samples)."
                 )
-            # The reduced quadratic form assumes a symmetric kernel matrix.
-            K = (X + X.T) / 2
+            # The reduced quadratic form assumes a symmetric kernel matrix, so
+            # the blocks it reads are symmetrized. Halving before adding
+            # cannot overflow.
             labeled = np.flatnonzero(mask_l)
-            K_ll = K[np.ix_(labeled, labeled)]
-            K_lc = K[np.ix_(labeled, mapping)]
-            diagonal = np.asarray(K[mapping, mapping], dtype=float)
+            K_ll = X[np.ix_(labeled, labeled)]
+            K_ll = K_ll / 2 + K_ll.T / 2
+            K_lc = (
+                X[np.ix_(labeled, mapping)] / 2
+                + X[np.ix_(mapping, labeled)].T / 2
+            )
+            diagonal = np.asarray(X[mapping, mapping], dtype=float)
         else:
             X_l = X[mask_l]
             if len(X_l):

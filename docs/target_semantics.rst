@@ -36,15 +36,18 @@ vocabularies to return an immutable specification with four fields:
     The normalized class vocabulary for classification, stored as a tuple or
     a tuple of tuples. For regression, this is ``None``.
 
-Components that interpret the labels themselves accept a ``target_type``
-constructor parameter: classifiers that support multi-label targets, e.g.,
-:class:`~skactiveml.classifier.ParzenWindowClassifier`, and pool strategies
-that use no estimator for ``y``, e.g., :class:`~skactiveml.pool.RandomSampling`.
-Other strategies take the target type from the estimator they receive, and the
-remaining components support single-output labels only. A class's docstring
-states whether it accepts ``target_type``. The default, ``"auto"``, infers the
-type for unambiguous single-output inputs. After a successful fit, classifiers
-and regressors store the resolved specification in ``target_spec_``.
+Only components that interpret ``y`` themselves and support multi-label
+targets have a ``target_type`` constructor parameter: classifiers such as
+:class:`~skactiveml.classifier.ParzenWindowClassifier` and pool strategies
+that use no estimator for ``y``, such as
+:class:`~skactiveml.pool.RandomSampling`. Strategies that receive an estimator
+take the target type from it, and pool wrappers leave it to the strategy they
+wrap. Stream strategies that use no labels, such as
+:class:`~skactiveml.stream.StreamRandomSampling`, need none. All other
+components support single-output labels only. A class's docstring states
+whether it accepts ``target_type``. The default, ``"auto"``, resolves
+unambiguous single-output inputs. After a successful fit, classifiers and
+regressors store the resolved specification in ``target_spec_``.
 
 Query strategies resolve the specification on each call. If you pass a fitted
 estimator, its ``target_spec_`` determines how the strategy interprets ``y``.
@@ -106,7 +109,8 @@ The contract consists of seven rules:
 2. **Values.** Labels and classes are strings or real numbers. Boolean values,
    integers, and floating-point values are all numbers and may be mixed.
    Mixing strings and numbers raises a ``TypeError``, as do complex numbers,
-   bytes, datetimes, and timedeltas.
+   bytes, datetimes, and timedeltas. Integer labels above ``2**53`` are not
+   supported, see :ref:`label-storage`.
 3. **Vocabularies.** A class vocabulary is one-dimensional, unique, and
    finite, and it contains neither ``None`` nor the missing label. Classes are
    unique by value, so ``[0, 0.0]`` contains a duplicate.
@@ -118,7 +122,8 @@ The contract consists of seven rules:
 6. **Regression.** Labels are finite real numbers other than Boolean values.
 7. **Dtypes.** Predictions use the dtype of ``classes_``. Labels with missing
    entries are stored in NumPy's common dtype of the classes and the missing
-   label, or in ``object`` for ``missing_label=None``.
+   label, or in ``object`` for ``missing_label=None``, see
+   :ref:`label-storage`.
 
 .. doctest::
 
@@ -138,10 +143,6 @@ For ``y``, validation uses the array dtype, so inferring the classes from
 ``np.array([0.0, 1.0])`` gives floating-point classes even though the values
 are integral. Declare ``classes`` explicitly when you need to control the
 prediction dtype.
-
-For classification, the missing label must be absent from every class
-vocabulary. For example, ``classes=[0, 1]`` with ``missing_label=1`` is invalid
-because ``1`` would also be a known class.
 
 An empty or entirely missing ``y`` has no observed labels from which to infer
 a vocabulary. Components that need one, such as the target resolver and label
@@ -496,7 +497,7 @@ the tags ``target_tags.multi_output`` or ``classifier_tags.multi_label`` set
 to true. The wrapper checks the estimator's metadata without fitting test data.
 
 A plain ``LogisticRegression`` has ``predict_proba`` but declares neither tag.
-The wrapper rejects it before storing fitted state.
+The wrapper rejects it for multi-label classification.
 
 .. doctest::
 
@@ -510,14 +511,12 @@ The wrapper rejects it before storing fitted state.
    ... except ValueError as error:
    ...     print("target_tags.multi_output" in str(error))
    True
-   >>> assert not hasattr(rejected, "target_spec_")
 
 Pre-fitted Estimators
 ---------------------
 
 When wrapping a pre-fitted estimator, ``SklearnClassifier`` checks the declared
-target specification against the learned classes before exposing fitted
-attributes.
+target specification against the learned classes by value.
 
 The declared ``classes`` may add classes to the learned vocabulary. Extra
 classes receive zero-filled probability columns in the wrapper's class order.
@@ -542,7 +541,6 @@ vocabularies have the same length.
    ... except ValueError as error:
    ...     print("learned the class labels" in str(error))
    True
-   >>> assert not hasattr(relabeled, "target_spec_")
 
 A fitted multi-label estimator must provide either:
 
@@ -645,11 +643,11 @@ infer a binary vocabulary, and a partially observed row.
 Ambiguous Two-dimensional Classification
 ========================================
 
-For single-annotator classification, a two-dimensional ``y`` is ambiguous with
-``target_type="auto"`` and ``classes=None``. Its columns could be binary
-multi-label outputs, or the annotators of a label matrix passed to a
-single-annotator component by mistake. The shape and values alone do not
-determine their meaning.
+For single-annotator classification, a two-dimensional ``y`` with more than one
+column is ambiguous when ``target_type="auto"`` and ``classes=None``. Its
+columns could represent binary label outputs, or the annotators of a label
+matrix passed to a single-annotator component by mistake. Binary-looking values
+do not resolve this ambiguity.
 
 Declare multi-label targets where the labels are interpreted: on the
 classifier, with ``target_type="multi-label"`` or a nested class vocabulary, or
@@ -673,23 +671,15 @@ Every nested vocabulary must be binary; see :ref:`current-limitations`.
 Single-output Column Vectors
 ============================
 
-Labels with shape ``(n_samples, 1)`` are accepted when the target type resolves
-to single-output. For classification, set ``target_type="single-output"``,
-declare a flat class vocabulary, or use a component without multi-label
-support. In pool and stream queries, the estimator decides: the column stays
-ambiguous if it supports multi-label targets. Classifiers and pool query
-strategies convert a single-output column to a one-dimensional array and emit
-``DataConversionWarning``. With ``target_type="auto"`` and ``classes=None``,
-the column remains ambiguous for components that support multi-label targets.
+As in scikit-learn, labels with shape ``(n_samples, 1)`` are single-output
+unless multi-label targets are declared. This holds for classification,
+regression, and task-agnostic strategies. Classifiers and pool query strategies
+convert such a column to the canonical one-dimensional representation and emit
+a ``DataConversionWarning``. With ``target_type="multi-label"`` or a nested
+class vocabulary, the column is one binary label output.
 
-For regression, a column vector is accepted whenever the task is known, for
-example in a regressor or in a strategy that resolves the target specification
-through a regressor.
-
-A strategy without a known task or class vocabulary treats a two-dimensional
-``y`` alone as ambiguous, including when it has continuous values. For both
-classification and regression, single-output labels can have at most one
-column.
+Labels with more than one column are not single-output for either
+classification or regression.
 
 Target-aware Masks and Indices
 ==============================
@@ -738,7 +728,7 @@ For single-output regression, ``predict`` returns one value per sample in an
 array of shape ``(n_samples,)``. If a wrapped estimator returns a single
 column, the wrapper reduces it to this shape. Predictions with several columns
 are rejected, as are samples drawn with ``sample_y`` that contain several
-target columns: flattening them would produce ``n_samples * n_outputs`` values.
+columns: flattening them would produce ``n_samples * n_outputs`` values.
 Non-finite predictions and samples are rejected as well.
 
 .. doctest::
@@ -758,9 +748,9 @@ Multiple Annotators
 ===================
 
 The target type describes the label to predict. The annotation type describes
-who provides it. In a multi-annotator matrix, each column holds one annotator's
-labels for the same task. A row such as ``[0, NaN]`` is valid: one annotator
-provided a label, and the other has not.
+who provides it. In a multi-annotator matrix, each row represents a sample and
+each column an annotator. A row such as ``[0, NaN]`` is valid: one annotator
+provided a label for the sample, and the other has not.
 
 Multi-annotator estimators retain this annotation type in their fitted
 specification. Multi-annotator strategies return ``(sample, annotator)`` pairs
@@ -844,21 +834,14 @@ classifier; see :ref:`multiple-annotators`.
 Stream Query Strategies
 -----------------------
 
-Model-based stream query strategies support single-output, single-annotator
-classification. They have no ``target_type`` parameter and use the classifier
-passed to ``query`` to determine the target specification. If ``y`` is given,
-it must match the single-annotator prediction specification derived from a
-fitted classifier's ``target_spec_``, as for pool strategies. For an unfitted
-classifier, resolution uses its ``classes``, ``missing_label``, and
-``target_type`` together with ``y``. Without ``y``, only these declarations
-count.
-
-With ``fit_clf=True``, the strategy fits a clone and then uses its
-``target_spec_``. The classifier's own capabilities are checked against its
-training specification, or the resolved specification if it is unfitted. The
-strategy's capability is checked against the single-annotator prediction
-specification. A multi-label classifier fails the capability check, whereas a
-fitted multi-annotator classifier passes both checks; see
+Stream query strategies that use a classifier support only single-output
+single-annotator classification and have no ``target_type`` parameter. They
+resolve the classifier and ``y`` as pool query strategies do: given labels
+``y`` must match the single-annotator prediction specification of the
+classifier, an unfitted classifier contributes its declarations, and with
+``fit_clf=True`` the fitted clone's ``target_spec_`` applies. A multi-label
+classifier is therefore rejected with the capability error described above,
+whereas a fitted multi-annotator classifier passes, see
 :ref:`multiple-annotators`.
 
 Passed labels are validated even with ``fit_clf=False``. This rejects some

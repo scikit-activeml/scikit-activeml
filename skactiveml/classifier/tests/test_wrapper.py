@@ -3571,6 +3571,17 @@ class TestSlidingWindowClassifier(
                     clf.fit(X[:2], y[:2])
                     self.assertIsNone(clf.sample_weight_train_)
 
+    def test_partial_fit_rejects_other_sample_shape(self):
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        clf = SlidingWindowClassifier(
+            ParzenWindowClassifier(classes=[0, 1]), window_size=4
+        ).fit(X, [0, 1, 0, 1])
+        self.assertRaises(ValueError, clf.partial_fit, [[8.0, 9.0]], [0])
+        clf.partial_fit([[6.0]], [1])
+        np.testing.assert_array_equal(
+            clf.X_train_, [[1.0], [2.0], [3.0], [6.0]]
+        )
+
     def test_outer_costs_follow_class_order(self):
         X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
         y = [1, 1, 2, 2]

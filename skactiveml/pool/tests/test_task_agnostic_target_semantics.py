@@ -229,20 +229,15 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y_column = np.array([[0], [1], [-1], [-1]])
 
-        with self.assertRaisesRegex(ValueError, "ambiguous"):
-            RandomSampling(
-                target_type="auto", missing_label=-1, random_state=0
-            ).query(X, y_column, batch_size=1)
-
-        with self.assertWarns(DataConversionWarning):
-            result = RandomSampling(
-                target_type="single-output", missing_label=-1, random_state=0
-            ).query(
-                X,
-                y_column,
-                batch_size=1,
-            )
-        self.assertEqual(result.shape, (1,))
+        for target_type in ["auto", "single-output"]:
+            with self.subTest(target_type=target_type):
+                with self.assertWarns(DataConversionWarning):
+                    result = RandomSampling(
+                        target_type=target_type,
+                        missing_label=-1,
+                        random_state=0,
+                    ).query(X, y_column, batch_size=1)
+                self.assertEqual(result.shape, (1,))
 
         invalid_cases = (
             (
