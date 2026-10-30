@@ -11,7 +11,7 @@ checks whether it supports that specification. A specification can be valid
 even when a component does not support it.
 
 These semantics apply to pool and stream workflows alike. The
-:doc:`Core Workflow <core_workflow>` defines each property, and the
+:doc:`Concepts <concepts>` page defines each property, and the
 :doc:`Strategy Overview <generated/strategy_overview>` filters strategies by
 them.
 
