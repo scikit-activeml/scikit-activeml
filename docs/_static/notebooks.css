@@ -66,6 +66,32 @@
     --tutorial-topic-color: #6cc6e3;
 }
 
+/* Concepts page: the inline panels sit side by side and stack on narrow
+   screens. The caption matches the theme's figure captions. */
+.concepts-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.concepts-panels svg {
+    width: 100%;
+    height: auto;
+}
+
+@media (max-width: 767.98px) {
+    .concepts-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+.concepts-figure > p {
+    margin: 0.3rem 1rem 1rem;
+    color: var(--pst-color-text-muted);
+    font-family: var(--pst-font-family-heading);
+    font-weight: var(--pst-font-weight-caption);
+}
+
 /* Landing page: on phones, show each tutorial as a block instead of a table
    that scrolls sideways. */
 @media (max-width: 575.98px) {
