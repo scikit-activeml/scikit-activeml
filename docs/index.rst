@@ -3,7 +3,7 @@
    :hidden:
 
    Home <self>
-   Workflow <core_workflow>
+   Concepts <concepts>
    Tutorials <tutorials>
    Strategies <generated/strategy_overview>
    generated/sphinx_gallery_examples/index
