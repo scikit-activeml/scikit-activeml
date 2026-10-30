@@ -83,6 +83,7 @@ extensions = [
     "nbsphinx",
     "numpydoc",
     "sphinx_copybutton",
+    "sphinx_design",
     "sphinx_sitemap",
     "copy_sphinx_gallery_notebooks",
 ]

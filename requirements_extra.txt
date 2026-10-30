@@ -9,6 +9,7 @@ nbsphinx~=0.9
 nbformat~=5.10
 sphinx-gallery>=0.22.1,<1
 sphinx-copybutton
+sphinx-design~=0.6
 sphinx-sitemap
 pybtex~=0.25
 pydata_sphinx_theme~=0.16

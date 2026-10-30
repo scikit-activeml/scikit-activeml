@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="112" viewBox="0 0 240 112">
+  <!-- Tutorial card pictogram in the style of the concepts-*.svg panels.
+       Mid-tone colors on a transparent background suit light and dark mode. -->
+  <defs>
+    <style>
+      .axis { fill: none; stroke: #8c8c8c; stroke-width: 1.5; marker-end: url(#arrow); }
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1.2; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .query { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 2.2; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="7" refX="7" refY="3.5"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 3.5 L0 7 L2 3.5 Z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+
+  <path class="axis" d="M22 98 V10"/>
+  <path class="axis" d="M22 98 H228"/>
+
+  <!-- The next query lies on the decision boundary. -->
+  <path d="M86 96 L150 12 H228 V96 Z" fill="#07aee6" fill-opacity=".10"/>
+  <path d="M86 96 L150 12" stroke="#8c8c8c" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <circle class="query" cx="118" cy="54" r="10"/>
+
+  <circle class="labeled" cx="44" cy="74" r="5.5"/>
+  <circle class="labeled" cx="66" cy="40" r="5.5"/>
+  <circle class="labeled" cx="158" cy="80" r="5.5"/>
+  <circle class="labeled" cx="196" cy="34" r="5.5"/>
+  <circle class="unlabeled" cx="52" cy="52" r="5.5"/>
+  <circle class="unlabeled" cx="84" cy="68" r="5.5"/>
+  <circle class="unlabeled" cx="100" cy="28" r="5.5"/>
+  <circle class="unlabeled" cx="118" cy="54" r="5.5"/>
+  <circle class="unlabeled" cx="140" cy="40" r="5.5"/>
+  <circle class="unlabeled" cx="170" cy="58" r="5.5"/>
+  <circle class="unlabeled" cx="180" cy="86" r="5.5"/>
+  <circle class="unlabeled" cx="208" cy="64" r="5.5"/>
+</svg>

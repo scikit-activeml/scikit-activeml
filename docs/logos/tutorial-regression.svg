@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="112" viewBox="0 0 240 112">
+  <!-- Tutorial card pictogram in the style of the concepts-*.svg panels.
+       Mid-tone colors on a transparent background suit light and dark mode. -->
+  <defs>
+    <style>
+      .axis { fill: none; stroke: #8c8c8c; stroke-width: 1.5; marker-end: url(#arrow); }
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1.2; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .query { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 2.2; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="7" refX="7" refY="3.5"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 3.5 L0 7 L2 3.5 Z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+
+  <path class="axis" d="M22 88 V8"/>
+  <path class="axis" d="M22 88 H228"/>
+
+  <!-- Predictive mean with an uncertainty band. -->
+  <path d="M30 74 C62 30 96 26 124 52 S186 88 222 36" fill="none"
+        stroke="#07aee6" stroke-opacity=".18" stroke-width="20" stroke-linecap="round"/>
+  <path d="M30 74 C62 30 96 26 124 52 S186 88 222 36" fill="none"
+        stroke="#8c8c8c" stroke-width="2"/>
+
+  <circle class="labeled" cx="46" cy="54" r="5.5"/>
+  <circle class="labeled" cx="88" cy="32" r="5.5"/>
+  <circle class="labeled" cx="128" cy="56" r="5.5"/>
+  <circle class="labeled" cx="196" cy="60" r="5.5"/>
+
+  <!-- Unlabeled samples have only a feature value. The query asks for a label. -->
+  <path d="M150 91 V72" stroke="#f8a661" stroke-width="2.4" stroke-dasharray="4 3"/>
+  <circle class="query" cx="150" cy="101" r="10"/>
+  <circle class="unlabeled" cx="62" cy="101" r="5.5"/>
+  <circle class="unlabeled" cx="108" cy="101" r="5.5"/>
+  <circle class="unlabeled" cx="150" cy="101" r="5.5"/>
+  <circle class="unlabeled" cx="172" cy="101" r="5.5"/>
+  <circle class="unlabeled" cx="214" cy="101" r="5.5"/>
+</svg>

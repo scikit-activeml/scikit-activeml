@@ -20,18 +20,59 @@
     overflow-wrap: anywhere;
 }
 
-/* Tutorials index and landing page: on phones, show each tutorial as a
-   block instead of a table that scrolls sideways. */
+/* Tutorials page: pictogram band above each getting-started card. Its
+   dark-light class keeps the theme from adding a white background in dark
+   mode. */
+.bd-content .tutorial-start .sd-card-img-top {
+    background-color: var(--pst-color-surface);
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid var(--pst-color-border);
+}
+
+/* Tutorials page: topic line above each further tutorial's title. */
+.bd-content .sd-card .sd-card-header.tutorial-kicker {
+    background-color: var(--pst-color-on-background);
+    border-bottom: 0;
+    padding-bottom: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pst-color-text-muted);
+}
+
+.tutorial-kicker p {
+    margin: 0;
+}
+
+.tutorial-topic.sd-card {
+    border-top: 3px solid var(--tutorial-topic-color);
+}
+
+.topic-evaluation {
+    --tutorial-topic-color: #7f9bd8;
+}
+
+.topic-deep-learning {
+    --tutorial-topic-color: #8cc68c;
+}
+
+.topic-human-labels {
+    --tutorial-topic-color: #f0b383;
+}
+
+/* Tutorials that extend a getting-started setting share one color. */
+.topic-setting {
+    --tutorial-topic-color: #6cc6e3;
+}
+
+/* Landing page: on phones, show each tutorial as a block instead of a table
+   that scrolls sideways. */
 @media (max-width: 575.98px) {
-    table.tutorial-table thead,
     table.tutorial-summary-table thead {
         display: none;
     }
 
-    table.tutorial-table,
-    table.tutorial-table tbody,
-    table.tutorial-table tr,
-    table.tutorial-table td,
     table.tutorial-summary-table,
     table.tutorial-summary-table tbody,
     table.tutorial-summary-table tr,
@@ -40,22 +81,14 @@
         width: 100%;
     }
 
-    table.tutorial-table tr,
     table.tutorial-summary-table tr {
         padding: 0.5rem 0;
         border-bottom: 1px solid var(--pst-color-border);
     }
 
-    table.tutorial-table td,
     table.tutorial-summary-table td {
         padding: 0.125rem 0.5rem;
         border: 0;
-    }
-
-    table.tutorial-table td:nth-child(2) > p:first-child::before,
-    table.tutorial-summary-table td:nth-child(4) > p:first-child::before {
-        content: "Data: ";
-        font-weight: 600;
     }
 
     table.tutorial-summary-table td:nth-child(2) > p:first-child::before {
@@ -68,7 +101,11 @@
         font-weight: 600;
     }
 
-    table.tutorial-table td:nth-child(3) ul,
+    table.tutorial-summary-table td:nth-child(4) > p:first-child::before {
+        content: "Data: ";
+        font-weight: 600;
+    }
+
     table.tutorial-summary-table td:nth-child(5) ul {
         margin: 0;
     }

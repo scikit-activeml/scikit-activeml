@@ -1562,9 +1562,12 @@ A new tutorial needs these parts:
   the notebook's link for the documentation version.
 * A code cell with the installation command as a comment, such as
   ``# !pip install scikit-activeml tqdm``. The Colab copy uncomments it.
-* A row in the matching table of ``docs/tutorials.rst`` and an entry in its
-  hidden toctree. If the tutorial serves one of the goals at the top of that
-  page, add it there too.
+* A card in ``docs/tutorials.rst`` and an entry in its hidden toctree. An
+  introductory tutorial for pool-based or stream-based active learning or
+  for a learning setting goes to Getting Started with a pictogram
+  ``docs/logos/tutorial-*.svg``. Other tutorials go to Go Further with a
+  topic line and a ``topic-*`` class from ``docs/_static/notebooks.css``.
+  Copy an existing card in the same section to keep its classes and badges.
 
 Use a flexible layout suited to one scenario or study question:
 

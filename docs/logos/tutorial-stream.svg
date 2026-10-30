@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="112" viewBox="0 0 240 112">
+  <!-- Tutorial card pictogram in the style of the concepts-*.svg panels.
+       Mid-tone colors on a transparent background suit light and dark mode. -->
+  <defs>
+    <style>
+      .axis { fill: none; stroke: #8c8c8c; stroke-width: 1.5; marker-end: url(#arrow); }
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1.2; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="7" refX="7" refY="3.5"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 3.5 L0 7 L2 3.5 Z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+
+  <path class="axis" d="M22 98 V10"/>
+  <path class="axis" d="M22 98 H228"/>
+
+  <!-- Only the newest arrivals are candidates for the current query. -->
+  <rect x="184" y="16" width="38" height="74" rx="6"
+        fill="#f8a661" fill-opacity=".16" stroke="#f8a661" stroke-width="1.8"/>
+
+  <circle class="labeled" cx="40" cy="60" r="5.5"/>
+  <circle class="unlabeled" cx="60" cy="34" r="5.5"/>
+  <circle class="labeled" cx="82" cy="70" r="5.5"/>
+  <circle class="labeled" cx="104" cy="38" r="5.5"/>
+  <circle class="unlabeled" cx="124" cy="56" r="5.5"/>
+  <circle class="labeled" cx="146" cy="74" r="5.5"/>
+  <circle class="unlabeled" cx="166" cy="44" r="5.5"/>
+  <circle class="unlabeled" cx="196" cy="36" r="5.5"/>
+  <circle class="unlabeled" cx="210" cy="68" r="5.5"/>
+</svg>

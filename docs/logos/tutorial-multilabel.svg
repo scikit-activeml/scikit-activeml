@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="112" viewBox="0 0 240 112">
+  <!-- Tutorial card pictogram in the style of the concepts-*.svg panels.
+       Mid-tone colors on a transparent background suit light and dark mode. -->
+  <defs>
+    <style>
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1.2; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .link { stroke: #8c8c8c; stroke-width: 1.4; }
+      .positive { fill: #2a7fff; }
+      .negative { fill: none; stroke: #2a7fff; stroke-width: 1.8; }
+      .missing { fill: none; stroke: #8c8c8c; stroke-width: 1.6; stroke-dasharray: 3 2.5; }
+      .queried { fill: none; stroke: #f8a661; stroke-width: 1.6; stroke-dasharray: 3 2.5; }
+    </style>
+  </defs>
+
+  <!-- Label vectors: positive, observed negative, and missing entries. -->
+  <circle class="labeled" cx="76" cy="22" r="5.5"/>
+  <path class="link" d="M88 22 H104"/>
+  <rect class="positive" x="110" y="14" width="16" height="16" rx="3"/>
+  <rect class="negative" x="133" y="15" width="14" height="14" rx="3"/>
+  <rect class="positive" x="154" y="14" width="16" height="16" rx="3"/>
+  <rect class="negative" x="177" y="15" width="14" height="14" rx="3"/>
+
+  <!-- The query asks for the complete label vector. -->
+  <rect x="54" y="41" width="146" height="30" rx="8"
+        fill="#f8a661" fill-opacity=".14" stroke="#f8a661" stroke-width="1.6"/>
+  <circle class="unlabeled" cx="76" cy="56" r="5.5"/>
+  <path class="link" d="M88 56 H104"/>
+  <rect class="queried" x="111" y="49" width="14" height="14" rx="3"/>
+  <rect class="queried" x="133" y="49" width="14" height="14" rx="3"/>
+  <rect class="queried" x="155" y="49" width="14" height="14" rx="3"/>
+  <rect class="queried" x="177" y="49" width="14" height="14" rx="3"/>
+
+  <circle class="unlabeled" cx="76" cy="90" r="5.5"/>
+  <path class="link" d="M88 90 H104"/>
+  <rect class="missing" x="111" y="83" width="14" height="14" rx="3"/>
+  <rect class="missing" x="133" y="83" width="14" height="14" rx="3"/>
+  <rect class="missing" x="155" y="83" width="14" height="14" rx="3"/>
+  <rect class="missing" x="177" y="83" width="14" height="14" rx="3"/>
+</svg>
