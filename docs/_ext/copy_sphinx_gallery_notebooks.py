@@ -1,13 +1,24 @@
+import json
 import os
 import re
 import shutil
+import textwrap
+import zipfile
+from pathlib import Path
+
 from sphinx.application import Sphinx
+
+# A reST raw HTML block as Sphinx-Gallery copies it into a markdown cell.
+RAW_HTML_PATTERN = re.compile(
+    r"^\.\. raw:: html\n\n((?:[ \t]+.*(?:\n|$))+)", re.M
+)
 
 
 def copy_gallery_notebooks_callback(app: Sphinx, exception):
     """A callback for the `build-finished` signal that is used by the
     `copy_gallery_notebooks` extension, that copies and post-processes
-    notebooks from sphinx gallery examples.
+    notebooks from sphinx gallery examples. It also renders the raw HTML
+    blocks of the downloadable notebooks.
 
     Parameters
     ----------
@@ -29,6 +40,7 @@ def copy_gallery_notebooks_callback(app: Sphinx, exception):
     dst_dir = f"{app.outdir}/{dst_dir}"
 
     copy_gallery_notebooks(src_dir, dst_dir)
+    render_downloaded_notebooks(f"{app.outdir}/_downloads")
 
 
 def copy_gallery_notebooks(src_dir, dst_dir):
@@ -73,9 +85,74 @@ def process_notebook(src_path, dst_path):
     pattern = r"\"# (!pip install .*?)\""
     repl = r'"\1"'
     output = re.sub(pattern=pattern, repl=repl, string=file_content)
+    output = render_raw_html(output)
 
     with open(dst_path, "w") as f:
         f.write(output)
+
+
+def render_raw_html(notebook):
+    """Replace the reST raw HTML blocks in markdown cells by their HTML.
+
+    Parameters
+    ----------
+    notebook : str
+        The content of a jupyter notebook file.
+
+    Returns
+    -------
+    str
+        The notebook content, unchanged if it has no raw HTML block.
+    """
+    content = json.loads(notebook)
+    rendered = False
+    for cell in content["cells"]:
+        if cell["cell_type"] != "markdown":
+            continue
+        source = "".join(cell["source"])
+        html = RAW_HTML_PATTERN.sub(
+            lambda match: textwrap.dedent(match.group(1)), source
+        )
+        if html != source:
+            cell["source"] = [html]
+            rendered = True
+    return json.dumps(content, indent=2) if rendered else notebook
+
+
+def render_downloaded_notebooks(downloads_dir):
+    """Render the raw HTML blocks of the notebooks offered for download,
+    including those in zip archives.
+
+    Parameters
+    ----------
+    downloads_dir : str
+        The directory of the downloadable files of the build.
+    """
+    for path in Path(downloads_dir).rglob("*.ipynb"):
+        notebook = path.read_text()
+        rendered = render_raw_html(notebook)
+        if rendered != notebook:
+            path.write_text(rendered)
+    for path in Path(downloads_dir).rglob("*.zip"):
+        with zipfile.ZipFile(path) as archive:
+            entries = [
+                (info, archive.read(info)) for info in archive.infolist()
+            ]
+        rendered = [
+            (
+                info,
+                (
+                    render_raw_html(data.decode()).encode()
+                    if info.filename.endswith(".ipynb")
+                    else data
+                ),
+            )
+            for info, data in entries
+        ]
+        if rendered != entries:
+            with zipfile.ZipFile(path, "w") as archive:
+                for info, data in rendered:
+                    archive.writestr(info, data)
 
 
 def setup(app: Sphinx):

@@ -9,6 +9,12 @@
    <span id="{{ id }}"></span>
 {%- endmacro %}
 
+{% macro legend(html) -%}
+.. raw:: html
+
+{{ html | indent(3, true) }}
+{%- endmacro %}
+
 {% macro gallery(items) -%}
 .. container:: visualization-cards
 
@@ -28,7 +34,7 @@
 {% endfor %}
 {%- endmacro %}
 
-{% macro multiple_annotators(examples, marker, legacy_aliases=false) -%}
+{% macro multiple_annotators(examples, legends, marker, legacy_aliases=false) -%}
 {% if marker %}
 {% if legacy_aliases %}
 {{ anchor("pool-based-al-strategies-for-mulitple-annotators") }}
@@ -43,13 +49,12 @@ Each sample has one class label to predict. Several annotators can label it,
 and the strategy selects sample–annotator pairs. The animation combines
 utilities and decision boundaries with a chart of requests per annotator.
 
-.. image:: /examples/pool_multi_annotator_legend.png
-   :alt: Legend for class labels, annotator correctness, decision boundaries, and utility scores.
+{{ legend(legends["pool-multi-annotator"]) }}
 
 {{ gallery(examples["pool-multi-annotator"]) }}
 {%- endmacro %}
 
-{% macro pool_classification(examples, marker, legacy_aliases=false) -%}
+{% macro pool_classification(examples, legends, marker, legacy_aliases=false) -%}
 {% if legacy_aliases %}
 {{ anchor("pool-based-al-strategies") }}
 
@@ -62,8 +67,7 @@ One annotator gives one class label per selected sample, and each cycle
 acquires one sample. A single plot shows the utilities and the classifier's
 decision boundary.
 
-.. image:: /examples/pool_classification_legend.png
-   :alt: Legend for class labels, decision boundaries, labeled samples, and utility scores.
+{{ legend(legends["pool-classification"]) }}
 
 {{ gallery(examples["pool-classification"]) }}
 
@@ -72,8 +76,7 @@ decision boundary.
 Each cycle acquires four samples. Panel *i* shows the utilities for the
 *i*-th selection in the batch. All panels use the same classifier and labels.
 
-.. image:: /examples/pool_classification_legend.png
-   :alt: Legend for class labels, decision boundaries, labeled samples, and utility scores.
+{{ legend(legends["pool-classification-batch"]) }}
 
 {{ gallery(examples["pool-classification-batch"]) }}
 
@@ -86,33 +89,30 @@ panel, class 0 means that the label is absent and class 1 means that it is
 present. Gray markers identify samples whose label vectors have been
 acquired.
 
-.. image:: /examples/pool_classification_legend.png
-   :alt: Legend applied per label: binary label values, decision boundaries, acquired samples, and utility scores.
+{{ legend(legends["pool-multilabel"]) }}
 
 {{ gallery(examples["pool-multilabel"]) }}
 
-{{ multiple_annotators(examples, marker, legacy_aliases) }}
+{{ multiple_annotators(examples, legends, marker, legacy_aliases) }}
 {%- endmacro %}
 
-{% macro pool_regression(examples) -%}
+{% macro pool_regression(examples, legends) -%}
 One annotator gives a continuous label for each selected sample. Two plots
 show the fitted regression curve and the utilities. Examples acquire one
 sample per cycle unless their caption names a batch.
 
-.. image:: /examples/pool_regression_legend.png
-   :alt: Legend for the regression curve, utility scores, and labeled and unlabeled samples.
+{{ legend(legends["pool-regression"]) }}
 
 {{ gallery(examples["pool-regression"]) }}
 {%- endmacro %}
 
-{% macro stream_classification(examples) -%}
+{% macro stream_classification(examples, legends) -%}
 One annotator gives one class label per queried sample. Samples arrive in
 sequence, and the strategy decides within its budget whether to request each
 sample's label. The animation shows arriving samples and the evolving
 decision boundary.
 
-.. image:: /examples/stream_classification_legend.png
-   :alt: Legend for class labels, unlabeled and current samples, and the decision boundary.
+{{ legend(legends["stream-classification"]) }}
 
 {{ gallery(examples["stream-classification"]) }}
 {%- endmacro %}

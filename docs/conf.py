@@ -193,6 +193,8 @@ sphinx_gallery_conf = {
     "within_subsection_order": "ExampleTitleSortKey",
     "minigallery_sort_order": ExampleTitleSortKey(""),
     "matplotlib_animations": True,
+    # Hide the comment that defers each animation below its legend.
+    "remove_config_comments": True,
     # directory where function/class granular galleries are stored
     "backreferences_dir": os.path.normpath(
         "generated/sphinx_gallery_backreferences"

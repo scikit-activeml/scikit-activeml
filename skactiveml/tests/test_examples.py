@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import unittest
 from os import path
+from unittest import mock
 
 from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
@@ -82,7 +83,10 @@ class TestExamples(unittest.TestCase):
                         examples_path, ""
                     )
                     file_path = path.join(root, filename)
-                    with self.subTest(msg=msg):
+                    with (
+                        self.subTest(msg=msg),
+                        mock.patch("matplotlib.pyplot.show"),
+                    ):
                         with open(file_path, "r") as f:
                             exec(f.read(), locals())
 

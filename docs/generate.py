@@ -1,6 +1,7 @@
 import os
 from collections import OrderedDict
 from pathlib import Path
+import base64
 import black
 
 import packaging.version
@@ -15,10 +16,9 @@ import copy
 
 import numpy as np
 from docutils.utils import column_width
-from matplotlib.lines import Line2D
+from matplotlib import colormaps
+from matplotlib.colors import to_hex
 from pybtex.database import parse_file
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 from joblib import Parallel, delayed
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -299,6 +299,184 @@ EXAMPLE_TEMPLATE_GROUPS = {
 }
 
 
+def _swatch(*shapes):
+    """Draw legend shapes on a white chip, like the animations' background.
+
+    The chip is an image because notebook sanitizers remove inline SVG.
+    """
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="20" '
+        'viewBox="0 0 32 20"><rect x="0.5" y="0.5" width="31" height="19" '
+        'rx="3" fill="#ffffff" stroke="#d1d5da"/>' + "".join(shapes) + "</svg>"
+    )
+    data = base64.b64encode(svg.encode()).decode()
+    return (
+        f'<img src="data:image/svg+xml;base64,{data}" width="32" height="20" '
+        'alt="">'
+    )
+
+
+def _line(color, width=2, opacity=1, dashed=False):
+    dash = ' stroke-dasharray="4 3"' if dashed else ""
+    return (
+        f'<path d="M5 10 H27" stroke="{color}" stroke-width="{width}" '
+        f'stroke-opacity="{opacity}"{dash}/>'
+    )
+
+
+def _dot(color, radius=3, opacity=1, edge="none"):
+    return (
+        f'<circle cx="16" cy="10" r="{radius}" fill="{color}" '
+        f'fill-opacity="{opacity}" stroke="{edge}" '
+        f'stroke-opacity="{opacity}"/>'
+    )
+
+
+def _cross(color):
+    return (
+        f'<path d="M13.5 7.5 L18.5 12.5 M18.5 7.5 L13.5 12.5" '
+        f'stroke="{color}" stroke-width="1.5"/>'
+    )
+
+
+def _ramp(cmap, opacity):
+    colors = colormaps[cmap]([0.0, 0.25, 0.5, 0.75, 1.0])
+    return "".join(
+        f'<rect x="{4 + 4.8 * i:g}" y="5" width="4.8" height="10" '
+        f'fill="{to_hex(color)}" fill-opacity="{opacity}"/>'
+        for i, color in enumerate(colors)
+    )
+
+
+def _area(color, opacity):
+    curve = "M4 15 L10 8 L16 12 L22 5 L28 15"
+    return (
+        f'<path d="{curve} Z" fill="{color}" fill-opacity="{opacity}"/>'
+        f'<path d="{curve}" fill="none" stroke="{color}" stroke-width="1.5"/>'
+    )
+
+
+def _text(text, hat=False):
+    hat_path = (
+        '<path d="M9.5 6 L16 3 L22.5 6" fill="none" stroke="#000000" '
+        'stroke-width="0.9"/>'
+        if hat
+        else ""
+    )
+    return (
+        f'{hat_path}<text x="16" y="{16 if hat else 14}" fill="#000000" '
+        'font-family="sans-serif" font-size="10" text-anchor="middle">'
+        f"{text}</text>"
+    )
+
+
+_CLASS_COLORS = [to_hex(colormaps["coolwarm"](value)) for value in (0.0, 1.0)]
+_LABELED_DISC = _dot("#808080", radius=6, opacity=0.8)
+_ANNOTATED_DISC = _dot("#808080", radius=6, opacity=0.8, edge="#000000")
+_CLASSIFICATION_LEGEND = [
+    *[
+        (_swatch(_dot(color)), f"Sample of class {label}")
+        for label, color in enumerate(_CLASS_COLORS)
+    ],
+    (_swatch(_LABELED_DISC), "Labeled sample"),
+    (_swatch(_line("#000000")), "Decision boundary"),
+    *[
+        (
+            _swatch(_line(color, dashed=True)),
+            f"75% confidence for class {label}",
+        )
+        for label, color in enumerate(_CLASS_COLORS)
+    ],
+    (_swatch(_ramp("Greens", 0.75)), "Utility, from low to high"),
+]
+
+# The legend of each visualization group. Keep the swatches in line with the
+# plots of the group's templates.
+VISUALIZATION_LEGENDS = {
+    "pool-classification": _CLASSIFICATION_LEGEND,
+    "pool-classification-batch": _CLASSIFICATION_LEGEND,
+    "pool-multilabel": _CLASSIFICATION_LEGEND,
+    "pool-regression": [
+        (_swatch(_dot("#add8e6", radius=4)), "Unlabeled sample"),
+        (_swatch(_dot("#ffa500", radius=4)), "Labeled sample"),
+        (_swatch(_line("#000000")), "Prediction"),
+        (_swatch(_area("#008000", 0.3)), "Utility"),
+    ],
+    "pool-multi-annotator": [
+        *[
+            (
+                _swatch(_dot(color, radius=2)),
+                f"Unlabeled sample of class {label}",
+            )
+            for label, color in enumerate(_CLASS_COLORS)
+        ],
+        *[
+            (
+                _swatch(_ANNOTATED_DISC, _dot(color, radius=2.5)),
+                f"Correct majority vote for class {label}",
+            )
+            for label, color in enumerate(_CLASS_COLORS)
+        ],
+        *[
+            (
+                _swatch(_ANNOTATED_DISC, _cross(color)),
+                f"Wrong majority vote for class {label}",
+            )
+            for label, color in enumerate(_CLASS_COLORS)
+        ],
+        (_swatch(_line("#000000")), "Decision boundary"),
+        *[
+            (
+                _swatch(_line(color, dashed=True)),
+                f"75% confidence for class {label}",
+            )
+            for label, color in enumerate(_CLASS_COLORS)
+        ],
+        (
+            _swatch(_ramp("Greens", 0.75)),
+            "Mean utility over annotators, from low to high",
+        ),
+        (
+            _swatch(
+                '<rect x="11" y="5" width="10" height="12" fill="#808080"/>'
+            ),
+            "Requested labels per annotator",
+        ),
+        (_swatch(_text("AP")), "Annotator performance"),
+        (_swatch(_text("AP", hat=True)), "Estimated annotator performance"),
+    ],
+    "stream-classification": [
+        *[
+            (
+                _swatch(_line(color, width=3, opacity=0.4)),
+                f"Labeled sample of class {label}",
+            )
+            for label, color in enumerate(_CLASS_COLORS)
+        ],
+        (_swatch(_line("#808080", width=3, opacity=0.2)), "Unlabeled sample"),
+        (
+            _swatch(_line("#808080", width=6, opacity=0.2)),
+            "Current sample, in its class color if labeled",
+        ),
+        (_swatch(_line("#000000")), "Decision boundary"),
+    ],
+}
+
+
+def visualization_legend_html(group):
+    """Render the legend of a visualization group as HTML without blank
+    lines, so that notebooks show it as one HTML block."""
+    items = "\n".join(
+        f"<li>{swatch}{label}</li>"
+        for swatch, label in VISUALIZATION_LEGENDS[group]
+    )
+    return (
+        '<div class="visualization-legend">\n'
+        '<p class="visualization-legend-title">Legend</p>\n'
+        f'<ul class="visualization-legend-items">\n{items}\n</ul>\n</div>'
+    )
+
+
 def check_example_setup(data):
     """Check that an example entry can show the setup it describes."""
     method = data["method"]
@@ -355,6 +533,10 @@ def check_example_setup(data):
             )
         if setup["selection"] == "single-sample" and batch_size != "1":
             raise ValueError(f'Give single-sample {method!r} batch_size "1".')
+    if _example_setup(data) not in EXAMPLE_GROUPS:
+        raise ValueError(
+            f"No visualization group for {method!r}: {_example_setup(data)!r}."
+        )
     template = Path(data["template"]).name
     group = EXAMPLE_TEMPLATE_GROUPS.get(template)
     if group is not None and group != _example_setup(data):
@@ -444,6 +626,7 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
         if any(examples[group] for group in groups)
     ]
 
+    legends = {group: visualization_legend_html(group) for group in examples}
     docs_path = Path(__file__).parent
     environment = Environment(
         loader=FileSystemLoader(docs_path / "_templates"),
@@ -453,6 +636,7 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
     rendered = environment.get_template("visualizations.rst.jinja").render(
         intro=(docs_path / "examples" / "README.rst").read_text(),
         examples=examples,
+        legends=legends,
         sections=sections,
     )
     destination = Path(gen_path) / "index.rst"
@@ -480,6 +664,7 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
             section_template.render(
                 section=section,
                 examples=examples,
+                legends=legends,
                 documents=owned_documents,
             )
         )
@@ -1202,7 +1387,9 @@ def generate_example_script(
                 code_blocks.append(data[block])
                 block_str = format_code(data[block])
             elif block.startswith("plot"):
-                block_str = format_plot(data, template_path)
+                block_str = format_plot(data, template_path) + format_legend(
+                    _example_setup(data)
+                )
             elif block.startswith("refs"):
                 block_str = format_refs(data[block])
 
@@ -1361,6 +1548,27 @@ def format_plot(data, template_path):
 
             template_str = template_str.replace(finding, new_str)
     return template_str + "\n"
+
+
+def format_legend(group):
+    """
+    Generates the string for the legend of an example's animation, formatted
+    for a 'sphinx-gallery' example script. The animation's figure is deferred
+    to a closing ``plt.show()`` block so that the legend precedes the player.
+
+    Parameters
+    ----------
+    group : str
+        The visualization group of the example.
+
+    Returns
+    -------
+    str : The formatted string for the example script.
+    """
+    block_str = "# sphinx_gallery_defer_figures\n\n# %%\n# .. raw:: html\n#\n"
+    for line in visualization_legend_html(group).splitlines():
+        block_str += "#    " + line + "\n"
+    return block_str + "\n# %%\nplt.show()\n\n"
 
 
 def format_refs(refs: list):
@@ -1684,177 +1892,6 @@ def uncomment_installation_code(file_content):
     repl = r'"\1"'
     output = re.sub(pattern=pattern, repl=repl, string=output)
     return output
-
-
-# Legends are 4 inches wide, so phones show them at nearly full size.
-LEGEND_FIGSIZE = (4, 4)
-
-
-def export_legend(handles, labels, ax, path="legend.pdf", expand=None, ncol=2):
-    if expand is None:
-        expand = [-5, -5, 5, 5]
-
-    ax.axis("off")
-    legend = ax.legend(
-        handles,
-        labels,
-        loc=3,
-        framealpha=1,
-        frameon=True,
-        ncol=ncol,
-        mode="expand",
-        bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
-        fontsize=8,
-    )
-
-    fig = legend.figure
-    fig.canvas.draw()
-    bbox = legend.get_window_extent()
-    bbox = bbox.from_extents(*(bbox.extents + np.array(expand)))
-    bbox = bbox.transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(os.path.abspath(path), dpi="figure", bbox_inches=bbox)
-    plt.close(fig)
-
-
-def generate_stream_classification_legend(path):
-    handles = []
-    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
-    labels = []
-
-    labels.append("Sample of Class 0")
-    handles.append(ax.plot([], [], color="blue")[0])
-    labels.append("Sample of Class 1")
-    handles.append(ax.plot([], [], color="red")[0])
-    labels.append("Unlabeled Sample")
-    handles.append(ax.plot([], [], color="grey")[0])
-    labels.append("Current Sample")
-    handles.append(ax.plot([], [], color="grey", linewidth=3)[0])
-    labels.append("Decision Boundary")
-    handles.append(ax.plot([], [], color="black")[0])
-
-    export_legend(handles, labels, ax, path=path)
-
-
-def generate_classification_legend(path):
-    handles = []
-    labels = []
-    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
-
-    labels.append("Decision Boundary")
-    handles.append(ax.plot([], [], color="black")[0])
-    labels.append("Labeled Sample")
-    handles.append(
-        ax.scatter([], [], marker=".", color="gray", s=100, alpha=0.8)
-    )
-    labels.append("Sample of Class 0")
-    handles.append(ax.scatter([], [], marker=".", color="blue"))
-    labels.append("Sample of Class 1")
-    handles.append(ax.scatter([], [], marker=".", color="red"))
-    labels.append("75% Confidence Class 0")
-    handles.append(ax.plot([], [], color="blue", ls="--")[0])
-    labels.append("75% Confidence Class 1")
-    handles.append(ax.plot([], [], color="red", ls="--")[0])
-    labels.append("High Utility Score")
-    handles.append(mpatches.Patch(color="green", alpha=1.0))
-    labels.append("Low Utility Score")
-    handles.append(mpatches.Patch(color="green", alpha=0.2))
-
-    export_legend(handles, labels, ax, path=path)
-
-
-def generate_regression_legend(path):
-    handles = []
-    labels = []
-    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
-
-    handles.append(ax.plot([], [], color="black")[0])
-    labels.append("Regression Curve")
-    handles.append(ax.plot([], [], color="green")[0])
-    labels.append("Utility Score")
-    handles.append(ax.scatter([], [], marker=".", color="lightblue", s=100))
-    labels.append("Unlabeled Sample")
-    handles.append(ax.scatter([], [], marker=".", color="orange", s=100))
-    labels.append("Labeled Sample")
-
-    export_legend(handles, labels, ax, path=path)
-
-
-def generate_multi_annotator_pool_legend(path):
-    handles = []
-    labels = []
-    fig, ax = plt.subplots(1, 1, figsize=LEGEND_FIGSIZE, tight_layout=True)
-    handles.append(plt.Rectangle((0, 0), 1, 1, color="grey"))
-    labels.append("Requested Labels (Total)")
-    handles.append(
-        Line2D(
-            [0],
-            [0],
-            color="black",
-            markerfacecolor="black",
-            markeredgecolor="black",
-            linewidth=0.5,
-            markeredgewidth=0.2,
-        )
-    )
-    labels.append("AP = Annotator Performance")
-    handles.append(
-        Line2D(
-            [0],
-            [0],
-            color="black",
-            markerfacecolor="black",
-            markeredgecolor="black",
-            linewidth=0.5,
-            markeredgewidth=0.2,
-        )
-    )
-    labels.append(r"$\widehat{\text{AP}}$ = Estimated Annotator Performance")
-    handles.append(
-        Line2D(
-            [0],
-            [0],
-            marker="X",
-            color="w",
-            markerfacecolor=plt.get_cmap("coolwarm")(0),
-            markersize=10,
-        ),
-    )
-    labels.append("Erroneous majority vote for class 0")
-    handles.append(
-        Line2D(
-            [0],
-            [0],
-            marker="X",
-            color="w",
-            markerfacecolor=plt.get_cmap("coolwarm")(0.99),
-            markersize=10,
-        ),
-    )
-    labels.append("Erroneous majority vote for class 1")
-    handles.append(
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=plt.get_cmap("coolwarm")(0),
-            markersize=10,
-        ),
-    )
-    labels.append("Correct majority vote for class 0")
-    handles.append(
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=plt.get_cmap("coolwarm")(0.99),
-            markersize=10,
-        ),
-    )
-    labels.append("Correct majority vote for class 1")
-
-    export_legend(handles, labels, ax, path=path, ncol=1)
 
 
 def generate_switcher(

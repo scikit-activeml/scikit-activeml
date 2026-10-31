@@ -111,6 +111,3 @@ for c in range(n_cycles):
     y[query_idx] = y_pool[query_idx]
 
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
-
-# %%
-# .. image:: ../../examples/pool_classification_legend.png

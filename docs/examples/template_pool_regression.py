@@ -127,6 +127,3 @@ for c in range(n_cycles):
 
 # Create an animation from the collected frames.
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
-
-# %%
-# .. image:: ../../examples/pool_regression_legend.png

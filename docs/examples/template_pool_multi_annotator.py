@@ -222,5 +222,3 @@ for c in range(n_cycles):
 lower_y_limit, upper_y_limit = ax2.get_ylim()
 ax2.set_ylim((lower_y_limit, upper_y_limit * 1.2))
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
-# %%
-# .. image:: ../../examples/pool_multi_annotator_legend.png

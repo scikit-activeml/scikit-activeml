@@ -141,6 +141,3 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
 
 # Create an animation from the collected frames.
 ani = animation.ArtistAnimation(fig, artists, interval=500, blit=True)
-
-# %%
-# .. image:: ../../examples/stream_classification_legend.png

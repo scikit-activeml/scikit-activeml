@@ -14,19 +14,19 @@ Each group shows one setup. The
 :doc:`Strategy Overview </generated/strategy_overview>` lists every setup a
 strategy supports.
 
-{{ pool_classification(examples, "-") }}
+{{ pool_classification(examples, legends, "-") }}
 {% elif section == "2-pool-regression" %}
 {{ heading("Pool-based Active Learning: Regression", "=") }}
 
 {{ anchor("pool-based-al-strategies-for-regression") }}
 
-{{ pool_regression(examples) }}
+{{ pool_regression(examples, legends) }}
 {% elif section == "4-stream" %}
 {{ heading("Stream-based Active Learning: Classification", "=") }}
 
 {{ anchor("stream-based-al-strategies") }}
 
-{{ stream_classification(examples) }}
+{{ stream_classification(examples, legends) }}
 {% elif section == "3-pool-multi-annotator" %}
 {{ heading("Pool-based Active Learning: Multi-annotator Learning", "=") }}
 
@@ -36,7 +36,7 @@ These animations also appear on the
 :doc:`Pool-based Active Learning: Classification
 <../1-pool-classification/index>` page.
 
-{{ multiple_annotators(examples, "") }}
+{{ multiple_annotators(examples, legends, "") }}
 {% endif %}
 {% if documents %}
 

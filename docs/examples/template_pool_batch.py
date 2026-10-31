@@ -136,6 +136,3 @@ for c in range(n_cycles):
 
 # Create the animation using the collected artists.
 ani = animation.ArtistAnimation(fig, artists, interval=1000)
-
-# %%
-# .. image:: ../../examples/pool_classification_legend.png

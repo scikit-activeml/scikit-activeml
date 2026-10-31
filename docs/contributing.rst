@@ -1427,6 +1427,9 @@ A strategy that needs a different animation can have its own template in its
 directory, such as ``template_DUAL.py`` in
 ``docs/examples/1-pool-classification/``. The file name must start with
 ``template``, so that the build does not copy the template as an example.
+The build appends the legend of the example's group and a final
+``plt.show()`` cell to each template. So a template ends with a code block and
+imports ``pyplot as plt``.
 
 Tags and Example Setup
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1474,7 +1477,10 @@ classification. A batch caption, such as "Diverse batch of 4 samples", comes
 from ``selection`` and ``batch_size``. Cards are sorted by title within each
 group. The pages come from ``visualizations.rst.jinja`` and
 ``visualization_section.rst.jinja`` in ``docs/_templates/``, which share the
-macros in ``visualization_macros.rst.jinja``.
+macros in ``visualization_macros.rst.jinja``. The legend of each group comes
+from ``VISUALIZATION_LEGENDS`` in ``docs/generate.py``. The build shows it on
+these pages and between each example's code and its animation. When a template
+changes its plot, update the legend too.
 
 The Strategy Overview notes that the target types of ``SubSamplingWrapper`` and
 ``ParallelUtilityEstimationWrapper`` depend on the wrapped strategy. The batch
