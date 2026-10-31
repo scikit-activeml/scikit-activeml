@@ -10,6 +10,7 @@ from os import path
 from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
 
+from docs.clean_readme_for_pypi import pin_raw_urls
 from docs.generate import (
     OVERVIEW_FILTERS,
     OVERVIEW_SCENARIOS,
@@ -750,6 +751,16 @@ class TestExamples(unittest.TestCase):
         )
         with open(readme) as file:
             self.assertEqual(file.read(), original)
+
+    def test_pypi_readme_pins_raw_urls_to_release_tag(self):
+        with open(path.join(self.skaml_path, "README.rst")) as file:
+            pinned = pin_raw_urls(file.read(), "1.1.0")
+        self.assertNotRegex(
+            pinned, r"raw\.githubusercontent\.com/\S*/(master|development)/"
+        )
+        self.assertIn(
+            "refs/tags/1.1.0/docs/logos/query-strategy-properties.svg", pinned
+        )
 
     def test_tutorial_documentation_links_in_colab_match_version(self):
         for version in ["latest", "development", "1.0"]:

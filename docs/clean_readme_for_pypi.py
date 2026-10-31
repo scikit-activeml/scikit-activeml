@@ -131,17 +131,36 @@ def ensure_blank_before_code_blocks(text: str) -> str:
     return "\n".join(out) + "\n"
 
 
-def main(src, dst):
+def pin_raw_urls(text: str, ref: str) -> str:
+    """
+    Point raw GitHub URLs of the master and development branches to `ref`.
+
+    PyPI keeps each release's README, but loads its images from their URLs.
+    Pinned URLs show the images of that release.
+    """
+    return re.sub(
+        r"(https://raw\.githubusercontent\.com/scikit-activeml/"
+        r"scikit-activeml/)(?:refs/heads/)?(?:master|development)/",
+        rf"\1refs/tags/{ref}/",
+        text,
+    )
+
+
+def main(src, dst, ref=None):
     src_path = Path(src)
     dst_path = Path(dst)
     text = src_path.read_text(encoding="utf8")
     text = transform_raw_blocks(text)
     text = cleanup_html_fragments(text)
     text = ensure_blank_before_code_blocks(text)
+    if ref:
+        text = pin_raw_urls(text, ref)
     dst_path.write_text(text, encoding="utf8")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise SystemExit("Usage: clean_readme_for_pypi.py SRC_RST DST_RST")
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) not in (3, 4):
+        raise SystemExit(
+            "Usage: clean_readme_for_pypi.py SRC_RST DST_RST [RELEASE_TAG]"
+        )
+    main(*sys.argv[1:])
