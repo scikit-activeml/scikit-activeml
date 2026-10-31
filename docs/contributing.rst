@@ -1315,7 +1315,12 @@ Every entry needs these fields:
 
 ``category``
    ``Informativeness``, ``Representativeness``, ``Hybrid``, ``Baseline``, or
-   ``Wrapper``.
+   ``Wrapper``. The Strategy Overview filters by this selection principle.
+   Use ``Wrapper`` for a generic wrapper, such as ``SubSamplingWrapper``,
+   whose principle depends on the strategy it wraps. These entries appear
+   only when the Selection Principle filter is set to Any. An entry that
+   wraps a specific strategy, such as ``SingleAnnotatorWrapper`` with
+   ``CoreSet``, uses the principle of that strategy.
 
 ``template``
    The template that renders the example, as a path relative to ``docs/``,
@@ -1387,8 +1392,8 @@ optional:
    not use them.
 
 ``batch_note``
-   A short note that the Strategy Overview shows next to the batch
-   selection, such as ``"Random selection within tree leaves"``.
+   A short note that the Strategy Overview shows below the entry's
+   properties, such as ``"Random selection within tree leaves"``.
 
 Check new or changed entries with:
 
@@ -1476,6 +1481,13 @@ The Strategy Overview notes that the target types of ``SubSamplingWrapper`` and
 selection of ``SubSamplingWrapper`` does too. ``get_strategy_metadata`` and
 ``json_data_to_strategy_table`` in ``docs/generate.py`` name these wrappers.
 Add a new generic wrapper there.
+
+The filter groups of the Strategy Overview come from ``OVERVIEW_FILTERS`` in
+``docs/generate.py``. ``docs/_static/filter_examples.js`` matches each group
+against the metadata of the entries, so a new group needs a rule there too.
+Each option shows a pictogram from ``docs/_static/strategy_filters/``. The
+README figure ``docs/logos/query-strategy-properties.svg`` repeats these
+pictograms, so update it together with them.
 
 Testing and Code Coverage
 -------------------------

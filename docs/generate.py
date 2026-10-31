@@ -102,36 +102,77 @@ OVERVIEW_LEGACY_IDS = {
     "stream": ["stream-based-al-strategies"],
 }
 
+# Each option shows the pictogram ``docs/_static/strategy_filters/<name>.svg``.
+# Soft hyphens let long labels break on narrow screens.
 OVERVIEW_FILTERS = [
     (
         "task",
         "Task",
-        [("classification", "Classification"), ("regression", "Regression")],
+        [
+            ("classification", "Classification", "task-classification"),
+            ("regression", "Regression", "task-regression"),
+        ],
     ),
     (
         "target",
         "Target Type",
-        [("single-output", "Single-output"), ("multi-label", "Multi-label")],
+        [
+            ("single-output", "Single-output", "target-single-output"),
+            ("multi-label", "Multi-label", "target-multi-label"),
+        ],
     ),
     (
         "annotators",
         "Annotation Type",
         [
-            ("single-annotator", "Single annotator"),
-            ("multi-annotator", "Multiple annotators"),
+            ("single-annotator", "Single annotator", "annotators-single"),
+            ("multi-annotator", "Multiple annotators", "annotators-multi"),
+        ],
+    ),
+    (
+        "principle",
+        "Selection Principle",
+        [
+            (
+                "informativeness",
+                "Informa&shy;tiveness",
+                "principle-informativeness",
+            ),
+            (
+                "representativeness",
+                "Representa&shy;tiveness",
+                "principle-representativeness",
+            ),
+            ("hybrid", "Hybrid", "principle-hybrid"),
+            ("baseline", "Baseline", "principle-baseline"),
         ],
     ),
     (
         "batch",
         "Pool Batching",
         [
-            ("batch", "Batch-capable"),
-            ("top-k-batch", "Top-k"),
-            ("diverse-batch", "Diverse"),
-            ("random-batch", "Random"),
-            ("single-sample", "Single-sample only"),
+            ("top-k-batch", "Top-k", "batch-top-k"),
+            ("diverse-batch", "Diverse", "batch-diverse"),
+            ("random-batch", "Random", "batch-random"),
         ],
     ),
+]
+
+# Wrappers take the selection principle of the wrapped strategy, so the
+# filter has no option for them.
+OVERVIEW_CATEGORIES = (
+    "Informativeness",
+    "Representativeness",
+    "Hybrid",
+    "Baseline",
+    "Wrapper",
+)
+
+# The first three filter groups follow the order of a capability tuple.
+OVERVIEW_SETUP_LABELS = [
+    (index, value, label)
+    for index, (_, _, options) in enumerate(OVERVIEW_FILTERS[:3])
+    for value, label, _ in options
 ]
 
 OVERVIEW_BATCH_LABELS = {
@@ -143,7 +184,7 @@ OVERVIEW_BATCH_LABELS = {
 
 
 def get_strategy_metadata(data):
-    """Resolve a documented method's supported setups and pool batching.
+    """Resolve a documented method's setups, principle, and pool batching.
 
     The API declares complete (task, target type, annotator type) tuples.
     Example tags restrict these to the documented method variant; they do
@@ -200,9 +241,12 @@ def get_strategy_metadata(data):
         not batch or ("single-sample" in batch and len(batch) != 1)
     ):
         raise ValueError(f"Specify pool batching for {data['method']!r}.")
+    if data["category"] not in OVERVIEW_CATEGORIES:
+        raise ValueError(f"Unknown category for {data['method']!r}.")
     return {
         "api_class": f"{package.__name__}.{cls.__name__}",
         "capabilities": capabilities,
+        "principle": data["category"].lower(),
         "batch": batch,
         "conditional": conditional,
     }
@@ -663,87 +707,92 @@ def generate_strategy_overview_rst(gen_path, json_data):
         file.write("#################\n")
         file.write("\n")
 
-        file.write("|\n\n")
         file.write(
-            ".. image:: ../logos/scikit-activeml-query-strategy-overview.svg\n"
+            "Each table entry is a query strategy, a variant, or a wrapped "
+            "configuration. Its API class links to the API reference and to "
+            "examples that use the class. The :doc:`Concepts </concepts>` "
+            "page defines the learning setting: task, target type, and "
+            "annotation type. Two further properties describe how a strategy "
+            "selects samples:\n\n"
+            "* **Selection principle:** informativeness-based strategies "
+            "select samples for which the model is uncertain. "
+            "Representativeness-based strategies select samples that "
+            "represent the data distribution, for example via clustering or "
+            "density estimation. Hybrid strategies combine both. Baselines, "
+            "such as random sampling, serve as reference points. Wrappers "
+            "take the principle of the strategy they wrap.\n"
+            "* **Pool batching:** top-k batches contain the samples with the "
+            "highest utilities. Diverse batches also avoid redundant "
+            "samples. Random batches select samples at random. A few "
+            "strategies select one sample per query. Stream strategies "
+            "decide for each arriving sample instead.\n\n"
+            "The :doc:`Visualizations </generated/sphinx_gallery_examples/"
+            "index>` catalog groups examples by the setup they "
+            "demonstrate.\n\n"
         )
-        file.write("   :class: dark-light\n")
-        file.write("   :align: center\n")
-        file.write("   :width: 100%\n\n")
-        file.write("|\n\n")
-
-        file.write(
-            f"This is an overview of all implemented pool- and stream-based "
-            f"active learning strategies, which are often divided into three "
-            f"main categories based on the utilities they compute for sample "
-            "selection:\n\n"
-            "1. **Informativeness-based** strategies mostly select samples "
-            "for which the model is most uncertain (e.g., via "
-            "information-theoretic measures).\n\n"
-            "2. **Representativeness-based** strategies select samples that "
-            "capture the overall data distribution (e.g., via clustering or "
-            "density estimation).\n\n"
-            "3. **Hybrid** strategies combine both criteria to select "
-            "samples that are informative and representative.\n\n"
-        )
-        file.write("\n")
-        file.write(
-            "Furthermore, we distinguish between **regression** and "
-            "**classification** as supervised learning tasks. Classification can "
-            "have a **multi-label** target type, and labels can come from a "
-            "**single annotator** or "
-            "**multiple annotators**. Pool strategies can select batches "
-            "using **top-k** utility scores, **diversity**, or **random "
-            "selection**. Some methods select only one sample at a time. "
-            "Stream strategies decide which arriving samples to label "
-            "within a **budget**.\n\n"
-            "Each table entry is a method, variant, or wrapped configuration. "
-            "Filters describe the setups that entry supports. API class "
-            "names link to the implementation documentation and its gallery "
-            "of examples using that class. The "
-            ":doc:`Visualizations </generated/sphinx_gallery_examples/index>` "
-            "catalog groups examples by the setup they demonstrate.\n"
-        )
-        file.write("\n")
+        # On narrow screens, the filter starts collapsed to a summary of the
+        # selected options.
         file.write(
             ".. raw:: html\n"
             "\n"
-            '   <section id="strategy-filters" class="strategy-filters" '
+            '   <section id="strategy-filters" '
+            'class="strategy-filters strategy-filters-collapsed" '
             'aria-labelledby="strategy-filter-title" '
             'aria-describedby="strategy-filter-hint" hidden>\n'
             '     <div class="strategy-filter-header">\n'
             '       <h2 id="strategy-filter-title" '
             'class="strategy-filter-title">Filter Strategies</h2>\n'
             '       <button type="button" id="clear-strategy-filters" '
-            'class="strategy-filter-clear">Clear all</button>\n'
+            'class="strategy-filter-button">Clear all</button>\n'
+            '       <button type="button" id="toggle-strategy-filters" '
+            'class="strategy-filter-button strategy-filter-toggle" '
+            'aria-expanded="false" aria-controls="strategy-filter-body">'
+            "Show filters</button>\n"
             "     </div>\n"
-            '     <p id="strategy-filter-hint" '
+            '     <p id="strategy-filter-summary" '
+            'class="strategy-filter-summary"></p>\n'
+            '     <div id="strategy-filter-body" '
+            'class="strategy-filter-body">\n'
+            '       <p id="strategy-filter-hint" '
             'class="strategy-filter-hint">Choose your intended setup, or '
             "leave a group on Any. Pool batching options apply to pool "
             "strategies. With multiple annotators, a batch contains "
-            "sample–annotator pairs.</p>\n"
+            "sample–annotator pairs. Dimmed options match no entries "
+            "together with your other choices.</p>\n"
+            '       <span id="strategy-filter-empty-note" hidden>Matches no '
+            "entries together with your other choices.</span>\n"
         )
         for key, group_name, options in OVERVIEW_FILTERS:
             file.write(
-                '     <fieldset class="strategy-filter-group" '
+                '       <fieldset class="strategy-filter-group" '
                 f'data-filter="{key}">\n'
-                f"       <legend>{group_name}</legend>\n"
-                '       <div class="strategy-filter-options">\n'
+                f"         <legend>{group_name}</legend>\n"
+                '         <div class="strategy-filter-options">\n'
             )
-            for value, label in [("", "Any")] + options:
+            for value, label, pictogram in [("", "Any", None)] + options:
                 option_id = f"strategy-filter-{key}-{value or 'any'}"
                 checked = " checked" if not value else ""
+                any_class = "" if pictogram else " strategy-filter-any"
+                image = (
+                    '             <img class="dark-light" '
+                    f'src="../_static/strategy_filters/{pictogram}.svg" '
+                    'alt="" width="120" height="64">\n'
+                    if pictogram
+                    else ""
+                )
                 file.write(
-                    '         <label class="strategy-filter-option" '
-                    f'for="{option_id}">\n'
-                    '           <input type="radio" '
+                    '           <label class="strategy-filter-option'
+                    f'{any_class}" for="{option_id}">\n'
+                    '             <input type="radio" '
                     f'name="strategy-{key}" id="{option_id}" '
                     f'value="{value}"{checked}>\n'
-                    f"           <span>{label}</span>\n"
-                    "         </label>\n"
+                    f"{image}"
+                    f"             <span>{label}</span>\n"
+                    "           </label>\n"
                 )
-            file.write("       </div>\n     </fieldset>\n")
+            file.write("         </div>\n       </fieldset>\n")
         file.write(
+            "     </div>\n"
             '     <p id="tag-filter-status" class="strategy-filter-status" '
             'role="status" aria-atomic="true"></p>\n'
             "   </section>\n"
@@ -813,51 +862,36 @@ def json_data_to_strategy_table(json_data, gen_path):
             for ref in data["refs"]:
                 ref_text += f":footcite:t:`{ref}`, "
             ref_text = ref_text[0:-2]
-            category = (
-                data["category"]
-                if "category" in data.keys() and data["category"] != ""
-                else "Others"
-            )
 
-            properties = [f"**{category}**"]
-            setups = metadata["capabilities"]
-            target_labels = {
-                (
-                    "classification",
-                    "single-output",
-                ): "Single-output classification",
-                (
-                    "classification",
-                    "multi-label",
-                ): "Multi-label classification",
-                ("regression", "single-output"): "Regression",
-            }
-            for setup, label in target_labels.items():
-                if any(capability[:2] == setup for capability in setups):
-                    properties.append(label)
+            # The category badge comes first, followed by badges with the
+            # filter's labels. Notes follow in a separate paragraph.
+            properties = [f":bdg-secondary:`{data['category']}`"]
             properties.extend(
-                label
-                for value, label in [
-                    ("single-annotator", "Single annotator"),
-                    ("multi-annotator", "Multiple annotators"),
-                ]
-                if any(capability[2] == value for capability in setups)
+                f":bdg:`{label}`"
+                for index, value, label in OVERVIEW_SETUP_LABELS
+                if any(
+                    setup[index] == value for setup in metadata["capabilities"]
+                )
             )
+            notes = []
             if data["class"] == "SubSamplingWrapper":
-                properties.append("Batch rule depends on wrapped strategy")
-            elif metadata["batch"]:
-                properties.extend(
-                    OVERVIEW_BATCH_LABELS[value] for value in metadata["batch"]
-                )
+                notes.append("Batch rule depends on wrapped strategy")
             else:
-                properties.append("Stream budget")
-            if metadata["conditional"]:
-                properties.append(
-                    "Target type support depends on wrapped strategy"
+                properties.extend(
+                    f":bdg:`{OVERVIEW_BATCH_LABELS[value]}`"
+                    for value in metadata["batch"]
                 )
+            if metadata["conditional"]:
+                notes.append("Target type support depends on wrapped strategy")
             if data.get("batch_note"):
-                properties.append(data["batch_note"])
-            properties_text = "\n".join(f"| {value}" for value in properties)
+                notes.append(data["batch_note"])
+            properties_text = " ".join(properties)
+            if notes:
+                properties_text += (
+                    "\n\n"
+                    + ". ".join(note.rstrip(".") for note in notes)
+                    + "."
+                )
             scenario = data["package"].split(".")[0]
             rows_by_scenario[scenario].append(
                 [

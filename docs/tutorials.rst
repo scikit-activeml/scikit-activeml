@@ -27,7 +27,9 @@ Getting Started
 ---------------
 
 Start with the tutorial that matches how your samples arrive and what your
-labels look like. The :doc:`Concepts </concepts>` page explains both.
+labels look like. The :doc:`Concepts </concepts>` page explains both, and the
+:doc:`Strategy Overview </generated/strategy_overview>` lists the matching
+query strategies.
 
 .. grid:: 1 2 3 3
    :gutter: 3

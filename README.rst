@@ -406,9 +406,10 @@ For better orientation, we provide an `overview <https://scikit-activeml
 .github.io/latest/generated/strategy_overview.html>`_
 (including paper references and `visual examples <https://scikit-activeml.github.io/latest/generated/sphinx_gallery_examples/index.html>`_)
 of the over **60 query strategies** implemented by scikit-activeml. The
-following mind map illustrates different attributes of a query strategy.
+overview filters them by the properties in the following figure.
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/scikit-activeml-query-strategy-overview.svg
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/query-strategy-properties.svg
+   :alt: Query strategy properties: task, target type, annotation type, selection principle, and pool batching
    :class: dark-light
    :align: center
    :width: 100%

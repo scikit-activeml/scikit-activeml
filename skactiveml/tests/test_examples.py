@@ -11,6 +11,7 @@ from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
 
 from docs.generate import (
+    OVERVIEW_FILTERS,
     OVERVIEW_SCENARIOS,
     check_example_setup,
     generate_examples,
@@ -313,10 +314,11 @@ class TestExamples(unittest.TestCase):
             pool_table.index("Greedy Sampling"),
             pool_table.index("Random Sampling"),
         )
-        self.assertIn("| Single-output classification", pool_table)
-        self.assertIn("| Regression", pool_table)
-        self.assertIn("| Multiple annotators", pool_table)
-        self.assertIn("| **Representativeness**", pool_table)
+        self.assertIn(":bdg:`Single-output`", pool_table)
+        self.assertIn(":bdg:`Regression`", pool_table)
+        self.assertIn(":bdg:`Multiple annotators`", pool_table)
+        self.assertIn(":bdg-secondary:`Representativeness`", pool_table)
+        self.assertNotIn("Stream budget", stream_table)
         self.assertIn("API class", pool_table)
         self.assertNotIn("Base Class", overview)
         self.assertNotIn("\nClassification\n", overview)
@@ -367,18 +369,37 @@ class TestExamples(unittest.TestCase):
             "multi-label",
             "single-annotator",
             "multi-annotator",
+            "informativeness",
+            "representativeness",
+            "hybrid",
+            "baseline",
             "top-k-batch",
             "diverse-batch",
             "random-batch",
-            "single-sample",
-            "batch",
         ]:
             with self.subTest(tag=tag):
                 self.assertIn(f'value="{tag}"', overview)
         self.assertIn("<span>Multi-label</span>", overview)
-        self.assertEqual(overview.count('value="" checked'), 4)
+        for _, _, options in OVERVIEW_FILTERS:
+            for _, _, pictogram in options:
+                with self.subTest(pictogram=pictogram):
+                    self.assertIn(
+                        f"_static/strategy_filters/{pictogram}.svg", overview
+                    )
+                    self.assertTrue(
+                        path.isfile(
+                            path.join(
+                                self.skaml_path,
+                                "docs",
+                                "_static",
+                                "strategy_filters",
+                                f"{pictogram}.svg",
+                            )
+                        )
+                    )
+        self.assertEqual(overview.count('value="" checked'), 5)
         self.assertNotIn('type="checkbox"', overview)
-        for name in ["task", "target", "annotators", "batch"]:
+        for name in ["task", "target", "annotators", "principle", "batch"]:
             self.assertIn(f'name="strategy-{name}"', overview)
         self.assertIn("RandomSampling", overview)
         self.assertIn(
@@ -467,6 +488,12 @@ class TestExamples(unittest.TestCase):
             ],
             ["diverse-batch"],
         )
+        self.assertEqual(
+            metadata("SingleAnnotatorWrapper", "Core Set + Greedy Selection")[
+                "principle"
+            ],
+            "representativeness",
+        )
         for name in ["SubSamplingWrapper", "ParallelUtilityEstimationWrapper"]:
             self.assertTrue(metadata(name)["conditional"])
 
@@ -485,6 +512,9 @@ class TestExamples(unittest.TestCase):
         data = self._overview_example("RandomSampling", "Random", "Baseline")
         data["tags"].append("single-sample")
         with self.assertRaisesRegex(ValueError, "pool batching"):
+            get_strategy_metadata(data)
+        data = self._overview_example("RandomSampling", "Random", "Others")
+        with self.assertRaisesRegex(ValueError, "Unknown category"):
             get_strategy_metadata(data)
 
     def test_visualizations_group_by_demonstrated_setup(self):
@@ -709,8 +739,7 @@ class TestExamples(unittest.TestCase):
             rendered,
         )
         self.assertIn(
-            ".. image:: /logos/scikit-activeml-query-strategy-overview.svg",
-            rendered,
+            ".. image:: /logos/query-strategy-properties.svg", rendered
         )
         self.assertIn(".. image:: /logos/readme_pool.gif", rendered)
         self.assertIn(".. image:: /logos/readme_stream.gif", rendered)

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="120" height="64" viewBox="0 0 120 64">
+  <!-- Strategy filter pictogram in the style of the tutorial-*.svg
+       pictograms. Mid-tone colors on a transparent background suit
+       light and dark mode. -->
+  <defs>
+    <style>
+      .axis { fill: none; stroke: #8c8c8c; stroke-width: 1.4; marker-end: url(#arrow); }
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .query { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 2.2; }
+      .boundary { stroke: #8c8c8c; stroke-width: 1.5; stroke-dasharray: 4 3; }
+      .tint { fill: #07aee6; fill-opacity: .10; }
+    </style>
+    <marker id="arrow" markerWidth="6" markerHeight="5" refX="5" refY="2.5"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L6 2.5 L0 5 L1.5 2.5 Z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+
+  <!-- The principle and batch pictograms share one scene: a dense cluster
+       far from the decision boundary, a dense cluster on it, and
+       isolated samples on it.
+       Top-k: the batch holds neighboring samples with the highest utilities. -->
+  <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+  <path class="boundary" d="M48 60 L84 4"/>
+  <path class="axis" d="M8 61 V3"/>
+  <path class="axis" d="M8 61 H117"/>
+  <circle class="query" cx="64" cy="35" r="8.5"/>
+  <circle class="query" cx="73" cy="30" r="8.5"/>
+  <circle class="query" cx="68" cy="45" r="8.5"/>
+  <circle class="labeled" cx="20" cy="53" r="4.4"/>
+  <circle class="labeled" cx="104" cy="50" r="4.4"/>
+  <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+  <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+  <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+  <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+  <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+  <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+  <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+  <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+  <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+  <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+  <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+</svg>

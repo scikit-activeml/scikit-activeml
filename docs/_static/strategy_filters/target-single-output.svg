@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="120" height="64" viewBox="0 0 120 64">
+  <!-- Strategy filter pictogram in the style of the tutorial-*.svg
+       pictograms. Mid-tone colors on a transparent background suit
+       light and dark mode. -->
+  <defs>
+    <style>
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .link { stroke: #8c8c8c; stroke-width: 1.1; }
+      .positive { fill: #2a7fff; }
+      .missing { fill: none; stroke: #8c8c8c; stroke-width: 1.2; stroke-dasharray: 2.5 2; }
+      .queried { fill: none; stroke: #f8a661; stroke-width: 1.2; stroke-dasharray: 2.5 2; }
+      .query-row { fill: #f8a661; fill-opacity: .14; stroke: #f8a661; stroke-width: 1.2; }
+    </style>
+  </defs>
+
+  <!-- Each sample has one label, and a query asks for it. -->
+  <circle class="labeled" cx="50" cy="12" r="3.6"/>
+  <path class="link" d="M57 12 H66"/>
+  <rect class="positive" x="70" y="6" width="12" height="12" rx="2.5"/>
+  <rect class="query-row" x="38" y="22" width="57" height="20" rx="6"/>
+  <circle class="unlabeled" cx="50" cy="32" r="3.6"/>
+  <path class="link" d="M57 32 H66"/>
+  <rect class="queried" x="70" y="26" width="12" height="12" rx="2.5"/>
+  <circle class="unlabeled" cx="50" cy="52" r="3.6"/>
+  <path class="link" d="M57 52 H66"/>
+  <rect class="missing" x="70" y="46" width="12" height="12" rx="2.5"/>
+</svg>

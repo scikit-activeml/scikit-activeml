@@ -89,8 +89,13 @@ A learning setting combines three properties of the labels:
 
 The supported combinations depend on the estimator and query strategy. The
 :doc:`Strategy Overview <generated/strategy_overview>` filters query
-strategies by these properties, and the :doc:`Tutorials <tutorials>` page
-starts with a getting-started tutorial for each of these settings.
+strategies by these properties, for example to list the strategies for
+`regression <generated/strategy_overview.html?task=regression>`__,
+`multi-label classification
+<generated/strategy_overview.html?target=multi-label>`__, or `multiple
+annotators <generated/strategy_overview.html?annotators=multi-annotator>`__.
+The :doc:`Tutorials <tutorials>` page starts with a getting-started tutorial
+for each of these settings.
 
 .. note::
 

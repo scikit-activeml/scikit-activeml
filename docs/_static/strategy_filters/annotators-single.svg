@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="120" height="64" viewBox="0 0 120 64">
+  <!-- Strategy filter pictogram in the style of the tutorial-*.svg
+       pictograms. Mid-tone colors on a transparent background suit
+       light and dark mode. -->
+  <defs>
+    <style>
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .query { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 2.2; }
+      .pair { stroke: #8c8c8c; stroke-width: 1.2; stroke-dasharray: 3 2.5; }
+      .bubble { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 1.3; }
+      .answer { font: bold 11px "Nimbus Mono PS", "Courier New", monospace; text-anchor: middle; fill: #8c8c8c; }
+    </style>
+    <g id="annotator">
+      <circle cx="0" cy="0" r="5.5"/>
+      <rect x="-8.5" y="7" width="17" height="12" rx="5"/>
+    </g>
+  </defs>
+
+  <!-- A query asks one annotator for the label. -->
+  <circle class="query" cx="28" cy="36" r="8.5"/>
+  <circle class="unlabeled" cx="28" cy="36" r="4.4"/>
+  <path class="pair" d="M38 34 L64 30"/>
+  <use xlink:href="#annotator" x="76" y="26" fill="#2a7fff"/>
+  <path class="bubble" d="M87 15 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+  <text class="answer" x="99.5" y="18.5">y</text>
+</svg>

@@ -25,7 +25,7 @@
     "class" : "SingleAnnotatorWrapper",
     "package" : "pool.multiannotator",
     "method" : "Core Set + Greedy Selection",
-    "category" : "Baseline",
+    "category" : "Representativeness",
     "template" : "examples/template_pool_multi_annotator.py",
     "tags" : ["pool", "classification", "multi-annotator", "diverse-batch"],
     "example_setup" : {

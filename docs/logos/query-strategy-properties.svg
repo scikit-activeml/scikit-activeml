@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1240" height="336" viewBox="0 0 1240 336"
+     role="img" aria-labelledby="title">
+  <!-- README.rst shows this figure, and the documentation's home page
+       includes that README section. GitHub and PyPI show it without
+       the documentation's styles, so it has its own background and
+       switches to dark colors by itself. It repeats the pictograms in
+       docs/_static/strategy_filters/. Keep both in sync. -->
+  <title id="title">The properties by which the Strategy Overview filters
+    query strategies: task, target type, annotation type, selection
+    principle, and pool batching.</title>
+  <defs>
+    <style>
+      .axis { fill: none; stroke: #8c8c8c; stroke-width: 1.4; marker-end: url(#arrow); }
+      .labeled { fill: #2a7fff; stroke: #8c8c8c; stroke-width: 1; }
+      .unlabeled { fill: none; stroke: #8c8c8c; stroke-width: 1.6; }
+      .query { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 2.2; }
+      .boundary { stroke: #8c8c8c; stroke-width: 1.5; stroke-dasharray: 4 3; }
+      .tint { fill: #07aee6; fill-opacity: .10; }
+      .density { fill: #8c8c8c; fill-opacity: .16; }
+      .link { stroke: #8c8c8c; stroke-width: 1.1; }
+      .positive { fill: #2a7fff; }
+      .negative { fill: none; stroke: #2a7fff; stroke-width: 1.3; }
+      .missing { fill: none; stroke: #8c8c8c; stroke-width: 1.2; stroke-dasharray: 2.5 2; }
+      .queried { fill: none; stroke: #f8a661; stroke-width: 1.2; stroke-dasharray: 2.5 2; }
+      .query-row { fill: #f8a661; fill-opacity: .14; stroke: #f8a661; stroke-width: 1.2; }
+      .pair { stroke: #8c8c8c; stroke-width: 1.2; stroke-dasharray: 3 2.5; }
+      .bubble { fill: #f8a661; fill-opacity: .28; stroke: #f8a661; stroke-width: 1.3; }
+      .answer { font: bold 11px "Nimbus Mono PS", "Courier New", monospace; text-anchor: middle; fill: #8c8c8c; }
+      .die { fill: none; stroke: #8c8c8c; stroke-width: 1.2; }
+      .pip { fill: #8c8c8c; }
+      .card { fill: #ffffff; stroke: #d0d7de; }
+      .frame { fill: none; stroke: #d0d7de; stroke-width: 1.2; }
+      .kicker { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+                letter-spacing: .06em; fill: #57606a; }
+      .label { font: 500 14px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+               text-anchor: middle; fill: #1f2328; }
+      @media (prefers-color-scheme: dark) {
+        .card { fill: #0d1117; stroke: #3d444d; }
+        .frame { stroke: #3d444d; }
+        .kicker { fill: #9198a1; }
+        .label { fill: #e6edf3; }
+      }
+    </style>
+    <marker id="arrow" markerWidth="6" markerHeight="5" refX="5" refY="2.5"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L6 2.5 L0 5 L1.5 2.5 Z" fill="#8c8c8c"/>
+    </marker>
+    <g id="annotator">
+      <circle cx="0" cy="0" r="5.5"/>
+      <rect x="-8.5" y="7" width="17" height="12" rx="5"/>
+    </g>
+  </defs>
+
+  <rect class="card" x=".5" y=".5" width="1239" height="335" rx="14"/>
+
+  <!-- Task -->
+  <rect class="frame" x="20" y="20" width="389.333" height="140" rx="12"/>
+  <text class="kicker" x="36" y="46">TASK</text>
+  <g transform="translate(63.3333 60)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="66" cy="32" r="8.5"/>
+    <circle class="labeled" cx="22" cy="44" r="4.4"/>
+    <circle class="labeled" cx="34" cy="16" r="4.4"/>
+    <circle class="labeled" cx="92" cy="46" r="4.4"/>
+    <circle class="labeled" cx="104" cy="20" r="4.4"/>
+    <circle class="unlabeled" cx="26" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="46" cy="38" r="4.4"/>
+    <circle class="unlabeled" cx="66" cy="32" r="4.4"/>
+    <circle class="unlabeled" cx="86" cy="22" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="36" r="4.4"/>
+  </g>
+  <text class="label" x="123.333" y="144">Classification</text>
+  <g transform="translate(246 60)">
+    <path class="axis" d="M8 45 V3"/>
+    <path class="axis" d="M8 45 H117"/>
+    <path d="M14 36 C30 12 46 10 60 25 S90 42 112 14" fill="none" stroke="#07aee6" stroke-opacity=".18" stroke-width="11" stroke-linecap="round"/>
+    <path d="M14 36 C30 12 46 10 60 25 S90 42 112 14" fill="none" stroke="#8c8c8c" stroke-width="1.6"/>
+    <circle class="labeled" cx="24" cy="21" r="4.4"/>
+    <circle class="labeled" cx="60" cy="25" r="4.4"/>
+    <circle class="labeled" cx="98" cy="29" r="4.4"/>
+    <path d="M80 45 V35" stroke="#f8a661" stroke-width="1.8" stroke-dasharray="3 2"/>
+    <circle class="query" cx="80" cy="54" r="8.5"/>
+    <circle class="unlabeled" cx="36" cy="54" r="4.4"/>
+    <circle class="unlabeled" cx="58" cy="54" r="4.4"/>
+    <circle class="unlabeled" cx="80" cy="54" r="4.4"/>
+    <circle class="unlabeled" cx="104" cy="54" r="4.4"/>
+  </g>
+  <text class="label" x="306" y="144">Regression</text>
+
+  <!-- Target Type -->
+  <rect class="frame" x="425.333" y="20" width="389.333" height="140" rx="12"/>
+  <text class="kicker" x="441.333" y="46">TARGET TYPE</text>
+  <g transform="translate(468.667 60)">
+    <circle class="labeled" cx="50" cy="12" r="3.6"/>
+    <path class="link" d="M57 12 H66"/>
+    <rect class="positive" x="70" y="6" width="12" height="12" rx="2.5"/>
+    <rect class="query-row" x="38" y="22" width="57" height="20" rx="6"/>
+    <circle class="unlabeled" cx="50" cy="32" r="3.6"/>
+    <path class="link" d="M57 32 H66"/>
+    <rect class="queried" x="70" y="26" width="12" height="12" rx="2.5"/>
+    <circle class="unlabeled" cx="50" cy="52" r="3.6"/>
+    <path class="link" d="M57 52 H66"/>
+    <rect class="missing" x="70" y="46" width="12" height="12" rx="2.5"/>
+  </g>
+  <text class="label" x="528.667" y="144">Single-output</text>
+  <g transform="translate(651.333 60)">
+    <circle class="labeled" cx="26" cy="12" r="3.6"/>
+    <path class="link" d="M33 12 H42"/>
+    <rect class="positive" x="46" y="6" width="12" height="12" rx="2.5"/>
+    <rect class="negative" x="61" y="6" width="12" height="12" rx="2.5"/>
+    <rect class="positive" x="76" y="6" width="12" height="12" rx="2.5"/>
+    <rect class="negative" x="91" y="6" width="12" height="12" rx="2.5"/>
+    <rect class="query-row" x="14" y="22" width="102" height="20" rx="6"/>
+    <circle class="unlabeled" cx="26" cy="32" r="3.6"/>
+    <path class="link" d="M33 32 H42"/>
+    <rect class="queried" x="46" y="26" width="12" height="12" rx="2.5"/>
+    <rect class="queried" x="61" y="26" width="12" height="12" rx="2.5"/>
+    <rect class="queried" x="76" y="26" width="12" height="12" rx="2.5"/>
+    <rect class="queried" x="91" y="26" width="12" height="12" rx="2.5"/>
+    <circle class="unlabeled" cx="26" cy="52" r="3.6"/>
+    <path class="link" d="M33 52 H42"/>
+    <rect class="missing" x="46" y="46" width="12" height="12" rx="2.5"/>
+    <rect class="missing" x="61" y="46" width="12" height="12" rx="2.5"/>
+    <rect class="missing" x="76" y="46" width="12" height="12" rx="2.5"/>
+    <rect class="missing" x="91" y="46" width="12" height="12" rx="2.5"/>
+  </g>
+  <text class="label" x="711.333" y="144">Multi-label</text>
+
+  <!-- Annotation Type -->
+  <rect class="frame" x="830.667" y="20" width="389.333" height="140" rx="12"/>
+  <text class="kicker" x="846.667" y="46">ANNOTATION TYPE</text>
+  <g transform="translate(874 60)">
+    <circle class="query" cx="28" cy="36" r="8.5"/>
+    <circle class="unlabeled" cx="28" cy="36" r="4.4"/>
+    <path class="pair" d="M38 34 L64 30"/>
+    <use xlink:href="#annotator" x="76" y="26" fill="#2a7fff"/>
+    <path class="bubble" d="M87 15 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+    <text class="answer" x="99.5" y="18.5">y</text>
+  </g>
+  <text class="label" x="934" y="144">Single annotator</text>
+  <g transform="translate(1056.67 60)">
+    <circle class="query" cx="14" cy="33" r="8.5"/>
+    <circle class="unlabeled" cx="14" cy="33" r="4.4"/>
+    <path class="pair" d="M24 29 L48 15"/>
+    <path class="pair" d="M24 37 L48 47"/>
+    <use xlink:href="#annotator" x="58" y="10" fill="#2a7fff"/>
+    <path class="bubble" d="M69 8 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+    <text class="answer" x="81.5" y="11.5">y</text>
+    <use xlink:href="#annotator" x="58" y="42" fill="#2a7fff"/>
+    <path class="bubble" d="M69 40 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+    <text class="answer" x="81.5" y="43.5">y</text>
+    <use xlink:href="#annotator" x="110" y="28" fill="#8c8c8c" fill-opacity=".55"/>
+  </g>
+  <text class="label" x="1116.67" y="144">Multiple annotators</text>
+
+  <!-- Selection Principle -->
+  <rect class="frame" x="20" y="176" width="676.571" height="140" rx="12"/>
+  <text class="kicker" x="36" y="202">SELECTION PRINCIPLE</text>
+  <g transform="translate(53.5714 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <ellipse class="density" cx="25" cy="35" rx="17" ry="15"/>
+    <ellipse class="density" cx="64" cy="37" rx="17" ry="15"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="79" cy="12" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+  </g>
+  <text class="label" x="113.571" y="300">Informativeness</text>
+  <g transform="translate(216.714 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <ellipse class="density" cx="25" cy="35" rx="17" ry="15"/>
+    <ellipse class="density" cx="64" cy="37" rx="17" ry="15"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="25" cy="33" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+  </g>
+  <text class="label" x="276.714" y="300">Representativeness</text>
+  <g transform="translate(379.857 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <ellipse class="density" cx="25" cy="35" rx="17" ry="15"/>
+    <ellipse class="density" cx="64" cy="37" rx="17" ry="15"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="64" cy="35" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+  </g>
+  <text class="label" x="439.857" y="300">Hybrid</text>
+  <g transform="translate(543 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <ellipse class="density" cx="25" cy="35" rx="17" ry="15"/>
+    <ellipse class="density" cx="64" cy="37" rx="17" ry="15"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="100" cy="26" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+    <rect class="die" x="44" y="3" width="16" height="16" rx="3"/>
+    <circle class="pip" cx="48" cy="7" r="1.5"/>
+    <circle class="pip" cx="52" cy="11" r="1.5"/>
+    <circle class="pip" cx="56" cy="15" r="1.5"/>
+  </g>
+  <text class="label" x="603" y="300">Baseline</text>
+
+  <!-- Pool Batching -->
+  <rect class="frame" x="712.571" y="176" width="507.429" height="140" rx="12"/>
+  <text class="kicker" x="728.571" y="202">POOL BATCHING</text>
+  <g transform="translate(745.143 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="64" cy="35" r="8.5"/>
+    <circle class="query" cx="73" cy="30" r="8.5"/>
+    <circle class="query" cx="68" cy="45" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+  </g>
+  <text class="label" x="805.143" y="300">Top-k</text>
+  <g transform="translate(906.286 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="79" cy="12" r="8.5"/>
+    <circle class="query" cx="64" cy="35" r="8.5"/>
+    <circle class="query" cx="54" cy="51" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+  </g>
+  <text class="label" x="966.286" y="300">Diverse</text>
+  <g transform="translate(1067.43 216)">
+    <path class="tint" d="M48 60 L84 4 H116 V60 Z"/>
+    <path class="boundary" d="M48 60 L84 4"/>
+    <path class="axis" d="M8 61 V3"/>
+    <path class="axis" d="M8 61 H117"/>
+    <circle class="query" cx="16" cy="27" r="8.5"/>
+    <circle class="query" cx="100" cy="26" r="8.5"/>
+    <circle class="query" cx="54" cy="51" r="8.5"/>
+    <circle class="labeled" cx="20" cy="53" r="4.4"/>
+    <circle class="labeled" cx="104" cy="50" r="4.4"/>
+    <circle class="unlabeled" cx="16" cy="27" r="4.4"/>
+    <circle class="unlabeled" cx="34" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="33" r="4.4"/>
+    <circle class="unlabeled" cx="25" cy="43" r="4.4"/>
+    <circle class="unlabeled" cx="55" cy="28" r="4.4"/>
+    <circle class="unlabeled" cx="73" cy="30" r="4.4"/>
+    <circle class="unlabeled" cx="64" cy="35" r="4.4"/>
+    <circle class="unlabeled" cx="68" cy="45" r="4.4"/>
+    <circle class="unlabeled" cx="79" cy="12" r="4.4"/>
+    <circle class="unlabeled" cx="54" cy="51" r="4.4"/>
+    <circle class="unlabeled" cx="100" cy="26" r="4.4"/>
+    <rect class="die" x="44" y="3" width="16" height="16" rx="3"/>
+    <circle class="pip" cx="48" cy="7" r="1.5"/>
+    <circle class="pip" cx="52" cy="11" r="1.5"/>
+    <circle class="pip" cx="56" cy="15" r="1.5"/>
+  </g>
+  <text class="label" x="1127.43" y="300">Random</text>
+</svg>
