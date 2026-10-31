@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** DropQuery incorporates both uncertainty and sample diversity into every selected batch. For this purpose, unlabeled samples are filtered according to a disagreement-based measure via dropout such that only the unlabeled samples with a disagreement above a threshold are clustered for selecting the unlabeled samples nearest to the respective clusters.",
     "import_misc" : "from skactiveml.pool import DropQuery",
-    "init_qs" : "DropQuery()",
+    "init_qs" : "DropQuery(random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf"
 }
 ]

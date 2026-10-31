@@ -22,7 +22,8 @@
                  "                      consider_labeled=False,",
                  "                      candidate_to_labeled=True,",
                  "                      subtract_current=True,",
-                 "                      normalize=True)"],
+                 "                      normalize=True,",
+                 "                      random_state=random_state)"],
     "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
@@ -47,7 +48,8 @@
     "init_qs" : ["ValueOfInformationEER(consider_unlabeled=False,",
                  "                      consider_labeled=True,",
                  "                      candidate_to_labeled=False,",
-                 "                      subtract_current=False)"],
+                 "                      subtract_current=False,",
+                 "                      random_state=random_state)"],
     "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
@@ -72,7 +74,8 @@
     "init_qs" : ["ValueOfInformationEER(consider_unlabeled=True,",
                  "                      consider_labeled=True,",
                  "                      candidate_to_labeled=True,",
-                 "                      subtract_current=True)"],
+                 "                      subtract_current=True,",
+                 "                      random_state=random_state)"],
     "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
@@ -94,7 +97,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "EER selects the unlabeled sample whose label, in expectation, would most reduce future log-loss after retraining. In practice it approximates this one-step lookahead with Monte Carlo over possible labels, but it is computationally heavy and sensitive to calibration of class probabilities.",
     "import_misc" : "from skactiveml.pool import MonteCarloEER",
-    "init_qs" : "MonteCarloEER(method='log_loss')",
+    "init_qs" : "MonteCarloEER(method='log_loss', random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
@@ -116,7 +119,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "EER selects the unlabeled sample whose label, in expectation, would most reduce future misclassification rate after retraining. In practice it approximates this one-step lookahead with Monte Carlo over possible labels, but it is computationally heavy and sensitive to calibration of class probabilities.",
     "import_misc" : "from skactiveml.pool import MonteCarloEER",
-    "init_qs" : "MonteCarloEER(method='misclassification_loss')",
+    "init_qs" : "MonteCarloEER(method='misclassification_loss', random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   }
 ]

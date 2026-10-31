@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** Random sampling is a baseline for comparing query strategies. It selects `batch_size` candidates uniformly without replacement. The returned utilities are 1 for available candidates and `np.nan` for entries excluded from selection, including earlier selections in the batch.",
     "import_misc" : "from skactiveml.pool import RandomSampling",
-    "init_qs" : "RandomSampling()",
+    "init_qs" : "RandomSampling(random_state=random_state)",
     "query_params" : "X=X, y=y"
   }
 ]

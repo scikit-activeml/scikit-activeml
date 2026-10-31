@@ -23,7 +23,7 @@
     ],
     "import_reg" : "from sklearn.gaussian_process import GaussianProcessRegressor",
     "init_reg" : "SklearnRegressor(GaussianProcessRegressor())",
-    "init_qs" : "QueryByCommittee(sample_predictions_method_name='sample_y', sample_predictions_dict={'n_samples': 100})",
+    "init_qs" : "QueryByCommittee(sample_predictions_method_name='sample_y', sample_predictions_dict={'n_samples': 100}, random_state=random_state)",
     "query_params" : "X=X, y=y, ensemble=reg"
   }
 ]

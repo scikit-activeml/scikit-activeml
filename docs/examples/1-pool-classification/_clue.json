@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** CLUE clusters latent embeddings while weighting samples by predictive uncertainty, then picks samples near the cluster centers. The result is a diverse set biased toward uncertain regions of representation space.",
     "import_misc" : "from skactiveml.pool import Clue",
-    "init_qs" : "Clue()",
+    "init_qs" : "Clue(random_state=random_state)",
     "query_params" : "X=X, y=y, estimator=clf"
 }
 ]

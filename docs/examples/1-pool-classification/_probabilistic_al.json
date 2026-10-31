@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** McPAL scores each unlabeled sample by the density-weighted expected gain in a chosen performance metric (e.g., accuracy), integrating a sample's impact, its class posterior, and the posterior's reliability via a closed-form expectation over all possible labelings. This yields a non-myopic selector for multi-class problems. Its effectiveness hinges on calibrated posteriors and sensible density estimates.",
     "import_misc" : "from skactiveml.pool import ProbabilisticAL",
-    "init_qs" : "ProbabilisticAL()",
+    "init_qs" : "ProbabilisticAL(random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf, utility_weight=dens",
     "preproc" : ["dens_est = clf.fit(X, np.zeros(len(X)))",
                  "dens = clf.predict_freq(X)[:, 0]"]

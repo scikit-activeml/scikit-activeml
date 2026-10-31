@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** ALCE embeds the misclassification cost matrix into a hidden space via non-metric multidimensional scaling (with a mirroring trick for asymmetric costs) and trains a multi-output regressor to predict each sample's hidden point. It then defines cost-sensitive uncertainty as the distance from the predicted hidden point to the nearest class point and selects the unlabeled instance with the largest distance, directly prioritizing high-cost confusions.",
     "import_misc" : "from skactiveml.pool import CostEmbeddingAL",
-    "init_qs" : "CostEmbeddingAL(classes=[0, 1])",
+    "init_qs" : "CostEmbeddingAL(classes=[0, 1], random_state=random_state)",
     "query_params" : "X=X, y=y"
   }
 ]

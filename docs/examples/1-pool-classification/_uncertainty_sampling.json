@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** US (margin sampling) samples where the gap between the two most probable classes is smallest.",
     "import_misc" : "from skactiveml.pool import UncertaintySampling",
-    "init_qs" : "UncertaintySampling(method='margin_sampling')",
+    "init_qs" : "UncertaintySampling(method='margin_sampling', random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf",
     "plot_utility_params" : "candidates=None"
   },
@@ -41,7 +41,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** US (least confidence) selects samples whose predicted top class has the lowest confidence.",
     "import_misc" : "from skactiveml.pool import UncertaintySampling",
-    "init_qs" : "UncertaintySampling(method='least_confident')",
+    "init_qs" : "UncertaintySampling(method='least_confident', random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf"
   },
   {
@@ -63,7 +63,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** US (entropy) selects samples with the highest overall predictive uncertainty across classes.",
     "import_misc" : "from skactiveml.pool import UncertaintySampling",
-    "init_qs" : "UncertaintySampling(method='entropy')",
+    "init_qs" : "UncertaintySampling(method='entropy', random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf"
   },
   {
@@ -93,7 +93,7 @@
     ],
     "text_0" : "**Idea:** USAP selects samples with the highest expected improvement in average precision under the model's current predictions.",
     "import_misc" : "from skactiveml.pool import UncertaintySampling",
-    "init_qs" : "UncertaintySampling(method='expected_average_precision')",
+    "init_qs" : "UncertaintySampling(method='expected_average_precision', random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf",
     "plot_utility_params" : "candidates=X"
   },
@@ -119,7 +119,7 @@
     "import_misc" : ["from skactiveml.pool import UncertaintySampling", "from skactiveml.utils import unlabeled_indices"],
     "init_qs" : "UncertaintySampling(method='least_confident', random_state=random_state)",
     "init_clf" : "SklearnClassifier(LogisticRegression(), classes=np.unique(y_true))",
-    "preproc" : "gmm = GaussianMixture(init_params='kmeans', n_components=5)\ngmm.fit(X)\ndensity = np.exp(gmm.score_samples(X))",
+    "preproc" : "gmm = GaussianMixture(init_params='kmeans', n_components=5, random_state=random_state)\ngmm.fit(X)\ndensity = np.exp(gmm.score_samples(X))",
     "query_params" : "X=X, y=y, clf=clf, utility_weight=density",
     "plot_utility_params" : "candidates=unlabeled_indices(y), replace_nan=None"
   },

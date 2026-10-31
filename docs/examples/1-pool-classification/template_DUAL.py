@@ -57,7 +57,9 @@ y = np.full(shape=y_pool.shape, fill_value=MISSING_LABEL)
 clf = SklearnClassifier(LogisticRegression(), classes=np.unique(y_true))
 # Initialise the query strategy.
 qs = UncertaintySampling(method="least_confident", random_state=random_state)
-gmm = GaussianMixture(init_params="kmeans", n_components=5)
+gmm = GaussianMixture(
+    init_params="kmeans", n_components=5, random_state=random_state
+)
 gmm.fit(X)
 density = np.exp(gmm.score_samples(X))
 delta = 0.1

@@ -16,7 +16,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** Fixed-Uncertainty queries a label when the classifier's confidence, the probability of its most likely class, is at or below a fixed threshold. The threshold depends on the budget and the number of classes. The budget manager also limits how often labels are queried.",
     "import_misc" : "from skactiveml.stream import FixedUncertainty",
-    "init_qs" : "FixedUncertainty(budget=0.2, classes=[0, 1])",
+    "init_qs" : "FixedUncertainty(budget=0.2, classes=[0, 1], random_state=random_state)",
     "query_params" : "candidates=X_cand, clf=clf",
     "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   },
@@ -37,7 +37,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** Variable-Uncertainty queries a label when the classifier's confidence, the probability of its most likely class, is below an adaptive threshold and the budget allows it. While budget is available, the threshold decreases after a query and increases when a sample is skipped.",
     "import_misc" : "from skactiveml.stream import VariableUncertainty",
-    "init_qs" : "VariableUncertainty(budget=0.2)",
+    "init_qs" : "VariableUncertainty(budget=0.2, random_state=random_state)",
     "query_params" : "candidates=X_cand, clf=clf",
     "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   },
@@ -58,7 +58,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** Randomized-Variable-Uncertainty queries a label when the probability of the most likely class is below a randomized adaptive threshold and the budget allows it. It multiplies the adaptive threshold by a normally distributed random factor with mean 1 and standard deviation `delta`. While budget is available, the adaptive threshold decreases after a query and increases when a sample is skipped.",
     "import_misc" : "from skactiveml.stream import RandomVariableUncertainty",
-    "init_qs" : "RandomVariableUncertainty(budget=0.2)",
+    "init_qs" : "RandomVariableUncertainty(budget=0.2, random_state=random_state)",
     "query_params" : "candidates=X_cand, clf=clf",
     "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   },
@@ -79,7 +79,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** Split combines random sampling with Variable-Uncertainty. For each sample, it chooses between a random query decision and an uncertainty-based decision. The latter queries when the probability of the most likely class is below an adaptive threshold. Both branches respect the budget, but only the uncertainty branch adjusts the threshold.",
     "import_misc" : "from skactiveml.stream import Split",
-    "init_qs" : "Split(budget=0.2)",
+    "init_qs" : "Split(budget=0.2, random_state=random_state)",
     "query_params" : "candidates=X_cand, clf=clf",
     "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   }

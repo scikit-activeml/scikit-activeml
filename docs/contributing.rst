@@ -1295,7 +1295,7 @@ Each JSON file holds a list of entries. This is ``_badge.json`` in
        "sequence": ["title", "text_0", "plot", "refs"],
        "text_0": "**Idea**: BADGE selects a batch by running k-means++ ...",
        "import_misc": "from skactiveml.pool import Badge",
-       "init_qs": "Badge()",
+       "init_qs": "Badge(random_state=random_state)",
        "query_params": "X=X, y=y, clf=clf"
      }
    ]
@@ -1358,7 +1358,10 @@ Every entry needs these fields:
    ``from skactiveml.pool import Badge``.
 
 ``init_qs``
-   Python code that creates the query strategy, such as ``Badge()``.
+   Python code that creates the query strategy, such as
+   ``Badge(random_state=random_state)``. Pass the template's ``random_state``
+   to the strategy and to every other random component of the entry, so that
+   each build shows the same animation.
 
 ``query_params``
    Python code for the arguments of ``query``, such as ``X=X, y=y, clf=clf``.

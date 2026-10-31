@@ -19,7 +19,7 @@
     "text_0" : "**Idea:** DAL selects samples that make the labeled set better match the unlabeled distribution. It trains a binary discriminator to distinguish labeled vs unlabeled (typically in feature space) and queries the unlabeled points the discriminator rates most unlabeled-like, thus covering underrepresented regions. It does not use predictive uncertainty such that effectiveness hinges on the representation and discriminator calibration.",
     "import_misc" : ["from skactiveml.pool import DiscriminativeAL",
                      "from sklearn import clone"],
-    "init_qs" : "DiscriminativeAL()",
+    "init_qs" : "DiscriminativeAL(random_state=random_state)",
     "query_params" : "X=X, y=y, discriminator=discriminator",
     "preproc" : ["discriminator=clone(clf)"]
   }

@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** UHerding greedily selects a batch by maximizing uncertainty-weighted coverage in feature space. It combines predictive uncertainty from a classifier with a kernel-based coverage objective and adapts the temperature scaling and kernel radius from the currently labeled data. Logits are preferred because they enable temperature scaling directly; if they are unavailable, UHerding falls back to the classifier's probability estimates.",
     "import_misc" : "from skactiveml.pool import UHerding",
-    "init_qs" : "UHerding(normalize_samples=False)",
+    "init_qs" : "UHerding(normalize_samples=False, random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf"
 }
 ]

@@ -18,7 +18,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** CoreSet applies a k-center (farthest-first) selection in an embedding space, seeded by the labeled set, to minimize the maximum distance of unlabeled samples to the labeled/selected samples. It is a pure diversity criterion without explicit consideration of prediction uncertainty.",
     "import_misc" : "from skactiveml.pool import CoreSet",
-    "init_qs" : "CoreSet()",
+    "init_qs" : "CoreSet(random_state=random_state)",
     "query_params" : "X=X, y=y"
 }
 ]

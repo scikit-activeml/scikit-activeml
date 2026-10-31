@@ -20,8 +20,8 @@
     "import_misc" : ["from skactiveml.pool import FourDs",
                      "from sklearn.mixture import GaussianMixture"],
     "import_clf" : "from skactiveml.classifier import MixtureModelClassifier",
-    "init_clf" : "MixtureModelClassifier(classes=[0, 1], mixture_model=GaussianMixture(n_components=5))",
-    "init_qs" : "FourDs()",
+    "init_clf" : "MixtureModelClassifier(classes=[0, 1], mixture_model=GaussianMixture(n_components=5, random_state=random_state), random_state=random_state)",
+    "init_qs" : "FourDs(random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf"
   },
   {
@@ -45,8 +45,8 @@
     "import_misc" : ["from skactiveml.pool import FourDs",
                      "from sklearn.mixture import GaussianMixture"],
     "import_clf" : "from skactiveml.classifier import MixtureModelClassifier",
-    "init_clf" : "MixtureModelClassifier(classes=[0, 1], mixture_model=GaussianMixture(n_components=5))",
-    "init_qs" : "FourDs()",
+    "init_clf" : "MixtureModelClassifier(classes=[0, 1], mixture_model=GaussianMixture(n_components=5, random_state=random_state), random_state=random_state)",
+    "init_qs" : "FourDs(random_state=random_state)",
     "query_params" : "X=X, y=y, clf=clf"
   }
 ]

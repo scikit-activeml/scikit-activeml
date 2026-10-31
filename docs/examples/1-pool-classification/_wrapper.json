@@ -20,8 +20,9 @@
     "import_misc" : "from skactiveml.pool import SubSamplingWrapper, UncertaintySampling",
     "init_qs" : [
       "SubSamplingWrapper(",
-      "    query_strategy=UncertaintySampling(),",
-      "    max_candidates=0.5",
+      "    query_strategy=UncertaintySampling(random_state=random_state),",
+      "    max_candidates=0.5,",
+      "    random_state=random_state,",
       ")"
     ],
     "query_params" : "X=X, y=y, clf=clf",
@@ -48,8 +49,9 @@
     "import_misc" : "from skactiveml.pool import ParallelUtilityEstimationWrapper, ProbabilisticAL",
     "init_qs" : [
       "ParallelUtilityEstimationWrapper(",
-      "    query_strategy=ProbabilisticAL(),",
-      "    n_jobs=4",
+      "    query_strategy=ProbabilisticAL(random_state=random_state),",
+      "    n_jobs=4,",
+      "    random_state=random_state,",
       ")"
     ],
     "query_params" : "X=X, y=y, clf=clf",
