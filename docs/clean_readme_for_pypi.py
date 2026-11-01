@@ -131,17 +131,19 @@ def ensure_blank_before_code_blocks(text: str) -> str:
     return "\n".join(out) + "\n"
 
 
-def pin_raw_urls(text: str, ref: str) -> str:
+def resolve_image_paths(text: str, ref: str | None = None) -> str:
     """
-    Point raw GitHub URLs of the master and development branches to `ref`.
+    Turn the README's relative image paths into raw GitHub URLs at the
+    release tag `ref`, or at the development branch without a tag.
 
     PyPI keeps each release's README, but loads its images from their URLs.
-    Pinned URLs show the images of that release.
+    Tagged URLs show the images of that release.
     """
+    target = f"refs/tags/{ref}" if ref else "refs/heads/development"
     return re.sub(
-        r"(https://raw\.githubusercontent\.com/scikit-activeml/"
-        r"scikit-activeml/)(?:refs/heads/)?(?:master|development)/",
-        rf"\1refs/tags/{ref}/",
+        r"((?:image|figure)::\s+)(docs/)",
+        rf"\1https://raw.githubusercontent.com/scikit-activeml/"
+        rf"scikit-activeml/{target}/\2",
         text,
     )
 
@@ -153,8 +155,7 @@ def main(src, dst, ref=None):
     text = transform_raw_blocks(text)
     text = cleanup_html_fragments(text)
     text = ensure_blank_before_code_blocks(text)
-    if ref:
-        text = pin_raw_urls(text, ref)
+    text = resolve_image_paths(text, ref)
     dst_path.write_text(text, encoding="utf8")
 
 

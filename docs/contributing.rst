@@ -16,7 +16,7 @@ illustrate the inheritance hierarchy among them. Dashed nodes indicate
 functionality that is not yet available in our library. scikit-learn
 is used in this image for identification only and does not imply endorsement.
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
+.. image:: logos/scikit-activeml-structure.png
    :width: 1000
 
 In our package ``skactiveml``, there are three major components:

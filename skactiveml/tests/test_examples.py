@@ -11,7 +11,7 @@ from unittest import mock
 from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
 
-from docs.clean_readme_for_pypi import pin_raw_urls
+from docs.clean_readme_for_pypi import main as clean_readme_for_pypi
 from docs.generate import (
     OVERVIEW_FILTERS,
     OVERVIEW_SCENARIOS,
@@ -756,15 +756,39 @@ class TestExamples(unittest.TestCase):
         with open(readme) as file:
             self.assertEqual(file.read(), original)
 
-    def test_pypi_readme_pins_raw_urls_to_release_tag(self):
-        with open(path.join(self.skaml_path, "README.rst")) as file:
-            pinned = pin_raw_urls(file.read(), "1.1.0")
-        self.assertNotRegex(
-            pinned, r"raw\.githubusercontent\.com/\S*/(master|development)/"
+    def test_pypi_readme_links_images_to_release_tag(self):
+        readme = path.join(self.skaml_path, "README.rst")
+        with open(readme) as file:
+            images = re.findall(r"(?:image|figure)::\s+(\S+)", file.read())
+        for image in images:
+            self.assertNotIn("raw.githubusercontent.com/", image)
+            if not image.startswith("https://"):
+                self.assertTrue(
+                    path.isfile(path.join(self.skaml_path, image)), image
+                )
+        raw = (
+            "https://raw.githubusercontent.com/scikit-activeml/"
+            "scikit-activeml"
         )
-        self.assertIn(
-            "refs/tags/1.1.0/docs/logos/query-strategy-properties.svg", pinned
-        )
+        for ref, target in [
+            ("1.1.0", "refs/tags/1.1.0"),
+            (None, "refs/heads/development"),
+        ]:
+            with self.subTest(ref=ref), tempfile.TemporaryDirectory() as tmp:
+                destination = path.join(tmp, "README-pypi.rst")
+                clean_readme_for_pypi(readme, destination, ref)
+                with open(destination) as file:
+                    linked = file.read()
+                self.assertNotRegex(
+                    linked, r"(?:image|figure)::\s+(?!https?://)"
+                )
+                self.assertIn(
+                    f"{raw}/{target}/docs/logos/query-strategy-properties.svg",
+                    linked,
+                )
+                self.assertIn(
+                    f"{raw}/{target}/docs/logos/readme_pool.gif", linked
+                )
 
     def test_tutorial_documentation_links_in_colab_match_version(self):
         for version in ["latest", "development", "1.0"]:

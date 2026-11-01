@@ -1,6 +1,6 @@
 .. intro_start
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
+.. image:: docs/logos/scikit-activeml-logo.png
    :class: dark-light
    :align: center
    :width: 40%
@@ -52,11 +52,11 @@ snippets are given below:
    :widths: 50 50
    :header-rows: 0
 
-   * - .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/readme_pool.gif
+   * - .. image:: docs/logos/readme_pool.gif
           :width: 100%
           :alt: Pool-based active learning with BADGE on Reuters news: the
                 labeled samples in a t-SNE plot and the learning curve
-     - .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/readme_stream.gif
+     - .. image:: docs/logos/readme_stream.gif
           :width: 100%
           :alt: Stream-based active learning with Split on CIFAR-10 images:
                 the labeled samples in a t-SNE plot, the share of labels,
@@ -423,7 +423,7 @@ For better orientation, we provide an `overview <https://scikit-activeml
 of the over **60 query strategies** implemented by scikit-activeml. The
 overview filters them by the properties in the following figure.
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/query-strategy-properties.svg
+.. image:: docs/logos/query-strategy-properties.svg
    :alt: Query strategy properties: task, target type, annotation type, selection principle, and pool batching
    :class: dark-light
    :align: center
