@@ -117,8 +117,10 @@ names a batch.
 {% macro stream_classification(examples, legends) -%}
 One annotator gives one class label per queried sample. Samples arrive in
 sequence, and the strategy decides within its budget whether to request each
-sample's label. The animation shows arriving samples and the evolving
-decision boundary.
+sample's label. The upper plot shows the arriving samples over time and the
+classifier's decision boundary. The middle plot shows each sample's utility
+and whether its label was queried. The lower plots compare the share of
+queried labels with the budget and show the test accuracy of this run.
 
 {{ legend(legends["stream-classification"]) }}
 

@@ -349,7 +349,7 @@ def _x_marker(color):
     return (
         '<path d="M12 7.6 L13.6 6 L16 8.4 L18.4 6 L20 7.6 L17.6 10 L20 12.4 '
         'L18.4 14 L16 11.6 L13.6 14 L12 12.4 L14.4 10 Z" '
-        f'fill="{color}" stroke="{_POOL_LINE_COLOR}" stroke-width="0.8"/>'
+        f'fill="{color}" stroke="{_LINE_COLOR}" stroke-width="0.8"/>'
     )
 
 
@@ -384,46 +384,45 @@ def _band(color, opacity):
     )
 
 
-_CLASS_COLORS = [to_hex(colormaps["coolwarm"](value)) for value in (0.0, 1.0)]
-_POOL_CLASS_COLORS = ["#2a78d6", "#1baf7a"]
-_POOL_LINE_COLOR = "#222832"
-_POOL_SELECTION_COLOR = "#eb6834"
+_CLASS_COLORS = ["#2a78d6", "#1baf7a"]
+_LINE_COLOR = "#222832"
+_SELECTION_COLOR = "#eb6834"
 
 
-def _pool_samples(values):
+def _samples(values):
     """Legend entries of the sample markers for the two label values."""
     return [
         *[
             (_swatch(_dot("none", edge=color)), f"Unlabeled sample {value}")
-            for value, color in zip(values, _POOL_CLASS_COLORS)
+            for value, color in zip(values, _CLASS_COLORS)
         ],
         *[
             (
-                _swatch(_dot(color, radius=4.5, edge=_POOL_LINE_COLOR)),
+                _swatch(_dot(color, radius=4.5, edge=_LINE_COLOR)),
                 f"Labeled sample {value}",
             )
-            for value, color in zip(values, _POOL_CLASS_COLORS)
+            for value, color in zip(values, _CLASS_COLORS)
         ],
     ]
 
 
-def _pool_boundaries(confidences, utility="Utility"):
+def _boundaries(confidences, utility="Utility"):
     """Legend entries of the decision boundary, the confidence lines for the
     two label values, and the utilities."""
     return [
-        (_swatch(_line(_POOL_LINE_COLOR)), "Decision boundary"),
+        (_swatch(_line(_LINE_COLOR)), "Decision boundary"),
         *[
             (_swatch(_line(color, dashed=True)), f"75% confidence {value}")
-            for value, color in zip(confidences, _POOL_CLASS_COLORS)
+            for value, color in zip(confidences, _CLASS_COLORS)
         ],
         (_swatch(_ramp("Purples", 0.5)), f"{utility}, from low to high"),
     ]
 
 
-_POOL_CLASSES = ["of class 0", "of class 1"]
-_POOL_CLASS_CONFIDENCES = ["for class 0", "for class 1"]
-_POOL_SELECTION = (
-    _swatch(_halo(_POOL_SELECTION_COLOR)),
+_CLASSES = ["of class 0", "of class 1"]
+_CLASS_CONFIDENCES = ["for class 0", "for class 1"]
+_SELECTION = (
+    _swatch(_halo(_SELECTION_COLOR)),
     "Sample selected in this cycle",
 )
 
@@ -431,92 +430,89 @@ _POOL_SELECTION = (
 # plots of the group's templates.
 VISUALIZATION_LEGENDS = {
     "pool-classification": [
-        *_pool_samples(_POOL_CLASSES),
-        _POOL_SELECTION,
-        *_pool_boundaries(_POOL_CLASS_CONFIDENCES),
+        *_samples(_CLASSES),
+        _SELECTION,
+        *_boundaries(_CLASS_CONFIDENCES),
     ],
     "pool-classification-batch": [
-        *_pool_samples(_POOL_CLASSES),
-        (_swatch(_halo(_POOL_SELECTION_COLOR)), "Selection of the panel"),
+        *_samples(_CLASSES),
+        (_swatch(_halo(_SELECTION_COLOR)), "Selection of the panel"),
         (
-            _swatch(_ring(_POOL_SELECTION_COLOR)),
+            _swatch(_ring(_SELECTION_COLOR)),
             "Earlier selection of the batch",
         ),
-        *_pool_boundaries(_POOL_CLASS_CONFIDENCES),
+        *_boundaries(_CLASS_CONFIDENCES),
     ],
     "pool-multilabel": [
-        *_pool_samples(["without the label", "with the label"]),
-        _POOL_SELECTION,
-        *_pool_boundaries(
+        *_samples(["without the label", "with the label"]),
+        _SELECTION,
+        *_boundaries(
             ["that the label is absent", "that the label is present"]
         ),
     ],
     "pool-regression": [
         (_swatch(_dot("none", edge="#8c8c8c")), "Unlabeled sample"),
         (
-            _swatch(
-                _dot(_POOL_CLASS_COLORS[0], radius=4.5, edge=_POOL_LINE_COLOR)
-            ),
+            _swatch(_dot(_CLASS_COLORS[0], radius=4.5, edge=_LINE_COLOR)),
             "Labeled sample",
         ),
-        _POOL_SELECTION,
+        _SELECTION,
         (_swatch(_line("#8c8c8c", width=1.5, dashed=True)), "True function"),
-        (_swatch(_line(_POOL_LINE_COLOR)), "Prediction"),
+        (_swatch(_line(_LINE_COLOR)), "Prediction"),
         (
-            _swatch(_band(_POOL_LINE_COLOR, 0.12)),
+            _swatch(_band(_LINE_COLOR, 0.12)),
             "Prediction ± one standard deviation, if available",
         ),
         (_swatch(_stems("#8c6bb1")), "Utility, from low to high"),
         (
-            _swatch(_tick(_POOL_SELECTION_COLOR)),
+            _swatch(_tick(_SELECTION_COLOR)),
             "Positions of the selected samples",
         ),
     ],
     "pool-multi-annotator": [
-        *_pool_samples(_POOL_CLASSES)[:2],
+        *_samples(_CLASSES)[:2],
         *[
             (
-                _swatch(_dot(color, radius=4.5, edge=_POOL_LINE_COLOR)),
+                _swatch(_dot(color, radius=4.5, edge=_LINE_COLOR)),
                 f"Correct majority vote for class {label}",
             )
-            for label, color in enumerate(_POOL_CLASS_COLORS)
+            for label, color in enumerate(_CLASS_COLORS)
         ],
         *[
             (
                 _swatch(_x_marker(color)),
                 f"Wrong majority vote for class {label}",
             )
-            for label, color in enumerate(_POOL_CLASS_COLORS)
+            for label, color in enumerate(_CLASS_COLORS)
         ],
-        _POOL_SELECTION,
-        *_pool_boundaries(
-            _POOL_CLASS_CONFIDENCES, utility="Mean utility over annotators"
+        _SELECTION,
+        *_boundaries(
+            _CLASS_CONFIDENCES, utility="Mean utility over annotators"
         ),
         (_swatch(_bar("#b9bec6")), "Labels requested earlier"),
         (
-            _swatch(_bar(_POOL_SELECTION_COLOR)),
+            _swatch(_bar(_SELECTION_COLOR)),
             "Labels requested in this cycle",
         ),
-        (_swatch(_tick(_POOL_LINE_COLOR)), "True annotator accuracy"),
+        (_swatch(_tick(_LINE_COLOR)), "True annotator accuracy"),
         (
-            _swatch(_dot(_POOL_LINE_COLOR, radius=3.5)),
+            _swatch(_dot(_LINE_COLOR, radius=3.5)),
             "Estimated annotator accuracy",
         ),
     ],
     "stream-classification": [
-        *[
-            (
-                _swatch(_line(color, width=3, opacity=0.4)),
-                f"Labeled sample of class {label}",
-            )
-            for label, color in enumerate(_CLASS_COLORS)
-        ],
-        (_swatch(_line("#808080", width=3, opacity=0.2)), "Unlabeled sample"),
+        *_samples(_CLASSES),
         (
-            _swatch(_line("#808080", width=6, opacity=0.2)),
-            "Current sample, in its class color if labeled",
+            _swatch(_halo(_SELECTION_COLOR)),
+            "Label queried since the previous frame",
         ),
-        (_swatch(_line("#000000")), "Decision boundary"),
+        (_swatch(_line(_LINE_COLOR)), "Decision boundary over time"),
+        (_swatch(_stems("#8c6bb1")), "Utility, label not queried"),
+        (_swatch(_stems(_SELECTION_COLOR)), "Utility, label queried"),
+        (
+            _swatch(_line("#8c8c8c", width=1.5, dashed=True)),
+            "Budget of the strategy",
+        ),
     ],
 }
 
@@ -529,6 +525,7 @@ LEARNING_CURVE_GROUPS = (
     "pool-multilabel",
     "pool-multi-annotator",
     "pool-regression",
+    "stream-classification",
 )
 
 
