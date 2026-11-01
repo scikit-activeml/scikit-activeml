@@ -4,6 +4,7 @@
    :class: dark-light
    :align: center
    :width: 40%
+   :alt: scikit-activeml
 
 |
 
@@ -53,8 +54,13 @@ snippets are given below:
 
    * - .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/readme_pool.gif
           :width: 100%
+          :alt: Pool-based active learning with BADGE on Reuters news: the
+                labeled samples in a t-SNE plot and the learning curve
      - .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/refs/heads/development/docs/logos/readme_stream.gif
           :width: 100%
+          :alt: Stream-based active learning with Split on CIFAR-10 images:
+                the labeled samples in a t-SNE plot, the share of labels,
+                and the learning curve
 
 .. raw:: html
 
@@ -103,6 +109,9 @@ PyTorch.
    # Define the device depending on its availability.
    device = "cuda" if torch.cuda.is_available() else "cpu"
 
+   # Seed the initialization and training of the network.
+   torch.manual_seed(0)
+
    # Load data from Huggingface and encode it via `sentence_transformers`.
    ds_train = load_dataset("yangwang825/reuters-21578", split="train")
    ds_test = load_dataset("yangwang825/reuters-21578", split="test")
@@ -118,16 +127,16 @@ PyTorch.
    # - classification logits,
    # - learned sample embeddings.
    class ClassificationModule(nn.Module):
-        def __init__(self, n_features, n_classes, n_hidden_units):
-            super().__init__()
-            self.linear_1 = nn.Linear(n_features, n_hidden_units)
-            self.linear_2 = nn.Linear(n_hidden_units, n_classes)
-            self.activation = nn.ReLU()
+       def __init__(self, n_features, n_classes, n_hidden_units):
+           super().__init__()
+           self.linear_1 = nn.Linear(n_features, n_hidden_units)
+           self.linear_2 = nn.Linear(n_hidden_units, n_classes)
+           self.activation = nn.ReLU()
 
-        def forward(self, x):
-            x_embed = self.linear_1(x)
-            logits = self.linear_2(self.activation(x_embed))
-            return logits, x_embed
+       def forward(self, x):
+           x_embed = self.linear_1(x)
+           logits = self.linear_2(self.activation(x_embed))
+           return logits, x_embed
 
    # Wrap your torch module via a `skactiveml` wrapper, which requires the
    # definition of training parameters.
@@ -171,6 +180,7 @@ PyTorch.
    qs = Badge(
        missing_label=missing_label,
        clf_embedding_flag_name={"extra_outputs": "emb"},
+       random_state=0,
    )
 
    # Define the active learning parameters.
@@ -209,8 +219,8 @@ The following snippet implements a stream-based active learning cycle over
 300 time steps on CIFAR-10 embeddings computed with the pretrained DINOv2
 vision transformer. A PyTorch-based classifier
 (wrapped via :code:`SkorchClassifier`) is trained online, and the
-Split query strategy is used with a labeling budget of 10% of the
-stream. Unlabeled data is represented by the value :code:`missing_label` in
+Split query strategy is used with a labeling budget of 10%, which its
+budget manager tracks over about the last 100 samples. Unlabeled data is represented by the value :code:`missing_label` in
 the label vector :code:`y_train`. Note that the packages `torch <https://pytorch.org/>`_,
 `transformers <https://huggingface.co/docs/transformers/en/quicktour>`_, and `datasets
 <https://huggingface.co/docs/datasets/en/quickstart>`_ are not included in the
@@ -240,7 +250,10 @@ PyTorch.
    # Define the device depending on its availability.
    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-   # Load data.
+   # Seed the initialization and training of the network.
+   torch.manual_seed(0)
+
+   # Load data and embed the stream and test images.
    ds = load_dataset("cifar10")
    processor = AutoImageProcessor.from_pretrained(
        "facebook/dinov2-small", use_fast=True
@@ -252,11 +265,13 @@ PyTorch.
            out = model(**inputs).last_hidden_state[:, 0]
        batch["emb"] = out.cpu().numpy()
        return batch
-   ds = ds.map(embed, batched=True, batch_size=128)
-   X_stream = np.stack(ds["train"]["emb"], dtype=np.float32)[:300]
-   y_stream = np.array(ds["train"]["label"], dtype=np.int64)[:300]
-   X_test = np.stack(ds["test"]["emb"], dtype=np.float32)
-   y_test = np.array(ds["test"]["label"], dtype=np.int64)
+   ds_stream = ds["train"].select(range(300))
+   ds_stream = ds_stream.map(embed, batched=True, batch_size=128)
+   ds_test = ds["test"].map(embed, batched=True, batch_size=128)
+   X_stream = np.stack(ds_stream["emb"], dtype=np.float32)
+   y_stream = np.array(ds_stream["label"], dtype=np.int64)
+   X_test = np.stack(ds_test["emb"], dtype=np.float32)
+   y_test = np.array(ds_test["label"], dtype=np.int64)
    n_features, classes = X_stream.shape[1], np.unique(y_stream)
    missing_label = -1
 
@@ -304,7 +319,7 @@ PyTorch.
        missing_label=missing_label,
    ).initialize()
 
-   # Initialize training data as empty lists.
+   # Start the stream with zero initial labels.
    y_train = np.full_like(y_stream, missing_label)
 
    # Execute active learning cycle.
