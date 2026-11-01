@@ -102,9 +102,12 @@ samples whose complete label vector is predicted correctly.
 {%- endmacro %}
 
 {% macro pool_regression(examples, legends) -%}
-One annotator gives a continuous label for each selected sample. Two plots
-show the fitted regression curve and the utilities. Examples acquire one
-sample per cycle unless their caption names a batch.
+One annotator gives a continuous label for each selected sample. The upper
+plot shows the samples, the true function, and the prediction, with its
+standard deviation where the regressor provides one. The middle plot shows
+the utilities and marks the selected samples. The lower plot shows the test
+R² of this run. Examples acquire one sample per cycle unless their caption
+names a batch.
 
 {{ legend(legends["pool-regression"]) }}
 

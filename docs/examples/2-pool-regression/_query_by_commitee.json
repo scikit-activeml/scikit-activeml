@@ -19,11 +19,14 @@
     "text_0" : "**Idea:** QBC selects samples where the committee's predictions disagree most. For regression, the returned utility is the standard deviation of these predictions. This gives the same ranking as empirical variance, with larger values preferred. In batch mode, it selects the `batch_size` samples with the highest utilities.",
     "import_misc" : [
       "from skactiveml.pool import QueryByCommittee",
-      "from skactiveml.regressor import SklearnRegressor"
+      "from skactiveml.regressor import SklearnNormalRegressor"
     ],
-    "import_reg" : "from sklearn.gaussian_process import GaussianProcessRegressor",
-    "init_reg" : "SklearnRegressor(GaussianProcessRegressor())",
-    "init_qs" : "QueryByCommittee(sample_predictions_method_name='sample_y', sample_predictions_dict={'n_samples': 100}, random_state=random_state)",
+    "import_reg" : [
+      "from sklearn.gaussian_process import GaussianProcessRegressor",
+      "from sklearn.gaussian_process.kernels import RBF, WhiteKernel"
+    ],
+    "init_reg" : "SklearnNormalRegressor(GaussianProcessRegressor(kernel=RBF() + WhiteKernel(), normalize_y=True, random_state=random_state), random_state=random_state)",
+    "init_qs" : "QueryByCommittee(sample_predictions_method_name='sample_y', sample_predictions_dict={'n_samples': 1000, 'random_state': random_state}, random_state=random_state)",
     "query_params" : "X=X, y=y, ensemble=reg"
   }
 ]

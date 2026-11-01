@@ -370,11 +370,17 @@ def _ramp(cmap, opacity):
     )
 
 
-def _area(color, opacity):
-    curve = "M4 15 L10 8 L16 12 L22 5 L28 15"
+def _stems(color):
+    return "".join(
+        f'<path d="M{x} 16 V{top}" stroke="{color}" stroke-width="2"/>'
+        for x, top in [(6, 11), (10, 7), (14, 5), (18, 9), (22, 6), (26, 12)]
+    )
+
+
+def _band(color, opacity):
     return (
-        f'<path d="{curve} Z" fill="{color}" fill-opacity="{opacity}"/>'
-        f'<path d="{curve}" fill="none" stroke="{color}" stroke-width="1.5"/>'
+        f'<rect x="4" y="5" width="24" height="10" fill="{color}" '
+        f'fill-opacity="{opacity}"/>'
     )
 
 
@@ -446,10 +452,25 @@ VISUALIZATION_LEGENDS = {
         ),
     ],
     "pool-regression": [
-        (_swatch(_dot("#add8e6", radius=4)), "Unlabeled sample"),
-        (_swatch(_dot("#ffa500", radius=4)), "Labeled sample"),
-        (_swatch(_line("#000000")), "Prediction"),
-        (_swatch(_area("#008000", 0.3)), "Utility"),
+        (_swatch(_dot("none", edge="#8c8c8c")), "Unlabeled sample"),
+        (
+            _swatch(
+                _dot(_POOL_CLASS_COLORS[0], radius=4.5, edge=_POOL_LINE_COLOR)
+            ),
+            "Labeled sample",
+        ),
+        _POOL_SELECTION,
+        (_swatch(_line("#8c8c8c", width=1.5, dashed=True)), "True function"),
+        (_swatch(_line(_POOL_LINE_COLOR)), "Prediction"),
+        (
+            _swatch(_band(_POOL_LINE_COLOR, 0.12)),
+            "Prediction ± one standard deviation, if available",
+        ),
+        (_swatch(_stems("#8c6bb1")), "Utility, from low to high"),
+        (
+            _swatch(_tick(_POOL_SELECTION_COLOR)),
+            "Positions of the selected samples",
+        ),
     ],
     "pool-multi-annotator": [
         *_pool_samples(_POOL_CLASSES)[:2],
@@ -507,6 +528,7 @@ LEARNING_CURVE_GROUPS = (
     "pool-classification-batch",
     "pool-multilabel",
     "pool-multi-annotator",
+    "pool-regression",
 )
 
 

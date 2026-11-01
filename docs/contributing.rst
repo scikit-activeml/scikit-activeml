@@ -1423,6 +1423,7 @@ string. These templates in ``docs/examples/`` are shared:
 * ``template_pool_multi_annotator.py``: pool classification with multiple
   annotators.
 * ``template_pool_regression.py``: pool regression, one sample per cycle.
+  Its regressor must support ``predict(X, return_std=True)``.
 * ``template_pool_regression_batch.py``: pool regression with batches.
 * ``template_stream.py``: stream classification.
 
