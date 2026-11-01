@@ -127,6 +127,12 @@
     flex: none;
 }
 
+.bd-content .visualization-legend-note {
+    margin: 0.625rem 0 0;
+    color: var(--pst-color-text-muted);
+    font-size: 0.875rem;
+}
+
 /* Phones show each card as a list row: thumbnail left, title and caption right. */
 @media (max-width: 575.98px) {
     .visualization-cards {

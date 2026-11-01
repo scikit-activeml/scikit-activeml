@@ -66,8 +66,7 @@ utilities and decision boundaries with a chart of requests per annotator.
 One annotator gives one class label per selected sample, and each cycle
 acquires one sample. The upper plot shows the utilities, the classifier's
 decision boundary, and the selected sample. The lower plot shows the test
-accuracy of this run. Runs with other data or seeds can give noticeably
-different curves.
+accuracy of this run.
 
 {{ legend(legends["pool-classification"]) }}
 
@@ -76,7 +75,9 @@ different curves.
 {{ heading("Single-output Classification with Batch Queries", marker) }}
 
 Each cycle acquires four samples. Panel *i* shows the utilities for the
-*i*-th selection in the batch. All panels use the same classifier and labels.
+*i*-th selection in the batch and marks the earlier selections of the batch.
+All panels use the same classifier and labels. The lower plot shows the test
+accuracy of this run.
 
 {{ legend(legends["pool-classification-batch"]) }}
 
@@ -85,11 +86,10 @@ Each cycle acquires four samples. Panel *i* shows the utilities for the
 {{ heading("Multi-label Classification", marker) }}
 
 One annotator gives a complete vector of binary labels for each selected
-sample. These examples acquire one vector per cycle. The three panels share
-the utilities and show a separate decision boundary for each label. In each
-panel, class 0 means that the label is absent and class 1 means that it is
-present. Gray markers identify samples whose label vectors have been
-acquired.
+sample. These examples acquire one vector per cycle. The three label panels
+share the utilities and show a separate decision boundary for each label. The
+fourth panel shows the exact-match accuracy of this run, the share of test
+samples whose complete label vector is predicted correctly.
 
 {{ legend(legends["pool-multilabel"]) }}
 

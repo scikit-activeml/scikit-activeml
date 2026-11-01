@@ -52,8 +52,7 @@ clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], class_prior=1e-3, metric
 # Initialise the query strategy.
 qs = "$init_qs"
 "$preproc"
-# Preparation for plotting: colors of the two classes, the selected samples,
-# the lines, and the utilities.
+# Preparation for plotting.
 class_cmap = ListedColormap(["#2a78d6", "#1baf7a"])
 selection_color = "#eb6834"
 line_color = "#222832"
@@ -67,7 +66,6 @@ plt.rcParams.update(
     }
 )
 
-# The feature space above, the learning curve below.
 fig, (ax, ax_curve) = plt.subplots(
     2, 1, figsize=(6.4, 6.4), height_ratios=[3, 1]
 )
@@ -92,7 +90,8 @@ ax_curve.set_xlabel("Acquired labels")
 ax_curve.set_ylabel("Test accuracy")
 ax_curve.xaxis.set_major_locator(MaxNLocator(integer=True))
 ax_curve.grid(axis="y", color="#e3e5e8")
-ax_curve.margins(x=0.03, y=0.2)
+ax_curve.margins(x=0.03)
+ax_curve.set_ylim(0.3, 1.02)
 artists = []
 n_acquired, accuracies = [], []
 
@@ -100,7 +99,7 @@ n_acquired, accuracies = [], []
 n_cycles = "$n_cycles|20"
 batch_size = "$batch_size|1"
 for c in range(n_cycles):
-    # Fit and evaluate the classifier with current labels.
+    # Fit and evaluate the classifier.
     clf.fit(X, y)
     is_lbld = is_labeled(y, missing_label=MISSING_LABEL)
     n_acquired.append(np.sum(is_lbld))
@@ -163,7 +162,7 @@ for c in range(n_cycles):
         transform=ax.transAxes,
     )
 
-    # Extend the learning curve and label its newest point.
+    # Update the learning curve.
     (curve,) = ax_curve.plot(n_acquired, accuracies, c=line_color, lw=2)
     point = ax_curve.scatter(n_acquired[-1], accuracies[-1], c=line_color)
     value = ax_curve.annotate(
@@ -180,4 +179,4 @@ for c in range(n_cycles):
     # Update labels based on query.
     y[query_idx] = y_pool[query_idx]
 
-ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
+ani = animation.ArtistAnimation(fig, artists, interval=1000)

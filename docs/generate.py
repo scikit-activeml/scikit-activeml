@@ -339,6 +339,13 @@ def _halo(color):
     )
 
 
+def _ring(color):
+    return (
+        f'<circle cx="16" cy="10" r="5" fill="none" stroke="{color}" '
+        f'stroke-width="1.2"/>'
+    )
+
+
 def _cross(color):
     return (
         f'<path d="M13.5 7.5 L18.5 12.5 M18.5 7.5 L13.5 12.5" '
@@ -378,59 +385,73 @@ def _text(text, hat=False):
 
 
 _CLASS_COLORS = [to_hex(colormaps["coolwarm"](value)) for value in (0.0, 1.0)]
-_LABELED_DISC = _dot("#808080", radius=6, opacity=0.8)
 _ANNOTATED_DISC = _dot("#808080", radius=6, opacity=0.8, edge="#000000")
-_CLASSIFICATION_LEGEND = [
-    *[
-        (_swatch(_dot(color)), f"Sample of class {label}")
-        for label, color in enumerate(_CLASS_COLORS)
-    ],
-    (_swatch(_LABELED_DISC), "Labeled sample"),
-    (_swatch(_line("#000000")), "Decision boundary"),
-    *[
-        (
-            _swatch(_line(color, dashed=True)),
-            f"75% confidence for class {label}",
-        )
-        for label, color in enumerate(_CLASS_COLORS)
-    ],
-    (_swatch(_ramp("Greens", 0.75)), "Utility, from low to high"),
-]
 _POOL_CLASS_COLORS = ["#2a78d6", "#1baf7a"]
 _POOL_LINE_COLOR = "#222832"
-_POOL_CLASSIFICATION_LEGEND = [
-    *[
-        (
-            _swatch(_dot("none", edge=color)),
-            f"Unlabeled sample of class {label}",
-        )
-        for label, color in enumerate(_POOL_CLASS_COLORS)
-    ],
-    *[
-        (
-            _swatch(_dot(color, radius=4.5, edge=_POOL_LINE_COLOR)),
-            f"Labeled sample of class {label}",
-        )
-        for label, color in enumerate(_POOL_CLASS_COLORS)
-    ],
-    (_swatch(_halo("#eb6834")), "Sample selected in this cycle"),
-    (_swatch(_line(_POOL_LINE_COLOR)), "Decision boundary"),
-    *[
-        (
-            _swatch(_line(color, dashed=True)),
-            f"75% confidence for class {label}",
-        )
-        for label, color in enumerate(_POOL_CLASS_COLORS)
-    ],
-    (_swatch(_ramp("Purples", 0.5)), "Utility, from low to high"),
-]
+_POOL_SELECTION_COLOR = "#eb6834"
+
+
+def _pool_samples(values):
+    """Legend entries of the sample markers for the two label values."""
+    return [
+        *[
+            (_swatch(_dot("none", edge=color)), f"Unlabeled sample {value}")
+            for value, color in zip(values, _POOL_CLASS_COLORS)
+        ],
+        *[
+            (
+                _swatch(_dot(color, radius=4.5, edge=_POOL_LINE_COLOR)),
+                f"Labeled sample {value}",
+            )
+            for value, color in zip(values, _POOL_CLASS_COLORS)
+        ],
+    ]
+
+
+def _pool_boundaries(confidences):
+    """Legend entries of the decision boundary, the confidence lines for the
+    two label values, and the utilities."""
+    return [
+        (_swatch(_line(_POOL_LINE_COLOR)), "Decision boundary"),
+        *[
+            (_swatch(_line(color, dashed=True)), f"75% confidence {value}")
+            for value, color in zip(confidences, _POOL_CLASS_COLORS)
+        ],
+        (_swatch(_ramp("Purples", 0.5)), "Utility, from low to high"),
+    ]
+
+
+_POOL_CLASSES = ["of class 0", "of class 1"]
+_POOL_CLASS_CONFIDENCES = ["for class 0", "for class 1"]
+_POOL_SELECTION = (
+    _swatch(_halo(_POOL_SELECTION_COLOR)),
+    "Sample selected in this cycle",
+)
 
 # The legend of each visualization group. Keep the swatches in line with the
 # plots of the group's templates.
 VISUALIZATION_LEGENDS = {
-    "pool-classification": _POOL_CLASSIFICATION_LEGEND,
-    "pool-classification-batch": _CLASSIFICATION_LEGEND,
-    "pool-multilabel": _CLASSIFICATION_LEGEND,
+    "pool-classification": [
+        *_pool_samples(_POOL_CLASSES),
+        _POOL_SELECTION,
+        *_pool_boundaries(_POOL_CLASS_CONFIDENCES),
+    ],
+    "pool-classification-batch": [
+        *_pool_samples(_POOL_CLASSES),
+        (_swatch(_halo(_POOL_SELECTION_COLOR)), "Selection of the panel"),
+        (
+            _swatch(_ring(_POOL_SELECTION_COLOR)),
+            "Earlier selection of the batch",
+        ),
+        *_pool_boundaries(_POOL_CLASS_CONFIDENCES),
+    ],
+    "pool-multilabel": [
+        *_pool_samples(["without the label", "with the label"]),
+        _POOL_SELECTION,
+        *_pool_boundaries(
+            ["that the label is absent", "that the label is present"]
+        ),
+    ],
     "pool-regression": [
         (_swatch(_dot("#add8e6", radius=4)), "Unlabeled sample"),
         (_swatch(_dot("#ffa500", radius=4)), "Labeled sample"),
@@ -498,6 +519,15 @@ VISUALIZATION_LEGENDS = {
 }
 
 
+# The visualization groups whose animations show a learning curve. Their
+# legends add a note on its noise.
+LEARNING_CURVE_GROUPS = (
+    "pool-classification",
+    "pool-classification-batch",
+    "pool-multilabel",
+)
+
+
 def visualization_legend_html(group):
     """Render the legend of a visualization group as HTML without blank
     lines, so that notebooks show it as one HTML block."""
@@ -505,10 +535,18 @@ def visualization_legend_html(group):
         f"<li>{swatch}{label}</li>"
         for swatch, label in VISUALIZATION_LEGENDS[group]
     )
+    note = (
+        '<p class="visualization-legend-note">The learning curve shows a '
+        "single run on a small synthetic dataset. Runs with other data or "
+        "seeds can give noticeably different curves.</p>\n"
+        if group in LEARNING_CURVE_GROUPS
+        else ""
+    )
     return (
         '<div class="visualization-legend">\n'
         '<p class="visualization-legend-title">Legend</p>\n'
-        f'<ul class="visualization-legend-items">\n{items}\n</ul>\n</div>'
+        f'<ul class="visualization-legend-items">\n{items}\n</ul>\n'
+        f"{note}</div>"
     )
 
 
