@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import shutil
 import textwrap
 import zipfile
 from pathlib import Path
@@ -13,12 +12,18 @@ RAW_HTML_PATTERN = re.compile(
     r"^\.\. raw:: html\n\n((?:[ \t]+.*(?:\n|$))+)", re.M
 )
 
+# The last cell of a gallery example. In a notebook, it would only show a
+# still image, so the notebook closes the figure and plays the animation.
+SHOW_CELL = "plt.show()"
+CLOSE_FIGURE = "\nplt.close(fig)"
+PLAYER_CELL = "from IPython.display import HTML\n\nHTML(ani.to_jshtml())"
+
 
 def copy_gallery_notebooks_callback(app: Sphinx, exception):
     """A callback for the `build-finished` signal that is used by the
     `copy_gallery_notebooks` extension, that copies and post-processes
     notebooks from sphinx gallery examples. It also renders the raw HTML
-    blocks of the downloadable notebooks.
+    blocks and animations of the downloadable notebooks.
 
     Parameters
     ----------
@@ -85,14 +90,15 @@ def process_notebook(src_path, dst_path):
     pattern = r"\"# (!pip install .*?)\""
     repl = r'"\1"'
     output = re.sub(pattern=pattern, repl=repl, string=file_content)
-    output = render_raw_html(output)
+    output = render_notebook(output)
 
     with open(dst_path, "w") as f:
         f.write(output)
 
 
-def render_raw_html(notebook):
-    """Replace the reST raw HTML blocks in markdown cells by their HTML.
+def render_notebook(notebook):
+    """Replace the reST raw HTML blocks in markdown cells by their HTML, and
+    the closing ``plt.show()`` cell by a player for the animation ``ani``.
 
     Parameters
     ----------
@@ -102,26 +108,34 @@ def render_raw_html(notebook):
     Returns
     -------
     str
-        The notebook content, unchanged if it has no raw HTML block.
+        The notebook content, unchanged if it has neither.
     """
     content = json.loads(notebook)
     rendered = False
+    previous_code = None
     for cell in content["cells"]:
-        if cell["cell_type"] != "markdown":
-            continue
         source = "".join(cell["source"])
-        html = RAW_HTML_PATTERN.sub(
-            lambda match: textwrap.dedent(match.group(1)), source
-        )
-        if html != source:
-            cell["source"] = [html]
-            rendered = True
+        if cell["cell_type"] == "markdown":
+            html = RAW_HTML_PATTERN.sub(
+                lambda match: textwrap.dedent(match.group(1)), source
+            )
+            if html != source:
+                cell["source"] = [html]
+                rendered = True
+        elif cell["cell_type"] == "code":
+            if source.strip() == SHOW_CELL and previous_code is not None:
+                previous_code["source"] = [
+                    "".join(previous_code["source"]) + CLOSE_FIGURE
+                ]
+                cell["source"] = [PLAYER_CELL]
+                rendered = True
+            previous_code = cell
     return json.dumps(content, indent=2) if rendered else notebook
 
 
 def render_downloaded_notebooks(downloads_dir):
-    """Render the raw HTML blocks of the notebooks offered for download,
-    including those in zip archives.
+    """Render the raw HTML blocks and animations of the notebooks offered for
+    download, including those in zip archives.
 
     Parameters
     ----------
@@ -130,7 +144,7 @@ def render_downloaded_notebooks(downloads_dir):
     """
     for path in Path(downloads_dir).rglob("*.ipynb"):
         notebook = path.read_text()
-        rendered = render_raw_html(notebook)
+        rendered = render_notebook(notebook)
         if rendered != notebook:
             path.write_text(rendered)
     for path in Path(downloads_dir).rglob("*.zip"):
@@ -142,7 +156,7 @@ def render_downloaded_notebooks(downloads_dir):
             (
                 info,
                 (
-                    render_raw_html(data.decode()).encode()
+                    render_notebook(data.decode()).encode()
                     if info.filename.endswith(".ipynb")
                     else data
                 ),

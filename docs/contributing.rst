@@ -1432,8 +1432,9 @@ directory, such as ``template_DUAL.py`` in
 ``docs/examples/1-pool-classification/``. The file name must start with
 ``template``, so that the build does not copy the template as an example.
 The build appends the legend of the example's group and a final
-``plt.show()`` cell to each template. So a template ends with a code block and
-imports ``pyplot as plt``.
+``plt.show()`` cell to each template. In the notebooks, it replaces this cell
+by a player for the animation. So a template ends with a code block, imports
+``pyplot as plt``, and names its figure ``fig`` and its animation ``ani``.
 
 Tags and Example Setup
 ~~~~~~~~~~~~~~~~~~~~~~
