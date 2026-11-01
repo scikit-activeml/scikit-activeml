@@ -332,6 +332,13 @@ def _dot(color, radius=3, opacity=1, edge="none"):
     )
 
 
+def _halo(color):
+    return (
+        f'<circle cx="16" cy="10" r="7" fill="{color}" fill-opacity="0.28" '
+        f'stroke="{color}" stroke-width="2"/>'
+    )
+
+
 def _cross(color):
     return (
         f'<path d="M13.5 7.5 L18.5 12.5 M18.5 7.5 L13.5 12.5" '
@@ -389,11 +396,39 @@ _CLASSIFICATION_LEGEND = [
     ],
     (_swatch(_ramp("Greens", 0.75)), "Utility, from low to high"),
 ]
+_POOL_CLASS_COLORS = ["#2a78d6", "#1baf7a"]
+_POOL_LINE_COLOR = "#222832"
+_POOL_CLASSIFICATION_LEGEND = [
+    *[
+        (
+            _swatch(_dot("none", edge=color)),
+            f"Unlabeled sample of class {label}",
+        )
+        for label, color in enumerate(_POOL_CLASS_COLORS)
+    ],
+    *[
+        (
+            _swatch(_dot(color, radius=4.5, edge=_POOL_LINE_COLOR)),
+            f"Labeled sample of class {label}",
+        )
+        for label, color in enumerate(_POOL_CLASS_COLORS)
+    ],
+    (_swatch(_halo("#eb6834")), "Sample selected in this cycle"),
+    (_swatch(_line(_POOL_LINE_COLOR)), "Decision boundary"),
+    *[
+        (
+            _swatch(_line(color, dashed=True)),
+            f"75% confidence for class {label}",
+        )
+        for label, color in enumerate(_POOL_CLASS_COLORS)
+    ],
+    (_swatch(_ramp("Purples", 0.5)), "Utility, from low to high"),
+]
 
 # The legend of each visualization group. Keep the swatches in line with the
 # plots of the group's templates.
 VISUALIZATION_LEGENDS = {
-    "pool-classification": _CLASSIFICATION_LEGEND,
+    "pool-classification": _POOL_CLASSIFICATION_LEGEND,
     "pool-classification-batch": _CLASSIFICATION_LEGEND,
     "pool-multilabel": _CLASSIFICATION_LEGEND,
     "pool-regression": [

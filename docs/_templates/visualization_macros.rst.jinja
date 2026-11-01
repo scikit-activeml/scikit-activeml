@@ -64,8 +64,10 @@ utilities and decision boundaries with a chart of requests per annotator.
 {{ heading("Single-output Classification", marker) }}
 
 One annotator gives one class label per selected sample, and each cycle
-acquires one sample. A single plot shows the utilities and the classifier's
-decision boundary.
+acquires one sample. The upper plot shows the utilities, the classifier's
+decision boundary, and the selected sample. The lower plot shows the test
+accuracy of this run. Runs with other data or seeds can give noticeably
+different curves.
 
 {{ legend(legends["pool-classification"]) }}
 
