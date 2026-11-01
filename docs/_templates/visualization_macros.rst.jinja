@@ -46,8 +46,11 @@
 
 {% endif %}
 Each sample has one class label to predict. Several annotators can label it,
-and the strategy selects sample–annotator pairs. The animation combines
-utilities and decision boundaries with a chart of requests per annotator.
+and the strategy selects sample–annotator pairs. The upper plot shows the
+mean utility over the annotators, the decision boundary, the majority vote of
+each labeled sample, and the selected sample. The middle plots show the labels requested from each
+annotator and compare its true accuracy with its estimate. The lower plot
+shows the test accuracy of this run.
 
 {{ legend(legends["pool-multi-annotator"]) }}
 

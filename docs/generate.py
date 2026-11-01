@@ -299,15 +299,15 @@ EXAMPLE_TEMPLATE_GROUPS = {
 }
 
 
-def _swatch(*shapes):
-    """Draw legend shapes on a white chip, like the animations' background.
+def _swatch(shape):
+    """Draw a legend shape on a white chip, like the animations' background.
 
     The chip is an image because notebook sanitizers remove inline SVG.
     """
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="20" '
         'viewBox="0 0 32 20"><rect x="0.5" y="0.5" width="31" height="19" '
-        'rx="3" fill="#ffffff" stroke="#d1d5da"/>' + "".join(shapes) + "</svg>"
+        'rx="3" fill="#ffffff" stroke="#d1d5da"/>' + shape + "</svg>"
     )
     data = base64.b64encode(svg.encode()).decode()
     return (
@@ -324,11 +324,10 @@ def _line(color, width=2, opacity=1, dashed=False):
     )
 
 
-def _dot(color, radius=3, opacity=1, edge="none"):
+def _dot(color, radius=3, edge="none"):
     return (
         f'<circle cx="16" cy="10" r="{radius}" fill="{color}" '
-        f'fill-opacity="{opacity}" stroke="{edge}" '
-        f'stroke-opacity="{opacity}"/>'
+        f'stroke="{edge}"/>'
     )
 
 
@@ -346,11 +345,20 @@ def _ring(color):
     )
 
 
-def _cross(color):
+def _x_marker(color):
     return (
-        f'<path d="M13.5 7.5 L18.5 12.5 M18.5 7.5 L13.5 12.5" '
-        f'stroke="{color}" stroke-width="1.5"/>'
+        '<path d="M12 7.6 L13.6 6 L16 8.4 L18.4 6 L20 7.6 L17.6 10 L20 12.4 '
+        'L18.4 14 L16 11.6 L13.6 14 L12 12.4 L14.4 10 Z" '
+        f'fill="{color}" stroke="{_POOL_LINE_COLOR}" stroke-width="0.8"/>'
     )
+
+
+def _bar(color):
+    return f'<rect x="7" y="6" width="18" height="8" fill="{color}"/>'
+
+
+def _tick(color):
+    return f'<path d="M16 4 V16" stroke="{color}" stroke-width="2"/>'
 
 
 def _ramp(cmap, opacity):
@@ -370,22 +378,7 @@ def _area(color, opacity):
     )
 
 
-def _text(text, hat=False):
-    hat_path = (
-        '<path d="M9.5 6 L16 3 L22.5 6" fill="none" stroke="#000000" '
-        'stroke-width="0.9"/>'
-        if hat
-        else ""
-    )
-    return (
-        f'{hat_path}<text x="16" y="{16 if hat else 14}" fill="#000000" '
-        'font-family="sans-serif" font-size="10" text-anchor="middle">'
-        f"{text}</text>"
-    )
-
-
 _CLASS_COLORS = [to_hex(colormaps["coolwarm"](value)) for value in (0.0, 1.0)]
-_ANNOTATED_DISC = _dot("#808080", radius=6, opacity=0.8, edge="#000000")
 _POOL_CLASS_COLORS = ["#2a78d6", "#1baf7a"]
 _POOL_LINE_COLOR = "#222832"
 _POOL_SELECTION_COLOR = "#eb6834"
@@ -408,7 +401,7 @@ def _pool_samples(values):
     ]
 
 
-def _pool_boundaries(confidences):
+def _pool_boundaries(confidences, utility="Utility"):
     """Legend entries of the decision boundary, the confidence lines for the
     two label values, and the utilities."""
     return [
@@ -417,7 +410,7 @@ def _pool_boundaries(confidences):
             (_swatch(_line(color, dashed=True)), f"75% confidence {value}")
             for value, color in zip(confidences, _POOL_CLASS_COLORS)
         ],
-        (_swatch(_ramp("Purples", 0.5)), "Utility, from low to high"),
+        (_swatch(_ramp("Purples", 0.5)), f"{utility}, from low to high"),
     ]
 
 
@@ -459,47 +452,35 @@ VISUALIZATION_LEGENDS = {
         (_swatch(_area("#008000", 0.3)), "Utility"),
     ],
     "pool-multi-annotator": [
+        *_pool_samples(_POOL_CLASSES)[:2],
         *[
             (
-                _swatch(_dot(color, radius=2)),
-                f"Unlabeled sample of class {label}",
-            )
-            for label, color in enumerate(_CLASS_COLORS)
-        ],
-        *[
-            (
-                _swatch(_ANNOTATED_DISC, _dot(color, radius=2.5)),
+                _swatch(_dot(color, radius=4.5, edge=_POOL_LINE_COLOR)),
                 f"Correct majority vote for class {label}",
             )
-            for label, color in enumerate(_CLASS_COLORS)
+            for label, color in enumerate(_POOL_CLASS_COLORS)
         ],
         *[
             (
-                _swatch(_ANNOTATED_DISC, _cross(color)),
+                _swatch(_x_marker(color)),
                 f"Wrong majority vote for class {label}",
             )
-            for label, color in enumerate(_CLASS_COLORS)
+            for label, color in enumerate(_POOL_CLASS_COLORS)
         ],
-        (_swatch(_line("#000000")), "Decision boundary"),
-        *[
-            (
-                _swatch(_line(color, dashed=True)),
-                f"75% confidence for class {label}",
-            )
-            for label, color in enumerate(_CLASS_COLORS)
-        ],
-        (
-            _swatch(_ramp("Greens", 0.75)),
-            "Mean utility over annotators, from low to high",
+        _POOL_SELECTION,
+        *_pool_boundaries(
+            _POOL_CLASS_CONFIDENCES, utility="Mean utility over annotators"
         ),
+        (_swatch(_bar("#b9bec6")), "Labels requested earlier"),
         (
-            _swatch(
-                '<rect x="11" y="5" width="10" height="12" fill="#808080"/>'
-            ),
-            "Requested labels per annotator",
+            _swatch(_bar(_POOL_SELECTION_COLOR)),
+            "Labels requested in this cycle",
         ),
-        (_swatch(_text("AP")), "Annotator performance"),
-        (_swatch(_text("AP", hat=True)), "Estimated annotator performance"),
+        (_swatch(_tick(_POOL_LINE_COLOR)), "True annotator accuracy"),
+        (
+            _swatch(_dot(_POOL_LINE_COLOR, radius=3.5)),
+            "Estimated annotator accuracy",
+        ),
     ],
     "stream-classification": [
         *[
@@ -525,6 +506,7 @@ LEARNING_CURVE_GROUPS = (
     "pool-classification",
     "pool-classification-batch",
     "pool-multilabel",
+    "pool-multi-annotator",
 )
 
 
