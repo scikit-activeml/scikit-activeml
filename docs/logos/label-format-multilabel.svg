@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     class="skaml-lf" width="400" height="330" viewBox="0 0 400 330"
+     role="img" aria-labelledby="lf-multilabel-title lf-multilabel-description">
+  <title id="lf-multilabel-title">Labels for multi-label classification</title>
+  <desc id="lf-multilabel-description">
+    The label array y has one row of binary labels per sample and the shape
+    (n_samples, n_outputs). Each row is complete, such as 1 0 1 or 0 0 0, or
+    entirely missing. A query requests a complete missing row. A row with a
+    missing entry beside observed ones is rejected.
+  </desc>
+
+  <!-- Embedded inline like label-format-single-output.svg, which explains
+       the shared style rules. Keep the four panels in sync. -->
+  <defs>
+    <style>
+      .skaml-lf {
+        font-family: var(--pst-font-family-base, system-ui, sans-serif);
+        font-size: 17px;
+        text-anchor: middle;
+        fill: var(--pst-color-text-base, #222832);
+      }
+      .skaml-lf-title { font-size: 21px; font-weight: 600; }
+      .skaml-lf-small { font-size: 16px; fill: var(--pst-color-text-muted, #48566b); }
+      .skaml-lf-code { font-family: var(--pst-font-family-monospace, monospace); }
+      .skaml-lf-frame {
+        fill: var(--pst-color-surface, #f3f4f5);
+        stroke: var(--pst-color-border, #d1d5da);
+        stroke-width: 1.5;
+      }
+      .skaml-lf-observed {
+        fill: #2a7fff; fill-opacity: .14;
+        stroke: #2a7fff; stroke-opacity: .7; stroke-width: 1.5;
+      }
+      .skaml-lf-missing {
+        fill: none; stroke: #8c8c8c; stroke-width: 1.5; stroke-dasharray: 4 3;
+      }
+      .skaml-lf-queried {
+        fill: #f8a661; fill-opacity: .28;
+        stroke: #f8a661; stroke-width: 1.8; stroke-dasharray: 4 3;
+      }
+      .skaml-lf-request {
+        fill: #f8a661; fill-opacity: .12; stroke: #f8a661; stroke-width: 1.5;
+      }
+      .skaml-lf-rejected {
+        fill: none; stroke: #e5534b; stroke-width: 3; stroke-linecap: round;
+      }
+    </style>
+  </defs>
+
+  <rect class="skaml-lf-frame" x="1.5" y="1.5" width="397" height="327" rx="14"/>
+  <text class="skaml-lf-title" x="200" y="42">Multi-label Classification</text>
+  <text class="skaml-lf-small" x="200" y="84">label outputs</text>
+
+  <rect class="skaml-lf-observed" x="115" y="101" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="140" y="122">1</text>
+  <rect class="skaml-lf-observed" x="175" y="101" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="200" y="122">0</text>
+  <rect class="skaml-lf-observed" x="235" y="101" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="260" y="122">1</text>
+
+  <!-- The query requests the complete row. -->
+  <rect class="skaml-lf-request" x="105" y="135" width="190" height="42" rx="10"/>
+  <rect class="skaml-lf-queried" x="115" y="141" width="50" height="30" rx="5"/>
+  <rect class="skaml-lf-queried" x="175" y="141" width="50" height="30" rx="5"/>
+  <rect class="skaml-lf-queried" x="235" y="141" width="50" height="30" rx="5"/>
+
+  <rect class="skaml-lf-observed" x="115" y="181" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="140" y="202">0</text>
+  <rect class="skaml-lf-observed" x="175" y="181" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="200" y="202">0</text>
+  <rect class="skaml-lf-observed" x="235" y="181" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="260" y="202">0</text>
+
+  <!-- A partially observed row is rejected. -->
+  <rect class="skaml-lf-observed" x="115" y="221" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="140" y="242">1</text>
+  <rect class="skaml-lf-missing" x="175" y="221" width="50" height="30" rx="5"/>
+  <rect class="skaml-lf-observed" x="235" y="221" width="50" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="260" y="242">0</text>
+  <path class="skaml-lf-rejected" d="M308 228 L324 244 M324 228 L308 244"/>
+
+  <text class="skaml-lf-code" x="200" y="284">(n_samples, n_outputs)</text>
+  <text class="skaml-lf-small" x="200" y="311">Query: complete row</text>
+</svg>

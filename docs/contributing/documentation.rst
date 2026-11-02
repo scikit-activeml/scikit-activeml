@@ -39,7 +39,7 @@ Links
 Use Sphinx ``:doc:`` and ``:ref:`` links within the documentation, so that
 readers stay in the version they are browsing. Notebooks link to
 documentation pages with relative source paths, such as
-``../../target_semantics.rst``. These paths start from
+``../../label_formats.rst``. These paths start from
 ``docs/generated/tutorials/``, where the build copies the notebooks. Sphinx
 turns them into links, and the Colab copies get links to the same
 documentation version if the paths start with ``../`` and end in ``.rst`` or

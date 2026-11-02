@@ -70,7 +70,8 @@ Learning Settings
 =================
 
 .. The former Multiple Annotators heading supplied a local HTML anchor.
-   Keep it local because target_semantics.rst owns the global Sphinx label.
+   Keep it local because label_formats/multiannotator.rst owns the global
+   Sphinx label.
 
 .. raw:: html
 
@@ -100,9 +101,9 @@ for each of these settings.
 .. note::
 
    scikit-activeml does not support general multi-output classification and
-   regression, or multi-label classification with multiple annotators. The
-   :doc:`Target and Annotation Semantics <target_semantics>` page defines
-   label representations and these limits.
+   regression, or multiple annotators for multi-label classification and
+   regression. The :doc:`Label Formats <label_formats>` page shows the label
+   format of each setting and the supported combinations.
 
 
 Where to Go Next

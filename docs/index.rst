@@ -8,7 +8,7 @@
    Strategies <generated/strategy_overview>
    generated/sphinx_gallery_examples/index
    generated/api/skactiveml
-   Target Semantics <target_semantics>
+   Label Formats <label_formats>
    contributing
    licenses
    Changelog <https://github.com/scikit-activeml/scikit-activeml/releases>

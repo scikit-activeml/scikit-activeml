@@ -459,7 +459,9 @@ class TestRegressionContract(_ContractCase):
 class TestDocumentedOutcomeTables(unittest.TestCase):
     """The documented outcome rows and the swept cases, counted."""
 
-    DOCUMENT = Path(__file__).parents[3] / "docs" / "target_semantics.rst"
+    DOCUMENT = (
+        Path(__file__).parents[3] / "docs" / "label_formats" / "values.rst"
+    )
 
     TABLES = {
         "Single-output classification outcomes": TestSingleOutputContract,
@@ -475,10 +477,13 @@ class TestDocumentedOutcomeTables(unittest.TestCase):
         """Count the outcome rows the document lists for one table."""
         lines = self.DOCUMENT.read_text().splitlines()
         marker = f".. list-table:: {title}"
-        self.assertIn(marker, lines)
+        stripped = [line.strip() for line in lines]
+        self.assertIn(marker, stripped)
+        start = stripped.index(marker)
+        indent = len(lines[start]) - len(stripped[start])
         rows = 0
-        for line in lines[lines.index(marker) + 1 :]:
-            if line.strip() and not line.startswith(" "):
+        for line in lines[start + 1 :]:
+            if line.strip() and len(line) - len(line.lstrip()) <= indent:
                 break
             rows += bool(re.match(r"\s+\* - ", line))
         return rows - 1

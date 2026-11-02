@@ -284,7 +284,6 @@ html_sidebars = {
     "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
     "licenses": [],  # no primary sidebar for this page
     "concepts": [],  # no primary sidebar for this page
-    "target_semantics": [],  # no primary sidebar for this page
     "generated/tutorials/*": [],  # no primary sidebar for these pages
 }
 

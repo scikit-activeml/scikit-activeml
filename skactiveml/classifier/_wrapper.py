@@ -3197,7 +3197,7 @@ if successful_river_import:
                 Class labels of the training samples, possibly including
                 missing labels indicated by `self.missing_label`. Only
                 single-output targets from one annotator are supported (see
-                :ref:`target-semantics`).
+                :ref:`label-formats`).
             sample_weight : array-like of shape (n_samples,), default=None
                 Weight of each training sample. It must have the same shape as
                 `y`.
@@ -3226,7 +3226,7 @@ if successful_river_import:
                 Class labels of the training samples, possibly including
                 missing labels indicated by `self.missing_label`. Only
                 single-output targets from one annotator are supported (see
-                :ref:`target-semantics`).
+                :ref:`label-formats`).
             sample_weight : array-like of shape (n_samples,), default=None
                 Weight of each training sample. It must have the same shape as
                 `y`.

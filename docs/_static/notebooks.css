@@ -95,7 +95,35 @@
     margin: 0 auto 1rem;
 }
 
-.concepts-figure > p {
+/* Label Formats pages: the four label formats sit in two columns and stack
+   on phones. The resolution flow keeps a readable size on wide screens. */
+.label-formats-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.label-formats-panels svg,
+.label-formats-flow svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.label-formats-flow svg {
+    max-width: 32rem;
+    margin: 0 auto;
+}
+
+@media (max-width: 767.98px) {
+    .label-formats-panels {
+        grid-template-columns: minmax(0, 26rem);
+        justify-content: center;
+    }
+}
+
+.concepts-figure > p,
+.label-formats-figure > p {
     margin: 0.3rem 1rem 1rem;
     color: var(--pst-color-text-muted);
     font-family: var(--pst-font-family-heading);

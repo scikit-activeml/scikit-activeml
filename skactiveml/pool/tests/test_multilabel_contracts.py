@@ -143,17 +143,20 @@ def _multilabel_test_cases_by_strategy():
 
 
 class TestMultilabelProbaFormatContract(unittest.TestCase):
-    def test_target_semantics_inventory_matches_capabilities(self):
-        target_semantics = (
-            Path(__file__).parents[3] / "docs" / "target_semantics.rst"
+    def test_documented_inventory_matches_capabilities(self):
+        multilabel_page = (
+            Path(__file__).parents[3]
+            / "docs"
+            / "label_formats"
+            / "multilabel.rst"
         ).read_text()
         marker = ".. _multilabel-strategy-inventory:"
-        end_marker = "Estimator Capability for Multi-label Wrapping"
-        self.assertIn(marker, target_semantics)
-        self.assertIn(end_marker, target_semantics)
-        inventory_section = target_semantics.split(marker, maxsplit=1)[
-            1
-        ].split(end_marker, maxsplit=1)[0]
+        end_marker = ".. _multilabel-classifiers:"
+        self.assertIn(marker, multilabel_page)
+        self.assertIn(end_marker, multilabel_page)
+        inventory_section = multilabel_page.split(marker, maxsplit=1)[1].split(
+            end_marker, maxsplit=1
+        )[0]
         documented_strategies = set(
             re.findall(
                 r":class:`~skactiveml\.pool\.([A-Za-z0-9_]+)`",
@@ -164,7 +167,7 @@ class TestMultilabelProbaFormatContract(unittest.TestCase):
         self.assertEqual(
             {strategy.__name__ for strategy in _multilabel_inventory()},
             documented_strategies,
-            msg="The target-semantics reference must categorize every "
+            msg="The multi-label label-format page must categorize every "
             "multi-label-capable pool strategy from this enforced inventory.",
         )
 

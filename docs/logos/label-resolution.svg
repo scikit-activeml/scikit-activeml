@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     class="skaml-lr" width="600" height="576" viewBox="0 0 600 576"
+     role="img" aria-labelledby="lr-title lr-description">
+  <title id="lr-title">How a component interprets labels</title>
+  <desc id="lr-description">
+    The labels y with missing_label, the declarations classes and target_type,
+    and the task and annotation type go to resolve_target_spec. A fitted
+    estimator supplies the declarations through its target_spec_. Invalid
+    labels or declarations raise a resolution error. Otherwise, the result is
+    a TargetSpec with task, target_type, annotation_type, and classes. A
+    capability check then raises a capability error if the component does not
+    support the valid specification. Otherwise, fit or query proceeds.
+  </desc>
+
+  <!-- The Resolution and Errors page embeds this file inline, so text and
+       frames follow the theme colors. Fallbacks apply when the file is
+       opened directly. Style rules and ids carry a prefix because they
+       apply to the whole page. Colors follow the concepts-*.svg panels. -->
+  <defs>
+    <style>
+      .skaml-lr {
+        font-family: var(--pst-font-family-base, system-ui, sans-serif);
+        font-size: 18px;
+        text-anchor: middle;
+        fill: var(--pst-color-text-base, #222832);
+      }
+      .skaml-lr-heading { font-size: 20px; font-weight: 600; }
+      .skaml-lr-small { font-size: 17px; fill: var(--pst-color-text-muted, #48566b); }
+      .skaml-lr-code { font-family: var(--pst-font-family-monospace, monospace); }
+      .skaml-lr-frame {
+        fill: var(--pst-color-surface, #f3f4f5);
+        stroke: var(--pst-color-border, #d1d5da);
+        stroke-width: 1.5;
+      }
+      .skaml-lr-node {
+        fill: #07aee6; fill-opacity: .12;
+        stroke: #07aee6; stroke-opacity: .6; stroke-width: 1.5;
+      }
+      .skaml-lr-spec {
+        fill: #2a7fff; fill-opacity: .1;
+        stroke: #2a7fff; stroke-opacity: .7; stroke-width: 1.5;
+      }
+      .skaml-lr-error {
+        fill: #e5534b; fill-opacity: .1;
+        stroke: #e5534b; stroke-opacity: .8; stroke-width: 1.5;
+      }
+      .skaml-lr-connection { fill: none; stroke: #8c8c8c; stroke-width: 2; }
+    </style>
+    <marker id="lr-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L10 4 L0 8 L2.5 4 Z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+
+  <rect class="skaml-lr-frame" x="20" y="16" width="320" height="136" rx="12"/>
+  <text class="skaml-lr-heading" x="180" y="48">Labels and declarations</text>
+  <text class="skaml-lr-code" x="180" y="82">y, missing_label</text>
+  <text class="skaml-lr-code" x="180" y="110">classes, target_type</text>
+  <text class="skaml-lr-small" x="180" y="138">task and annotation type</text>
+  <rect class="skaml-lr-frame" x="380" y="49" width="210" height="70" rx="12"/>
+  <text class="skaml-lr-heading" x="485" y="77">Fitted estimator</text>
+  <text class="skaml-lr-code" x="485" y="104">target_spec_</text>
+  <path class="skaml-lr-connection" d="M380 84 H342" marker-end="url(#lr-arrow)"/>
+
+  <path class="skaml-lr-connection" d="M180 152 V188" marker-end="url(#lr-arrow)"/>
+
+  <rect class="skaml-lr-node" x="20" y="190" width="320" height="52" rx="12"/>
+  <text class="skaml-lr-code" x="180" y="222">resolve_target_spec(...)</text>
+  <path class="skaml-lr-connection" d="M340 216 H378" marker-end="url(#lr-arrow)"/>
+  <rect class="skaml-lr-error" x="380" y="172" width="210" height="88" rx="12"/>
+  <text class="skaml-lr-heading" x="485" y="200">Resolution error</text>
+  <text class="skaml-lr-small" x="485" y="225">invalid labels</text>
+  <text class="skaml-lr-small" x="485" y="247">or declarations</text>
+
+  <path class="skaml-lr-connection" d="M180 242 V278" marker-end="url(#lr-arrow)"/>
+
+  <rect class="skaml-lr-spec" x="20" y="280" width="320" height="100" rx="12"/>
+  <text class="skaml-lr-code skaml-lr-heading" x="180" y="310">TargetSpec</text>
+  <text class="skaml-lr-code" x="180" y="340">task, target_type,</text>
+  <text class="skaml-lr-code" x="180" y="366">annotation_type, classes</text>
+
+  <path class="skaml-lr-connection" d="M180 380 V416" marker-end="url(#lr-arrow)"/>
+
+  <rect class="skaml-lr-node" x="20" y="418" width="320" height="52" rx="12"/>
+  <text class="skaml-lr-heading" x="180" y="450">Capability check</text>
+  <path class="skaml-lr-connection" d="M340 444 H378" marker-end="url(#lr-arrow)"/>
+  <rect class="skaml-lr-error" x="380" y="409" width="210" height="70" rx="12"/>
+  <text class="skaml-lr-heading" x="485" y="438">Capability error</text>
+  <text class="skaml-lr-small" x="485" y="464">valid but unsupported</text>
+
+  <path class="skaml-lr-connection" d="M180 470 V506" marker-end="url(#lr-arrow)"/>
+
+  <rect class="skaml-lr-frame" x="20" y="508" width="320" height="52" rx="12"/>
+  <text x="180" y="540"><tspan class="skaml-lr-code">fit(...)</tspan> or <tspan class="skaml-lr-code">query(...)</tspan></text>
+</svg>

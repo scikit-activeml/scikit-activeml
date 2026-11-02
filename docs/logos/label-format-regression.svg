@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     class="skaml-lf" width="400" height="330" viewBox="0 0 400 330"
+     role="img" aria-labelledby="lf-regression-title lf-regression-description">
+  <title id="lf-regression-title">Labels for regression</title>
+  <desc id="lf-regression-description">
+    The label array y has one numerical label per sample and the shape
+    (n_samples,). Two samples have the labels 0.3 and 1.7, and two labels are
+    missing. A query requests the missing label of one sample.
+  </desc>
+
+  <!-- Embedded inline like label-format-single-output.svg, which explains
+       the shared style rules. Keep the four panels in sync. -->
+  <defs>
+    <style>
+      .skaml-lf {
+        font-family: var(--pst-font-family-base, system-ui, sans-serif);
+        font-size: 17px;
+        text-anchor: middle;
+        fill: var(--pst-color-text-base, #222832);
+      }
+      .skaml-lf-title { font-size: 21px; font-weight: 600; }
+      .skaml-lf-small { font-size: 16px; fill: var(--pst-color-text-muted, #48566b); }
+      .skaml-lf-code { font-family: var(--pst-font-family-monospace, monospace); }
+      .skaml-lf-frame {
+        fill: var(--pst-color-surface, #f3f4f5);
+        stroke: var(--pst-color-border, #d1d5da);
+        stroke-width: 1.5;
+      }
+      .skaml-lf-observed {
+        fill: #2a7fff; fill-opacity: .14;
+        stroke: #2a7fff; stroke-opacity: .7; stroke-width: 1.5;
+      }
+      .skaml-lf-missing {
+        fill: none; stroke: #8c8c8c; stroke-width: 1.5; stroke-dasharray: 4 3;
+      }
+      .skaml-lf-queried {
+        fill: #f8a661; fill-opacity: .28;
+        stroke: #f8a661; stroke-width: 1.8; stroke-dasharray: 4 3;
+      }
+      .skaml-lf-request {
+        fill: #f8a661; fill-opacity: .12; stroke: #f8a661; stroke-width: 1.5;
+      }
+      .skaml-lf-rejected {
+        fill: none; stroke: #e5534b; stroke-width: 3; stroke-linecap: round;
+      }
+    </style>
+  </defs>
+
+  <rect class="skaml-lf-frame" x="1.5" y="1.5" width="397" height="327" rx="14"/>
+  <text class="skaml-lf-title" x="200" y="42">Regression</text>
+  <text class="skaml-lf-small" x="200" y="84">label</text>
+
+  <rect class="skaml-lf-observed" x="160" y="101" width="80" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="200" y="122">0.3</text>
+  <rect class="skaml-lf-queried" x="160" y="141" width="80" height="30" rx="5"/>
+  <rect class="skaml-lf-observed" x="160" y="181" width="80" height="30" rx="5"/>
+  <text class="skaml-lf-code" x="200" y="202">1.7</text>
+  <rect class="skaml-lf-missing" x="160" y="221" width="80" height="30" rx="5"/>
+
+  <text class="skaml-lf-code" x="200" y="284">(n_samples,)</text>
+  <text class="skaml-lf-small" x="200" y="311">Query: one label</text>
+</svg>

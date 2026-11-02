@@ -801,8 +801,8 @@ class TestExamples(unittest.TestCase):
                             {
                                 "cell_type": "markdown",
                                 "source": [
-                                    "[Targets](../../target_semantics.rst"
-                                    "#classification)\n",
+                                    "[Labels](../../label_formats/"
+                                    "multilabel.rst#query-strategies)\n",
                                     "[Strategies](../strategy_overview.rst)\n",
                                     "[Notebook]"
                                     "(00_pool_getting_started.ipynb)",
@@ -825,17 +825,19 @@ class TestExamples(unittest.TestCase):
                                 json.load(file)["cells"][0]["source"]
                             )
                     prefix = f"https://scikit-activeml.github.io/{version}/"
-                    targets = (
-                        prefix + "target_semantics.html#classification"
+                    labels = (
+                        prefix
+                        + "label_formats/multilabel.html#query-strategies"
                         if colab
-                        else "../../target_semantics.rst#classification"
+                        else "../../label_formats/multilabel.rst"
+                        "#query-strategies"
                     )
                     strategies = (
                         prefix + "generated/strategy_overview.html"
                         if colab
                         else "../strategy_overview.rst"
                     )
-                    self.assertIn(f"[Targets]({targets})", source)
+                    self.assertIn(f"[Labels]({labels})", source)
                     self.assertIn(f"[Strategies]({strategies})", source)
                     self.assertIn(
                         "[Notebook](00_pool_getting_started.ipynb)", source

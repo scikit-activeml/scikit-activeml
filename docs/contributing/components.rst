@@ -110,8 +110,8 @@ Target Semantics and Compatibility
 ----------------------------------
 
 Labels and target semantics have an explicit public contract. Read the
-:doc:`/target_semantics` reference before changing estimators, query
-strategies, label helpers, or multi-annotator components. In particular:
+:doc:`/label_formats` pages before changing estimators, query strategies,
+label helpers, or multi-annotator components. In particular:
 
 - Resolve the target meaning with
   :func:`~skactiveml.utils.resolve_target_spec`. Do not infer it from the
@@ -150,8 +150,9 @@ When adding multi-label support to a pool strategy:
   ``skactiveml/utils/_validation.py``.
 - Tag at least one of its example entries ``multi-label``, as
   :ref:`contributing-tags` describes.
-- Add the strategy to the :ref:`multilabel-strategy-inventory`, which groups
-  the strategies by their use of multi-label data.
+- Add the strategy to the :ref:`multi-label strategy inventory
+  <multilabel-strategy-inventory>`, which groups the strategies by their use
+  of multi-label data.
 
 Query Strategies
 ----------------
@@ -226,7 +227,7 @@ flow with and without an estimator.
   ``fit_clf=True``, the estimator is a fitted clone.
 * A strategy that uses no estimator for ``y`` takes the target type from a
   ``target_type`` parameter if it supports multi-label data, as
-  :doc:`/target_semantics` describes. It resolves the parameter with
+  :doc:`/label_formats/resolution` describes. It resolves the parameter with
   ``self._resolve_query_target_type(y)``.
 * Compute the utilities in a separate public function. A naive batch strategy
   uses ``simple_batch`` from ``skactiveml.utils`` to select the batch and set
@@ -410,7 +411,7 @@ from :class:`~skactiveml.base.SkactivemlClassifier` and implement
 * Use the standard parameter names ``classes``, ``missing_label``,
   ``cost_matrix``, which requires ``classes``, and ``random_state``. Only
   classifiers that support multi-label classification take ``target_type``,
-  as :doc:`/target_semantics` describes.
+  as :doc:`/label_formats/multilabel` describes.
 * ``fit`` takes ``X``, ``y`` with ``missing_label`` for missing labels, and
   optionally ``sample_weight`` with the shape of ``y``. ``y`` has the shape
   ``(n_samples,)`` for single-output classification and
