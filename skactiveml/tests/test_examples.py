@@ -117,10 +117,11 @@ class TestExamples(unittest.TestCase):
                         f"add an example in\n"
                         f"{self.json_path}.\n"
                         f"For information how to create one, see the "
-                        f"Examples section of docs/contributing.rst. If "
+                        f"Examples section of "
+                        f"docs/contributing/documentation.rst. If "
                         f"{item} is not an "
-                        f'AL-strategy, add "{item}" to the '
-                        f'"exceptions" list in this test class.',
+                        f'AL-strategy, add "{item}" to '
+                        f"QUERY_STRATEGY_EXCEPTIONS_LIST in this module.",
                     )
 
     def test_api_reference_prioritizes_native_methods(self):
@@ -585,7 +586,7 @@ class TestExamples(unittest.TestCase):
         )
         self.assertEqual(
             sum("/3-pool-multi-annotator/" in item for item in classification),
-            3,
+            len(json_data["3-pool-multi-annotator"]["data"]),
         )
         self.assertTrue(all("/4-stream/" in item for item in stream))
         self.assertIn(

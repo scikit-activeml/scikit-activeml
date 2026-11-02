@@ -280,7 +280,6 @@ html_js_files = [
 #
 html_sidebars = {
     "tutorials": [],  # no primary sidebar for this page
-    "contributing": [],  # no primary sidebar for this page
     "generated/strategy_overview": [],  # no primary sidebar for this page
     "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
     "licenses": [],  # no primary sidebar for this page

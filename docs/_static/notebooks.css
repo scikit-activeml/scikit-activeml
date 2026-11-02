@@ -85,6 +85,16 @@
     }
 }
 
+/* Contributing guide: the inline class tree keeps a readable size on wide
+   screens and shrinks on narrow ones. */
+.structure-figure svg {
+    display: block;
+    width: 100%;
+    max-width: 30rem;
+    height: auto;
+    margin: 0 auto 1rem;
+}
+
 .concepts-figure > p {
     margin: 0.3rem 1rem 1rem;
     color: var(--pst-color-text-muted);

@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     class="skaml-structure" width="553" height="704" viewBox="0 0 553 704"
+     aria-labelledby="structure-title structure-description">
+  <title id="structure-title">Base classes of scikit-activeml</title>
+  <desc id="structure-description">
+    An inheritance tree. scikit-learn's BaseEstimator is the root. Its
+    subclasses are SkactivemlClassifier, which also inherits ClassifierMixin,
+    SkactivemlRegressor, which also inherits RegressorMixin, QueryStrategy,
+    and BudgetManager. ClassFrequencyEstimator inherits from
+    SkactivemlClassifier, and ProbabilisticRegressor from SkactivemlRegressor.
+    QueryStrategy has the subclasses PoolQueryStrategy and
+    SingleAnnotatorStreamQueryStrategy. PoolQueryStrategy has the subclasses
+    SingleAnnotatorPoolQueryStrategy and MultiAnnotatorPoolQueryStrategy.
+    SingleAnnotatorStreamQueryStrategy uses a BudgetManager. Each class links
+    to its API reference.
+  </desc>
+
+  <!-- The page "Developing Components" embeds this file inline, so that text
+       and frames follow the theme colors. Fallbacks apply when the file is
+       opened directly. Style rules and ids carry a prefix because they apply
+       to the whole page. Colors follow concepts-pool.svg. Released
+       documentation loads scikit-activeml-structure.png from master, so that
+       file stays unchanged. -->
+  <defs>
+    <style>
+      .skaml-structure {
+        font-family: var(--pst-font-family-monospace, monospace);
+        font-size: 18px;
+        fill: var(--pst-color-text-base, #222832);
+      }
+      .skaml-structure a { text-decoration: none; }
+      .skaml-structure-class {
+        fill: #07aee6; fill-opacity: .12;
+        stroke: #07aee6; stroke-opacity: .6; stroke-width: 1.5;
+      }
+      .skaml-structure-external {
+        fill: var(--pst-color-surface, #f3f4f5);
+        stroke: var(--pst-color-border, #d1d5da);
+        stroke-width: 1.5;
+      }
+      .skaml-structure a:hover rect,
+      .skaml-structure a:focus rect { stroke-opacity: 1; stroke-width: 2.5; }
+      .skaml-structure-tag { font-size: 15px; }
+      .skaml-structure-note {
+        font-family: var(--pst-font-family-base, system-ui, sans-serif);
+        font-size: 16px;
+        fill: var(--pst-color-text-muted, #48566b);
+      }
+      .skaml-structure-line {
+        fill: none; stroke: #8c8c8c; stroke-width: 2; stroke-linejoin: round;
+      }
+      .skaml-structure-uses { stroke-dasharray: 7 5; }
+    </style>
+    <marker id="structure-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L10 4 L0 8 L2.5 4 Z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+
+  <!-- Each class connects to the class it inherits from. -->
+  <path class="skaml-structure-line" d="M36 64 V662 M36 100 H60 M36 216 H60 M36 332 H60 M36 662 H60"/>
+  <path class="skaml-structure-line" d="M76 122 V158 M76 158 H100"/>
+  <path class="skaml-structure-line" d="M76 238 V274 M76 274 H100"/>
+  <path class="skaml-structure-line" d="M76 354 V564 M76 390 H100 M76 564 H100"/>
+  <path class="skaml-structure-line" d="M116 412 V506 M116 448 H140 M116 506 H140"/>
+  <path class="skaml-structure-line" d="M319 100 H355"/>
+  <path class="skaml-structure-line" d="M308 216 H344"/>
+  <path class="skaml-structure-line skaml-structure-uses" d="M160 586 V638" marker-end="url(#structure-arrow)"/>
+  <text class="skaml-structure-note" x="172" y="619">uses</text>
+
+  <a href="https://scikit-learn.org/stable/modules/generated/sklearn.base.BaseEstimator.html">
+    <rect class="skaml-structure-external" x="20" y="20" width="181" height="44" rx="10"/>
+    <text x="38" y="48">BaseEstimator</text>
+  </a>
+  <text class="skaml-structure-note" x="215" y="48">scikit-learn</text>
+  <a href="../generated/api/skactiveml.base.SkactivemlClassifier.html">
+    <rect class="skaml-structure-class" x="60" y="78" width="259" height="44" rx="10"/>
+    <text x="78" y="106">SkactivemlClassifier</text>
+  </a>
+  <a href="https://scikit-learn.org/stable/modules/generated/sklearn.base.ClassifierMixin.html">
+    <rect class="skaml-structure-external" x="355" y="84" width="164" height="32" rx="8"/>
+    <text class="skaml-structure-tag" x="367" y="105">ClassifierMixin</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.ClassFrequencyEstimator.html">
+    <rect class="skaml-structure-class" x="100" y="136" width="293" height="44" rx="10"/>
+    <text x="118" y="164">ClassFrequencyEstimator</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.SkactivemlRegressor.html">
+    <rect class="skaml-structure-class" x="60" y="194" width="248" height="44" rx="10"/>
+    <text x="78" y="222">SkactivemlRegressor</text>
+  </a>
+  <a href="https://scikit-learn.org/stable/modules/generated/sklearn.base.RegressorMixin.html">
+    <rect class="skaml-structure-external" x="344" y="200" width="154" height="32" rx="8"/>
+    <text class="skaml-structure-tag" x="356" y="221">RegressorMixin</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.ProbabilisticRegressor.html">
+    <rect class="skaml-structure-class" x="100" y="252" width="282" height="44" rx="10"/>
+    <text x="118" y="280">ProbabilisticRegressor</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.QueryStrategy.html">
+    <rect class="skaml-structure-class" x="60" y="310" width="181" height="44" rx="10"/>
+    <text x="78" y="338">QueryStrategy</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.PoolQueryStrategy.html">
+    <rect class="skaml-structure-class" x="100" y="368" width="226" height="44" rx="10"/>
+    <text x="118" y="396">PoolQueryStrategy</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.SingleAnnotatorPoolQueryStrategy.html">
+    <rect class="skaml-structure-class" x="140" y="426" width="393" height="44" rx="10"/>
+    <text x="158" y="454">SingleAnnotatorPoolQueryStrategy</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.MultiAnnotatorPoolQueryStrategy.html">
+    <rect class="skaml-structure-class" x="140" y="484" width="382" height="44" rx="10"/>
+    <text x="158" y="512">MultiAnnotatorPoolQueryStrategy</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.SingleAnnotatorStreamQueryStrategy.html">
+    <rect class="skaml-structure-class" x="100" y="542" width="415" height="44" rx="10"/>
+    <text x="118" y="570">SingleAnnotatorStreamQueryStrategy</text>
+  </a>
+  <a href="../generated/api/skactiveml.base.BudgetManager.html">
+    <rect class="skaml-structure-class" x="60" y="640" width="181" height="44" rx="10"/>
+    <text x="78" y="668">BudgetManager</text>
+  </a>
+</svg>

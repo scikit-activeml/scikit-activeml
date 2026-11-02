@@ -141,5 +141,5 @@ class TestLayout(unittest.TestCase):
             "function or constant in the file that uses it, in a private "
             "file of the subpackage sharing it, or in a clearly named "
             "private file under `skactiveml/utils`. See the helper "
-            "placement rule in `docs/contributing.rst`.",
+            "placement rule in `docs/contributing/components.rst`.",
         )
