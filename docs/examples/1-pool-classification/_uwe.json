@@ -1,0 +1,17 @@
+[
+{
+    "class" : "UWE",
+    "package" : "pool",
+    "method" : "Uncertainty-Weighted Embeddings (UWE)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool", "classification", "regression", "single-annotator", "diverse-batch"],
+    "title" : "Uncertainty-Weighted Embeddings (UWE)",
+    "refs" : ["he2024hybrid"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** UWE generalizes the gradient embeddings of BADGE by weighting each sample's (learned) representation with the model's uncertainty, e.g., the entropy of its predicted class probabilities. Since uncertain samples get embeddings of large magnitude, the K-Center-Greedy algorithm, seeded by the labeled samples, selects a batch of uncertain and diverse samples. In contrast to BADGE, any non-negative uncertainty measure can be used, which also enables regression.",
+    "import_misc" : "from skactiveml.pool import UWE",
+    "init_qs" : "UWE()",
+    "query_params" : "X=X, y=y, estimator=clf"
+}
+]
