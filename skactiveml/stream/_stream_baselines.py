@@ -1,20 +1,50 @@
 import numpy as np
+from sklearn.utils import check_array
 
 from ..base import SingleAnnotatorStreamQueryStrategy
 from ..utils import check_scalar
+from ..utils._validation import _validate_budget_update
+
+# Label-free baselines consume neither labels nor a model. They declare the
+# same task-agnostic capabilities as their pool-based counterparts.
+_TASK_AGNOSTIC_CAPABILITIES = frozenset(
+    {
+        ("classification", "single-output", "single-annotator"),
+        ("classification", "multi-label", "single-annotator"),
+        ("regression", "single-output", "single-annotator"),
+    }
+)
+
+
+def _validate_update_state(strategy):
+    """Validate and commit the state an `update` needs.
+
+    Parameters
+    ----------
+    strategy : SingleAnnotatorStreamQueryStrategy
+        The query strategy being updated.
+    """
+    strategy._validate_random_state()
+    strategy._validate_budget()
+    if not hasattr(strategy, "observed_samples_"):
+        strategy.observed_samples_ = 0
+    if not hasattr(strategy, "queried_samples_"):
+        strategy.queried_samples_ = 0
 
 
 class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     """Random Sampling for Data Streams.
 
     The RandomSampling strategy queries labels completely randomly. The
-    probability to query a sample is dependent on the budget specified in
-    the budget manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1)
-    with a probability of 10%. samples are queried regardless of their
-    position in the feature space and disregards any information about the
-    sample. Thus, it should only be used as a baseline strategy. The
-    `allow_exceeding_budget` parameter allows to configure the strategy to
-    strictly adhere to a given budget.
+    probability to query a sample is dependent on `budget`. Given a budget
+    of 10%, the utility exceeds 0.9 (1-0.1) with a probability of 10%.
+    Samples are queried regardless of their position in the feature space
+    and without using information about the sample. Thus, it should only be
+    used as a baseline strategy. The `allow_exceeding_budget` parameter
+    controls whether the strategy strictly adheres to a given budget.
+    Neither labels nor a model are consumed, so the strategy is task-agnostic
+    and supports single-output and multi-label classification as well as
+    regression.
 
     Parameters
     ----------
@@ -23,8 +53,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         as the average number of queries will be within the budget. If `False`,
         queries are not allowed if the budget is exhausted.
     budget : float, default=None
-        The budget which models the budgeting constraint used in the
-        stream-based active learning setting.
+        Specifies the ratio of samples which may be queried, with
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -34,6 +65,10 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.allow_exceeding_budget = allow_exceeding_budget
+
+    @property
+    def _target_capabilities(self):
+        return _TASK_AGNOSTIC_CAPABILITIES
 
     def query(self, candidates, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
@@ -57,8 +92,8 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -73,36 +108,33 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         self.random_state_.set_state(prior_random_state)
 
-        # keep record if the sample is queried and if there was budget left,
-        # when assessing the corresponding utilities
         queried = np.full(len(utilities), False)
 
-        # keep the internal state to reset it later if simulate is true
+        # Track counts locally without advancing acquisition state.
         tmp_observed_samples = self.observed_samples_
         tmp_queried_samples = self.queried_samples_
-        # check for each sample separately if budget is left and the utility is
-        # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_samples += 1
-            available_budget = (
-                tmp_observed_samples * self.budget_ - tmp_queried_samples
+            # Include exact boundaries that round one ULP below the limit.
+            budget_limit = np.nextafter(
+                tmp_observed_samples * self.budget_, np.inf
             )
             queried[i] = (
-                self.allow_exceeding_budget or available_budget > 1
+                self.allow_exceeding_budget
+                or tmp_queried_samples + 1 <= budget_limit
             ) and (utility >= 1 - self.budget_)
             tmp_queried_samples += queried[i]
 
-        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
-
-        # queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices):
+    def update(
+        self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the count for seen and queried labels. This function should
         be used in conjunction with the `query` function.
 
@@ -112,24 +144,26 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
+        budget_manager_param_dict : Ignored
+            Not used, present here for API consistency by convention.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a random state is set
-        self._validate_data([[0]], False)
-        # update observed samples and queried samples
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
-        self.observed_samples_ += candidates.shape[0]
+        candidates = check_array(candidates)
+        queried = _validate_budget_update(candidates, queried_indices)
+        check_scalar(
+            self.allow_exceeding_budget, "allow_exceeding_budget", bool
+        )
+        _validate_update_state(self)
+        self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
-        # update the random state assuming, that query(..., simulate=True) was
-        # used
+        # Advance the draws consumed by query.
         self.random_state_.random_sample(len(candidates))
         return self
 
@@ -164,7 +198,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):
@@ -193,21 +226,28 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     that period is determined by the `budget`. For instance, a `budget` of 0.25
     would result in querying every fourth sample. The main idea behind this
     query strategy is to exhaust a given budget as soon as it is available.
-    samples are queried regardless of their position in the feature space and
-    disregards any information about the sample. Thus, it should only be used
-    as a baseline strategy.
+    Samples are queried regardless of their position in the feature space and
+    without using information about the sample. Thus, it should only be used
+    as a baseline strategy. Neither labels nor a model are consumed, so the
+    strategy is task-agnostic and supports single-output and multi-label
+    classification as well as regression.
 
     Parameters
     ----------
     budget : float, default=None
-        The budget which models the budgeting constraint used in the
-        stream-based active learning setting.
+        Specifies the ratio of samples which may be queried, with
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
 
     def __init__(self, budget=None, random_state=None):
         super().__init__(budget=budget, random_state=random_state)
+
+    @property
+    def _target_capabilities(self):
+        return _TASK_AGNOSTIC_CAPABILITIES
 
     def query(self, candidates, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
@@ -231,8 +271,8 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -242,33 +282,31 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         utilities = np.zeros(candidates.shape[0])
 
-        # keep record if the sample is queried and if there was budget left,
-        # when assessing the corresponding utilities
         queried = np.full(len(candidates), False)
 
         tmp_observed_samples = self.observed_samples_
         tmp_queried_samples = self.queried_samples_
         for i, x in enumerate(candidates):
             tmp_observed_samples += 1
-            remaining_budget = (
-                tmp_observed_samples * self.budget_ - tmp_queried_samples
+            # Include exact boundaries that round one ULP below the limit.
+            budget_limit = np.nextafter(
+                tmp_observed_samples * self.budget_, np.inf
             )
-            queried[i] = remaining_budget >= 1
+            queried[i] = tmp_queried_samples + 1 <= budget_limit
             if queried[i]:
                 utilities[i] = 1
             tmp_queried_samples += queried[i]
 
-        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
-
-        # queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices):
+    def update(
+        self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the count for seen and queried labels. This function should
         be used in conjunction with the `query` function.
 
@@ -278,19 +316,20 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted only
             if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried, with
-            `0 <= queried_indices <= n_candidates`.
+            `0 <= queried_indices < n_candidates`.
+        budget_manager_param_dict : Ignored
+            Not used, present here for API consistency by convention.
 
         Returns
         -------
         self : SingleAnnotatorStreamQueryStrategy
             The query strategy returns itself, after it is updated.
         """
-        # check if a budgetmanager is set
-        self._validate_data(np.array([[0]]), False)
-        queried = np.zeros(len(candidates))
-        queried[queried_indices] = 1
+        candidates = check_array(candidates)
+        queried = _validate_budget_update(candidates, queried_indices)
+        _validate_update_state(self)
         self.observed_samples_ += len(queried)
         self.queried_samples_ += np.sum(queried)
         return self
@@ -335,7 +374,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         self._validate_random_state()
 
-        # check if counting of samples has begun
         if not hasattr(self, "observed_samples_"):
             self.observed_samples_ = 0
         if not hasattr(self, "queried_samples_"):

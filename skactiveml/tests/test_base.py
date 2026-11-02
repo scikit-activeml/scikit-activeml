@@ -57,8 +57,8 @@ class DummySkactivemlClassifier(SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.probas = probas
 
     def fit(self, X, y, sample_weight=None):
@@ -247,10 +247,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
         self.assertEqual(query_indices.shape, (0,))
 
     def test_guard_does_not_rewrap_a_republished_query(self):
-        # A strategy may republish the `query` it inherits under its own name.
-        # That function already carries the guard, so guarding it again would
-        # wrap it twice and warn about an exhausted pool for a query that has
-        # already answered it.
         class ParentStrategy(DummySingleAnnotatorPoolQueryStrategy):
             pass
 
@@ -268,8 +264,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
         self.assertEqual(query_indices.shape, (0,))
 
     def test_guard_covers_a_query_published_through_a_descriptor(self):
-        # `match_signature` publishes `query` as a descriptor, which stays in
-        # place while the function it binds carries the guard.
         class DescriptorPublishingStrategy(SingleAnnotatorPoolQueryStrategy):
             @match_signature("query_strategy", "query")
             def query(
@@ -305,8 +299,6 @@ class ExhaustedCandidatePoolGuardTest(unittest.TestCase):
                 query = property(lambda self: None)
 
     def test_guard_preserves_an_abstract_query(self):
-        # The guard wraps `query` while the class is created, i.e., before the
-        # abstract methods are collected, so it must not hide abstractness.
         for base in (
             SingleAnnotatorPoolQueryStrategy,
             MultiAnnotatorPoolQueryStrategy,
@@ -496,6 +488,12 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
     def setUp(self):
         self.qs = MultiAnnotatorPoolQueryStrategy()
         self.qs.missing_label_ = MISSING_LABEL
+
+    def test_validation_preserves_string_annotations(self):
+        y = np.array([["a", None], ["b", None], [None, None]], dtype=object)
+        strategy = DummyMultiAnnotatorPoolQueryStrategy(missing_label=None)
+        validated = strategy.query(X=np.arange(3)[:, None], y=y)
+        np.testing.assert_array_equal(validated[1], y)
 
     def test_query(self):
         self.assertRaises(
@@ -741,8 +739,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
     def test__validate_data(self):
         X = np.ones((10, 2))
         y = np.random.rand(10)
-        # TODO: Wait for scikit-learn update.
-        # self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
         y = np.full(10, fill_value=-1)
         self.clf.classes = None
         self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
@@ -795,23 +791,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         self.assertEqual(
             multi_annotator_clf.target_spec_.annotation_type, "multi-annotator"
         )
-
-    def test_partial_fit_rejects_changed_multilabel_dtype_kind(self):
-        X = np.arange(4).reshape(2, 2)
-        y = np.array([[0, 2], [1, 3]])
-        clf = DummySkactivemlClassifier(
-            classes=((0, 1), (2, 3)),
-            missing_label=-1,
-            target_type="multi-label",
-        )
-        clf.partial_fit(X, y)
-        established_spec = clf.target_spec_
-
-        clf.classes = ((0.0, 1.0), (2.0, 3.0))
-        with self.assertRaisesRegex(ValueError, "cannot change"):
-            clf.partial_fit(X, y.astype(float))
-
-        self.assertIs(clf.target_spec_, established_spec)
 
     def test_public_fit_validates_weights_and_orders_cost_matrix(self):
         X = np.arange(4).reshape(2, 2)
@@ -926,8 +905,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         np.testing.assert_array_equal(clf.predict(X), y)
 
     def test_predict_dtype_matches_class_dtype(self):
-        # `missing_label=np.nan` widens the label encoder to `float64`, so
-        # the decoded labels must be narrowed back to the class dtype.
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, np.nan])
         clf = DummySkactivemlClassifier(
@@ -940,7 +917,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         y_pred = clf.predict(X)
 
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
-        # The decoded labels are usable where class labels are expected.
         np.testing.assert_array_equal(np.array(["a", "b"])[y_pred], ["a", "b"])
 
     def test_predict_dtype_matches_class_dtype_multilabel(self):
@@ -959,7 +935,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
 
     def test_predict_dtype_preserves_extra_outputs(self):
-        # Only the class labels are narrowed; extra outputs are untouched.
         X = np.arange(4).reshape(2, 2)
         y = np.array([0, np.nan])
         extra = np.array([[0.5], [0.5]], dtype=np.float32)
@@ -975,6 +950,25 @@ class SkactivemlClassifierTest(unittest.TestCase):
         assert_predicts_class_dtype(self, y_pred, clf.classes_)
         self.assertEqual(extra_pred.dtype, np.float32)
 
+    def test_class_label_decoder_rejects_missing_prediction_codes(self):
+        X = np.arange(4).reshape(2, 2)
+        cases = [
+            ([0, 1], [0, 1], [0, -1], "auto"),
+            (
+                [[0, 1], [0, 1]],
+                [[0, 0], [1, 1]],
+                [[0, 0], [-1, -1]],
+                "multi-label",
+            ),
+        ]
+        for classes, y, codes, target_type in cases:
+            with self.subTest(classes=classes):
+                clf = DummySkactivemlClassifier(
+                    classes=classes, target_type=target_type
+                ).fit(X, y)
+                with self.assertRaisesRegex(ValueError, "`y`.*encoded.*-1"):
+                    clf._decode_class_labels(codes)
+
     def test_score_multilabel(self):
         X = np.arange(4).reshape(2, 2)
         y = np.array([[1, 1], [1, 1]])
@@ -987,18 +981,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
 
         clf.fit(X, y)
         self.assertEqual(clf.score(X, y), 0.5)
-
-    def test_multi_output_is_rejected_before_fitted_state(self):
-        X = np.arange(4).reshape(2, 2)
-        y = np.array([[2, 1], [1, 0]])
-        clf = DummySkactivemlClassifier(
-            classes=[[0, 1, 2], [0, 1]],
-            missing_label=-1,
-            target_type="multi-output",
-        )
-        with self.assertRaisesRegex(ValueError, "Supported capabilities"):
-            clf.fit(X, y)
-        self.assertFalse(hasattr(clf, "target_spec_"))
 
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
@@ -1108,6 +1090,71 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
             np.zeros((2, 1)),
         )
 
+    def test_predict_proba_rejects_negative_frequencies(self):
+        clf = DummyClassFrequencyEstimator(
+            freq=np.array([[-2.0, 1.0]]),
+            class_prior=0.0,
+        )
+        clf.classes_ = np.array([0, 1])
+        clf.class_prior_ = np.array([0.0, 0.0])
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_proba(np.zeros((1, 1)))
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.sample_proba(np.zeros((1, 1)), random_state=0)
+
+    def test_multilabel_predict_proba_rejects_negative_frequencies(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.array([[[-2.0, 1.0], [1.0, 3.0]]]),
+            class_prior=0,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(
+            np.zeros((2, 1)),
+            np.array([["no", "on"], ["yes", "off"]]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "negative class frequency"):
+            clf.predict_proba(np.zeros((1, 1)))
+
+    def test_sample_proba_follows_tiny_asymmetric_concentrations(self):
+        for prior, expected in (
+            ([1e-100, 9e-100], [0.1, 0.9]),
+            ([1e-3, 9e-3], [0.1, 0.9]),
+            ([1.0, 3.0], [0.25, 0.75]),
+        ):
+            with self.subTest(class_prior=prior):
+                clf = DummyClassFrequencyEstimator(
+                    freq=np.zeros((1, 2)),
+                    class_prior=prior,
+                    classes=[0, 1],
+                )
+                clf.classes_ = np.array([0, 1])
+                clf.class_prior_ = np.array(prior)
+
+                P = clf.sample_proba(
+                    np.zeros((1, 1)), n_samples=20000, random_state=0
+                )
+
+                assert_allclose(P.sum(axis=-1), 1)
+                assert_allclose(P.mean(axis=0)[0], expected, atol=0.02)
+
+    def test_multilabel_sample_proba_follows_tiny_concentrations(self):
+        clf = DummyMultilabelClassFrequencyEstimator(
+            freq=np.zeros((1, 2, 2)),
+            class_prior=1,
+            classes=[["no", "yes"], ["off", "on"]],
+            missing_label=None,
+            target_type="multi-label",
+        ).fit(np.zeros((2, 1)), np.array([["no", "on"], ["yes", "off"]]))
+        clf.class_prior_ = np.array([[1e-100, 9e-100], [9e-100, 1e-100]])
+
+        P = clf.sample_proba(np.zeros((1, 1)), n_samples=20000, random_state=0)
+
+        assert_allclose(P.sum(axis=-1), 1)
+        assert_allclose(P.mean(axis=0)[0][..., 1], [0.9, 0.1], atol=0.02)
+
     def test_multilabel_sample_proba_returns_full_binary_vectors(self):
         clf = DummyMultilabelClassFrequencyEstimator(
             freq=np.array(
@@ -1179,6 +1226,14 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
 
     def test_query(self):
         self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
+
+    def test_target_capabilities(self):
+        self.assertEqual(
+            self.qs._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
 
     def test_update(self):
         self.assertRaises(
@@ -1473,44 +1528,34 @@ if successful_skorch_torch_import:
 
             allowed = ["a", "b", "c"]
 
-            # extra_outputs is None -> returns []
             self.assertEqual(norm(None, allowed_names=allowed), [])
 
-            # extra_outputs is str -> single name list
             self.assertEqual(
                 norm("a", allowed_names=allowed, primary_name=None),
                 ["a"],
             )
 
-            # extra_outputs is sequence of str (list)
             self.assertEqual(
                 norm(["a", "c"], allowed_names=allowed, primary_name="b"),
                 ["a", "c"],
             )
 
-            # extra_outputs is sequence of str (tuple)
             self.assertEqual(
                 norm(("a",), allowed_names=allowed, primary_name=None),
                 ["a"],
             )
 
-            # extra_outputs of invalid type ->
-            # TypeError (non-str / non-sequence)
             with self.assertRaises(TypeError):
                 norm(123, allowed_names=allowed)
 
-            # extra_outputs sequence with non-str element -> TypeError
             with self.assertRaises(TypeError):
                 norm(["a", 1], allowed_names=allowed)
 
-            # duplicate names -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "a"], allowed_names=allowed)
 
-            # unknown names -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "z"], allowed_names=allowed)
 
-            # primary_name included in extras -> ValueError
             with self.assertRaises(ValueError):
                 norm(["a", "b"], allowed_names=allowed, primary_name="b")

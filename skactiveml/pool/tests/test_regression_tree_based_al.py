@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 import numpy as np
 from sklearn.metrics import pairwise_distances_argmin
@@ -12,7 +13,6 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import MISSING_LABEL
 from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 
@@ -47,19 +47,6 @@ class TestRegressionTreeBasedAL(
         ]
         self._test_param("init", "method", test_cases)
 
-    def test_init_param_target_type(self):
-        self._test_param(
-            "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("multi-output", ValueError),
-                ("multi-label", ValueError),
-                ("invalid", ValueError),
-            ],
-        )
-
     def test_query_uses_fitted_regressor_target_spec(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
@@ -73,7 +60,7 @@ class TestRegressionTreeBasedAL(
 
         self.assertIn(query_idx[0], [4, 5])
 
-    def test_fitted_target_shape_failure_precedes_acquisition_state(self):
+    def test_fitted_target_shape_failure_is_rejected(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.arange(12, dtype=float).reshape(6, 2)
         reg = SklearnRegressor(
@@ -83,38 +70,6 @@ class TestRegressionTreeBasedAL(
 
         with self.assertRaisesRegex(ValueError, "Single-output regression"):
             strategy.query(X, y, reg, fit_reg=False)
-
-        assert_no_query_state(self, strategy)
-
-    def test_strategy_target_type_errors_are_semantic(self):
-        X = np.arange(12, dtype=float).reshape(-1, 2)
-        y = np.arange(6, dtype=float)
-        reg = SklearnRegressor(
-            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
-        ).fit(X, y)
-
-        with self.assertRaisesRegex(ValueError, "must be one of"):
-            RegressionTreeBasedAL(target_type="invalid").query(
-                X, y, reg, fit_reg=False
-            )
-        with self.assertRaisesRegex(ValueError, "requires classification"):
-            RegressionTreeBasedAL(target_type="multi-label").query(
-                X, y, reg, fit_reg=False
-            )
-
-    def test_unfitted_regressor_declaration_conflict_precedes_state(self):
-        X = np.arange(12, dtype=float).reshape(-1, 2)
-        y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
-        reg = SklearnRegressor(
-            DecisionTreeRegressor(min_samples_leaf=2, random_state=0),
-            target_type="multi-output",
-        )
-        strategy = RegressionTreeBasedAL(target_type="single-output")
-
-        with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
-            strategy.query(X, y, reg, fit_reg=False)
-
-        assert_no_query_state(self, strategy)
 
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []
@@ -178,7 +133,92 @@ class TestRegressionTreeBasedAL(
             (SklearnRegressor(DecisionTreeRegressor()), None),
             (SklearnRegressor(ExtraTreeRegressor()), None),
         ]
-        self._test_param("query", "reg", test_cases)
+        super().test_query_param_reg(test_cases=test_cases)
+
+    def test_query_param_candidates(self, test_cases=None):
+        super().test_query_param_candidates(test_cases=test_cases)
+        X = np.array([0, 1, 10, 11, 2, 2, 12, 13]).reshape(-1, 1)
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(
+                max_depth=1, min_samples_leaf=2, random_state=0
+            )
+        )
+        for targets in [[0, 1, 10, 11], [0, 0, 10, 10], [0, 100, 200, 201]]:
+            y = np.array(targets + [MISSING_LABEL] * 4)
+            for method in ["random", "diversity", "representativity"]:
+                for candidates, eligible in [
+                    (None, np.arange(4, 8)),
+                    ([4, 5], np.array([4, 5])),
+                    ([6, 7], np.array([6, 7])),
+                    ([4, 6, 7], np.array([4, 6, 7])),
+                    (X[[4, 5]], np.arange(2)),
+                    (np.array([[-2], [-1], [14]]), np.arange(3)),
+                    (np.array([[-2], [-2], [-2]]), np.arange(3)),
+                ]:
+                    for batch_size in sorted({1, 2, len(eligible)}):
+                        with self.subTest(
+                            targets=targets,
+                            method=method,
+                            candidates=candidates,
+                            batch_size=batch_size,
+                        ):
+                            qs = self.qs_class(method=method, random_state=0)
+                            indices, utilities = qs.query(
+                                X,
+                                y,
+                                reg,
+                                candidates=candidates,
+                                batch_size=batch_size,
+                                return_utilities=True,
+                            )
+                            self.assertIsInstance(indices, np.ndarray)
+                            self.assertEqual(indices.shape, (batch_size,))
+                            self.assertTrue(
+                                np.issubdtype(indices.dtype, np.integer)
+                            )
+                            self.assertEqual(
+                                len(np.unique(indices)), batch_size
+                            )
+                            self.assertTrue(np.isin(indices, eligible).all())
+                            n_utilities = (
+                                len(X)
+                                if candidates is None
+                                or np.ndim(candidates) == 1
+                                else len(candidates)
+                            )
+                            self.assertEqual(
+                                utilities.shape, (batch_size, n_utilities)
+                            )
+                            selected = utilities[
+                                np.arange(batch_size), indices
+                            ]
+                            self.assertTrue(np.isfinite(selected).all())
+                            np.testing.assert_array_equal(
+                                selected, np.nanmax(utilities, axis=1)
+                            )
+                            for i in range(batch_size):
+                                self.assertTrue(
+                                    np.isnan(utilities[i, indices[:i]]).all()
+                                )
+                            np.testing.assert_array_equal(
+                                indices,
+                                qs.query(
+                                    X,
+                                    y,
+                                    reg,
+                                    candidates=candidates,
+                                    batch_size=batch_size,
+                                ),
+                            )
+
+                indices = self.qs_class(method=method, random_state=0).query(
+                    X[:4],
+                    y[:4],
+                    reg,
+                    candidates=np.array([[-2], [-1], [14]]),
+                    batch_size=3,
+                )
+                np.testing.assert_array_equal(np.sort(indices), [0, 1, 2])
 
     def test__calc_acquisitions_per_leaf(self):
         reg = SklearnRegressor(_DummyRegressor())
@@ -188,6 +228,33 @@ class TestRegressionTreeBasedAL(
             _calc_acquisitions_per_leaf(X, y, reg, MISSING_LABEL),
             np.full(3, 1 / 3),
         )
+
+        for targets, candidates, batch_size, expected in [
+            ([0, 2, 10, 12, 20, 22], [[1], [1]], 2, [2, 0, 0]),
+            ([0, 0, 10, 10, 20, 20], [[1], [1]], 2, [2, 0, 0]),
+            (
+                [0, 100, 10, 12, 20, 22],
+                [[1], [11], [21], [21]],
+                3,
+                [1, 2 / (1 + np.sqrt(2)), 2 * np.sqrt(2) / (1 + np.sqrt(2))],
+            ),
+            (
+                [0, 100, 10, 10, 20, 20],
+                [[1], [11], [21], [21]],
+                3,
+                [1, 1, 1],
+            ),
+        ]:
+            with self.subTest(targets=targets, candidates=candidates):
+                actual = _calc_acquisitions_per_leaf(
+                    X,
+                    np.array(targets + [MISSING_LABEL] * 3),
+                    reg,
+                    MISSING_LABEL,
+                    batch_size=batch_size,
+                    X_cand=np.array(candidates),
+                )
+                np.testing.assert_allclose(actual, expected)
 
     def test__discretize_acquisitions_per_leaf(self):
         n_k = np.array([2.5, 4.0, 3.9, 7.3, 9.6])
@@ -218,6 +285,36 @@ class TestRegressionTreeBasedAL(
         self.assertTrue((n_k_discrete != n_k_discrete_new).any())
 
     def test_query(self):
+        for targets, message in [
+            (
+                [np.nan] * 4,
+                "Fewer than two samples are labeled.*random sampling",
+            ),
+            (
+                [1, np.nan, np.nan, np.nan],
+                "Fewer than two samples are labeled",
+            ),
+            (
+                [1, 1, np.nan, np.nan],
+                "zero label variance.*identical labels.*uniformly",
+            ),
+            ([1, 2, np.nan, np.nan], None),
+        ]:
+            with self.subTest(targets=targets):
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    self.qs_class(random_state=0).query(
+                        np.arange(4).reshape(-1, 1),
+                        targets,
+                        self.reg,
+                        batch_size=2,
+                    )
+                if message is None:
+                    self.assertEqual(caught, [])
+                else:
+                    self.assertEqual(len(caught), 1)
+                    self.assertRegex(str(caught[0].message), message)
+
         X = np.linspace(-2, 2, 100).reshape(-1, 1)
         y = np.sin(X.ravel())
         y[30:70] = MISSING_LABEL

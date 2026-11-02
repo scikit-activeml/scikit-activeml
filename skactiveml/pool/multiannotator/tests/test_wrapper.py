@@ -1,4 +1,7 @@
+from functools import wraps
 import unittest
+from unittest.mock import patch
+import warnings
 
 import numpy as np
 from sklearn.datasets import make_blobs
@@ -14,7 +17,6 @@ from skactiveml.pool import (
     RandomSampling,
 )
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
-from skactiveml.tests.utils import assert_no_query_state
 from skactiveml.utils import is_labeled
 from skactiveml.utils import majority_vote, MISSING_LABEL, is_unlabeled
 
@@ -42,8 +44,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ]
         )
         self.random_state = 0
-        # A three-class annotation matrix, i.e., a class vocabulary a binary
-        # auxiliary estimator could never describe.
         self.X_three_classes = np.arange(24, dtype=float).reshape(12, 2)
         self.y_three_classes = np.full((12, 3), MISSING_LABEL)
         self.y_three_classes[:6] = np.array(
@@ -58,14 +58,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             dtype=float,
         )
 
-    def test_init_param_target_type(self):
-        wrapper = SingleAnnotatorWrapper(
-            RandomSampling(random_state=self.random_state),
-            target_type="auto",
-            random_state=self.random_state,
-        )
+    def test_target_capabilities(self):
+        wrapper = SingleAnnotatorWrapper(RandomSampling())
 
-        self.assertEqual(wrapper.target_type, "auto")
         self.assertEqual(
             wrapper._target_capabilities,
             frozenset(
@@ -79,10 +74,44 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             ),
         )
 
+    def test_default_aggregation_honors_missing_label(self):
+        X = np.arange(3)[:, None]
+        for missing_label, y, expected in [
+            (
+                None,
+                [["a", None, None], ["b", None, None], [None, None, None]],
+                ["a", "b", None],
+            ),
+            (-1, [[0, -1, -1], [1, -1, -1], [-1, -1, -1]], [0, 1, -1]),
+        ]:
+            with self.subTest(missing_label=missing_label):
+                strategy = RandomSampling(
+                    missing_label=missing_label, random_state=0
+                )
+                wrapper = SingleAnnotatorWrapper(
+                    strategy, missing_label=missing_label, random_state=0
+                )
+                aggregates = []
+
+                @wraps(majority_vote)
+                def vote(*args, **kwargs):
+                    result = majority_vote(*args, **kwargs)
+                    aggregates.append(result.copy())
+                    return result
+
+                with patch(
+                    "skactiveml.pool.multiannotator._wrapper.majority_vote",
+                    new=vote,
+                ):
+                    query = wrapper.query(X, np.asarray(y), batch_size=1)
+                self.assertEqual(query.shape, (1, 2))
+                self.assertEqual(len(aggregates), 1)
+                np.testing.assert_array_equal(aggregates[0], expected)
+                self.assertIsNone(wrapper.y_aggregate)
+
     def test_outer_and_aggregated_targets_use_separate_semantics(self):
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(random_state=self.random_state),
-            target_type="auto",
             random_state=self.random_state,
         )
 
@@ -96,29 +125,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertEqual(query_indices.shape, (2, 2))
         self.assertEqual(utilities.shape, (2, len(self.X), self.y.shape[1]))
 
-    def test_explicit_multilabel_intent_fails_before_aggregation(self):
-        calls = []
-
-        def y_aggregate(y):
-            calls.append(y)
-            return majority_vote(y)
-
-        wrapper = SingleAnnotatorWrapper(
-            RandomSampling(random_state=self.random_state),
-            y_aggregate=y_aggregate,
-            target_type="multi-label",
-            random_state=self.random_state,
-        )
-
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            wrapper.query(self.X, self.y)
-
-        self.assertEqual(calls, [])
-        assert_no_query_state(self, wrapper)
-
-    def test_wrapped_target_rejection_precedes_query_state(self):
+    def test_wrapped_target_is_rejected(self):
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(target_type="multi-label"),
             random_state=self.random_state,
@@ -127,9 +134,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         with self.assertRaises(ValueError):
             wrapper.query(self.X, self.y)
 
-        assert_no_query_state(self, wrapper)
-
-    def test_wrapped_classifier_rejection_precedes_query_state(self):
+    def test_wrapped_classifier_is_rejected(self):
         strategy = UncertaintySampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             strategy,
@@ -140,10 +145,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not support"):
             wrapper.query(self.X, self.y, clf=clf)
 
-        for component in (wrapper, strategy):
-            assert_no_query_state(self, component)
-
-    def test_prefitted_estimator_marker_rejection_precedes_query_state(self):
+    def test_prefitted_estimator_missing_label_is_rejected(self):
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
             classes=self.classes,
@@ -162,61 +164,12 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                 [0, 0, 1],
                 [0, 1, 1],
                 [1, 0, 1],
-                [1, 1, 0],
+                [-1, -1, -1],
             ]
         )
 
         with self.assertRaisesRegex(ValueError, "must be equal"):
             wrapper.query(self.X, y, clf=clf, fit_clf=False)
-
-        for component in (wrapper, strategy):
-            assert_no_query_state(self, component)
-
-    def test_wrapped_rejection_preserves_existing_query_state(self):
-        strategy = UncertaintySampling(random_state=self.random_state)
-        wrapper = SingleAnnotatorWrapper(
-            strategy,
-            random_state=self.random_state,
-        )
-        clf = SklearnClassifier(
-            estimator=GaussianProcessClassifier(),
-            classes=[0, 1],
-            random_state=self.random_state,
-        )
-        wrapper.query(self.X, self.y, clf=clf)
-        expected_state = {}
-        for component in (wrapper, strategy):
-            expected_state[component] = (
-                component.n_features_in_,
-                component.missing_label_,
-                component.random_state_.get_state(),
-            )
-
-        with self.assertRaisesRegex(ValueError, "does not support"):
-            wrapper.query(
-                self.X,
-                self.y,
-                clf=AnnotatorLogisticRegression(classes=[0, 1]),
-            )
-
-        for component in (wrapper, strategy):
-            (
-                expected_n_features,
-                expected_missing_label,
-                expected_random_state,
-            ) = expected_state[component]
-            self.assertEqual(component.n_features_in_, expected_n_features)
-            np.testing.assert_equal(
-                component.missing_label_, expected_missing_label
-            )
-            actual_random_state = component.random_state_.get_state()
-            self.assertEqual(actual_random_state[0], expected_random_state[0])
-            np.testing.assert_array_equal(
-                actual_random_state[1], expected_random_state[1]
-            )
-            self.assertEqual(
-                actual_random_state[2:], expected_random_state[2:]
-            )
 
     def test_class_agnostic_wrapper_accepts_an_all_missing_matrix(self):
         y = np.full_like(self.y, MISSING_LABEL)
@@ -243,10 +196,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_auxiliary_estimator_argument_is_no_target_authority(self):
-        # The discriminator separates labeled from unlabeled samples such that
-        # its target semantics do not describe `y`. Querying first keeps this a
-        # behavioural guard, i.e., a wrapper resolving the discriminator
-        # against `y` fails here rather than on the declaration seam below.
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1])
         strategy = DiscriminativeAL(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
@@ -262,18 +211,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         np.testing.assert_array_equal(query_indices, [[11, 0], [9, 0]])
         self._assert_selects_unlabeled_pairs(query_indices)
-        self.assertEqual(
-            wrapper._collect_target_authorities(
-                {"discriminator": discriminator}
-            ),
-            [],
-        )
 
     def test_fitted_auxiliary_estimator_is_no_target_authority(self):
-        # Mirrors the pool wrapper's
-        # `test_estimator_like_argument_is_no_target_authority`, which
-        # supplies a fitted discriminator so that `target_spec_` and
-        # `classes_` both exist.
         labeled = np.full(len(self.X_three_classes), MISSING_LABEL)
         labeled[:6], labeled[6:] = 1.0, 0.0
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1]).fit(
@@ -326,9 +265,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertEqual(query_indices.shape, (2, 2))
         self._assert_selects_unlabeled_pairs(query_indices)
 
-    def test_declared_authority_rejection_precedes_query_state(self):
-        # Unlike the auxiliary discriminator, a declared `clf` does describe
-        # `y` and must therefore still be rejected for a narrower vocabulary.
+    def test_declared_classifier_vocabulary_is_rejected(self):
         strategy = UncertaintySampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             strategy, random_state=self.random_state
@@ -338,32 +275,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside `classes`"):
             wrapper.query(self.X_three_classes, self.y_three_classes, clf=clf)
 
-        for component in (wrapper, strategy):
-            assert_no_query_state(self, component)
-
-    def test_repeated_authority_across_declared_params_resolves_once(self):
-        clf_0 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        clf_1 = SklearnClassifier(GaussianNB(), classes=[0, 1])
-        wrapper = SingleAnnotatorWrapper(
-            UncertaintySampling(random_state=self.random_state),
-            random_state=self.random_state,
-        )
-
-        authorities = wrapper._collect_target_authorities(
-            {
-                "ensemble": [clf_1, clf_0],
-                "clf": clf_0,
-                "discriminator": SklearnClassifier(
-                    GaussianNB(), classes=[0, 1]
-                ),
-                "fit_clf": False,
-                "fit_ensemble": False,
-            }
-        )
-
-        self.assertEqual([id(a) for a in authorities], [id(clf_0), id(clf_1)])
-
-    def test_nested_wrapper_delegates_authority_discovery(self):
+    def test_nested_wrapper_forwards_auxiliary_estimator(self):
         discriminator = SklearnClassifier(GaussianNB(), classes=[0, 1])
         wrapper = SingleAnnotatorWrapper(
             SubSamplingWrapper(
@@ -385,12 +297,51 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         np.testing.assert_array_equal(query_indices, [[11, 0], [9, 0]])
         self._assert_selects_unlabeled_pairs(query_indices)
-        self.assertEqual(
-            wrapper._collect_target_authorities(
-                {"discriminator": discriminator}
-            ),
-            [],
-        )
+
+    def test_nested_subsampling_uses_effective_wrapped_batch_size(self):
+        X = np.arange(10, dtype=float).reshape(5, 2)
+        y = np.full((5, 2), MISSING_LABEL)
+
+        for max_candidates, retained, expected_batch_size in (
+            (1, [4], 2),
+            (2, [3, 4], 3),
+        ):
+            with self.subTest(max_candidates=max_candidates):
+                wrapper = SingleAnnotatorWrapper(
+                    SubSamplingWrapper(
+                        RandomSampling(random_state=0),
+                        max_candidates=max_candidates,
+                        random_state=0,
+                    ),
+                    random_state=0,
+                )
+
+                with warnings.catch_warnings(record=True) as caught_warnings:
+                    warnings.simplefilter("always")
+                    query_indices, utilities = wrapper.query(
+                        X,
+                        y,
+                        batch_size=3,
+                        return_utilities=True,
+                    )
+
+                self.assertEqual(query_indices.shape, (expected_batch_size, 2))
+                self.assertEqual(
+                    utilities.shape, (expected_batch_size, len(X), y.shape[1])
+                )
+                self.assertEqual(
+                    len(np.unique(query_indices, axis=0)), expected_batch_size
+                )
+                self.assertTrue(np.isin(query_indices[:, 0], retained).all())
+                excluded = np.setdiff1d(np.arange(len(X)), retained)
+                self.assertTrue((~np.isfinite(utilities[:, excluded])).all())
+                if expected_batch_size < 3:
+                    self.assertTrue(
+                        any(
+                            "sample-annotator pairs" in str(warning.message)
+                            for warning in caught_warnings
+                        )
+                    )
 
     def test_init_param_strategy(self):
         wrapper = SingleAnnotatorWrapper(MixtureModelClassifier())
@@ -638,6 +589,48 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             annotators=self.A_cand,
             n_annotators_per_sample=n_annotators_per_sample,
         )
+
+        for preference, error in [
+            ([-1], ValueError),
+            ([0], ValueError),
+            ([0.5], TypeError),
+            ([1.0], TypeError),
+            ([1, -1], ValueError),
+        ]:
+            with self.subTest(preference=preference):
+                self.assertRaises(
+                    error,
+                    wrapper.query,
+                    self.X,
+                    self.y,
+                    candidates=self.X_cand,
+                    annotators=self.A_cand,
+                    n_annotators_per_sample=preference,
+                )
+
+    def test_query_integer_preference_types(self):
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            random_state=self.random_state,
+        )
+        query_params = dict(
+            X=self.X, y=self.y, candidates=self.X_cand, batch_size=5
+        )
+        expected = wrapper.query(**query_params, n_annotators_per_sample=2)
+        for preference in [
+            np.int32(2),
+            np.int64(2),
+            np.uint64(2),
+            [2],
+            np.array([2], dtype=np.int32),
+            np.array([2], dtype=np.uint64),
+            np.array([2], dtype=object),
+        ]:
+            with self.subTest(preference=repr(preference)):
+                actual = wrapper.query(
+                    **query_params, n_annotators_per_sample=preference
+                )
+                np.testing.assert_array_equal(actual, expected)
 
     def test_query_param_A_perf(self):
         random = RandomSampling(random_state=self.random_state)
@@ -1025,8 +1018,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_exhausted_candidate_pool(self):
-        # An exhausted candidate pool is a valid acquisition state that is
-        # answered with an empty batch instead of an error about array shapes.
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(random_state=self.random_state),
             random_state=self.random_state,

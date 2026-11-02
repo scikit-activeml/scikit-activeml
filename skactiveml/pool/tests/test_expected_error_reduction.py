@@ -1,5 +1,7 @@
 import unittest
 from copy import deepcopy
+from itertools import product
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.naive_bayes import GaussianNB
@@ -7,13 +9,14 @@ from sklearn.svm import SVC
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
-    _cmp_object_dict,
 )
-from skactiveml.utils import MISSING_LABEL, is_labeled
+from skactiveml.tests.utils import assert_state_unchanged
+from skactiveml.utils import MISSING_LABEL, is_labeled, unlabeled_indices
 
 
 class TemplateTestExpectedErrorReduction(
@@ -74,8 +77,32 @@ class TemplateTestExpectedErrorReduction(
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection()
+
+    def test_multiannotator_classifier_rejected_before_fit(self):
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("clf", ParzenWindowClassifier(random_state=0))],
+            classes=self.classes,
+            voting="soft",
+            random_state=0,
+        ).fit(self.X, np.asarray(self.y)[:, None])
+        clf_before = deepcopy(clf)
+
+        with patch.object(
+            AnnotatorEnsembleClassifier,
+            "fit",
+            side_effect=AssertionError("Unexpected classifier fit"),
+        ) as fit:
+            for fit_clf in [False, True]:
+                with self.subTest(fit_clf=fit_clf):
+                    qs = self.qs_class(random_state=0)
+                    with self.assertRaisesRegex(
+                        ValueError, "does not support target capability"
+                    ):
+                        qs.query(self.X, self.y, clf=clf, fit_clf=fit_clf)
+            fit.assert_not_called()
+        assert_state_unchanged(self, clf, clf_before)
 
     def test_init_param_cost_matrix(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -107,13 +134,49 @@ class TemplateTestExpectedErrorReduction(
 
                 qs = self.qs_class(**self.init_default_params)
                 qs.query(**query_params)
-                self.assertTrue(
-                    _cmp_object_dict(
-                        query_params["clf"].__dict__, clf.__dict__
-                    ),
+                assert_state_unchanged(
+                    self,
+                    query_params["clf"],
+                    clf,
+                    name="clf",
                     msg=f"Classifier changed after calling query for "
                     f"`fit_clf={fit_clf}`.",
                 )
+
+    def test_query_refit_resolves_classes_from_constructor(self):
+        X = np.arange(6.0).reshape(-1, 1)
+        y_two = np.array([0, 1, np.nan, np.nan, np.nan, np.nan])
+        y_three = np.array([0, 1, 2, np.nan, np.nan, np.nan])
+
+        for y_fit, y_query, msg in [
+            (y_two, y_three, "new class"),
+            (y_three, y_two, "disappearing class"),
+        ]:
+            with self.subTest(msg=msg):
+                qs = self.qs_class(random_state=0)
+                _, expected = qs.query(
+                    X,
+                    y_query,
+                    ParzenWindowClassifier(random_state=0),
+                    return_utilities=True,
+                )
+                clf = ParzenWindowClassifier(random_state=0).fit(X, y_fit)
+                clf_before = deepcopy(clf)
+                _, utilities = self.qs_class(random_state=0).query(
+                    X, y_query, clf, fit_clf=True, return_utilities=True
+                )
+                np.testing.assert_allclose(utilities, expected)
+                self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+                assert_state_unchanged(self, clf, clf_before, name="clf")
+
+        for clf, fit_clf in [
+            (ParzenWindowClassifier().fit(X, y_two), False),
+            (ParzenWindowClassifier(classes=[0, 1]).fit(X, y_two), True),
+        ]:
+            with self.subTest(fit_clf=fit_clf):
+                qs = self.qs_class(random_state=0)
+                with self.assertRaisesRegex(ValueError, "outside `classes`"):
+                    qs.query(X, y_three, clf, fit_clf=fit_clf)
 
     def test_init_param_subtract_current(self):
         test_cases = [(2, TypeError), ("string", TypeError)]
@@ -141,6 +204,35 @@ class TemplateTestExpectedErrorReduction(
 
 
 class TestExpectedErrorReduction(unittest.TestCase):
+    def test_query_mean_gamma_parzen_window_classifier(self):
+        X = np.linspace(0, 1, 8).reshape(-1, 1)
+        y = np.full(8, MISSING_LABEL)
+        y[:4] = [0, 1, 0, 1]
+
+        def query(metric_dict):
+            return MonteCarloEER(random_state=0).query(
+                X=X,
+                y=y,
+                clf=ParzenWindowClassifier(
+                    classes=[0, 1], metric_dict=metric_dict
+                ),
+                return_utilities=True,
+            )[1]
+
+        utilities = query({"gamma": "mean"})
+        self.assertTrue(np.all(np.isfinite(utilities[0, 4:])))
+
+        frozen = (
+            ParzenWindowClassifier(
+                classes=[0, 1], metric_dict={"gamma": "mean"}
+            )
+            .fit(X, y)
+            .metric_dict_["gamma"]
+        )
+        self.assertFalse(
+            np.allclose(utilities, query({"gamma": frozen}), equal_nan=True)
+        )
+
     def test__estimate_error_for_candidate(self):
         qs = ExpectedErrorReduction(enforce_mapping=False)
         self.assertRaises(
@@ -449,6 +541,57 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
     def setUp(self):
         super().setUp(qs_class=MonteCarloEER)
 
+    def test_explicit_evaluation_with_training_weights(self):
+        X = np.array([[0.0], [1.0], [0.2], [0.8]])
+        y = np.array([0, 1, np.nan, np.nan])
+        X_eval = np.array([[0.3], [0.9]])
+        for method in ["misclassification_loss", "log_loss"]:
+            for subtract_current in [False, True]:
+                for candidates in [None, [2, 3], X[2:]]:
+                    weights_cases = [None, np.ones(2), np.array([1.0, 3.0])]
+                    for weights in weights_cases:
+                        with self.subTest(
+                            method=method,
+                            subtract_current=subtract_current,
+                            candidates=candidates,
+                            weights=weights,
+                        ):
+                            qs = MonteCarloEER(
+                                method=method,
+                                subtract_current=subtract_current,
+                                random_state=0,
+                            )
+                            kwargs = dict(
+                                X=X,
+                                y=y,
+                                clf=ParzenWindowClassifier(classes=[0, 1]),
+                                sample_weight=np.array([2.0, 1.0, 1.0, 1.0]),
+                                candidates=candidates,
+                                return_utilities=True,
+                            )
+                            indices, utilities = qs.query(
+                                **kwargs,
+                                X_eval=X_eval,
+                                sample_weight_eval=weights,
+                            )
+                            repeats = (
+                                np.ones(2, dtype=int)
+                                if weights is None
+                                else weights.astype(int)
+                            )
+                            repeated_eval = np.repeat(X_eval, repeats, axis=0)
+                            expected_indices, expected_utilities = qs.query(
+                                **kwargs,
+                                X_eval=repeated_eval,
+                                sample_weight_eval=np.ones(len(repeated_eval)),
+                            )
+                            np.testing.assert_array_equal(
+                                indices, expected_indices
+                            )
+                            np.testing.assert_allclose(
+                                utilities, expected_utilities
+                            )
+
     def test_init_param_method(self):
         test_cases = [(2, TypeError), ("string", ValueError)]
         self._test_param("init", "method", test_cases)
@@ -533,24 +676,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
             replace_query_params=replace_query_params,
         )
 
-        # qs = self.Strategy()
-        # for swe in [
-        #     "string",
-        #     self.candidates,
-        #     None,
-        #     np.empty((len(self.X_eval) - 1)),
-        # ]:
-        #     with self.assertRaises(
-        #         ValueError, msg=f"sample_weight_eval={swe}"
-        #     ):
-        #         qs.query(
-        #             **self.kwargs,
-        #             X_eval=self.X_eval,
-        #             sample_weight=np.ones(len(self.X)),
-        #             sample_weight_candidates=np.ones(len(self.candidates)),
-        #             sample_weight_eval=swe,
-        #         )
-
     def test_query(self):
         super().test_query()
         classes = [0, 1]
@@ -560,7 +685,6 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
         id_cost_matrix = 1 - np.eye(2)
 
         clf = self.DummyClf(classes=classes)
-        # clf = ParzenWindowClassifier(classes=classes)
 
         params_list = [
             [
@@ -689,6 +813,93 @@ class TestValueOfInformationEER(
         test_cases = [(2, TypeError), ("string", TypeError)]
         self._test_param("query", "normalize", test_cases)
 
+    def test_query_current_risk_respects_missing_label(self):
+        X = np.arange(6.0).reshape(-1, 1)
+        label_sets = [
+            ([0, 1], [0, 1, 0], np.nan),
+            ([0, 1], [0, 1, 0], -1),
+            ([0, 1], [0, 1, 0], None),
+            (["a", "b"], ["a", "b", "a"], "?"),
+        ]
+        for flags in product([False, True], repeat=4):
+            (
+                consider_labeled,
+                consider_unlabeled,
+                candidate_to_labeled,
+                normalize,
+            ) = flags
+            expected = None
+            for classes, labels, missing_label in label_sets:
+                with self.subTest(
+                    flags=flags, missing_label=repr(missing_label)
+                ):
+                    y = np.array(
+                        labels + [missing_label] * 3,
+                        dtype=(
+                            object
+                            if missing_label is None
+                            or isinstance(missing_label, str)
+                            else float
+                        ),
+                    )
+                    qs = ValueOfInformationEER(
+                        consider_labeled=consider_labeled,
+                        consider_unlabeled=consider_unlabeled,
+                        candidate_to_labeled=candidate_to_labeled,
+                        subtract_current=True,
+                        normalize=normalize,
+                        missing_label=missing_label,
+                        random_state=0,
+                    )
+                    clf = ParzenWindowClassifier(
+                        classes=classes, missing_label=missing_label
+                    )
+                    _, utilities = qs.query(X, y, clf, return_utilities=True)
+                    self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+                    if expected is None:
+                        expected = utilities
+                    else:
+                        np.testing.assert_allclose(utilities, expected)
+
+    def test_query_normalized_risk_without_considered_samples(self):
+        X = np.arange(4.0).reshape(-1, 1)
+        nan = MISSING_LABEL
+        test_cases = [
+            (False, False, True, [0, 1, nan, nan], None),
+            (True, False, False, [nan, nan, nan, nan], None),
+            (False, True, True, [0.0, 1.0, 0.0, 1.0], [0, 1]),
+        ]
+        for (
+            consider_labeled,
+            consider_unlabeled,
+            candidate_to_labeled,
+            y,
+            candidates,
+        ) in test_cases:
+            with self.subTest(
+                consider_labeled=consider_labeled,
+                consider_unlabeled=consider_unlabeled,
+            ):
+                qs = ValueOfInformationEER(
+                    consider_labeled=consider_labeled,
+                    consider_unlabeled=consider_unlabeled,
+                    candidate_to_labeled=candidate_to_labeled,
+                    subtract_current=True,
+                    normalize=True,
+                    random_state=0,
+                )
+                _, utilities = qs.query(
+                    X,
+                    y,
+                    ParzenWindowClassifier(classes=[0, 1]),
+                    candidates=candidates,
+                    return_utilities=True,
+                )
+                cand = (
+                    unlabeled_indices(y) if candidates is None else candidates
+                )
+                np.testing.assert_array_equal(utilities[0, cand], 0.0)
+
     def test_query(self):
         super().test_query()
         classes = [0, 1]
@@ -697,9 +908,6 @@ class TestValueOfInformationEER(
         y2 = [0, 0, MISSING_LABEL, 1]
         cand = [1, 2]
         cost_matrix = 1 - np.eye(2)
-        # clf_partial = SklearnClassifier(
-        #     GaussianNB(), classes=classes
-        # ).fit(X, y)
 
         params_list = [
             ["kapoor-sub", True, True, True, True, False, [[0, 0]]],

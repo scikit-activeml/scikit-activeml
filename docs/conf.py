@@ -30,7 +30,7 @@ from docs.generate import (
 # -- Project information -----------------------------------------------------
 
 project = "scikit-activeml"
-copyright = "2025"
+copyright = "2020-2026"
 author = "Marek Herde, " \
          "Minh Tuan Pham, " \
          "Daniel Kottke, " \
@@ -39,10 +39,10 @@ author = "Marek Herde, " \
          "Pascal Mergard, " \
          "Christoph Sandrock, " \
          "Jiaying Cheng, "\
-         "Atal Roghman," \
-         "Mehmet Mjüde, " \
+         "Atal Roghman, " \
+         "Mehmet Müjde, " \
          "Lukas Rauch, " \
-         "Bernhard Sick "
+         "Bernhard Sick"
 
 # The short X.Y version
 version = skactiveml.__version__
@@ -222,10 +222,11 @@ html_js_files = [
 # 'searchbox.html']``.
 #
 html_sidebars = {
-    "tutorials": [], # no primary sidebar for this page
-    "contributing": [], # no primary sidebar for this page
-    "generated/strategy_overview": [], # no primary sidebar for this page
-    "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
+    "tutorials": [],
+    "contributing": [],
+    "generated/strategy_overview": [],
+    "generated/sphinx_gallery_examples/index": [],
+    "licenses": [],
 }
 
 

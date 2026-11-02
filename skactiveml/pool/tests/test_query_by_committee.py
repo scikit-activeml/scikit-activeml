@@ -1,7 +1,9 @@
 import numpy as np
 import unittest
+import pickle
 
 from copy import deepcopy
+from itertools import product
 
 from sklearn import clone
 from sklearn.ensemble import (
@@ -12,8 +14,8 @@ from sklearn.ensemble import (
 )
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.multioutput import MultiOutputClassifier
-from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LinearRegression
+from sklearn.multioutput import MultiOutputRegressor
 from sklearn.utils.validation import NotFittedError
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
@@ -27,6 +29,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.tests.utils import assert_committee_label_invariance
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -63,38 +66,57 @@ class TestQueryByCommittee(
             query_default_params_reg=query_default_params_reg,
         )
 
-    def test_fitted_multilabel_classifier_rejected_before_state(self):
+    def test_sequence_ensembles_preserve_members(self):
+        X = np.arange(4, dtype=float).reshape(-1, 1)
+        y = np.array([0, 1, np.nan, np.nan])
+        for regressor in [False, True]:
+            for fit_ensemble in [True, False]:
+                for prefitted in [False, True]:
+                    if not fit_ensemble and not prefitted:
+                        continue
+                    members = (
+                        [NICKernelRegressor(), NICKernelRegressor()]
+                        if regressor
+                        else [
+                            ParzenWindowClassifier(classes=[0, 1]),
+                            ParzenWindowClassifier(classes=[0, 1]),
+                        ]
+                    )
+                    if prefitted:
+                        for member in members:
+                            member.fit(X, [1, 0, np.nan, np.nan])
+                    before = [pickle.dumps(member) for member in members]
+                    results = []
+                    for sequence in [tuple, list]:
+                        with self.subTest(
+                            regressor=regressor,
+                            fit_ensemble=fit_ensemble,
+                            prefitted=prefitted,
+                            sequence=sequence,
+                        ):
+                            results.append(
+                                QueryByCommittee(random_state=0).query(
+                                    X,
+                                    y,
+                                    ensemble=sequence(members),
+                                    fit_ensemble=fit_ensemble,
+                                    batch_size=2,
+                                    return_utilities=True,
+                                )
+                            )
+                            self.assertEqual(
+                                before,
+                                [pickle.dumps(member) for member in members],
+                            )
+                    np.testing.assert_array_equal(results[0][0], results[1][0])
+                    np.testing.assert_allclose(results[0][1], results[1][1])
+
+    def test_fitted_multilabel_classifier_rejected(self):
         self._test_fitted_multilabel_classifier_rejection(
             estimator_param="ensemble",
             fit_param="fit_ensemble",
             ensemble=True,
         )
-
-    def test_explicit_target_type_conflicts_with_unfitted_estimator(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
-        clf = SklearnClassifier(
-            MultiOutputClassifier(GaussianNB()),
-            classes=[[0, 1], [0, 1]],
-            target_type="multi-label",
-        )
-        strategy = QueryByCommittee(target_type="single-output")
-
-        with self.assertRaisesRegex(ValueError, "explicit `target_type`"):
-            strategy.query(X, y, ensemble=clf, fit_ensemble=True)
-
-    def test_explicit_target_type_conflicts_with_fitted_estimator(self):
-        X = np.arange(8, dtype=float).reshape(4, 2)
-        y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
-        clf = SklearnClassifier(
-            MultiOutputClassifier(GaussianNB()),
-            classes=[[0, 1], [0, 1]],
-            target_type="multi-label",
-        ).fit(X, y)
-        strategy = QueryByCommittee(target_type="single-output")
-
-        with self.assertRaisesRegex(ValueError, "fitted estimator"):
-            strategy.query(X, y, ensemble=clf, fit_ensemble=False)
 
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -207,6 +229,15 @@ class TestQueryByCommittee(
         )
 
     def test_query_param_ensemble(self):
+        for ensemble in ([], ()):
+            query_params = dict(
+                self.query_default_params_clf, ensemble=ensemble
+            )
+            with self.assertRaisesRegex(
+                ValueError, "`ensemble`.*at least one"
+            ):
+                self.qs_class().query(**query_params)
+
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
             ("pwc2", ParzenWindowClassifier()),
@@ -381,6 +412,136 @@ class TestQueryByCommittee(
                 self.assertEqual(len(idx), 1)
                 self.assertEqual(len(u), 1)
 
+    def test_query_rejects_prefitted_multi_output_regressor(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.full(8, MISSING_LABEL)
+        y[:3] = X[:3, 0]
+        Y = np.column_stack((X[:, 0], 100 - X[:, 0]))
+        estimators = [
+            MultiOutputRegressor(LinearRegression()),
+            RandomForestRegressor(n_estimators=3, random_state=0),
+        ]
+        for estimator in estimators:
+            with self.subTest(estimator=type(estimator).__name__):
+                reg = SklearnRegressor(estimator.fit(X, Y))
+                with self.assertRaisesRegex(
+                    ValueError, "single-output regression"
+                ):
+                    QueryByCommittee().query(
+                        X, y, ensemble=reg, fit_ensemble=False
+                    )
+
+    def test_query_is_invariant_to_class_labels(self):
+        X = np.array(
+            [[1, 2], [5, 8], [8, 4], [5, 4], [2, 2], [7, 7], [3, 6], [6, 1]],
+            dtype=float,
+        )
+        codes = np.array([0, 2, 0, -1, -1, -1, 2, -1])
+        sampling = {
+            "sample_predictions_method_name": "sample_proba",
+            "sample_predictions_dict": {"n_samples": 6, "random_state": 0},
+        }
+        forms = ["members", "forest", "bagging", "sampling"]
+        methods = ["KL_divergence", "vote_entropy", "variation_ratios"]
+        for form, method in product(forms, methods):
+            results = []
+            for classes in ([0, 1, 2], [0, 2, 5], ["a", "b", "c"]):
+                ml = None if isinstance(classes[0], str) else np.nan
+                y = np.full(
+                    len(codes), ml, dtype=object if ml is None else float
+                )
+                y[codes >= 0] = np.asarray(classes)[codes[codes >= 0]]
+                clf_params = {"classes": classes, "missing_label": ml}
+                qs_params = {"method": method, "missing_label": ml}
+                fit_ensemble = True
+                if form == "members":
+                    ensemble = []
+                    for subset in ([0, 1], [2, 6], [0, 6]):
+                        y_subset = np.full_like(y, ml)
+                        y_subset[subset] = y[subset]
+                        ensemble.append(
+                            ParzenWindowClassifier(**clf_params).fit(
+                                X, y_subset
+                            )
+                        )
+                    fit_ensemble = False
+                elif form == "forest":
+                    ensemble = SklearnClassifier(
+                        RandomForestClassifier(n_estimators=7, random_state=0),
+                        random_state=0,
+                        **clf_params,
+                    )
+                elif form == "bagging":
+                    ensemble = SklearnClassifier(
+                        BaggingClassifier(
+                            ParzenWindowClassifier(),
+                            n_estimators=5,
+                            random_state=0,
+                        ),
+                        random_state=0,
+                        **clf_params,
+                    )
+                else:
+                    ensemble = ParzenWindowClassifier(
+                        class_prior=1, random_state=0, **clf_params
+                    )
+                    qs_params.update(sampling)
+                results.append(
+                    QueryByCommittee(**qs_params, random_state=0).query(
+                        X,
+                        y,
+                        ensemble,
+                        fit_ensemble=fit_ensemble,
+                        batch_size=2,
+                        return_utilities=True,
+                    )
+                )
+            with self.subTest(form=form, method=method):
+                indices, utilities = results[0]
+                self.assertGreater(np.nanmax(utilities), 0)
+                for other_indices, other_utilities in results[1:]:
+                    np.testing.assert_array_equal(other_indices, indices)
+                    np.testing.assert_allclose(other_utilities, utilities)
+
+    def test_query_preserves_mixed_integer_class_labels(self):
+        for method in ("KL_divergence", "vote_entropy", "variation_ratios"):
+            with self.subTest(method=method):
+                assert_committee_label_invariance(
+                    self, QueryByCommittee(method=method, random_state=0)
+                )
+
+    def test_sampled_votes_match_votes_of_class_labels(self):
+        X = np.array(
+            [[1, 2], [5, 8], [8, 4], [5, 4], [2, 2], [7, 7], [3, 6], [6, 1]],
+            dtype=float,
+        )
+        y = np.array([10, 30, 10, np.nan, np.nan, np.nan, 30, np.nan])
+        classes = np.array([10, 20, 30])
+        sample_dict = {"n_samples": 6, "random_state": 0}
+        clf = ParzenWindowClassifier(
+            classes=classes, class_prior=1, random_state=0
+        ).fit(X, y)
+        is_unlabeled = np.isnan(y)
+        probas = clf.sample_proba(X[is_unlabeled], **sample_dict)
+        votes = classes[probas.argmax(axis=-1)].T
+        for method, expected in [
+            ("vote_entropy", vote_entropy(votes, classes)),
+            ("variation_ratios", variation_ratios(votes)),
+        ]:
+            with self.subTest(method=method):
+                qs = QueryByCommittee(
+                    method=method,
+                    sample_predictions_method_name="sample_proba",
+                    sample_predictions_dict=sample_dict,
+                )
+                _, utilities = qs.query(
+                    X, y, clf, fit_ensemble=False, return_utilities=True
+                )
+                self.assertGreater(np.max(expected), 0)
+                np.testing.assert_allclose(
+                    utilities[0, is_unlabeled], expected
+                )
+
 
 class TestAverageKlDivergence(unittest.TestCase):
     def setUp(self):
@@ -403,6 +564,23 @@ class TestAverageKlDivergence(unittest.TestCase):
         average_kl_divergence(np.zeros((10, 10, 10)))
         scores = average_kl_divergence(self.probas)
         np.testing.assert_almost_equal(scores, self.scores)
+
+    def test_probability_inputs_are_preserved(self):
+        values = np.array([[[1, 0], [0, 1]], [[0, 1], [0, 1]]])
+        eps = 0.01
+        p = 1 / (1 + eps)
+        q = eps / (1 + eps)
+        expected = [p * np.log(2 * p) + q * np.log(2 * q), 0]
+        for dtype in (np.float64, np.float32, np.int64):
+            for readonly in (False, True):
+                with self.subTest(dtype=dtype, readonly=readonly):
+                    probas = values.astype(dtype)
+                    original = probas.copy()
+                    if readonly:
+                        probas.setflags(write=False)
+                    scores = average_kl_divergence(probas, eps=eps)
+                    np.testing.assert_array_equal(probas, original)
+                    np.testing.assert_allclose(scores, expected, atol=1e-7)
 
 
 class TestVoteEntropy(unittest.TestCase):
@@ -461,6 +639,22 @@ class TestVoteEntropy(unittest.TestCase):
         scores = vote_entropy(votes=self.votes, classes=self.classes)
         np.testing.assert_almost_equal(scores, self.scores)
 
+    def test_vote_entropy_with_class_labels(self):
+        for classes in (["cat", "dog", "fish"], [10, 20, 30]):
+            with self.subTest(classes=classes):
+                votes = np.asarray(classes)[self.votes].tolist()
+                scores = vote_entropy(votes=votes, classes=classes)
+                np.testing.assert_almost_equal(scores, self.scores)
+        self.assertRaises(
+            ValueError,
+            vote_entropy,
+            votes=[["cat", "cow"]],
+            classes=["cat", "dog"],
+        )
+        self.assertRaises(
+            TypeError, vote_entropy, votes=[["cat", "dog"]], classes=[0, 1]
+        )
+
 
 class TestVariationRatios(unittest.TestCase):
     def setUp(self):
@@ -488,3 +682,10 @@ class TestVariationRatios(unittest.TestCase):
     def test_variation_ratios(self):
         scores = variation_ratios(votes=self.votes)
         np.testing.assert_almost_equal(scores, self.scores)
+
+    def test_variation_ratios_with_class_labels(self):
+        for classes in (["cat", "dog", "fish"], [10, 20, 30]):
+            with self.subTest(classes=classes):
+                votes = np.asarray(classes)[self.votes].tolist()
+                scores = variation_ratios(votes=votes)
+                np.testing.assert_almost_equal(scores, self.scores)

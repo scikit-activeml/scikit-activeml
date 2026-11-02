@@ -97,7 +97,7 @@ for c in range(n_cycles):
         0.5,
         1.18,
         f"Active learning cycle {c + 1}/{n_cycles} "
-        f"after acquiring {c} label vectors\n"
+        f"after acquiring {len(labeled_indices(y, missing_label=MISSING_LABEL, target_type='multi-label'))} label vectors\n"
         f"Test exact-match accuracy: {clf.score(X_test, y_test):.4f}",
         ha="center",
         va="bottom",

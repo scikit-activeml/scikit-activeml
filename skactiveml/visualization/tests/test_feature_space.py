@@ -1,5 +1,6 @@
 import os
 import unittest
+import warnings
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -39,10 +40,7 @@ from skactiveml.visualization import (
     plot_stream_training_data,
     plot_stream_decision_boundary,
 )
-from skactiveml.visualization._feature_space import (
-    _general_plot_utilities,
-    _resolve_utility_target_type,
-)
+from skactiveml.visualization._feature_space import _general_plot_utilities
 
 # PDF rasterization differs slightly across supported Matplotlib versions.
 IMAGE_COMPARE_TOL = 6.0
@@ -374,6 +372,90 @@ class TestFeatureSpace(unittest.TestCase):
                 confidence=None,
             )
 
+    def test_decision_boundary_predict_only_with_noncanonical_labels(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for labels in (
+            [10, 20, 20, 20, 20],
+            [10.0, 20.0, 20.0, 20.0, 20.0],
+            ["a", "b", "b", "b", "b"],
+        ):
+            with self.subTest(labels=labels[:2]):
+                clf = LinearSVC().fit(X, labels)
+                _, ax = plt.subplots()
+
+                returned_ax = plot_decision_boundary(
+                    clf,
+                    feature_bound=[[-3, -1], [3, 2]],
+                    ax=ax,
+                    res=5,
+                    confidence=None,
+                )
+
+                self.assertIs(returned_ax, ax)
+                self.assertGreater(len(ax.collections), 0)
+
+    def test_decision_boundary_predict_only_without_classes(self):
+        clf = RelabeledPredictOnlyClassifier(["left", "right"])
+        del clf.classes_
+
+        returned_ax = plot_decision_boundary(
+            clf,
+            feature_bound=[[-1, -1], [1, 1]],
+            res=5,
+            confidence=None,
+        )
+
+        self.assertIsInstance(returned_ax, plt.Axes)
+
+    def test_decision_boundary_predict_only_with_unknown_class(self):
+        clf = RelabeledPredictOnlyClassifier([0, 1])
+        clf.classes_ = np.array([0])
+
+        with self.assertRaisesRegex(ValueError, "not present in.*classes_"):
+            plot_decision_boundary(
+                clf,
+                feature_bound=[[-1, -1], [1, 1]],
+                res=5,
+                confidence=None,
+            )
+
+    def test_decision_boundary_is_invariant_to_relabeling(self):
+        reference_vertices = None
+        for classes in ([0, 1], [10, 20], ["a", "b"], [1.5, 2.5]):
+            with self.subTest(classes=classes):
+                clf = RelabeledPredictOnlyClassifier(classes)
+                _, ax = plt.subplots()
+
+                plot_decision_boundary(
+                    clf,
+                    feature_bound=[[-1, -1], [1, 1]],
+                    ax=ax,
+                    res=5,
+                    confidence=None,
+                )
+
+                vertices = ax.collections[0].get_paths()[0].vertices
+                if reference_vertices is None:
+                    reference_vertices = vertices
+                else:
+                    np.testing.assert_allclose(vertices, reference_vertices)
+
+    def test_decision_boundary_region_with_only_second_class(self):
+        clf = RelabeledPredictOnlyClassifier([0, 1], constant_class=1)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            returned_ax = plot_decision_boundary(
+                clf,
+                feature_bound=[[-1, -1], [1, 1]],
+                res=5,
+                confidence=None,
+            )
+
+        self.assertIsInstance(returned_ax, plt.Axes)
+
     # Tests for plot_utilities function
     def test__general_plot_utilities_param_qs(self):
         self.assertRaises(
@@ -552,12 +634,59 @@ class TestFeatureSpace(unittest.TestCase):
             contour_dict={"linestyles": "."},
         )
 
+    def test_plot_utilities_preserves_categorical_targets(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for missing_label in (None, "?"):
+            with self.subTest(missing_label=missing_label):
+                y = np.array(
+                    ["a", "b", missing_label, missing_label, missing_label],
+                    dtype=object,
+                )
+                qs = UncertaintySampling(missing_label=missing_label)
+                clf = ParzenWindowClassifier(
+                    classes=["a", "b"], missing_label=missing_label
+                )
+                _, ax = plt.subplots()
+
+                returned_ax = plot_utilities(qs, X, y, clf=clf, ax=ax, res=5)
+
+                self.assertIs(returned_ax, ax)
+                self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_utilities_preserves_categorical_multilabel_targets(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        for missing_label in (None, "?"):
+            with self.subTest(missing_label=missing_label):
+                y = np.array(
+                    [
+                        ["a", "x"],
+                        ["b", "y"],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                    ],
+                    dtype=object,
+                )
+                qs = RandomSampling(
+                    missing_label=missing_label,
+                    target_type="multi-label",
+                    random_state=0,
+                )
+                _, ax = plt.subplots()
+
+                returned_ax = plot_utilities(qs, X, y, ax=ax, res=5)
+
+                self.assertIs(returned_ax, ax)
+                self.assertGreater(len(ax.collections), 0)
+
     def test_plot_utilities_multilabel_prediction_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
-        qs = LabelCardinalityInconsistency(
-            target_type="multi-label", random_state=0
-        )
+        qs = LabelCardinalityInconsistency(random_state=0)
         _, ax = plt.subplots()
 
         returned_ax = plot_utilities(
@@ -576,9 +705,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_plot_utilities_multilabel_probability_strategy(self):
         X, y, _, feature_bound = self.multilabel_pool()
         clf = self.multilabel_classifier()
-        qs = MaxLossReductionMaxConfidence(
-            target_type="multi-label", random_state=0
-        )
+        qs = MaxLossReductionMaxConfidence(random_state=0)
         discriminator = ParzenWindowClassifier(random_state=0)
         _, ax = plt.subplots()
 
@@ -643,10 +770,9 @@ class TestFeatureSpace(unittest.TestCase):
         y[:15, 0] = X[:15, 0]
         reg = SklearnRegressor(
             DecisionTreeRegressor(random_state=0),
-            target_type="auto",
             random_state=0,
         ).fit(X, y)
-        qs = MappingOnlyRegressionStrategy(target_type="auto", random_state=0)
+        qs = MappingOnlyRegressionStrategy(random_state=0)
         feature_bound = [X.min(axis=0), X.max(axis=0)]
         _, ax = plt.subplots()
 
@@ -716,8 +842,6 @@ class TestFeatureSpace(unittest.TestCase):
             res=5,
         )
 
-        # A sample is a candidate as soon as one annotator still owes a label
-        # for it, which includes sample 0.
         np.testing.assert_array_equal(
             qs.candidates_, np.concatenate([[0], np.arange(15, len(X))])
         )
@@ -725,13 +849,61 @@ class TestFeatureSpace(unittest.TestCase):
         for ax in returned_axes:
             self.assertGreater(len(ax.collections), 0)
 
-    def test_resolve_utility_target_type_of_multi_annotator_strategy(self):
-        qs = SingleAnnotatorWrapper(RandomSampling(), random_state=0)
-
-        self.assertEqual(
-            _resolve_utility_target_type(qs, self.y_active_multi, {}),
-            "single-output",
+    def test_plot_annotator_utilities_preserves_categorical_targets(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
         )
+        for missing_label in (None, "?"):
+            with self.subTest(missing_label=missing_label):
+                y = np.array(
+                    [
+                        ["a", "a"],
+                        ["b", "b"],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                        [missing_label, missing_label],
+                    ],
+                    dtype=object,
+                )
+                qs = SingleAnnotatorWrapper(
+                    RandomSampling(
+                        missing_label=missing_label, random_state=0
+                    ),
+                    missing_label=missing_label,
+                    random_state=0,
+                )
+
+                returned_axes = plot_annotator_utilities(qs, X, y, res=5)
+
+                self.assertEqual(returned_axes.shape, (2,))
+                for ax in returned_axes:
+                    self.assertGreater(len(ax.collections), 0)
+
+    def test_plot_annotator_utilities_auto_creates_one_axis(self):
+        X = np.array(
+            [[-2.0, 0.0], [-1.0, 1.0], [1.0, 0.0], [2.0, 1.0], [0.0, 1.0]]
+        )
+        y = np.array([0.0, 1.0, np.nan, np.nan, np.nan])
+        cases = (
+            (y[:, None], None),
+            (np.column_stack([y, y]), [1]),
+        )
+        for targets, plot_annotators in cases:
+            with self.subTest(plot_annotators=plot_annotators):
+                qs = SingleAnnotatorWrapper(
+                    RandomSampling(random_state=0), random_state=0
+                )
+
+                returned_axes = plot_annotator_utilities(
+                    qs,
+                    X,
+                    targets,
+                    plot_annotators=plot_annotators,
+                    res=5,
+                )
+
+                self.assertEqual(returned_axes.shape, (1,))
+                self.assertIsInstance(returned_axes[0], plt.Axes)
 
     def test_plot_utilities_rejects_annotator_options_for_multilabel(self):
         y = np.column_stack([self.y_active, self.y_active])
@@ -744,6 +916,38 @@ class TestFeatureSpace(unittest.TestCase):
             plot_utilities(qs, self.X, y, plot_annotators=[0])
 
     # Tests for plot_stream_decision_boundary function
+    def test_stream_labels(self):
+        for classes in ([-2, -1], ["b", "a"]):
+            with self.subTest(classes=classes):
+                fig, ax = plt.subplots()
+                clf = RelabeledPredictOnlyClassifier(classes)
+                pred_list = []
+                for t_x in range(3):
+                    plot_stream_decision_boundary(
+                        ax, t_x, 1, clf, [[-1], [1]], pred_list, res=5
+                    )
+
+                vertices = ax.collections[0].get_paths()[0].vertices
+                np.testing.assert_allclose(
+                    vertices[np.argsort(vertices[:, 0])],
+                    [[1, -0.25], [2, -0.25]],
+                )
+
+                data_lines = plot_stream_training_data(
+                    ax,
+                    [[-1], [0], [1]],
+                    [classes[0], np.nan, classes[1]],
+                    queried_indices=[True, False, True],
+                    classes=classes,
+                    feature_bound=[[0, 2], [-1, 1]],
+                )
+                self.assertEqual(data_lines[2].get_color(), "grey")
+                np.testing.assert_allclose(
+                    [data_lines[1].get_color(), data_lines[3].get_color()],
+                    plt.get_cmap("coolwarm")([0.0, 1.0]),
+                )
+                plt.close(fig)
+
     def test_plot_stream_decision_boundary_param_ax(self):
         self.assertRaises(
             TypeError,
@@ -878,7 +1082,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=np.ones([len(self.X), 3]),
@@ -891,7 +1095,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=self.X_stream,
@@ -904,7 +1108,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=True,
@@ -923,6 +1127,16 @@ class TestFeatureSpace(unittest.TestCase):
             queried_indices=self.queried_indices,
             y=self.y_stream,
         )
+        with self.assertRaisesRegex(ValueError, "Queried labels.*classes"):
+            plot_stream_training_data(
+                ax,
+                [[0], [1]],
+                ["known", "unknown"],
+                queried_indices=[True, True],
+                classes=["known"],
+                feature_bound=[[0, 1], [0, 1]],
+            )
+        self.assertEqual(len(ax.lines), 0)
 
     def test_plot_stream_training_data_unlabeled_color(self):
         _, ax = plt.subplots()
@@ -930,7 +1144,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -944,7 +1158,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -958,7 +1172,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -972,7 +1186,7 @@ class TestFeatureSpace(unittest.TestCase):
             ValueError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -986,7 +1200,7 @@ class TestFeatureSpace(unittest.TestCase):
             TypeError,
             plot_stream_training_data,
             ax=ax,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             queried_indices=self.queried_indices,
@@ -998,22 +1212,57 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertRaises(
             TypeError,
             plot_stream_training_data,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
+            queried_indices=self.queried_indices,
             ax=2,
         )
         _, axes = plt.subplots(1, 2)
         self.assertRaises(
             TypeError,
             plot_stream_training_data,
-            classes=np.unique(self.y),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
             X=self.X_stream,
             y=self.y_stream,
+            queried_indices=self.queried_indices,
             ax=axes,
         )
+
+    def test_plot_stream_training_data_rejects_mismatched_masks(self):
+        n_samples = len(self.y_stream)
+        for n_queried in [n_samples - 1, n_samples + 1]:
+            with self.subTest(n_queried=n_queried):
+                _, ax = plt.subplots()
+                self.assertRaises(
+                    ValueError,
+                    plot_stream_training_data,
+                    ax=ax,
+                    classes=np.unique(self.y_stream),
+                    feature_bound=self.stream_bound,
+                    X=self.X_stream,
+                    queried_indices=[True] * n_queried,
+                    y=self.y_stream,
+                )
+                self.assertEqual(len(ax.lines), 0)
+
+    def test_plot_contour_for_samples_accepts_list_X(self):
+        values = self.utilities.copy()
+        values[:10] = np.nan
+        levels = []
+        for X in [self.X, self.X.tolist()]:
+            _, ax = plt.subplots()
+            plot_contour_for_samples(X, values, replace_nan=None, ax=ax)
+            levels.append(ax.collections[-1].levels)
+        np.testing.assert_array_equal(levels[0], levels[1])
+
+    def test_plot_utilities_propagates_keyboard_interrupt(self):
+        qs = InterruptingStrategy()
+        with self.assertRaises(KeyboardInterrupt):
+            plot_utilities(qs, self.X, self.y)
+        self.assertEqual(qs.n_calls, 1)
 
     def test_plot_contour_for_samples_param_X(self):
         for X in [None, 1, np.arange(10)]:
@@ -1319,7 +1568,7 @@ class TestFeatureSpace(unittest.TestCase):
             self.X_stream,
             self.y_stream,
             queried_indices=queried_indices,
-            classes=np.unique(self.y_train),
+            classes=np.unique(self.y_stream),
             feature_bound=self.stream_bound,
         )
 
@@ -1332,6 +1581,20 @@ class TestFeatureSpace(unittest.TestCase):
 
 class TestClassifier(ClassifierMixin):
     pass
+
+
+class RelabeledPredictOnlyClassifier(ClassifierMixin):
+    def __init__(self, classes, constant_class=None):
+        self._prediction_classes = np.asarray(classes)
+        self.classes_ = self._prediction_classes
+        self.constant_class = constant_class
+
+    def predict(self, X):
+        if self.constant_class is not None:
+            class_indices = np.full(len(X), self.constant_class, dtype=int)
+        else:
+            class_indices = (X[:, 0] >= 0).astype(int)
+        return self._prediction_classes[class_indices]
 
 
 class MultilabelTestClassifier(ClassifierMixin):
@@ -1387,6 +1650,22 @@ class MappingOnlyMultiAnnotatorStrategy(MultiAnnotatorPoolQueryStrategy):
         if return_utilities:
             return query_indices, utilities
         return query_indices
+
+
+class InterruptingStrategy(SingleAnnotatorPoolQueryStrategy):
+    n_calls = 0
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def query(
+        self, X, y, candidates=None, batch_size=1, return_utilities=False
+    ):
+        self.n_calls += 1
+        raise KeyboardInterrupt
 
 
 class MappingOnlyRegressionStrategy(SingleAnnotatorPoolQueryStrategy):

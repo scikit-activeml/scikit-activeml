@@ -50,14 +50,25 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         non-negative prior number of samples per class for every output.
     metric : str or callable, default='rbf'
         The metric must be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
+        `sklearn.metrics.pairwise.pairwise_kernels`. Its values weight the
+        class counts, so it must not be negative for the given data.
+        `'rbf'`, `'laplacian'` and `'chi2'` always satisfy this.
+        `'linear'`, `'poly'`, `'polynomial'`, `'sigmoid'` and `'cosine'` do
+        so only for some data, and `'additive_chi2'` never does because it
+        is non-positive by construction. A `'precomputed'` matrix and a
+        callable are the caller's responsibility. `predict_freq` raises a
+        `ValueError` when the resulting frequencies are negative.
     n_neighbors : int or None, default=None
-        Number of nearest neighbours. Default is `None`, which means all
-        available samples are considered.
+        Number of nearest neighbours. The neighbours are selected among the
+        training samples carrying class frequencies, i.e., the labeled samples
+        whose `sample_weight` is non-zero. Unlabeled training samples are never
+        selected, independent of their kernel similarity. Default is `None`,
+        which means all of these samples are considered.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
         For the kernel 'rbf' we allow the use of mean bandwidth criterion [2]_
-        and use it when gamma is set to 'mean' (i.e., {'gamma': 'mean'})..
+        and use it when gamma is set to 'mean' (i.e., {'gamma': 'mean'}). The
+        bandwidth is estimated from the labeled samples.
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
@@ -138,7 +149,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             It contains the class labels of the training samples.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            It contains the weights of the training samples' class labels.
+            Non-negative weights of the training samples' class labels.
             One weight per sample or one weight per target entry can be
             provided.
 
@@ -183,18 +194,31 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             and self.metric_dict["gamma"] == "mean"
             and self.metric == "rbf"
         ):
-            is_lbld = is_labeled(
-                y,
-                missing_label=-1,
-                target_type=target_spec.target_type,
-            )
-            N = np.max([2, np.sum(is_lbld)])
-            variance = np.var(X, axis=0)
-            n_features = X.shape[1]
-            gamma = ParzenWindowClassifier._calculate_mean_gamma(
-                N, variance, n_features
-            )
-            self.metric_dict_["gamma"] = gamma
+            if X.ndim == 1 or X.shape[1] == 0:
+                # Without observed data, use default.
+                self.metric_dict_["gamma"] = None
+            else:
+                is_lbld = is_labeled(
+                    y,
+                    missing_label=-1,
+                    target_type=target_spec.target_type,
+                )
+                n_lbld = np.sum(is_lbld)
+                N = np.max([2, n_lbld])
+                # The mean criterion estimates the bandwidth from the same
+                # samples it counts in `N`, i.e., the labeled ones. Fewer than
+                # two labeled samples carry no spread, which the zero variance
+                # reports to `_calculate_mean_gamma`.
+                variance = (
+                    np.var(X[is_lbld], axis=0)
+                    if n_lbld >= 2
+                    else np.zeros(X.shape[1])
+                )
+                n_features = X.shape[1]
+                gamma = ParzenWindowClassifier._calculate_mean_gamma(
+                    N, variance, n_features
+                )
+                self.metric_dict_["gamma"] = gamma
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
@@ -206,6 +230,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             self.V_ = 0
         else:
             self.V_ = self._compute_class_frequency_vectors(y, sample_weight)
+        self._cache_contributing_samples()
 
         self.target_spec_ = target_spec
 
@@ -230,53 +255,80 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         check_is_fitted(self)
         X = check_array(X, ensure_all_finite=(self.metric != "precomputed"))
 
+        output_shape = (
+            (np.size(X, 0), len(self.classes_), 2)
+            if self.target_spec_.target_type == "multi-label"
+            else (np.size(X, 0), len(self.classes_))
+        )
+
         # Predict zeros because of missing training data.
         if self.n_features_in_ is None:
-            if self.target_spec_.target_type == "multi-label":
-                return np.zeros((len(X), len(self.classes_), 2))
-            return np.zeros((len(X), len(self.classes_)))
+            return np.zeros(output_shape)
 
-        # Compute kernel (metric) matrix.
         if self.metric == "precomputed":
-            K = X
-            if np.size(K, 0) != np.size(X, 0) or np.size(K, 1) != np.size(
-                self.X_, 0
-            ):
+            if np.size(X, 1) != np.size(self.X_, 0):
                 raise ValueError(
                     "The kernel matrix 'X' must have the shape "
                     "(n_test_samples, n_train_samples)."
                 )
         else:
             check_n_features(self, X, reset=False)
+
+        n_contributing = len(self._V_contributing)
+        if n_contributing == 0:
+            return np.zeros(output_shape)
+
+        if self.metric == "precomputed":
+            K = X if self._all_contributing else X[:, self._contributing]
+        else:
             K = pairwise_kernels(
-                X, self.X_, metric=self.metric, **self.metric_dict_
+                X,
+                self._X_contributing,
+                metric=self.metric,
+                **self.metric_dict_,
             )
 
         # computing class frequency estimates
-        if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:
+        if self.n_neighbors is None or n_contributing <= self.n_neighbors:
             if self.target_spec_.target_type == "multi-label":
-                F = np.einsum("nm,moc->noc", K, self.V_)
+                F = np.einsum("nm,moc->noc", K, self._V_contributing)
             else:
-                F = K @ self.V_
+                F = K @ self._V_contributing
         else:
             indices = np.argpartition(K, -self.n_neighbors, axis=1)
             indices = indices[:, -self.n_neighbors :]
-            output_shape = (
-                (np.size(X, 0), len(self.classes_), 2)
-                if self.target_spec_.target_type == "multi-label"
-                else (np.size(X, 0), len(self.classes_))
-            )
             F = np.empty(output_shape)
             for i in range(np.size(X, 0)):
                 if self.target_spec_.target_type == "multi-label":
                     F[i] = np.einsum(
                         "m,moc->oc",
                         K[i, indices[i]],
-                        self.V_[indices[i]],
+                        self._V_contributing[indices[i]],
                     )
                 else:
-                    F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
-        return F
+                    F[i, :] = (
+                        K[i, indices[i]] @ self._V_contributing[indices[i], :]
+                    )
+        return self._check_frequencies(F)
+
+    def _cache_contributing_samples(self):
+        """Cache the training samples with non-zero class frequencies."""
+        if np.ndim(self.V_) == 0:
+            self._contributing = np.zeros(len(self.X_), dtype=bool)
+            self._all_contributing = False
+            self._X_contributing = self.X_
+            self._V_contributing = np.zeros(0)
+            return
+        self._contributing = np.any(
+            self.V_ != 0, axis=tuple(range(1, self.V_.ndim))
+        )
+        self._all_contributing = bool(self._contributing.all())
+        if self._all_contributing:
+            self._X_contributing = self.X_
+            self._V_contributing = self.V_
+        else:
+            self._X_contributing = self.X_[self._contributing]
+            self._V_contributing = self.V_[self._contributing]
 
     @staticmethod
     def _calculate_mean_gamma(
@@ -287,7 +339,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         if denominator <= 0:
             gamma = 1 / n_features
             warnings.warn(
-                "The variance of the provided data is 0. Bandwidth of "
+                "The variance of the labeled data is 0. Bandwidth of "
                 + f"1/n_features={gamma} is used instead."
             )
         else:

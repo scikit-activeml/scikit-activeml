@@ -84,12 +84,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         the number of label outputs. Only the callability of the reduction is
         validated at runtime, so a violating reduction silently changes the
         acquisition scale.
-    target_type : "auto" or "single-output" or "multi-label", default="auto"
-        Declared target type. Single-output classification is always supported.
-        Multi-label classification is supported only when `cost_matrix=None`
-        and `method` is `"least_confident"`, `"margin_sampling"`, or
-        `"entropy"`. A fitted classifier's target specification is
-        authoritative when available.
 
     References
     ----------
@@ -116,12 +110,10 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.method = method
         self.cost_matrix = cost_matrix
@@ -436,7 +428,6 @@ def uncertainty_scores(
         cost_matrix = check_cost_matrix(cost_matrix, n_classes=n_classes)
 
     # Compute uncertainties.
-    # here changes, multilabel cases
     if method == "least_confident":
         if cost_matrix is None:
             if is_multilabel:
@@ -445,16 +436,22 @@ def uncertainty_scores(
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
-            costs = np.partition(costs, 1, axis=1)[:, :2]
-            return costs[:, 0]
+            return np.min(costs, axis=1)
     elif method == "margin_sampling":
         if cost_matrix is None:
             if is_multilabel:
                 per_label_margin = 1 - np.abs(2 * probas - 1)
                 return multilabel_aggregation_fn(per_label_margin, axis=1)
+            if n_classes == 1:
+                return np.zeros(len(probas))
             probas = -(np.partition(-probas, 1, axis=1)[:, :2])
             return 1 - np.abs(probas[:, 0] - probas[:, 1])
         else:
+            if n_classes == 1:
+                raise ValueError(
+                    "Cost-sensitive margin sampling requires at least two "
+                    "classes."
+                )
             costs = probas @ cost_matrix
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return -np.abs(costs[:, 0] - costs[:, 1])
@@ -521,10 +518,7 @@ def expected_average_precision(classes, probas):
         estimator=None,
     )
 
-    if (np.sum(probas, axis=1) - 1).all():
-        raise ValueError(
-            "probas are invalid. The sum over axis 1 must be " "one."
-        )
+    _check_probas_are_valid(probas, is_multilabel=False)
 
     # Check if `classes` are valid.
     check_classes(classes)
@@ -541,40 +535,37 @@ def expected_average_precision(classes, probas):
         probas, probas_sort_idx_per_class, axis=0
     )
 
-    g_arr_mask = np.arange(probas.shape[0] - 1) > 0
-    f_arr_mask = np.arange(probas.shape[0]) > 0
+    n_samples = len(probas)
+    # Batch omitted candidates and retain only the current recurrence rows.
+    # Process at most 128 omissions at once and limit each rolling table to
+    # about one million entries. Arithmetic is still cubic in the number of
+    # candidates, as in Algorithm 1 of [1].
+    chunk_size = max(1, min(128, 2**20 // n_samples))
+    t = np.arange(1, n_samples)
     for i in range(len(classes)):
-        for j in range(len(probas)):
-            # The i-th column of p without p[j,i]
-            p = np.delete(probas_sorted[:, i], [j])
-            # calculate g_arr
-            g_arr = np.zeros((len(p), len(p)))
-            if len(p) > 0:
-                g_arr[0, 0] = 1
-            for n in range(1, len(p)):
-                # p_n*g(n-1,t-1)
-                g_term_0 = p[n - 1] * np.pad(g_arr[n - 1], (1, 0))[:-1]
-                # (1-p_n)*g(n-1,t)
-                g_term_1 = (1 - p[n - 1]) * g_arr[n - 1]
-                g_arr[n] = (g_term_0 + g_term_1) * (g_arr_mask)
+        for start in range(0, n_samples, chunk_size):
+            stop = min(start + chunk_size, n_samples)
+            omitted = np.arange(start, stop)
+            g = np.zeros((len(omitted), n_samples))
+            f = np.zeros_like(g)
+            # Base cases of equations (17) and (18) of [1].
+            g[:, 0] = 1
+            f[:, 0] = 1
+            for n in range(1, n_samples):
+                # Skip each omitted candidate in the sorted probabilities.
+                indices = n - 1 + (n - 1 >= omitted)
+                p = probas_sorted[indices, i, None]
+                f[:, 1 : n + 1] = (
+                    p * f[:, :n]
+                    + p * g[:, :n] * (t[:n] / n)
+                    + (1 - p) * f[:, 1 : n + 1]
+                )
+                f[:, 0] = 0
+                if n < n_samples - 1:
+                    g[:, 1 : n + 1] = p * g[:, :n] + (1 - p) * g[:, 1 : n + 1]
+                    g[:, 0] = 0
 
-            # calculate f_arr
-            f_arr = np.zeros((len(p) + 1, len(p) + 1))
-            f_arr[0, 0] = 1
-            for n in range(1, len(p) + 1):
-                # p_n*f(n-1,t-1)
-                f_term_0 = p[n - 1] * np.pad(f_arr[n - 1], (1, 0))[:-1]
-                # p_n*t/n*g(n-1,t-1)
-                f_term_1 = p[n - 1] * np.pad(g_arr[n - 1], (1, 0))
-                f_term_1 *= np.arange(len(p) + 1) / n
-                # (1-p_n)*f(n-1,t)
-                f_term_2 = (1 - p[n - 1]) * f_arr[n - 1]
-                f_arr[n] = (f_term_0 + f_term_1 + f_term_2) * f_arr_mask
-
-            # calculate score
-            sample_index = probas_sort_idx_per_class[j, i]
-            score[sample_index] += np.sum(
-                f_arr[len(p), 1:] / np.arange(1, len(p) + 1)
-            )
+            sample_indices = probas_sort_idx_per_class[start:stop, i]
+            score[sample_indices] += np.sum(f[:, 1:] / t, axis=1)
 
     return score

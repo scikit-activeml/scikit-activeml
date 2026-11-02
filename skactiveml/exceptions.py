@@ -10,15 +10,10 @@ class MappingError(Exception):
 class _ExhaustedCandidatePool(Exception):
     """Signals a query that has no candidate left to select from.
 
-    The shared pool validation raises this signal, and the guard that
-    :class:`skactiveml.base.PoolQueryStrategy` puts around every `query`
-    implementation answers it with the carried result. It therefore never
-    leaves `query` and is not part of the public interface.
-
-    The carried result is shaped for the call that raised the signal, so
-    `_validate_data` must only ever be reached from the `query` of the same
-    strategy. A strategy validating on behalf of another one would have its own
-    guard answer with a result shaped for the other strategy's candidates.
+    The guard that :class:`skactiveml.base.PoolQueryStrategy` puts around
+    every `query` answers this signal with the carried result. The result
+    is shaped for the raising call, so a strategy must not call the
+    `_validate_data` of another strategy.
 
     Parameters
     ----------

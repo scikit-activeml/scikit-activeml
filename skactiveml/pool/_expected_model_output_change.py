@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn import clone
 from sklearn.utils.validation import check_array, _check_n_features
 from sklearn.metrics import mean_squared_error
 
@@ -7,14 +6,15 @@ from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.pool._target import _fit_and_resolve_estimator_target_spec
 from skactiveml.pool.utils import _update_reg, conditional_expect
 from skactiveml.utils import (
     check_type,
     simple_batch,
     MISSING_LABEL,
-    _check_callable,
     is_unlabeled,
 )
+from skactiveml.utils._validation import _check_callable
 
 
 class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
@@ -42,9 +42,6 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        regression.
 
     References
     ----------
@@ -63,12 +60,10 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         loss=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.loss = loss
         self.integration_dict = integration_dict
@@ -147,14 +142,33 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(ProbabilisticRegressor,),
+        )
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
 
-        check_type(reg, "reg", ProbabilisticRegressor)
-        if self.integration_dict is None:
-            self.integration_dict = {"method": "assume_linear"}
-        check_type(self.integration_dict, "self.integration_dict", dict)
+        integration_dict = (
+            {"method": "assume_linear"}
+            if self.integration_dict is None
+            else self.integration_dict
+        )
+        check_type(integration_dict, "self.integration_dict", dict)
         if X_eval is None:
             X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
             if len(X_eval) == 0:
@@ -167,18 +181,10 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         else:
             X_eval = check_array(X_eval)
             _check_n_features(self, X_eval, reset=False)
-        check_type(fit_reg, "fit_reg", bool)
-        if self.loss is None:
-            self.loss = mean_squared_error
-        _check_callable(self.loss, "self.loss", n_positional_parameters=2)
+        loss = mean_squared_error if self.loss is None else self.loss
+        _check_callable(loss, "self.loss", n_positional_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
 
         y_pred = reg.predict(X_eval)
 
@@ -195,14 +201,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             )
             y_pred_new = reg_new.predict(X_eval)
 
-            return self.loss(y_pred, y_pred_new)
+            return loss(y_pred, y_pred_new)
 
         change = conditional_expect(
             X_cand,
             _model_output_change,
             reg,
             random_state=self.random_state_,
-            **self.integration_dict,
+            **integration_dict,
         )
 
         if mapping is None:

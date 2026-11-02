@@ -16,6 +16,10 @@ from ..base import (
     ProbabilisticRegressor,
 )
 from ..classifier import ParzenWindowClassifier
+from ..utils._label_dtype import (
+    _common_label_dtype,
+    _holds_missing_label,
+)
 from ..utils import (
     MISSING_LABEL,
     is_labeled,
@@ -29,7 +33,11 @@ from ..utils import (
 )
 from ..utils._wrapper_state import _resolve_own_fitted_attribute
 
-__all__ = ["IndexClassifierWrapper"]
+__all__ = [
+    "IndexClassifierWrapper",
+    "expected_target_val",
+    "conditional_expect",
+]
 
 from ..utils._validation import _check_callable
 
@@ -58,35 +66,30 @@ class IndexClassifierWrapper:
     set_base_clf : bool, default=False
         If `True`, the base classifier will be set to the newly fitted
         classifier.
-    ignore_partial_fit : bool, default=True
+    ignore_partial_fit : bool, default=False
         Specifies if the `partial_fit` function of `self.clf` should be used
         (if implemented).
     enforce_unique_samples : bool, default=False
         If `True`, `partial_fit` will not simply append additional samples but
         replace the current labels by the new one. If `False`, samples might
         appear multiple times if their indices are repeated.
-    use_speed_up : bool, default=True
+    use_speed_up : bool, default=False
         Specifies if potentially available speed ups should be used. Currently
-        implemented for `skactiveml.classifier.ParzenWindowClassifier`.
+        implemented for `skactiveml.classifier.ParzenWindowClassifier`, whose
+        kernel matrix is then precomputed once. A bandwidth requested via
+        `metric_dict={'gamma': 'mean'}` is then held fixed for all fits.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
 
     Notes
     -----
-    Attributes this wrapper does not hold itself are read from the wrapped
-    `clf`, `classes_` among them: the wrapper resolves no target semantics of
-    its own, so those its `SkactivemlClassifier` resolved are the wrapper's own
-    answer. The fitted attributes it does hold itself, e.g. `clf_` and `idx_`,
-    are never read from `clf` and raise the usual not-fitted error before a
-    fit.
+    Attributes this wrapper does not hold itself, e.g., `classes_`, are read
+    from the wrapped `clf`.
     """
 
-    #: Fitted attributes this wrapper holds itself, which `__getattr__`
-    #: therefore never forwards to the wrapped `clf`. `classes_` and
-    #: `target_spec_` are deliberately absent: this wrapper resolves no target
-    #: semantics of its own, so those the wrapped `SkactivemlClassifier`
-    #: resolved are the wrapper's own answer. `missing_label_` is the one name
-    #: here that `__init__` already sets, so it never reaches `__getattr__`.
+    #: Fitted attributes `__getattr__` never forwards to `clf`. `classes_` and
+    #: `target_spec_` are forwarded, because this wrapper resolves no target
+    #: semantics of its own.
     _own_fitted_attributes = frozenset(
         {
             "base_clf_",
@@ -179,13 +182,27 @@ class IndexClassifierWrapper:
         check_type(self.use_speed_up, "use_speed_up", bool)
 
         # Check missing label
-        check_missing_label(self.missing_label)
+        check_missing_label(
+            self.missing_label, target_type=self.y.dtype, name="y"
+        )
         self.missing_label_ = self.missing_label
-        if not np.issubdtype(type(self.missing_label), self.y.dtype):
+        # Labels are cast to the dtype of `self.y`, which must therefore hold
+        # the missing label.
+        if self.y.dtype.kind in "biufU" and not _holds_missing_label(
+            self.y, self.missing_label
+        ):
             raise TypeError(
-                f"`missing_label` has type {type(missing_label)}, "
-                f"which is not compatible with {self.y.dtype} as the "
-                f"type of `y`."
+                f"`missing_label={self.missing_label}` is not representable "
+                f"in the dtype '{self.y.dtype}' of `y`. Pass `y` in a dtype "
+                "holding both the labels and the missing label, e.g. "
+                "`float` for integer labels beside `np.nan`, or `object`."
+            )
+        # Hypothetical labels are cast to the dtype of `self.y` as well, so it
+        # must also hold the classes, e.g., the class `0.5` beside integers.
+        classes = getattr(self.clf, "classes_", self.clf._declared_classes)
+        if classes is not None:
+            self.y = self.y.astype(
+                _common_label_dtype([self.y, classes]), copy=False
             )
         check_equal_missing_label(self.clf.missing_label, self.missing_label_)
 
@@ -195,6 +212,20 @@ class IndexClassifierWrapper:
             self.pwc_metric_dict_ = (
                 {} if self.clf.metric_dict is None else self.clf.metric_dict
             )
+            if (
+                isinstance(self.pwc_metric_dict_, dict)
+                and self.pwc_metric_dict_.get("gamma") == "mean"
+                and self.pwc_metric_ == "rbf"
+            ):
+                # The mean bandwidth is resolved once and held fixed for the
+                # hypothetical refits.
+                self.pwc_metric_dict_ = (
+                    self.clf.metric_dict_
+                    if hasattr(self.clf, "metric_dict_")
+                    else clone(self.clf)
+                    .fit(self.X, self.y, self.sample_weight)
+                    .metric_dict_
+                )
             self.pwc_K_ = np.full([len(self.X), len(self.X)], np.nan)
 
             self.clf_ = clone(self.clf)
@@ -226,12 +257,12 @@ class IndexClassifierWrapper:
             'unlabeled'.
         """
         idx_fit = check_array(
-            idx_fit, ensure_2d=False, dtype=int, input_name="`idx_fit`"
+            idx_fit, ensure_2d=False, dtype=None, input_name="`idx_fit`"
         )
         idx_fit = check_indices(idx_fit, self.X, dim=0)
 
         idx_pred = check_array(
-            idx_pred, ensure_2d=False, dtype=int, input_name="`idx_pred`"
+            idx_pred, ensure_2d=False, dtype=None, input_name="`idx_pred`"
         )
         idx_pred = check_indices(idx_pred, self.X, dim=0)
 
@@ -304,7 +335,7 @@ class IndexClassifierWrapper:
             The fitted `IndexClassifierWrapper`.
         """
         # check idx
-        idx = check_array(idx, ensure_2d=False, dtype=int, input_name="`idx`")
+        idx = check_array(idx, ensure_2d=False, dtype=None, input_name="`idx`")
         idx = check_indices(
             idx, self.X, dim=0, unique=self.enforce_unique_samples
         )
@@ -398,7 +429,7 @@ class IndexClassifierWrapper:
 
         # check idx
         add_idx = check_array(
-            idx, ensure_2d=False, dtype=int, input_name="`add_idx`"
+            idx, ensure_2d=False, dtype=None, input_name="`add_idx`"
         )
         add_idx = check_indices(
             add_idx, self.X, dim=0, unique=self.enforce_unique_samples
@@ -483,7 +514,7 @@ class IndexClassifierWrapper:
                 self.sample_weight_ = self._copy_sw(self.base_sample_weight_)
 
             if self.enforce_unique_samples:
-                cur_idx = np.array([i not in add_idx for i in self.idx_])
+                cur_idx = np.isin(self.idx_, add_idx, invert=True)
             else:
                 cur_idx = np.arange(len(self.idx_))
             self.idx_ = np.concatenate([self.idx_[cur_idx], add_idx], axis=0)
@@ -519,7 +550,7 @@ class IndexClassifierWrapper:
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
                 warnings.warn("Speed-up not possible when prefitted")
-                return self.clf.predict_proba(self.X[idx])
+                return self.clf.predict(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
@@ -587,7 +618,7 @@ class IndexClassifierWrapper:
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
                 warnings.warn("Speed-up not possible when prefitted")
-                return self.clf.predict_proba(self.X[idx])
+                return self.clf.predict_freq(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
@@ -690,16 +721,20 @@ def _cross_entropy(
         other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
     )
 
-    cross_ent = -expected_target_val(
+    return -expected_target_val(
         X_eval,
         dist.logpdf,
         reg=true_reg,
         random_state=random_state,
         **integration_dict,
-        vector_func="both",
+        # The frozen logpdf contains one distribution per evaluation row.
+        # Dynamic quadrature must select that row from its vector output.
+        vector_func=(
+            True
+            if integration_dict.get("method") == "dynamic_quad"
+            else "both"
+        ),
     )
-
-    return cross_ent
 
 
 def _update_reg(
@@ -791,9 +826,14 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     """
 
     X = check_array(X, input_name="`X`")
+    # Keep the labels' dtype, so that `missing_label=None` stays `None`.
     y = column_or_1d(
         check_array(
-            y, ensure_all_finite=False, ensure_2d=False, input_name="`y`"
+            y,
+            ensure_all_finite=False,
+            ensure_2d=False,
+            dtype=None,
+            input_name="`y`",
         )
     )
     check_consistent_length(X, y)
@@ -810,13 +850,17 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
         )
         y_update = column_or_1d(y_update)
 
+    # Widen the labels before assigning: writing a fractional hypothetical
+    # target into an integer array would truncate it.
+    dtype = _common_label_dtype([y, y_update])
+
     if idx_update is not None:
         if isinstance(idx_update, (int, np.integer)):
             idx_update = np.array([idx_update])
         idx_update = check_indices(idx_update, A=X, unique="check_unique")
         check_consistent_length(y_update, idx_update)
         X_new = X.copy()
-        y_new = y.copy()
+        y_new = y.astype(dtype)
         y_new[idx_update] = y_update
         return X_new, y_new
     elif X_update is not None:
@@ -828,22 +872,26 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
         check_consistent_length(X.T, X_update.T)
         check_consistent_length(y_update, X_update)
         X_new = np.append(X, X_update, axis=0)
-        y_new = np.append(y, y_update, axis=0)
+        y_new = np.append(y.astype(dtype), y_update.astype(dtype), axis=0)
         return X_new, y_new
     else:
         raise ValueError("`idx_update` or `X_update` must not be `None`")
 
 
 def _reshape_scipy_dist(dist, shape):
-    """Reshapes the parameters `loc`, `scale`, `df` of a distribution, if they
-    exist.
+    """Return a new frozen distribution with reshaped broadcast parameters.
+
+    Positional and keyword parameters are broadcast together before reshaping.
+    The original distribution is unchanged.
 
     Parameters
     ----------
     dist : scipy.stats._distn_infrastructure.rv_frozen
         The distribution.
     shape : tuple
-        The new shape.
+        The new shape of the distribution's parameter grid. A scalar or
+        singleton grid is broadcast to an explicit shape. Otherwise, the
+        number of distributions must remain unchanged.
 
     Returns
     -------
@@ -855,12 +903,21 @@ def _reshape_scipy_dist(dist, shape):
     for idx, item in enumerate(shape):
         check_type(item, f"shape[{idx}]", int)
 
-    for argument in ["loc", "scale", "df"]:
-        if argument in dist.kwds:
-            # check if shapes are compatible
-            dist.kwds[argument].shape = shape
+    kwds = dist.kwds.copy()
+    if not dist.args and not kwds:
+        kwds["loc"] = 0
+    parameters = np.broadcast_arrays(*dist.args, *kwds.values())
+    reshaped = []
+    for parameter in parameters:
+        if parameter.size == 1 and all(dim >= 0 for dim in shape):
+            parameter = np.broadcast_to(parameter.reshape(()), shape)
+        else:
+            parameter = parameter.reshape(shape)
+        reshaped.append(parameter)
 
-    return dist
+    args = reshaped[: len(dist.args)]
+    kwds = dict(zip(kwds, reshaped[len(dist.args) :]))
+    return dist.dist(*args, **kwds)
 
 
 def expected_target_val(X, target_func, reg, **kwargs):
@@ -899,7 +956,8 @@ def expected_target_val(X, target_func, reg, **kwargs):
         - 'dynamic_quad' uses `scipy's` function `expect` on the
           `rv_continuous` random variable of `reg`, which in turn uses a
           dynamic gaussian quadrature routine for calculating the integral.
-          Performance is worse using a vector function.
+          A random variable with zero standard deviation is evaluated at its
+          mean instead. Performance is worse using a vector function.
     quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
@@ -956,10 +1014,10 @@ def conditional_expect(
     random_state=None,
     vector_func=False,
 ):
-    """Calculates the conditional expectation of a function depending on the
-    target value the corresponding feature value and an index for each sample
-    in `X`, i.e. E[func(Y, x, idx)|X=x], where
-    Y | X=x ~ reg.predict_target_distribution, for x in `X`.
+    """Calculates the conditional expectation of a function depending on an
+    index, the feature value, and the label for each sample in `X`, i.e.,
+    E[func(idx, x, Y)|X=x], where Y | X=x ~ reg.predict_target_distribution,
+    for x in `X`.
 
     Parameters
     ----------
@@ -967,12 +1025,12 @@ def conditional_expect(
         The samples where the expectation should be evaluated.
     func : callable
         The function that transforms the random variable. The signature of the
-        function must be of the form `func(y, x, idx)`, where `y` is the target
-        value, `x` is the feature value and `idx` is such that `X[idx] = x`.
-    reg: ProbabilisticRegressor
+        function must be of the form `func(idx, x, y)`, where `idx` is such
+        that `X[idx] = x`, `x` is the feature value, and `y` is the label.
+    reg : ProbabilisticRegressor
         Predicts the target distribution over which the expectation is
         calculated.
-    method: string, optional, default='gauss_hermite'
+    method : string, optional, default='gauss_hermite'
         The method by which the expectation is computed.
 
         -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
@@ -989,8 +1047,9 @@ def conditional_expect(
           by `n_integration_samples`.
         -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
           random variable of `reg`, which in turn uses a dynamic gaussian
-          quadrature routine for calculating the integral. Performance is worse
-          using a vector function.
+          quadrature routine for calculating the integral. A random variable
+          with zero standard deviation is evaluated at its mean instead.
+          Performance is worse using a vector function.
     quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
@@ -1014,12 +1073,12 @@ def conditional_expect(
     random_state : int or np.random.RandomState or None,default=None
         Random state for fixing the number generation.
     vector_func : bool or str, default=False
-        If `vector_func` is `True`, the integration values are passes
+        If `vector_func` is `True`, the integration values are passed
         in vectorized form to `func`. If `vector_func` is 'both', the
         integration values might or might not be passed in vectorized form,
         depending on what is more efficient. The integration values
         are passed in vectorized form, means that in a call like
-        `func(y, x, idx)` `y` is of the form `(n_samples,
+        `func(idx, x, y)` `y` is of the form `(n_samples,
         n_integration_samples)`, `x` equals `X` and `idx` is an index map of
         `X`.
 
@@ -1056,7 +1115,9 @@ def conditional_expect(
             None,
         ],
     )
-    check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
+    check_scalar(
+        n_integration_samples, "n_integration_samples", int, min_val=1
+    )
     check_type(quad_dict, "scipy_args", dict, target_vals=[None])
     check_type(vector_func, "vector_func", bool, target_vals=["both"])
     _check_callable(func, "func", n_positional_parameters=3)
@@ -1068,10 +1129,10 @@ def conditional_expect(
     if quad_dict is None:
         quad_dict = {}
     if method == "quantile" and quantile_method == "romberg":
-        # n_integration_samples need to be of the form 2**k + 1
-        n_integration_samples = (
-            2 ** int(np.log2(n_integration_samples) + 1) + 1
-        )
+        # `romb` needs `2**k + 1` points. Take the smallest such count that
+        # is not below the requested one.
+        gaps = max(n_integration_samples - 1, 1)
+        n_integration_samples = (1 << (gaps - 1).bit_length()) + 1
     is_optional = vector_func == "both"
     if is_optional:
         vector_func = True
@@ -1106,30 +1167,36 @@ def conditional_expect(
                 n_integration_samples + 1
             )
             cond_dist = _reshape_scipy_dist(
-                reg.predict_target_distribution(X), shape=(-1, 1)
+                reg.predict_target_distribution(X), shape=(len(X), 1)
             )
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
 
-            if quantile_method == "trapezoid":
-                expectation = integrate.trapezoid(
-                    output, dx=1 / n_integration_samples, axis=1
+            # The points are spaced `dx` apart and span the probability mass
+            # `covered`. The tails are left out, because `ppf` is infinite at
+            # 0 and 1, so the closed rules are divided by `covered`.
+            dx = 1 / (n_integration_samples + 1)
+            covered = (n_integration_samples - 1) * dx
+
+            if quantile_method == "average" or covered == 0:
+                # A single evaluation point spans no interval, which leaves
+                # the closed rules nothing to integrate.
+                expectation = np.average(output, axis=-1)
+            elif quantile_method == "trapezoid":
+                expectation = (
+                    integrate.trapezoid(output, dx=dx, axis=1) / covered
                 )
             elif quantile_method == "simpson":
-                expectation = integrate.simpson(
-                    output, dx=1 / n_integration_samples, axis=1
+                expectation = (
+                    integrate.simpson(output, dx=dx, axis=1) / covered
                 )
-            elif quantile_method == "average":
-                expectation = np.average(output, axis=-1)
             else:  # quantile_method equals "romberg"
-                expectation = integrate.romb(
-                    output, dx=1 / n_integration_samples, axis=1
-                )
+                expectation = integrate.romb(output, dx=dx, axis=1) / covered
         else:  # quantile_method equals "quadrature"
 
             def fixed_quad_function_wrapper(inner_eval_points):
                 inner_cond_dist = _reshape_scipy_dist(
-                    reg.predict_target_distribution(X), shape=(-1, 1)
+                    reg.predict_target_distribution(X), shape=(len(X), 1)
                 )
                 inner_potential_y = inner_cond_dist.ppf(
                     inner_eval_points.reshape(1, -1)
@@ -1179,9 +1246,12 @@ def conditional_expect(
                 func_out = func(np.arange(len(X)), X, np.full((len(X), 1), y))
                 return float(to_scalar_if_singleton(func_out[idx]))
 
-            expectation[idx] = cond_dist.expect(
-                quad_function_wrapper,
-                **quad_dict,
-            )
+            if cond_dist.std() == 0:
+                expectation[idx] = quad_function_wrapper(cond_dist.mean())
+            else:
+                expectation[idx] = cond_dist.expect(
+                    quad_function_wrapper,
+                    **quad_dict,
+                )
 
     return expectation

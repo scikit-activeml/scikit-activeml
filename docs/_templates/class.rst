@@ -35,6 +35,8 @@
    {% endif %}
    {% endblock %}
 
+{% include "license_notice.rst" %}
+
 {% for item in methods %}
 {%- if item != '__init__' and is_skactiveml_method(fullname, item) %}
 .. automethod:: {{ fullname }}.{{ item }}

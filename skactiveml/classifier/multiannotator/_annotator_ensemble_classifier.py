@@ -2,7 +2,7 @@
 Classifier Ensemble for Multiple Annotators
 """
 
-from copy import deepcopy
+from copy import copy, deepcopy
 
 import numpy as np
 from sklearn.base import MetaEstimatorMixin
@@ -14,7 +14,7 @@ from sklearn.utils.validation import (
 from ...base import SkactivemlClassifier
 from ...utils import (
     MISSING_LABEL,
-    is_labeled,
+    check_equal_missing_label,
     compute_vote_vectors,
     check_n_features,
 )
@@ -48,9 +48,6 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This classifier supports only single-output
-        classification with multiple annotators.
 
     Attributes
     ----------
@@ -80,7 +77,6 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
-        target_type="auto",
     ):
         SkactivemlClassifier.__init__(
             self,
@@ -88,7 +84,6 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
         self.estimators = estimators
         self.voting = voting
@@ -160,9 +155,13 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
 
         # Fit each estimator
         for i, est in enumerate(self.estimators_):
-            est[1].set_params(missing_label=-1)
-            if self.classes is None or est[1].classes is None:
-                est[1].set_params(classes=np.arange(len(self.classes_)))
+            # Preserve declared class order so member costs keep their meaning.
+            classes = (
+                np.arange(len(self.classes_))
+                if est[1].classes is None
+                else self._le.transform(est[1].classes).astype(int)
+            )
+            est[1].set_params(missing_label=-1, classes=classes)
             if sample_weight is None:
                 est[1].fit(X=X, y=y[:, i])
             else:
@@ -191,9 +190,16 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             return np.ones((len(X), len(self.classes_))) / len(self.classes_)
         elif self.voting == "hard":
             y_pred = np.array(
-                [est.predict(X) for _, est in self.estimators_]
+                [
+                    _copy_prediction_random_state(est).predict(X)
+                    for _, est in self.estimators_
+                ]
             ).T
-            V = compute_vote_vectors(y=y_pred, classes=self.classes_)
+            V = compute_vote_vectors(
+                y=y_pred,
+                classes=np.arange(len(self.classes_)),
+                missing_label=-1,
+            )
             P = V / np.sum(V, axis=1, keepdims=True)
         elif self.voting == "soft":
             P = np.array([est.predict_proba(X) for _, est in self.estimators_])
@@ -240,10 +246,11 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
                 f"as parameter."
             )
             try:
-                if is_labeled([self.missing_label], est.missing_label)[0]:
-                    raise TypeError(error_msg)
-            except TypeError:
-                raise TypeError(error_msg)
+                check_equal_missing_label(
+                    est.missing_label, self.missing_label
+                )
+            except (TypeError, ValueError) as error:
+                raise TypeError(error_msg) from error
             error_msg = (
                 f"{est} of 'estimators' has 'classes={est.classes}' "
                 f"as attribute being unequal to the given 'classes="
@@ -256,6 +263,21 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             if (
                 not classes_none
                 and not est_classes_none
-                and not np.array_equal(self.classes, est.classes)
+                and not np.array_equal(
+                    np.sort(self.classes), np.sort(est.classes)
+                )
             ):
                 raise ValueError(error_msg)
+
+
+def _copy_prediction_random_state(estimator):
+    """Isolate tie-breaking RNGs while sharing the fitted model data."""
+    estimator = copy(estimator)
+    if hasattr(estimator, "random_state_"):
+        estimator.random_state_ = deepcopy(estimator.random_state_)
+    # Wrappers such as SlidingWindowClassifier delegate predict to estimator_.
+    # Copy those wrappers too, since changing only their own RNG has no effect.
+    wrapped_estimator = vars(estimator).get("estimator_")
+    if isinstance(wrapped_estimator, SkactivemlClassifier):
+        estimator.estimator_ = _copy_prediction_random_state(wrapped_estimator)
+    return estimator

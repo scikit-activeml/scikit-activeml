@@ -1,9 +1,11 @@
 """
-Implementation of Active Learning with Cost Embedding (CostEmbeddingAL), which
-is modified of:
+This module implementing Active Learning with Cost Embedding
+(`CostEmbeddingAL`) is a modification of:
 
 https://github.com/ntucllab/libact/blob/master/libact.
 Copyright (c) 2014, National Taiwan University All rights reserved.
+BSD-2-Clause license. The full text is distributed with scikit-activeml
+in `LICENSES/libact/LICENSE`.
 """
 
 import warnings
@@ -64,9 +66,6 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for annotator selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports only single-output
-        classification.
 
     References
     ----------
@@ -88,12 +87,10 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         nn_params=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.classes = classes
         self.base_regressor = base_regressor
@@ -274,6 +271,8 @@ def _alce(
     check_classifier_params(classes, missing_label, cost_matrix)
     if cost_matrix is None:
         cost_matrix = 1 - np.eye(len(classes))
+    else:
+        cost_matrix = np.asarray(cost_matrix, dtype=float)
 
     if np.count_nonzero(cost_matrix) == 0:
         raise ValueError(
@@ -338,10 +337,6 @@ def _alce(
     dissimilarities[:n_classes, n_classes:] = cost_matrix
     dissimilarities[n_classes:, :n_classes] = cost_matrix.T
 
-    W = np.zeros((2 * n_classes, 2 * n_classes))
-    W[:n_classes, n_classes:] = 1
-    W[n_classes:, :n_classes] = 1
-
     mds = MDSP(**mds_params)
     embedding = mds.fit(dissimilarities).embedding_
     class_embed = embedding[:n_classes, :]
@@ -356,8 +351,7 @@ def _alce(
 
     dist, _ = nn.kneighbors(pred_embed)
 
-    utilities = dist[:, 0]
-    return utilities
+    return dist[:, 0]
 
 
 """
@@ -365,14 +359,17 @@ Implementation of Multi-dimensional Scaling Partial (MDSP), which
 is a modification of:
 
 https://github.com/ntucllab/libact/blob/master/libact/query_strategies/multiclass/mdsp.py
-written by Kuan-Hao Huang (BSD license. Copyright (c) 2014, National Taiwan
-University All rights reserved.)
+written by Kuan-Hao Huang (BSD-2-Clause license. Copyright (c) 2014,
+National Taiwan University All rights reserved.)
 
 and
 
 https://github.com/scikit-learn/scikit-learn/blob/14031f6/sklearn/manifold/mds.py.
-written by Nelle Varoquaux <nelle.varoquaux@gmail.com> (BSD license.
+written by Nelle Varoquaux <nelle.varoquaux@gmail.com> (BSD-3-Clause license.
 Copyright (c) 2007–2016 The scikit-learn developers. All rights reserved.).
+
+The full license texts are distributed with scikit-activeml in
+`LICENSES/libact/LICENSE` and `LICENSES/scikit-learn/COPYING-14031f6`.
 """
 
 
@@ -597,7 +594,7 @@ def smacof_p(
     References
     ----------
     .. [1] "Modern Multidimensional Scaling - Theory and Applications" Borg,
-       I.; Groenen P. Springer Series in Statistics (1997)
+       I., Groenen P. Springer Series in Statistics (1997)
     .. [2] "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
        Psychometrika, 29 (1964)
     .. [3] "Multidimensional scaling by optimizing goodness of fit to a
@@ -715,7 +712,7 @@ class MDSP(BaseEstimator):
     References
     ----------
     .. [1] "Modern Multidimensional Scaling - Theory and Applications" Borg,
-       I.; Groenen P. Springer Series in Statistics (1997)
+       I., Groenen P. Springer Series in Statistics (1997)
     .. [2] "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
        Psychometrika, 29 (1964)
     .. [3] "Multidimensional scaling by optimizing goodness of fit to a

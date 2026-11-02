@@ -9,6 +9,7 @@
    generated/api/skactiveml
    Target Semantics <target_semantics>
    contributing
+   licenses
    Changelog <https://github.com/scikit-activeml/scikit-activeml/releases>
 
 .. include:: ../README.rst
@@ -30,6 +31,10 @@
 .. include:: ../README.rst
    :start-after: citing_start
    :end-before: citing_end
+
+.. include:: ../README.rst
+   :start-after: license_start
+   :end-before: license_end
 
 Indices and tables
 ==================

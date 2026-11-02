@@ -14,8 +14,7 @@ def _instantiate(strategy):
         if name == "self":
             continue
         if name == "query_strategy":
-            # Wrappers delegate their capabilities to the wrapped strategy,
-            # so they must not be inspected with an absent one.
+            # Wrappers delegate their capabilities to the wrapped strategy.
             init_params[name] = RandomSampling()
         elif parameter.default is inspect.Parameter.empty:
             init_params[name] = None

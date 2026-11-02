@@ -31,11 +31,7 @@ class ExactMultilabelClassifier(SkactivemlClassifier):
         classes=((0, 1), (0, 1)),
         missing_label=MISSING_LABEL,
     ):
-        super().__init__(
-            classes=classes,
-            missing_label=missing_label,
-            target_type="multi-label",
-        )
+        super().__init__(classes=classes, missing_label=missing_label)
         self.probas = probas
 
     @property
@@ -125,8 +121,6 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
                     ("regression", "single-output", "single-annotator"),
                 }
             ),
-            estimator_param="estimator",
-            fit_param="fit_estimator",
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):
@@ -289,7 +283,7 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
                 if candidates is not None:
                     self.assertTrue(np.isnan(utilities_plus[0, :10]).all())
                     self.assertTrue(np.isnan(utilities_plus[0, 30:]).all())
-                    self.assertTrue((utilities_plus[30:50] <= 0).all())
+                    self.assertTrue((utilities_plus[0, candidates] <= 0).all())
                 else:
                     self.assertTrue((utilities_plus <= 0).all())
 
@@ -357,8 +351,6 @@ class TestClue(TemplateMultilabelAggregationQueryStrategy, unittest.TestCase):
         ).query(X, y, estimator=estimator, batch_size=5)
         np.testing.assert_array_equal(explicit_seed, propagated_seed)
 
-        # A one-centroid clustering problem was deterministic before seed
-        # propagation and remains unchanged for integer and absent seeds.
         np.testing.assert_array_equal(
             Clue(random_state=7).query(
                 X, y, estimator=estimator, batch_size=1

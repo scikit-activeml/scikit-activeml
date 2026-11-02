@@ -16,13 +16,12 @@ from docs.generate import (
     is_skactiveml_method,
 )
 from skactiveml import pool, stream
+from skactiveml.base import QueryStrategy
 
-from skactiveml.pool import ExpectedErrorReduction
+from skactiveml.pool import ExpectedErrorReduction, multiannotator
+from skactiveml.pool.tests._strategy_helpers import _instantiate
 from skactiveml.pool.tests.test_multilabel_contracts import (
-    MULTILABEL_DELEGATING_WRAPPERS,
-    MULTILABEL_PREDICTION_CONSUMERS,
-    MULTILABEL_PROBA_CONSUMERS,
-    MULTILABEL_TASK_AGNOSTIC,
+    MULTILABEL_CAPABILITY,
 )
 from skactiveml.stream import UncertaintyZliobaite, CognitiveDualQueryStrategy
 
@@ -31,6 +30,22 @@ QUERY_STRATEGY_EXCEPTIONS_LIST = [
     UncertaintyZliobaite,
     CognitiveDualQueryStrategy,
 ]
+
+EXAMPLE_SUBPACKAGES = (pool, multiannotator, stream)
+
+
+def _multilabel_capable_strategy_names():
+    """Collect the names of the strategies declaring multi-label support."""
+    names = set()
+    for module in EXAMPLE_SUBPACKAGES:
+        for name in dir(module):
+            obj = getattr(module, name)
+            if not inspect.isclass(obj) or not issubclass(obj, QueryStrategy):
+                continue
+            capabilities = _instantiate(obj)._target_capabilities
+            if MULTILABEL_CAPABILITY in capabilities:
+                names.add(obj.__name__)
+    return names
 
 
 class TestExamples(unittest.TestCase):
@@ -43,18 +58,15 @@ class TestExamples(unittest.TestCase):
         ]
         self.working_dir = os.path.abspath(os.curdir)
 
-        # A list of all modules that should have a json file.
         self.modules = [pool, stream]
 
     def test_example_files(self):
-        # Temporary generate the examples from the json files.
         examples_path = path.join(self.skaml_path, "docs", "temp_examples")
         notebooks_path = path.join(self.skaml_path, "docs", "temp_notebooks")
         os.chdir(self.docs_path)
         generate_examples(examples_path, self.json_path, notebooks_path)
         os.chdir(self.working_dir)
 
-        # Execute the examples.
         for root, dirs, files in os.walk(examples_path, topdown=True):
             for filename in files:
                 if filename.endswith(".py"):
@@ -66,11 +78,9 @@ class TestExamples(unittest.TestCase):
                         with open(file_path, "r") as f:
                             exec(f.read(), locals())
 
-        # Remove the created examples and notebooks from disk.
         shutil.rmtree(examples_path)
 
     def test_json(self):
-        # Collect all strategies for which an example exists
         strats_with_json = []
         for root, dirs, files in os.walk(self.json_path, topdown=True):
             for filename in files:
@@ -81,7 +91,6 @@ class TestExamples(unittest.TestCase):
                         if example["class"] not in strats_with_json:
                             strats_with_json.append(example["class"])
 
-        # Test if there is a json example for every AL-strategy.
         for module in self.modules:
             for item in module.__all__:
                 with self.subTest(msg="JSON Test", qs_name=item):
@@ -102,7 +111,10 @@ class TestExamples(unittest.TestCase):
                     )
 
     def test_api_reference_prioritizes_native_methods(self):
-        environment = Environment(loader=FileSystemLoader(self.docs_path))
+        templates_path = path.join(self.docs_path, "_templates")
+        environment = Environment(
+            loader=FileSystemLoader([self.docs_path, templates_path])
+        )
         environment.filters["underline"] = lambda value: value
         template = environment.get_template("_templates/class.rst")
         test_cases = [
@@ -165,16 +177,8 @@ class TestExamples(unittest.TestCase):
                 self.assertEqual(expected, summarized)
                 self.assertEqual(expected, detailed)
 
-    def test_multilabel_tags_match_capability_inventory(self):
-        expected_strategies = {
-            strategy.__name__
-            for strategy in (
-                MULTILABEL_PROBA_CONSUMERS
-                | MULTILABEL_PREDICTION_CONSUMERS
-                | MULTILABEL_TASK_AGNOSTIC
-                | MULTILABEL_DELEGATING_WRAPPERS
-            )
-        }
+    def test_multilabel_tags_match_declared_capabilities(self):
+        expected_strategies = _multilabel_capable_strategy_names()
         examples_by_strategy = {}
         for root, dirs, files in os.walk(self.json_path, topdown=True):
             for filename in files:
@@ -191,15 +195,6 @@ class TestExamples(unittest.TestCase):
             for strategy, examples in examples_by_strategy.items()
             if any("multi-label" in example["tags"] for example in examples)
         }
-        # The tags are not rendered; they only decide which rows the
-        # `Multi-Label` filter of the strategy overview surfaces. What a user
-        # depends on is therefore that no multi-label capable strategy is
-        # missing from that filter, which is what this comparison states.
-        # Whether every single example of such a strategy is tagged is not
-        # checked, because a class declares its capabilities while an example
-        # describes one configuration of it, e.g.
-        # `UncertaintySampling(method="expected_average_precision")` is not
-        # multi-label capable although its class is.
         self.assertEqual(expected_strategies, tagged_strategies)
 
     @staticmethod
@@ -229,8 +224,6 @@ class TestExamples(unittest.TestCase):
             return file.read()
 
     def test_strategy_overview_groups_tasks_under_their_scenario(self):
-        # Two sections of one scenario share its heading, and each task and
-        # category is one level below the previous one.
         sections = list(OVERVIEW_HEADINGS)[:2]
         scenario, first_task = OVERVIEW_HEADINGS[sections[0]]
         _, second_task = OVERVIEW_HEADINGS[sections[1]]
@@ -273,8 +266,6 @@ class TestExamples(unittest.TestCase):
                 self.assertIn(f"{title}\n{expected}\n", overview)
 
     def test_strategy_overview_keeps_a_section_without_a_heading_path(self):
-        # A gallery section that nobody added to `OVERVIEW_HEADINGS` keeps
-        # its own title instead of silently losing its strategies.
         json_data = {
             "9-unmapped": {
                 "data": [
@@ -292,10 +283,6 @@ class TestExamples(unittest.TestCase):
         self.assertIn("RandomSampling", overview)
 
     def test_strategy_overview_offers_a_filter_per_tag(self):
-        # The tags themselves are never rendered; a strategy reaches a user
-        # only through these checkboxes, so every tag a row can carry needs
-        # one. The rows are real, because a filter over nothing filters
-        # nothing.
         section = next(iter(OVERVIEW_HEADINGS))
         json_data = {
             section: {
@@ -321,8 +308,6 @@ class TestExamples(unittest.TestCase):
             with self.subTest(tag=tag):
                 self.assertIn(f'value="{tag}"', overview)
         self.assertIn("<label>Multi-Label</label>", overview)
-        # The filter reads the tags of a rendered row, so the row has to
-        # carry them where the filter looks.
         self.assertIn("RandomSampling", overview)
         self.assertIn("single-annotator", overview)
 

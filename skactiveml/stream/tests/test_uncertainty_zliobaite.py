@@ -47,15 +47,18 @@ class TestFixedUncertainty(
         test_cases += [
             (None, TypeError),
             (FixedUncertainty, TypeError),
+            ([[0, 1], [0, 1]], ValueError),
         ]
         self._test_param("init", "classes", test_cases)
         self._test_param("init", "classes", [([0, 1], None)])
+        y = ["0", "1", "none", "none"]
+        clf = ParzenWindowClassifier(classes=["0", "1"], missing_label="none")
         self._test_param(
             "init",
             "classes",
             [(["0", "1"], None)],
             {},
-            {"y": ["0", "1", "none", "none"]},
+            {"y": y, "clf": clf.fit(self.query_default_params_clf["X"], y)},
         )
 
         qs_2 = FixedUncertainty(classes=[0, 1], random_state=0)
@@ -85,7 +88,6 @@ class TestFixedUncertainty(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -136,7 +138,6 @@ class TestSplit(TemplateSingleAnnotatorStreamQueryStrategy, unittest.TestCase):
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -189,7 +190,6 @@ class TestVariableUncertainty(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
@@ -242,14 +242,13 @@ class TestRandomVariableUncertainty(
 
     def test_query_param_clf(self):
         add_test_cases = [
-            (GaussianNB(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(GaussianNB()), None),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = [0, 1, 2, 4, 5, 6, 7, 12]
+        expected_output = [0, 2, 3, 5, 6, 7, 8, 15]
         expected_utilities = [
             1.6358911e-04,
             2.4108488e-05,

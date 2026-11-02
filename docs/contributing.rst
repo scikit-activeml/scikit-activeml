@@ -181,10 +181,17 @@ named private file under ``skactiveml/utils``.
 
 Do not import helper functions or constants from ``skactiveml.base``; that
 file is for base classes. If a helper must import a base class, keep it in the
-subpackage that uses it. ``skactiveml/pool/_target.py`` is an example. Put
-exception classes in ``skactiveml/exceptions.py``.
+subpackage that uses it. ``skactiveml/pool/_target.py`` and
+``skactiveml/stream/_target.py`` are examples. Put exception classes in
+``skactiveml/exceptions.py``.
 
-Add a query-strategy base class only when it contains behavior shared by its
+A base class keeps its public contract, the methods it calls itself,
+declarations with conservative defaults such as ``_target_capabilities``,
+behavior all its subclasses share, and methods that work with the state it
+defines, such as the label state of ``SkactivemlClassifier``. Other helpers,
+e.g., those that only check passed arguments or that need attributes only some
+subclasses define, are functions placed by the rules above instead. Add a
+query-strategy base class only when it contains behavior shared by its
 subclasses. Do not add one only to share a constant or to help tests find
 strategies.
 
@@ -234,29 +241,33 @@ Query Strategies
 
 All query strategies inherit from the abstract superclass
 ``skactiveml.base.QueryStrategy``, which is implemented in ``skactiveml/base.py``.
-This superclass inherits from ``sklearn.base.Estimator``. Its optional
+This superclass inherits from scikit-learn's ``BaseEstimator``. Its optional
 ``random_state`` parameter controls reproducibility, and the abstract ``query``
 method enforces the implementation of the sample-selection logic.
 
-Target semantics and compatibility
+Target Semantics and Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Target data has an explicit public contract. Read the
+Labels and target semantics have an explicit public contract. Read the
 :doc:`target_semantics` reference before changing estimators, query strategies,
 label helpers, or multi-annotator components. In particular:
 
 - resolve target meaning with
   :func:`~skactiveml.utils.resolve_target_spec`; do not infer semantics from
-  array shape or values alone;
+  array shape or values alone. Only label masks may use the shape, e.g., a
+  wrapper treats each row of a two-dimensional ``y`` as one sample;
 - declare the exact target combinations a component supports through its
   ``_target_capabilities``;
+- override ``_declared_classes`` in a classifier wrapper that takes its
+  ``classes`` from a wrapped estimator, as ``SlidingWindowClassifier`` does,
+  so that query strategies see this vocabulary before fitting;
 - preserve the fitted ``target_spec_`` on estimators and wrappers that retain a
   fitted target specification; query strategies resolve each query and do not
   retain a last-query specification;
 - add tests for every supported target combination and for invalid or
-  unsupported combinations, including ambiguous two-dimensional targets and
+  unsupported combinations, including ambiguous two-dimensional labels and
   complete-row requirements for multi-label data;
-- operate on encoded targets for multi-label data, because each label output
+- operate on encoded labels for multi-label data, because each label output
   may declare its own binary class vocabulary, e.g.
   ``[["no", "yes"], ["off", "on"]]``. A pool strategy test supplying
   ``query_default_params_clf_multilabel`` runs the shared custom class
@@ -372,13 +383,15 @@ General Advice
 
 Use the ``self._validate_data`` method (implemented in the superclass) exactly
 once for structural validation of the query inputs ``X`` and ``y``. Target
-resolution is a separate semantic step and may intentionally precede
-``self._validate_data`` so that invalid or unsupported target semantics fail
-before estimator fitting or query-state initialization. Fit the classifier or
-regressor if it is not yet fitted (using ``fit_if_not_fitted`` from ``utils``).
-Calculate utilities via an extra public function. Use the ``simple_batch``
-function from ``utils`` to determine the query indices and set the utilities in
-naive batch query strategies.
+resolution is a separate semantic step and may precede
+``self._validate_data``, e.g., to pass the resolved target type to it. If the
+strategy takes one estimator that it may refit, use
+``_fit_and_resolve_estimator_target_spec`` from ``skactiveml/pool/_target.py``.
+It validates the estimator and returns the estimator to use, i.e., a fitted
+clone if requested, e.g., via ``fit_clf=True``, with the resolved target
+specification. Calculate utilities via an extra public function. Use the
+``simple_batch`` function from ``utils`` to determine the query indices and set
+the utilities in naive batch query strategies.
 
 .. _testing-1:
 
@@ -449,7 +462,7 @@ Required Parameters:
 +==============================+=============================================================+
 | ``candidates``               | Set of candidate instances,                                 |
 |                              | inherited from                                              |
-|                              | ``SingleAnnotatorStreamBasedQueryStrategy``.                |
+|                              | ``SingleAnnotatorStreamQueryStrategy``.                     |
 +------------------------------+-------------------------------------------------------------+
 | ``clf``, optional            | The classifier used by the                                  |
 |                              | strategy.                                                   |
@@ -457,9 +470,9 @@ Required Parameters:
 | ``X``, optional              | Set of labeled and unlabeled                                |
 |                              | instances.                                                  |
 +------------------------------+-------------------------------------------------------------+
-| ``y``, optional              | Labels of ``X`` (it may be set to                           |
-|                              | ``MISSING_LABEL`` if ``y`` is                               |
-|                              | unknown).                                                   |
+| ``y``, optional              | Labels of ``X``, possibly including                         |
+|                              | ``clf.missing_label`` for unknown                           |
+|                              | labels.                                                     |
 +------------------------------+-------------------------------------------------------------+
 | ``sample_weight``, optional  | Weights for each instance in                                |
 |                              | ``X`` or ``None`` if all are                                |
@@ -468,7 +481,7 @@ Required Parameters:
 | ``fit_clf``, optional        | Uses ``X`` and ``y`` to fit the classifier.                 |
 +------------------------------+-------------------------------------------------------------+
 | ``return_utilities``         | Whether to return the candidates' utilities,                |
-|                              | inherited from ``SingleAnnotatorStreamBasedQueryStrategy``. |
+|                              | inherited from ``SingleAnnotatorStreamQueryStrategy``.      |
 +------------------------------+-------------------------------------------------------------+
 
 Returns:
@@ -477,7 +490,7 @@ Returns:
 | Parameter                         | Description                       |
 +===================================+===================================+
 | ``queried_indices``               | Indices of the best instances     |
-|                                   | from ``X_Cand``.                  |
+|                                   | from ``candidates``.              |
 +-----------------------------------+-----------------------------------+
 | ``utilities``                     | Utilities of all candidate        |
 |                                   | instances, only if                |
@@ -486,16 +499,25 @@ Returns:
 
 .. _general-advice-2:
 
-General advice
+General Advice
 ''''''''''''''
 
 The ``query`` method must not change the internal state of the ``query``
 strategy (``budget``, ``budget_manager`` and ``random_state`` included) to allow
 for assessing multiple instances with the same state. Update the internal state
 in the ``update()`` method. If the class implements a classifier (``clf``) the
-optional attributes need to be implement. Use ``self._validate_data`` method
-(is implemented in superclass). Check the input ``X`` and ``y`` only once. Fit
-classifier if ``fit_clf`` is set to ``True``.
+optional attributes need to be implemented. Use ``self._validate_data`` method
+(is implemented in superclass). Check the input ``X`` and ``y`` only once. For
+a strategy using a classifier, call ``_validate_X_y_sample_weight`` from
+``skactiveml/stream/_validation.py`` and then
+``_fit_and_resolve_clf_target_spec`` from ``skactiveml/stream/_target.py``. It
+returns ``(clf, target_spec)``, where ``clf`` is a fitted clone if
+``fit_clf=True``.
+
+When adapting subclasses written for version 1.0.1, replace overrides of
+``_validate_clf`` and ``_validate_X_y_sample_weight`` with validation in the
+strategy's ``_validate_data`` method. These private methods have moved to
+module helpers, so the old overrides are no longer called.
 
 .. _update-1:
 
@@ -509,25 +531,27 @@ Required Parameters:
 +===============================+==============================================+
 | ``candidates``                | Set of candidate instances,                  |
 |                               | inherited from                               |
-|                               | ``SingleAnnotatorStreamBasedQueryStrategy``. |
+|                               | ``SingleAnnotatorStreamQueryStrategy``.      |
 +-------------------------------+----------------------------------------------+
 | ``queried_indices``           | Typically the return value of                |
 |                               | ``query``.                                   |
 +-------------------------------+----------------------------------------------+
 | ``budget_manager_param_dict`` | Provides additional parameters to            |
 |                               | the ``update`` method of the                 |
-|                               | ``budget_manager`` (only include             |
-|                               | if a ``budget_manager`` is used).            |
+|                               | ``budget_manager``. Strategies without a     |
+|                               | ``budget_manager`` accept and ignore it.     |
 +-------------------------------+----------------------------------------------+
 
 .. _general-advice-3:
 
-General advice
+General Advice
 ''''''''''''''
 
-Use ``self._validate_data`` in the case the strategy is used without using
-the ``query`` method (if parameters need to be initialized before the
-update). If a ``budget_manager`` is used forward the update call to the
+The ``update`` method checks ``candidates`` and ``queried_indices`` with
+``_validate_budget_update`` from ``skactiveml/utils/_validation.py`` and
+prepares ``budget_manager_`` with ``_validate_budget_manager`` from
+``skactiveml/stream/_validation.py``. It must not set ``n_features_in_``.
+If a ``budget_manager`` is used, forward the update call to the
 ``budget_manager.update`` method.
 
 .. _testing-2:
@@ -555,12 +579,20 @@ following methods:
 +===================================+===================================+
 | ``__init__``                      | Function for initialization       |
 +-----------------------------------+-----------------------------------+
-| ``query_by_utilities``            | Identify which instances to query |
+| ``query_by_utility``              | Identify which instances to query |
 |                                   | based on the assessed utility     |
 +-----------------------------------+-----------------------------------+
 | ``update``                        | Adapting the budget monitoring    |
 |                                   | according to the queried labels   |
 +-----------------------------------+-----------------------------------+
+
+Once initialized, ``query_by_utility`` must leave the budget manager's
+acquisition state unchanged, including counters, thresholds, histories, and
+random state. Repeated queries with the same utilities and parameters must
+return the same indices until ``update`` advances that state. Both
+``query_by_utility`` and ``update`` must initialize the state needed for
+querying when called first. The shared budget-manager test template checks
+this contract for both initialization paths.
 
 .. _update-2:
 
@@ -575,18 +607,17 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``budget``                        | % of labels that the strategy is  |
-|                                   | allowed to query                  |
+| ``candidates``                    | The samples which may be queried  |
 +-----------------------------------+-----------------------------------+
-| ``random_state``                  | Integer that acts as random seed  |
-|                                   | or ``np.random.RandomState`` like |
-|                                   | sklearn                           |
+| ``queried_indices``               | The indices of samples in         |
+|                                   | ``candidates`` whose labels are   |
+|                                   | queried                           |
 +-----------------------------------+-----------------------------------+
 
 .. _query-by-utilities-1:
 
-``query_by_utilities``
-^^^^^^^^^^^^^^^^^^^^^^
+``query_by_utility``
+^^^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
 
@@ -606,7 +637,7 @@ Returns:
 | ``queried_indices``               | The indices of samples in          |
 |                                   | candidates whose labels are        |
 |                                   | queried, with                      |
-|                                   | ``0 <= queried_indices <=          |
+|                                   | ``0 <= queried_indices <           |
 |                                   | n_candidates``.                    |
 +-----------------------------------+------------------------------------+
 
@@ -625,7 +656,16 @@ strategy needs to be adapted accordingly:
 -  If both are not given use the default ``budget_manager`` with the
    default budget
 -  If both are given and the budget differs from
-   ``budget_manager.budget`` throw an error
+   ``budget_manager.budget`` warn and use the ``budget_manager`` as is
+
+Call ``_validate_budget_manager`` from ``skactiveml/stream/_validation.py`` in
+every ``_validate_data`` and ``update`` call. It creates ``budget_manager_`` on
+first use and applies changes of ``budget`` to a default ``budget_manager_``.
+
+Budget-manager subclasses written for version 1.0.1 must also account for the
+removal of the private ``_validate_random_state`` methods. Random-state setup
+now uses ``_ensure_random_state`` from ``skactiveml/utils/_validation.py``;
+overrides of the removed methods are no longer called.
 
 .. _testing-3:
 
@@ -647,14 +687,14 @@ All query strategies are stored in
 
 The class must implement the following methods:
 
-+------------+----------------------------------------------------------------+
-| Method     | Description                                                    |
-+============+================================================================+
++--------------+--------------------------------------------------------------+
+| Method       | Description                                                  |
++==============+==============================================================+
 | ``__init__`` | Method for initialization.                                   |
-+------------+----------------------------------------------------------------+
-| ``query``  | Select the annotator-sample pairs to decide which sample's     |
-|            | class label is to be queried from which annotator.             |
-+------------+----------------------------------------------------------------+
++--------------+--------------------------------------------------------------+
+| ``query``    | Select the annotator-sample pairs to decide which sample's   |
+|              | class label is to be queried from which annotator.           |
++--------------+--------------------------------------------------------------+
 
 .. _query-method-3:
 
@@ -676,7 +716,7 @@ Required Parameters:
 |                                   | indicated by self.MISSING_LABEL), |
 |                                   | meaning that ``y[i, j]`` contains |
 |                                   | the label annotated by annotator  |
-|                                   | ``i`` for sample ``j``.           |
+|                                   | ``j`` for sample ``i``.           |
 +-----------------------------------+-----------------------------------+
 | ``candidates``, optional          | If ``candidates`` is ``None``,    |
 |                                   | the samples from ``(X, y)``, for  |
@@ -767,14 +807,13 @@ Returns:
 
 .. _general-advice-6:
 
-General advice
+General Advice
 ''''''''''''''
 
 Use ``self._validate_data`` (implemented in the superclass).
-Check the input ``X`` and ``y`` only once. Fit classifier if it is not
-yet fitted (may use ``fit_if_not_fitted`` form ``utils``). If the
-strategy combines a single annotator query strategy with a performance
-estimate:
+Check the input ``X`` and ``y`` only once. Fit a clone of the classifier if
+``fit_clf`` is ``True``. If the strategy combines a single annotator query
+strategy with a performance estimate:
 
 -  define an aggregation function,
 -  evaluate the performance for each sample-annotator pair,
@@ -854,12 +893,14 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the class labels of the training    |
-|                                   | samples. Missing labels are represented by   |
-|                                   | the attribute ``missing_label``. Usually,    |
-|                                   | ``y`` is a column array except for multi-    |
-|                                   | annotator classifiers, which expect a matrix |
-|                                   | with columns for each annotator.             |
+| ``y``                             | Class labels of the training samples, with   |
+|                                   | ``missing_label`` for missing labels. For    |
+|                                   | single-output classification, ``y`` has the  |
+|                                   | shape ``(n_samples,)``, and for multi-label  |
+|                                   | classification ``(n_samples, n_outputs)``.   |
+|                                   | Multi-annotator classifiers expect           |
+|                                   | ``(n_samples, n_annotators)``. See           |
+|                                   | :doc:`target_semantics`.                     |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
 |                                   | class labels. Must have the same shape as    |
@@ -876,7 +917,7 @@ Returns:
 
 .. _general-advice-7:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
@@ -913,11 +954,11 @@ Returns:
 
 .. _general-advice-8:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
-Check parameter ``X`` regarding its shape, i.e., use superclass method
-``self._check_n_features`` to ensure a correct number of features. Check
+Check parameter ``X`` regarding its shape, i.e., use ``check_n_features`` from
+``skactiveml.utils`` to ensure a correct number of features. Check
 that the classifier has been fitted. If the classifier is a
 ``skactiveml.base.ClassFrequencyEstimator``, this method is already
 implemented in the superclass.
@@ -947,7 +988,7 @@ Returns:
 
 .. _general-advice-9:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass through
@@ -986,7 +1027,7 @@ Returns:
 
 .. _general-advice-10:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass. If the
@@ -1018,7 +1059,7 @@ Standard regressor implementations are part of the subpackage
 +-------------------+---------------------------------------------------------+
 | ``fit``           | Method to fit the regressor for given training data.    |
 +-------------------+---------------------------------------------------------+
-| ``predict``       | Method predicting the target values for samples.        |
+| ``predict``       | Method predicting the labels for samples.               |
 +-------------------+---------------------------------------------------------+
 
 .. _init-3:
@@ -1049,15 +1090,13 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples.                                     |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the target values of the training   |
-|                                   | samples. Missing labels are represented by   |
-|                                   | the attribute ``missing_label``. Usually,    |
-|                                   | ``y`` is a column array except for multi-    |
-|                                   | target regressors, which expect a matrix     |
-|                                   | with columns for each target type.           |
+| ``y``                             | Labels of the training samples, of shape     |
+|                                   | ``(n_samples,)``, with ``missing_label`` for |
+|                                   | missing labels. Regressors reject labels     |
+|                                   | with several columns.                        |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Contains weights for the training samples'   |
-|                                   | targets. Must have the same shape as ``y``.  |
+|                                   | labels. Must have the same shape as ``y``.   |
 +-----------------------------------+----------------------------------------------+
 
 Returns:
@@ -1070,7 +1109,7 @@ Returns:
 
 .. _general-advice-11:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
@@ -1099,14 +1138,14 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``y_pred``                        | The estimated targets per sample, |
+| ``y_pred``                        | The estimated labels per sample,  |
 |                                   | as an array of shape              |
 |                                   | ``(n_samples,)``.                 |
 +-----------------------------------+-----------------------------------+
 
 .. _general-advice-12:
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Check parameter ``X`` regarding its shape, i.e., use method
@@ -1128,7 +1167,7 @@ Required Parameters:
 | ``X``                             | Matrix of feature values representing the    |
 |                                   | samples for which predictions are made.      |
 +-----------------------------------+----------------------------------------------+
-| ``y``                             | Contains the true target values for each     |
+| ``y``                             | Contains the true labels for each            |
 |                                   | sample.                                      |
 +-----------------------------------+----------------------------------------------+
 | ``sample_weight``, optional       | Defines the importance of each sample when   |
@@ -1144,7 +1183,7 @@ Returns:
 |                                   |  regarding ``y``.                 |
 +-----------------------------------+-----------------------------------+
 
-General advice
+General Advice
 ^^^^^^^^^^^^^^
 
 Usually, this method is already implemented by the superclass. If the

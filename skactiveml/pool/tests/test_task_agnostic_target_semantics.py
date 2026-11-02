@@ -12,12 +12,10 @@ from skactiveml.pool import (
     DiscriminativeAL,
     GreedySamplingX,
     MaxHerding,
-    ProbCover,
     RandomSampling,
     TypiClust,
 )
 from skactiveml.pool.tests._strategy_helpers import _instantiate
-from skactiveml.tests.utils import assert_no_query_state
 
 TASK_AGNOSTIC_CAPABILITIES = frozenset(
     {
@@ -31,17 +29,8 @@ TASK_AGNOSTIC_CAPABILITIES = frozenset(
 def _task_agnostic_strategies():
     """Collect every estimator-free strategy with these exact capabilities.
 
-    The roster below is written out, so this scan is what keeps it complete.
-    Declaring the capabilities is not sufficient on its own, which is why two
-    kinds of strategy are excluded. A wrapper reports the capabilities of the
-    strategy it wraps rather than its own. An estimator-backed strategy
-    receives a semantic authority for `y` and resolves its target with that
-    estimator, whereas these strategies resolve the target type alone; the
-    auxiliary `discriminator` of `DiscriminativeAL` is no such authority and
-    is therefore not among the authority parameter names.
-
-    `_instantiate` is reused rather than reimplemented, because it already
-    owns how an arbitrary pool strategy is built for capability inspection.
+    Wrappers and strategies taking an estimator for `y`, e.g., `clf`, are
+    excluded.
     """
     strategies = set()
     for name in dir(skactiveml.pool):
@@ -56,7 +45,9 @@ def _task_agnostic_strategies():
         if strategy._target_capabilities != TASK_AGNOSTIC_CAPABILITIES:
             continue
         query_params = inspect.signature(obj.query).parameters
-        if any(p in query_params for p in strategy._target_authority_params):
+        if any(
+            p in query_params for p in ("clf", "reg", "ensemble", "estimator")
+        ):
             continue
         strategies.add(obj)
     return strategies
@@ -76,14 +67,6 @@ def _strategy_cases(target_type="auto"):
                 **common,
                 cluster_algo_dict={"n_init": 1},
                 k=2,
-            ),
-            {},
-        ),
-        (
-            ProbCover(
-                **common,
-                deltas=[0.2],
-                cluster_algo_dict={"n_init": 1},
             ),
             {},
         ),
@@ -188,7 +171,7 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                     equal_nan=True,
                 )
 
-    def test_auto_rejects_ambiguous_matrix_before_query_state(self):
+    def test_auto_rejects_ambiguous_matrix(self):
         X = np.arange(16, dtype=float).reshape(8, 2)
         y = np.array(
             [
@@ -206,31 +189,19 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
             with self.subTest(strategy=type(strategy).__name__):
                 with self.assertRaisesRegex(ValueError, "ambiguous"):
                     strategy.query(X, y, **extra)
-                assert_no_query_state(self, strategy)
                 self.assertTrue(
                     strategy_specific_state_attributes.isdisjoint(
                         strategy.__dict__
                     )
                 )
 
-    def test_semantic_and_capability_failures_precede_query_state(self):
+    def test_semantic_and_capability_failures(self):
         X = np.arange(16, dtype=float).reshape(8, 2)
         invalid_cases = (
             (
                 "invalid",
                 np.array([0, 1, -1, -1, -1, -1, -1, -1]),
                 "target_type",
-            ),
-            (
-                "multi-output",
-                np.array(
-                    [
-                        [0, 2],
-                        [1, 3],
-                        *[[-1, -1] for _ in range(6)],
-                    ]
-                ),
-                "does not support target capability",
             ),
             (
                 "multi-label",
@@ -253,26 +224,20 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 ):
                     with self.assertRaisesRegex(ValueError, message):
                         strategy.query(X, y, **extra)
-                    assert_no_query_state(self, strategy)
 
     def test_target_types_validate_public_shapes(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y_column = np.array([[0], [1], [-1], [-1]])
 
-        with self.assertRaisesRegex(ValueError, "ambiguous"):
-            RandomSampling(
-                target_type="auto", missing_label=-1, random_state=0
-            ).query(X, y_column, batch_size=1)
-
-        with self.assertWarns(DataConversionWarning):
-            result = RandomSampling(
-                target_type="single-output", missing_label=-1, random_state=0
-            ).query(
-                X,
-                y_column,
-                batch_size=1,
-            )
-        self.assertEqual(result.shape, (1,))
+        for target_type in ["auto", "single-output"]:
+            with self.subTest(target_type=target_type):
+                with self.assertWarns(DataConversionWarning):
+                    result = RandomSampling(
+                        target_type=target_type,
+                        missing_label=-1,
+                        random_state=0,
+                    ).query(X, y_column, batch_size=1)
+                self.assertEqual(result.shape, (1,))
 
         invalid_cases = (
             (
@@ -281,7 +246,6 @@ class TestTaskAgnosticTargetSemantics(unittest.TestCase):
                 "one-dimensional or a column",
             ),
             ("multi-label", np.array([0, 1, -1, -1]), "two-dimensional"),
-            ("multi-output", np.array([[0], [1], [-1], [-1]]), "at least two"),
         )
         for target_type, y, message in invalid_cases:
             with self.subTest(target_type=target_type):

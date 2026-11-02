@@ -1,3 +1,4 @@
+from sklearn.metrics import mean_squared_error
 import numpy as np
 import unittest
 
@@ -42,6 +43,30 @@ class TestExpectedModelOutputChange(
         ]
         self._test_param("init", "loss", test_cases)
 
+    def test_query_effective_defaults_match_explicit_parameters(self):
+        query_kwargs = deepcopy(self.query_default_params_reg)
+        effective_defaults = {
+            "integration_dict": {"method": "assume_linear"},
+            "loss": mean_squared_error,
+        }
+        reference = ExpectedModelOutputChange(
+            random_state=0, **effective_defaults
+        ).query(
+            **query_kwargs,
+            return_utilities=True,
+        )
+        for explicit in [False, True]:
+            with self.subTest(explicit=explicit):
+                parameters = deepcopy(effective_defaults) if explicit else {}
+                qs = ExpectedModelOutputChange(random_state=0, **parameters)
+                for _ in range(2):
+                    indices, utilities = qs.query(
+                        **query_kwargs,
+                        return_utilities=True,
+                    )
+                    np.testing.assert_array_equal(indices, reference[0])
+                    np.testing.assert_allclose(utilities, reference[1])
+
     def test_init_param_integration_dict(self):
         test_cases = [
             ({"method": "assume_linear"}, None),
@@ -69,9 +94,6 @@ class TestExpectedModelOutputChange(
             ("illegal", ValueError),
         ]
         self._test_param("query", "X_eval", test_cases)
-        # Without unlabeled samples, no evaluation set can be derived. The
-        # candidates are given explicitly, because an exhausted candidate pool
-        # is answered with an empty batch before `X_eval` is resolved.
         test_cases = [(None, ValueError)]
         query_params = deepcopy(self.query_default_params_reg)
         query_params["y"] = np.ones_like(self.query_default_params_reg["y"])

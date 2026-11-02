@@ -2,6 +2,10 @@ import unittest
 
 import numpy as np
 
+from skactiveml.utils._label import (
+    _check_labels,
+    _observed_numerical_labels,
+)
 from skactiveml.utils import (
     is_labeled,
     is_unlabeled,
@@ -24,10 +28,23 @@ class TestLabel(unittest.TestCase):
         self.y8 = [[0, 0, 1], [1, 1, 1], [1, 0, 1], [-1, -1, -1]]
         self.y9 = [[0, 0, 1], [1, 1, 1], [1, 0, 1], [-1, 0, -1]]
 
+    def test_missing_masks_preserve_object_integer_targets(self):
+        for missing in (np.nan, None, -2.5, -1):
+            with self.subTest(missing=missing):
+                y = np.array([[2, 3], [missing, missing]], dtype=object)
+                np.testing.assert_array_equal(
+                    is_unlabeled(y, missing), [[False, False], [True, True]]
+                )
+                np.testing.assert_array_equal(
+                    is_labeled(y, missing, target_type="multi-label"),
+                    [True, False],
+                )
+                self.assertEqual(y[0].tolist(), [2, 3])
+
     def test_is_unlabeled(self):
         self.assertRaises(ValueError, is_unlabeled, y=[0], target_type="auto")
         self.assertRaises(
-            ValueError, is_unlabeled, y=[0], target_type="multi-output"
+            ValueError, is_unlabeled, y=[0], target_type="invalid"
         )
         self.assertRaises(
             ValueError, is_unlabeled, y=[], target_type="multi-label"
@@ -142,6 +159,84 @@ class TestLabel(unittest.TestCase):
             ),
         )
 
+    def test_label_and_index_helpers_are_task_agnostic(self):
+        y = np.array([0, 1.5, None], dtype=object)
+        np.testing.assert_array_equal(
+            is_unlabeled(y, missing_label=None),
+            [False, False, True],
+        )
+        np.testing.assert_array_equal(
+            is_labeled(y, missing_label=None),
+            [True, True, False],
+        )
+        np.testing.assert_array_equal(
+            unlabeled_indices(y, missing_label=None), [2]
+        )
+        np.testing.assert_array_equal(
+            labeled_indices(y, missing_label=None), [0, 1]
+        )
+
+        invalid_for_both_tasks = np.array(["cat", 2], dtype=object)
+        for helper in (
+            is_unlabeled,
+            is_labeled,
+            unlabeled_indices,
+            labeled_indices,
+        ):
+            with self.subTest(helper=helper.__name__):
+                with self.assertRaisesRegex(
+                    TypeError, "mixes strings and numbers"
+                ):
+                    helper(invalid_for_both_tasks)
+
+    def test_complex_targets_are_rejected(self):
+        with self.assertRaisesRegex(TypeError, "unsupported type"):
+            is_unlabeled(np.array([1 + 2j, 3 + 0j, -1 + 0j]), -1)
+        y = np.array([1 + 2j, -1], dtype=object)
+        with self.assertRaisesRegex(TypeError, "unsupported type"):
+            is_unlabeled(y, -1)
+
+    def test_timedelta_targets_are_rejected(self):
+        for y in (
+            np.array([1, 2], dtype="m8[s]"),
+            np.array([np.timedelta64(1, "s"), None], dtype=object),
+        ):
+            with self.subTest(dtype=y.dtype):
+                with self.assertRaisesRegex(
+                    TypeError, "unsupported type 'timedelta64'"
+                ):
+                    is_unlabeled(y, None)
+
+    def test_object_targets_reject_non_scalar_entries(self):
+        for value in ([0, 1], np.array([0, 1]), np.array(0), {"label": 0}):
+            for missing in (np.nan, -1, None):
+                with self.subTest(value=repr(value), missing=missing):
+                    y = np.empty((2, 1), dtype=object)
+                    y[0, 0] = value
+                    y[1, 0] = missing
+                    with self.assertRaisesRegex(TypeError, "unsupported type"):
+                        is_unlabeled(y, missing)
+
+    def test_numeric_arrays_reject_string_missing_labels(self):
+        y = np.array([0.0, np.nan, 1.0])
+        for targets in (y, y.astype(object), y.tolist()):
+            with self.subTest(targets=repr(targets)):
+                with self.assertRaisesRegex(
+                    TypeError, "is not compatible with"
+                ):
+                    is_unlabeled(targets, missing_label="nan")
+        np.testing.assert_array_equal(y, [0.0, np.nan, 1.0])
+
+    def test_object_targets_accept_numpy_boolean_scalars(self):
+        for missing in (np.nan, None):
+            with self.subTest(missing=missing):
+                y = np.array(
+                    [np.bool_(False), np.bool_(True), missing], dtype=object
+                )
+                np.testing.assert_array_equal(
+                    is_unlabeled(y, missing), [False, False, True]
+                )
+
     def test_is_unlabeled_accepts_numpy_floating_nan_sentinels(self):
         for dtype in (np.float16, np.float32, np.float64, np.longdouble):
             with self.subTest(dtype=dtype):
@@ -153,7 +248,7 @@ class TestLabel(unittest.TestCase):
                     [False, True],
                 )
 
-    def test_is_unlabeled_accepts_complex_nan_sentinels(self):
+    def test_is_unlabeled_rejects_complex_nan_sentinels(self):
         for missing_label in (
             complex(float("nan"), 0),
             np.complex64(np.nan),
@@ -162,10 +257,60 @@ class TestLabel(unittest.TestCase):
             with self.subTest(dtype=type(missing_label)):
                 y = np.array([0, missing_label])
 
-                np.testing.assert_array_equal(
-                    is_unlabeled(y, missing_label=missing_label),
-                    [False, True],
-                )
+                with self.assertRaisesRegex(
+                    TypeError, "must be a real number"
+                ):
+                    is_unlabeled(y, missing_label=missing_label)
+
+    def test_is_unlabeled_rejects_nan_under_a_none_missing_label(self):
+        for targets in (
+            [0.0, np.nan, 1.0],
+            np.array([0.0, np.nan, 1.0]),
+            np.array([0.0, np.nan, 1.0], dtype=object),
+        ):
+            with self.subTest(targets=repr(targets)):
+                with self.assertRaisesRegex(ValueError, "contains NaN"):
+                    is_unlabeled(targets, missing_label=None)
+
+    def test_is_unlabeled_rejects_infinite_labels_and_missing_labels(self):
+        for targets in (
+            [0.0, np.inf],
+            np.array([0.0, -np.inf]),
+            np.array([0.0, np.inf], dtype=object),
+        ):
+            with self.subTest(targets=repr(targets)):
+                with self.assertRaisesRegex(
+                    ValueError, "contains an infinite value"
+                ):
+                    is_unlabeled(targets, missing_label=np.nan)
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            is_unlabeled([0.0, 1.0], missing_label=np.inf)
+
+    def test_arrays_mixing_numbers_and_strings_are_rejected(self):
+        for targets in (
+            ["paris", -1],
+            np.array(["paris", -1], dtype=object),
+        ):
+            with self.subTest(targets=repr(targets)):
+                with self.assertRaisesRegex(
+                    TypeError, "mixes strings and numbers"
+                ):
+                    is_unlabeled(targets, missing_label=np.nan)
+
+    def test_observed_numerical_labels_are_floating_point_values(self):
+        for missing in (np.nan, None, -999):
+            with self.subTest(missing=missing):
+                y = [0, 1.5, missing]
+                is_lbld, observed = _observed_numerical_labels(y, missing)
+                np.testing.assert_array_equal(is_lbld, [True, True, False])
+                self.assertEqual(observed.dtype, np.dtype(float))
+                np.testing.assert_array_equal(observed, [0.0, 1.5])
+
+    def test_observed_numerical_labels_reject_string_values(self):
+        for y in ([True, False], ["0.5", "1.5"]):
+            with self.subTest(y=y):
+                with self.assertRaisesRegex(TypeError, "numerical labels"):
+                    _observed_numerical_labels(y, np.nan)
 
     def test_is_labeled(self):
         np.testing.assert_array_equal(
@@ -243,6 +388,30 @@ class TestLabel(unittest.TestCase):
         self.assertRaises(
             TypeError, check_missing_label, missing_label="2", target_type=int
         )
+
+    def test_check_missing_label_maps_bytes_target_type_to_strings(self):
+        check_missing_label("", target_type=np.dtype("S5"))
+        check_missing_label("none", target_type=np.dtype("S5"))
+        for missing_label in (np.nan, 2, True):
+            with self.subTest(missing_label=missing_label):
+                self.assertRaises(
+                    TypeError,
+                    check_missing_label,
+                    missing_label=missing_label,
+                    target_type=np.dtype("S5"),
+                )
+
+    def test_check_missing_label_ignores_unreadable_target_type(self):
+        for target_type in ("nonsense", object(), np.dtype(object)):
+            with self.subTest(target_type=target_type):
+                for missing_label in (np.nan, None, "none", 2):
+                    check_missing_label(missing_label, target_type=target_type)
+
+    def test_check_labels_rejects_an_unknown_task(self):
+        with self.assertRaisesRegex(
+            ValueError, "'classification' or 'regression'"
+        ):
+            _check_labels(np.array([0, 1]), np.nan, task="ranking")
 
     def test_check_equal_missing_label(self):
         self.assertRaises(

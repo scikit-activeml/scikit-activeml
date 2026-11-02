@@ -9,10 +9,10 @@ from skactiveml.utils import (
     rand_argmax,
     labeled_indices,
     MISSING_LABEL,
-    is_labeled,
     check_type,
     check_scalar,
 )
+from skactiveml.utils._label import _observed_numerical_labels
 from ._target import _fit_and_resolve_estimator_target_spec
 
 
@@ -20,9 +20,10 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling in the Feature Space (GSx)
 
     This class implements the query strategy Greedy Sampling in the Feature
-    Space (GSx) [1]_ that tries to select those samples that increase the
-    diversity of the feature space the most. It does this by selecting those
-    features that are the furthest away from all previously labeled samples.
+    Space (GSx) [1]_. It selects candidates that maximize the minimum distance
+    to labeled samples and samples already selected in the batch. Without
+    labeled samples, the first selected sample minimizes the sum of distances
+    to the samples in `X`.
     Originally, this query strategy was only proposed for regression.
     Nevertheless, it is task-agnostic such that it can handle class labels,
     numerical targets, and multilabel targets represented by a
@@ -43,8 +44,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Random state for candidate selection.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
-        targets must be declared explicitly.
+        single-output targets. Multi-label targets must be declared
+        explicitly.
 
     References
     ----------
@@ -73,8 +74,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.metric = metric
         self.metric_dict = metric_dict
 
@@ -99,7 +100,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Labeled candidates remain eligible and also
+              serve as initial centers.
             - If `candidates` is of shape `(n_candidates, ...)`, the candidate
               samples are directly given in `candidates` (not necessarily
               contained in `X`).
@@ -124,7 +126,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
+            Utilities for samples outside the candidate set and samples
+            already selected in the batch are set to `np.nan`.
 
             - If `candidates` is `None`, the indexing refers to the samples
               in `X`.
@@ -151,7 +154,6 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             candidates=candidates, X=X, y=y, target_type=target_type
         )
 
-        # Determine already labeled samples.
         sample_indices = np.arange(len(X), dtype=int)
         selected_indices = labeled_indices(
             y=y,
@@ -227,18 +229,15 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
     n_GSx_samples : int, default=1
         Indicates the number of selected samples required till the query
         strategy switches from GSx to the strategy specified by `method`.
-    method : "GSy" or "GSi", optional (default="GSi")
+    method : "GSy" or "GSi" or None, default=None
         Specifies whether only the diversity in the target space ("GSy") or the
         diversity in the feature and the target space ("GSi") should be
         maximized, when the number of selected samples exceeds `n_GSx_samples`.
+        `None` uses "GSi" without changing the configured parameter.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. A fitted regressor's target specification is
-        authoritative when available. Only single-output regression is
-        supported.
 
     References
     ----------
@@ -256,12 +255,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         n_GSx_samples=1,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             random_state=random_state,
             missing_label=missing_label,
-            target_type=target_type,
         )
         self.method = method
         self.x_metric = x_metric
@@ -287,12 +284,21 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`.)
+        reg : skactiveml.base.SkactivemlRegressor
+            Regressor predicting the labels of the candidates.
+        fit_reg : bool, default=True
+            Defines whether the regressor should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates, ) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -332,7 +338,6 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        # Resolve through the regressor before acquisition state is changed.
         reg, target_spec = _fit_and_resolve_estimator_target_spec(
             self,
             reg,
@@ -355,14 +360,16 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             target_type=target_spec.target_type,
         )
 
-        if self.method is None:
-            self.method = "GSi"
-        check_type(self.method, "self.method", target_vals=["GSy", "GSi"])
+        method = "GSi" if self.method is None else self.method
+        check_type(method, "self.method", target_vals=["GSy", "GSi"])
         check_scalar(self.n_GSx_samples, "self.k_0", int, min_val=0)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        n_labeled = np.sum(is_labeled(y, missing_label=self.missing_label_))
+        is_lbld, y_observed = _observed_numerical_labels(
+            y, self.missing_label_
+        )
+        n_labeled = np.sum(is_lbld)
         batch_size_x = max(0, min(self.n_GSx_samples - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
@@ -374,13 +381,18 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         )
         y_cand = reg.predict(X_cand)
 
+        # Distances are measured on the labels themselves, which are
+        # stored as objects whenever the missing label has no common numeric
+        # dtype with them, e.g. for `missing_label=None`.
+        y_float = np.full(len(y), np.nan, dtype=float)
+        y_float[is_lbld] = y_observed
         if mapping is None:
             X_all = np.append(X, X_cand, axis=0)
-            y_all = np.append(y, reg.predict(X_cand))
+            y_all = np.append(y_float, reg.predict(X_cand))
             candidate_indices = len(X) + np.arange(len(X_cand), dtype=int)
         else:
             X_all = X
-            y_all = y.copy()
+            y_all = y_float
             y_all[mapping] = y_cand
             candidate_indices = mapping
 
@@ -397,7 +409,7 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
                 selected_indices=selected_indices,
                 candidate_indices=candidate_indices,
                 batch_size=batch_size_x,
-                random_state=None,
+                random_state=self.random_state_,
                 metric_x=self.x_metric,
                 metric_dict_x=self.x_metric_dict,
                 method="x",
@@ -430,12 +442,12 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
                 selected_indices=selected_indices,
                 candidate_indices=candidate_indices,
                 batch_size=batch_size_y,
-                random_state=None,
+                random_state=self.random_state_,
                 metric_x=self.x_metric,
                 metric_dict_x=self.x_metric_dict,
                 metric_y=self.y_metric,
                 metric_dict_y=self.y_metric_dict,
-                method="xy" if self.method == "GSi" else "y",
+                method="xy" if method == "GSi" else "y",
             )
 
             query_indices[batch_size_x:] = unselected_cands[query_indices_y]
@@ -471,38 +483,72 @@ def _greedy_sampling(
     )
     query_indices = np.zeros(batch_size, dtype=int)
     utilities = np.full((batch_size, len(X_cand)), np.nan)
-    distances = np.full((len(X_cand), len(X)), np.nan)
+    min_distances = np.full(len(X_cand), np.inf)
+    # Bound the temporary distance blocks to roughly 512 KiB of float64 data.
+    max_distance_elements = 2**16
 
     if len(selected_indices) == 0:
-        distances[:, sample_indices] = _measure_distance(
-            sample_indices, **dist_dict
-        )
+        initial_utilities = np.empty(len(X_cand))
+        chunk_size = max(1, max_distance_elements // len(sample_indices))
+        for start in range(0, len(X_cand), chunk_size):
+            stop = start + chunk_size
+            chunk_args = dict(dist_dict, X_cand=X_cand[start:stop])
+            if y_cand is not None:
+                chunk_args["y_cand"] = y_cand[start:stop]
+            for axis in method:
+                key = f"metric_dict_{axis}"
+                metric_dict = dist_dict.get(key)
+                if isinstance(metric_dict, dict):
+                    norms = metric_dict.get("X_norm_squared")
+                    if norms is not None:
+                        norms = np.asarray(norms)
+                        if norms.shape not in [
+                            (len(X_cand),),
+                            (len(X_cand), 1),
+                            (1, len(X_cand)),
+                        ]:
+                            raise ValueError(
+                                "X_norm_squared is incompatible with "
+                                "candidates."
+                            )
+                        chunk_args[key] = dict(
+                            metric_dict,
+                            X_norm_squared=norms.reshape(-1)[start:stop],
+                        )
+            distances = _measure_distance(sample_indices, **chunk_args)
+            # Chunk the candidates rather than the summed sample axis to keep
+            # the column-wise summation order.
+            if len(X_cand) == 1:
+                initial_utilities[start:stop] = -np.sum(distances, axis=1)
+            else:
+                np.add.accumulate(distances, axis=1, out=distances)
+                initial_utilities[start:stop] = -distances[:, -1]
     else:
-        distances[:, selected_indices] = _measure_distance(
-            selected_indices, **dist_dict
-        )
+        chunk_size = max(1, max_distance_elements // len(X_cand))
+        for start in range(0, len(selected_indices), chunk_size):
+            distances = _measure_distance(
+                selected_indices[start : start + chunk_size], **dist_dict
+            )
+            min_distances = np.minimum(
+                min_distances, np.min(distances, axis=1)
+            )
 
     not_selected_candidates = np.arange(len(X_cand), dtype=int)
 
     for i in range(batch_size):
-        if len(selected_indices) == 0:
-            dist = distances[not_selected_candidates][:, sample_indices]
-            util = -np.sum(dist, axis=1)
+        if i == 0 and len(selected_indices) == 0:
+            util = initial_utilities[not_selected_candidates]
         else:
-            dist = distances[not_selected_candidates][:, selected_indices]
-            util = np.min(dist, axis=1)
+            util = min_distances[not_selected_candidates]
         utilities[i, not_selected_candidates] = util
 
-        idx = rand_argmax(util, random_state=random_state)
-        query_indices[i] = not_selected_candidates[idx][0]
-        distances[:, candidate_indices[idx]] = _measure_distance(
-            candidate_indices[idx], **dist_dict
-        )
-
-        selected_indices = np.append(
-            selected_indices, candidate_indices[idx], axis=0
-        )
-        candidate_indices = np.delete(candidate_indices, idx, axis=0)
+        idx = rand_argmax(util, random_state=random_state)[0]
+        query_indices[i] = not_selected_candidates[idx]
+        if i + 1 < batch_size:
+            distances = _measure_distance(
+                candidate_indices[[query_indices[i]]], **dist_dict
+            )
+            min_distances = np.minimum(min_distances, distances[:, 0])
         not_selected_candidates = np.delete(not_selected_candidates, idx)
 
     return query_indices, utilities

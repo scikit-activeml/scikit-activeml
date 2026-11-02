@@ -20,7 +20,6 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
     kernel-based coverage objective in embedding space, accounting for the
     already labeled set. The objective promotes representativeness and
     diversity via kernel similarity. Originally, this query strategy was only
-    proposed for classification. Originally, this query strategy was only
     proposed for classification tasks. Nevertheless, this implementation is
     task-agnostic such that it can handle class labels, numerical targets, and
     multilabel targets represented by a two-dimensional `y`.
@@ -41,8 +40,8 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
-        targets must be declared explicitly.
+        single-output targets. Multi-label targets must be declared
+        explicitly.
 
     References
     ----------
@@ -73,8 +72,8 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.normalize_samples = normalize_samples
         self.metric = metric
         self.metric_dict = metric_dict
@@ -180,14 +179,15 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         # Storages for saving query indices and utilities.
         query_indices_cand = np.empty(batch_size, dtype=int)
         utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
+        gains = None
 
         # Greedy selection (cf. lines 3 to 6 of Algorithm 1 in [1]).
         for b in range(batch_size):
             if k_max is not None:
                 # Compute utilities if labeled data is available.
-                utilities_cand[b] = np.mean(
-                    np.maximum(K_cand - k_max, 0), axis=1
-                )
+                gains = np.subtract(K_cand, k_max, out=gains)
+                np.maximum(gains, 0, out=gains)
+                utilities_cand[b] = np.mean(gains, axis=1)
             else:
                 # Fallback to the kernel-based densities as utilities if
                 # labeled data is unavailable.

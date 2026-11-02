@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+from scipy.sparse import csr_matrix, issparse, vstack
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 from sklearn.utils.validation import column_or_1d
@@ -13,6 +14,8 @@ from ..utils import (
     is_labeled,
 )
 from ._clustering import _set_random_state_if_supported
+
+_MAX_GRAPH_BLOCK_ENTRIES = 2**20
 
 
 class ProbCover(SingleAnnotatorPoolQueryStrategy):
@@ -28,6 +31,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     uncertainty. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation can handle class
     labels and multilabel targets represented by a two-dimensional `y`.
+    Regression is not supported, because the default radius `delta` depends
+    on a class count, which continuous labels do not provide.
 
     Multi-label support in this implementation is an extension and not part of
     the original proposal in [1]_. Coverage is computed in the embedding space
@@ -48,12 +53,15 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         fallback.
     deltas : None or array-like of shape (n_deltas,), default=None
         List of deltas (ball radii) to be tested for finding the maximum
-        value satisfying a sample coverage >= `alpha`. If no value in
+        value satisfying a purity >= `alpha`. If no value in
         `deltas` satisfies this constraint, a warning is raised where
-        the minimum `delta` value is used. If `deltas=None`, the values
-        `np.arange(0.1, 2.1, 0.1)` are used.
-    alpha : float in (0, 1), alpha=0.95
-        Minimum coverage as a constraint for the `delta` selection.
+        the minimum `delta` value is used. A single value is used as a fixed
+        radius. If `deltas=None`, the values `np.arange(0.2, 2.2, 0.2)` are
+        used.
+    alpha : float in (0, 1), default=0.95
+        Minimum purity as a constraint for the `delta` selection, i.e., the
+        fraction of samples whose `delta`-ball contains only samples of their
+        own cluster.
     cluster_algo : ClusterMixin.__class__, default=sklearn.cluster.KMeans
         The cluster algorithm to be used for determining the best delta value.
     cluster_algo_dict : dict, default=None
@@ -71,8 +79,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
-        targets must be declared explicitly.
+        single-output targets. Multi-label targets must be declared
+        explicitly.
 
     References
     ----------
@@ -86,7 +94,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             {
                 ("classification", "single-output", "single-annotator"),
                 ("classification", "multi-label", "single-annotator"),
-                ("regression", "single-output", "single-annotator"),
             }
         )
 
@@ -106,8 +113,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.deltas = deltas
         self.alpha = alpha
         self.n_classes = n_classes
@@ -151,6 +158,10 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
+        update : bool, default=False
+            Whether to recompute the distances and the radius `delta`, which
+            are otherwise reused from the previous computation. Pass `True`
+            whenever `X` changes.
 
         Returns
         -------
@@ -193,14 +204,14 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         # Infer number of classes, which must have a minimum of 2.
         is_candidate = np.full(len(X), fill_value=False)
         is_candidate[mapping] = True
+        is_center = is_labeled(
+            y=y,
+            missing_label=self.missing_label_,
+            target_type=target_type,
+        )
         n_classes = self.n_classes
         if n_classes is None:
-            is_lbld = is_labeled(
-                y=y,
-                missing_label=self.missing_label_,
-                target_type=target_type,
-            )
-            y_labeled = y[is_lbld]
+            y_labeled = y[is_center]
             if target_type == "multi-label":
                 n_classes = len(
                     {tuple(np.asarray(row).tolist()) for row in y_labeled}
@@ -222,8 +233,15 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         else:
             deltas = column_or_1d(self.deltas, dtype=float)
             deltas = np.sort(deltas)
-            if (deltas < 0).any():
-                raise ValueError("`deltas` must contain non-negative floats.")
+            if (
+                len(deltas) == 0
+                or not np.all(np.isfinite(deltas))
+                or (deltas < 0).any()
+            ):
+                raise ValueError(
+                    "`deltas` must contain at least one finite, non-negative "
+                    "float."
+                )
         check_scalar(
             self.alpha,
             "alpha",
@@ -253,6 +271,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             self.cluster_algo, cluster_algo_dict, self.random_state
         )
 
+        chunk_size = max(1, _MAX_GRAPH_BLOCK_ENTRIES // len(X))
         if update or not hasattr(self, "delta_max_"):
             # Compute distances between each pair of observed samples.
             self.distances_ = self.distance_func(X)
@@ -264,41 +283,90 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 cluster_algo_dict[self.n_cluster_param_name] = n_classes
                 cluster_obj = self.cluster_algo(**cluster_algo_dict)
                 y_cluster = cluster_obj.fit_predict(X)
-                is_impure = y_cluster[:, None] != y_cluster
                 for delta in deltas:
-                    edges = self.distances_ <= delta
-                    purity = 1 - (edges * is_impure).any(axis=1).mean()
+                    n_impure = 0
+                    for start in range(0, len(X), chunk_size):
+                        stop = start + chunk_size
+                        is_impure = y_cluster[start:stop, None] != y_cluster
+                        edges = self.distances_[start:stop] <= delta
+                        n_impure += np.count_nonzero(
+                            (edges & is_impure).any(axis=1)
+                        )
+                    purity = 1 - n_impure / len(X)
                     max_purity = max(max_purity, purity)
                     if purity < self.alpha:
                         break
                     self.delta_max_ = delta
 
-            # Check whether condition defined by `alpha` was satisfied.
-            if max_purity < self.alpha:
-                warnings.warn(
-                    f"The maximum purity was {max_purity} being smaller "
-                    f"than the required value `alpha={self.alpha}`. You must"
-                    f"provide smaller values in `deltas` to avoid "
-                    f"this warning."
-                )
+                # Check whether condition defined by `alpha` was satisfied.
+                if max_purity < self.alpha:
+                    warnings.warn(
+                        f"The maximum purity was {max_purity} being smaller "
+                        f"than the required value `alpha={self.alpha}`. You "
+                        f"must provide smaller values in `deltas` to avoid "
+                        f"this warning."
+                    )
 
         # Compute edges of the graph with the samples as vertices.
-        edges = self.distances_ <= self.delta_max_
+        edges = _radius_graph(self.distances_, self.delta_max_)
+        incoming = edges.tocsc() if issparse(edges) else None
+        degrees = np.asarray(edges.sum(axis=1)).ravel()
+        covered = np.zeros(len(X), dtype=bool)
+
+        def cover(center):
+            if incoming is not None:
+                neighbors = edges.indices[
+                    edges.indptr[center] : edges.indptr[center + 1]
+                ]
+                newly_covered = neighbors[~covered[neighbors]]
+                covered[newly_covered] = True
+                for vertex in newly_covered:
+                    parents = incoming.indices[
+                        incoming.indptr[vertex] : incoming.indptr[vertex + 1]
+                    ]
+                    degrees[parents] -= 1
+            else:
+                newly_covered = np.flatnonzero(edges[center] & ~covered)
+                covered[newly_covered] = True
+                for start in range(0, len(newly_covered), chunk_size):
+                    vertices = newly_covered[start : start + chunk_size]
+                    degrees[:] -= edges[:, vertices].sum(axis=1)
+
+        # A covered vertex decrements its predecessors' degrees only once.
+        for center in np.flatnonzero(is_center):
+            cover(center)
 
         # Perform sample-wise selection of the batch.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
         for b in range(batch_size):
-            # Step (ii) in [1]: Remove incoming edges for covered samples.
-            is_covered = edges[~is_candidate].any(axis=0)
-            edges[:, is_covered] = False
             # Step (i) in [1]: Query the sample with the highest out-degree.
-            utilities[b][is_candidate] = edges[is_candidate].sum(axis=1)
+            utilities[b, is_candidate] = degrees[is_candidate]
             idx = rand_argmax(utilities[b], random_state=self.random_state_)[0]
             is_candidate[idx] = False
             query_indices[b] = idx
+            if b + 1 < batch_size:
+                cover(idx)
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
+
+
+def _radius_graph(distances, radius):
+    """Build adjacency in bounded row chunks, retaining dense
+    graphs cheaply.
+    """
+    blocks = []
+    storage = 0
+    chunk_size = max(1, _MAX_GRAPH_BLOCK_ENTRIES // len(distances))
+    for start in range(0, len(distances), chunk_size):
+        block = csr_matrix(distances[start : start + chunk_size] <= radius)
+        storage += (
+            block.data.nbytes + block.indices.nbytes + block.indptr.nbytes
+        )
+        if 2 * storage >= distances.size:
+            return distances <= radius
+        blocks.append(block)
+    return vstack(blocks, format="csr")

@@ -3,6 +3,7 @@ import numpy as np
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
+    check_indices,
     labeled_indices,
     unlabeled_indices,
     rand_argmax,
@@ -22,12 +23,12 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     This class implements the core-set based query strategy, i.e., the
     standard greedy algorithm for the k-center problem [1]_. CoreSet
     applies a k-center (farthest-first) selection in a feature space,
-    seeded by the labeled set, to minimize the maximum distance of unlabeled
-    samples to the labeled/selected samples. It is a pure diversity criterion
-    without explicit consideration of prediction uncertainty. Originally,
-    this query strategy was only proposed for classification. Nevertheless, it
-    is task-agnostic such that it can handle class labels, numerical targets,
-    and multilabel targets represented by a two-dimensional `y`.
+    seeded by the labeled set, to minimize the maximum distance of candidates
+    to the labeled/selected samples. It is a pure diversity criterion without
+    explicit consideration of prediction uncertainty. Originally, this query
+    strategy was only proposed for classification. Nevertheless, it is
+    task-agnostic such that it can handle class labels, numerical targets, and
+    multilabel targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -43,8 +44,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target structure. Automatic resolution accepts only
-        unambiguous one-dimensional targets; two-dimensional multi-label
-        targets must be declared explicitly.
+        single-output targets. Multi-label targets must be declared
+        explicitly.
 
     References
     ----------
@@ -73,8 +74,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.metric = metric
         self.metric_dict = metric_dict
 
@@ -104,7 +105,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
-              samples in `(X,y)`.
+              samples in `(X,y)`. Labeled candidates remain eligible and also
+              serve as initial centers.
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
@@ -130,9 +132,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Samples outside the candidate set and samples already selected in
-            the batch have utilities set to np.nan. Explicit candidate indices
-            may include labeled samples.
+            Utilities for samples outside the candidate set and samples
+            already selected in the batch are set to `np.nan`.
 
             - If `candidates` is `None` or of shape
               `(n_candidates,)`, the indexing refers to the samples in
@@ -222,8 +223,8 @@ def k_greedy_center(
     metric_dict=None,
     target_type="single-output",
 ):
-    """An active learning method that greedily forms a batch to minimize the
-    maximum distance to a cluster center among all unlabeled datapoints.
+    """Greedily select candidates to minimize their maximum distance to a
+    cluster center.
 
     Parameters
     ----------
@@ -243,7 +244,8 @@ def k_greedy_center(
         Value to represent a missing label.
     mapping : None or np.ndarray of shape (n_candidates,), default=None
         Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
-        Labeled samples in `mapping` remain eligible candidates.
+        If `None`, the unlabeled samples are candidates. Labeled samples in
+        `mapping` remain eligible and also serve as initial centers.
     n_new_cand : int or None, default=None
         The number of new candidates that are additionally added to `X`.
         Only used for the case, that in the query function with the shape of
@@ -274,8 +276,8 @@ def k_greedy_center(
         The utilities of samples after each selected sample of the batch,
         e.g., `utilities[0]` indicates the utilities used for selecting
         the first sample (with index `query_indices[0]`) of the batch.
-        Utilities outside `mapping` and for samples already selected in the
-        batch will be set to np.nan.
+        Utilities for samples outside the candidate set and samples already
+        selected in the batch are set to `np.nan`.
 
         - If `candidates` is `None` or of shape
           `(n_candidates,)`, the indexing refers to the samples in
@@ -308,7 +310,9 @@ def k_greedy_center(
             target_type=target_type,
         )
     else:
-        mapping = column_or_1d(mapping, dtype=int, warn=True)
+        mapping = check_indices(
+            column_or_1d(mapping, warn=True), X, dim=0, unique=False
+        )
 
     if not isinstance(batch_size, int):
         raise TypeError("`batch_size` must be an `integer`.")
@@ -343,8 +347,7 @@ def k_greedy_center(
             )
         else:
             # With no initial centers, the first row contains initialization
-            # zeros rather than distances. Compute real distances once a
-            # first center has been selected; keep genuine zero distances.
+            # zeros rather than distances. Later rows contain real distances.
             latest_dist = (
                 None
                 if i == 1 and len(selected_samples) == 0

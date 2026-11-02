@@ -19,12 +19,17 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError, _ExhaustedCandidatePool
+from .utils._label_dtype import (
+    _as_class_vocabulary_array,
+    _as_label_array,
+    _common_label_dtype,
+)
 from .utils._target import (
     _check_target_capability,
-    _has_no_class_evidence,
     _resolve_task_agnostic_target_type,
     _check_target_spec_capability,
 )
+from .utils._validation import _ensure_random_state
 from .utils import (
     MISSING_LABEL,
     is_labeled,
@@ -42,7 +47,6 @@ from .utils import (
     check_indices,
     check_n_features,
     check_type,
-    compute_vote_vectors,
 )
 
 __all__ = [
@@ -63,7 +67,7 @@ try:
     from collections.abc import Sequence
     from skorch import NeuralNet
     from skorch.utils import to_numpy
-    from .utils import _check_forward_outputs
+    from .utils._validation import _check_forward_outputs
 
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover
@@ -72,11 +76,7 @@ except ImportError:  # pragma: no cover
 
 _TARGET_SPEC_NOT_PROVIDED = object()
 
-# Canonical names of `query` parameters carrying an estimator whose target
-# semantics describe the queried targets `y`. Estimators passed under any other
-# name (e.g. the labeled-vs-unlabeled `discriminator` of `DiscriminativeAL`)
-# solve an auxiliary problem and are therefore no semantic authority for `y`.
-_TARGET_AUTHORITY_QUERY_PARAMS = ("clf", "reg", "ensemble", "estimator")
+_DEFAULT_BUDGET = 0.1
 
 
 def _maps_to_samples(candidates):
@@ -101,10 +101,7 @@ def _answer_exhausted_candidate_pool(
 ):
     """Warn about an exhausted candidate pool and answer it as an empty batch.
 
-    The result is shaped like an ordinary acquisition with a batch size of
-    zero, so that a budget loop running one cycle past exhaustion can consume
-    it without a special case. The warning names the exhaustion, so that the
-    empty batch is never mistaken for a defect.
+    The result is shaped like an acquisition with a batch size of zero.
 
     Parameters
     ----------
@@ -146,41 +143,6 @@ def _guard_exhausted_candidate_pool(query):
     return guarded_query
 
 
-def _guard_own_query(cls):
-    """Guard the `query` a pool query strategy defines itself.
-
-    A `query` published through a descriptor, i.e. the one `match_signature`
-    creates, is guarded through the function that descriptor binds, so that
-    the descriptor keeps owning how `query` is exposed. Any other publication
-    is rejected at class definition time rather than silently left unguarded.
-
-    Parameters
-    ----------
-    cls : type
-        The pool query strategy whose own `query` is to be guarded.
-
-    Raises
-    ------
-    TypeError
-        If `cls` publishes `query` in a way this guard does not cover.
-    """
-    query = cls.__dict__.get("query")
-    if query is None:
-        return
-    if inspect.isfunction(query):
-        cls.query = _guard_exhausted_candidate_pool(query)
-        return
-    published_query = getattr(query, "fn", None)
-    if inspect.isfunction(published_query):
-        query.fn = _guard_exhausted_candidate_pool(published_query)
-        return
-    raise TypeError(
-        f"'{cls.__name__}' publishes `query` as {type(query).__name__}, which "
-        "the exhausted candidate pool guard does not cover. Extend "
-        "`_guard_own_query` for that publication."
-    )
-
-
 def _reuse_established_target_spec(resolved_spec, established_spec=None):
     if established_spec is None:
         return resolved_spec
@@ -191,6 +153,17 @@ def _reuse_established_target_spec(resolved_spec, established_spec=None):
             f"{resolved_spec!r}."
         )
     return established_spec
+
+
+def _check_budget(budget):
+    """Return `budget`, or `_DEFAULT_BUDGET` if it is `None`, after checking
+    that it is a float in `(0, 1]`.
+    """
+    budget = _DEFAULT_BUDGET if budget is None else budget
+    check_scalar(
+        budget, "budget", float, min_val=0.0, max_val=1.0, min_inclusive=False
+    )
+    return budget
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -226,10 +199,32 @@ class PoolQueryStrategy(QueryStrategy):
     """
 
     def __init_subclass__(cls, **kwargs):
-        # Every `query` is guarded, so that the shared validation can answer an
-        # exhausted candidate pool for all pool strategies at once.
+        """Guard the `query` a pool query strategy defines itself.
+
+        A `query` published through a descriptor, e.g., by `match_signature`,
+        is guarded through the function the descriptor binds.
+
+        Raises
+        ------
+        TypeError
+            If `cls` publishes `query` in a way this guard does not cover.
+        """
         super().__init_subclass__(**kwargs)
-        _guard_own_query(cls)
+        query = cls.__dict__.get("query")
+        if query is None:
+            return
+        if inspect.isfunction(query):
+            cls.query = _guard_exhausted_candidate_pool(query)
+            return
+        published_query = getattr(query, "fn", None)
+        if inspect.isfunction(published_query):
+            query.fn = _guard_exhausted_candidate_pool(published_query)
+            return
+        raise TypeError(
+            f"'{cls.__name__}' publishes `query` as {type(query).__name__}, "
+            "which the exhausted candidate pool guard does not cover. Extend "
+            "`PoolQueryStrategy.__init_subclass__` for that publication."
+        )
 
     def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
@@ -293,22 +288,21 @@ class PoolQueryStrategy(QueryStrategy):
         return_utilities : bool
             Checked boolean value of `return_utilities`.
         """
-        # Check samples.
         if check_X_dict is None:
             check_X_dict = {"allow_nd": True}
         X = check_array(X, **check_X_dict)
 
-        # Check number of features.
         check_n_features(self, X, reset=reset)
 
-        # Check labels
         y = check_array(
-            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
+            _as_label_array(y),
+            ensure_2d=False,
+            ensure_all_finite="allow-nan",
+            dtype=None,
         )
         check_consistent_length(X, y)
 
-        # Check missing_label
-        check_missing_label(self.missing_label, target_type=y.dtype)
+        check_missing_label(self.missing_label, target_type=y.dtype, name="y")
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
@@ -331,23 +325,18 @@ class PoolQueryStrategy(QueryStrategy):
             else:
                 check_candidates_dict = deepcopy(check_X_dict)
                 check_candidates_dict["ensure_2d"] = False
-                # An empty candidate matrix is an exhausted candidate pool,
-                # i.e., a valid acquisition state the guarded `query` answers
-                # with an empty batch. Anything without a sample axis at all
-                # stays a rejected input.
+                # The guarded `query` answers an empty candidate matrix with
+                # an empty batch. A scalar is still rejected.
                 check_candidates_dict["ensure_min_samples"] = (
                     0 if np.ndim(candidates) > 0 else 1
                 )
                 candidates = check_array(candidates, **check_candidates_dict)
                 check_n_features(self, candidates, reset=False)
 
-        # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check batch size.
         check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
 
-        # Check random state.
         self.random_state_ = check_random_state(self.random_state, seed_mult)
 
         return X, y, candidates, batch_size, return_utilities
@@ -364,23 +353,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
-        Declared target type. Subclasses reject resolved specifications
-        outside their exact capabilities.
     """
-
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label,
-            random_state=random_state,
-        )
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -389,25 +362,25 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             {("classification", "single-output", "single-annotator")}
         )
 
-    @property
-    def _target_authority_params(self):
-        """Names of `query` parameters carrying a target authority.
+    def _resolve_query_target_type(self, y):
+        """Resolve the target type of `y` from the strategy's declarations.
 
-        This is the narrow interface through which a strategy declares which
-        of its `query` arguments hold an estimator whose target semantics are
-        authoritative for `y`. Wrappers use it instead of inspecting arbitrary
-        query arguments. Strategies naming such an estimator differently, or
-        accepting estimators that describe an auxiliary problem rather than
-        `y`, override this property.
+        The result is checked against `_target_capabilities`. Strategies that
+        do not resolve `y` through an estimator use it, and `_validate_data`
+        calls it if no `target_type` is passed.
+
+        Parameters
+        ----------
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
 
         Returns
         -------
-        authority_params : tuple of str
-            The declared parameter names in deterministic resolution order.
+        target_type : str
+            The resolved target type.
         """
-        return _TARGET_AUTHORITY_QUERY_PARAMS
-
-    def _resolve_query_target_type(self, y):
+        declared_target_type = getattr(self, "target_type", "auto")
         tasks = {capability[0] for capability in self._target_capabilities}
         if len(tasks) == 1:
             task = next(iter(tasks))
@@ -416,7 +389,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 if classes is None:
                     target_type = _resolve_task_agnostic_target_type(
                         y,
-                        target_type=self.target_type,
+                        target_type=declared_target_type,
                         missing_label=self.missing_label,
                     )
                     _check_target_capability(
@@ -429,7 +402,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                     target_spec = resolve_target_spec(
                         y,
                         task=task,
-                        target_type=self.target_type,
+                        target_type=declared_target_type,
                         annotation_type="single-annotator",
                         classes=classes,
                         missing_label=self.missing_label,
@@ -438,7 +411,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 target_spec = resolve_target_spec(
                     y,
                     task=task,
-                    target_type=self.target_type,
+                    target_type=declared_target_type,
                     annotation_type="single-annotator",
                     classes=None,
                     missing_label=self.missing_label,
@@ -449,7 +422,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             return target_spec.target_type
         target_type = _resolve_task_agnostic_target_type(
             y,
-            target_type=self.target_type,
+            target_type=declared_target_type,
             missing_label=self.missing_label,
         )
         applicable_tasks = (
@@ -530,8 +503,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         An exhausted candidate pool, i.e., a fully labeled `(X, y)` queried
         with `candidates=None` or an empty `candidates`, is a valid
         acquisition state. It is answered with an empty batch of `batch_size`
-        zero and a warning naming the exhaustion, so that a budget loop
-        running one cycle past exhaustion needs no special case.
+        zero and a warning.
         """
         raise NotImplementedError
 
@@ -729,23 +701,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator. If None, the RandomState
         singleton used by `np.random` is used.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
-        Declared target type. Multi-annotator strategies support only
-        single-output classification in version 1.1.
     """
-
-    def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        target_type="auto",
-    ):
-        super().__init__(
-            missing_label=missing_label,
-            random_state=random_state,
-        )
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -759,20 +715,20 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             target_spec = resolve_target_spec(
                 y,
                 task="classification",
-                target_type=self.target_type,
                 annotation_type="multi-annotator",
                 classes=classes,
                 missing_label=self.missing_label,
             )
         except ValueError:
-            # A class-agnostic strategy can still acquire the first
-            # sample-annotator pair before a class vocabulary is observable.
-            # The matrix structure remains unambiguously multi-annotator.
-            lacks_class_evidence = classes is None and _has_no_class_evidence(
-                y,
-                self.target_type,
-                "multi-annotator",
-                self.missing_label,
+            # A class-agnostic strategy can acquire the first sample-annotator
+            # pair before a class vocabulary is observable.
+            y_array = _as_label_array(y)
+            lacks_class_evidence = (
+                classes is None
+                and y_array.ndim == 2
+                and is_unlabeled(
+                    y_array, missing_label=self.missing_label
+                ).all()
             )
             if lacks_class_evidence:
                 return None
@@ -805,8 +761,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
+            that `y[i, j]` contains the label annotated by annotator `j` for
+            sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             See parameter `annotators`.
@@ -840,7 +796,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               considered as candidate annotator-sample pairs.
         batch_size : int or str, default=1
             The number of annotators-sample pairs to be selected in one AL
-            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+            cycle. Some strategies, e.g., `IntervalEstimationThreshold`, also
+            accept `batch_size='adaptive'`.
         return_utilities : bool, default=False
             If True, also return the utilities based on the query strategy.
 
@@ -874,9 +831,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         -----
         An exhausted candidate pool, i.e., no candidate annotator-sample pair
         left to be queried, is a valid acquisition state. It is answered with
-        an empty batch of `batch_size` zero and a warning naming the
-        exhaustion, so that a budget loop running one cycle past exhaustion
-        needs no special case.
+        an empty batch of `batch_size` zero and a warning.
         """
         raise NotImplementedError
 
@@ -905,7 +860,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by `self.missing_label`),
             meaning that `y[i, j]` contains the label annotated by annotator
-            `i` for sample `j`.
+            `j` for sample `i`.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features),
             See annotators.
@@ -936,9 +891,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               n_annotators)` the annotator-sample-pairs, for which the sample
               is a candidate sample and the boolean matrix has entry `True` are
               considered as candidate annotator-sample pairs.
-        batch_size : int or string,
+        batch_size : int
             The number of annotators sample pairs to be selected in one AL
-            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+            cycle.
         return_utilities : bool
             If true, also return the utilities based on the query strategy.
         reset : bool, default=True
@@ -982,14 +937,14 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        check_array(y, ensure_2d=True, ensure_all_finite="allow-nan")
+        check_array(
+            y, dtype=None, ensure_2d=True, ensure_all_finite="allow-nan"
+        )
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
-            # An empty set of available annotators exhausts the candidate
-            # pairs, i.e., a valid acquisition state the guarded `query`
-            # answers with an empty batch. Anything without a sample axis at
-            # all stays a rejected input.
+            # The guarded `query` answers an empty set of available
+            # annotators with an empty batch. A scalar is still rejected.
             annotators = check_array(
                 annotators,
                 ensure_2d=False,
@@ -1164,7 +1119,7 @@ class BudgetManager(ABC, BaseEstimator):
     ----------
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
-        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        `0 < budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     """
 
@@ -1176,18 +1131,24 @@ class BudgetManager(ABC, BaseEstimator):
         """Ask the budget manager which `utilities` are sufficient to query the
         corresponding labels.
 
+        The first call may initialize the manager. Once initialized, querying
+        must leave its acquisition state unchanged, including counters,
+        thresholds, histories, and random state. Repeated calls with the same
+        utilities and parameters must return the same indices until `update`
+        advances that state.
+
         Parameters
         ----------
-        utilities : array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_samples`.
         """
         raise NotImplementedError
 
@@ -1195,15 +1156,18 @@ class BudgetManager(ABC, BaseEstimator):
     def update(self, candidates, queried_indices, *args, **kwargs):
         """Updates the budget manager.
 
+        If called before `query_by_utility`, this method must also initialize
+        all state required for subsequent queries.
+
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
 
         Returns
         -------
@@ -1213,42 +1177,29 @@ class BudgetManager(ABC, BaseEstimator):
         raise NotImplementedError
 
     def _validate_budget(self):
-        """check the assigned `budget` and set the default value 0.1 if
-        `budget` is set to `None`.
+        """Validate `budget` and store it as `budget_`, which is
+        `_DEFAULT_BUDGET` if `budget` is `None`.
         """
-        if self.budget is not None:
-            self.budget_ = self.budget
-        else:
-            self.budget_ = 0.1
-        check_scalar(
-            self.budget_,
-            "budget",
-            float,
-            min_val=0.0,
-            max_val=1.0,
-            min_inclusive=False,
-        )
+        self.budget_ = _check_budget(self.budget)
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.
 
         Parameters
         ----------
-        utilities: array-like of shape (n_samples,)
+        utilities : np.ndarray of shape (n_samples,)
             The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
-        utilities: ndarray of shape (n_samples,)
+        utilities : ndarray of shape (n_samples,)
             Checked `utilities`.
         """
-        # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
             raise TypeError(
                 "{} is not a valid type for utilities".format(type(utilities))
             )
-        # Check budget
         self._validate_budget()
         return utilities
 
@@ -1256,11 +1207,18 @@ class BudgetManager(ABC, BaseEstimator):
 class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies.
 
+    Stream query strategies have no `target_type` parameter, because they do
+    not resolve the labels `y` themselves. A strategy consuming a classifier
+    treats it as the target authority and supports single-output
+    classification only. Label-free strategies are task-agnostic and declare
+    the same capabilities as their pool-based counterparts.
+
     Parameters
     ----------
-    budget : float
+    budget : float or None
         Specifies the ratio of labels which are allowed to be queried, with
-        `0 <= budget <= 1`.
+        `0 < budget <= 1`. If `budget` is `None`, the default
+        budget 0.1 is used.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -1268,6 +1226,13 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     def __init__(self, budget, random_state=None):
         super().__init__(random_state=random_state)
         self.budget = budget
+
+    @property
+    def _target_capabilities(self):
+        """Exact target semantics supported by a stream query strategy."""
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
 
     @abstractmethod
     def query(self, candidates, *args, return_utilities=False, **kwargs):
@@ -1290,10 +1255,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : list of int or ndarray of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
-        utilities: np.ndarray of shape (n_candidates,),
+            with `0 <= queried_indices < n_candidates`.
+        utilities : np.ndarray of shape (n_candidates,)
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -1318,11 +1283,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
                 (n_candidates, n_features)
             The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : np.ndarray of shape (n_queried_indices,)
+        queried_indices : array-like of shape (n_queried_indices,)
             The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            with `0 <= queried_indices < n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for budget_manager.
+            Optional kwargs for `budget_manager`. If supplied, `utilities`
+            must be a one-dimensional array with one value per candidate.
+            Some budget managers, e.g., `BalancedIncrementalQuantileFilter`,
+            require `utilities`. Strategies without a budget manager ignore it.
 
         Returns
         -------
@@ -1332,30 +1300,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     def _validate_random_state(self):
-        """Creates a copy 'random_state_' if random_state is an instance of
-        np.random_state. If not create a new random state. See also
-        :func:`~sklearn.utils.check_random_state`
-        """
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = deepcopy(self.random_state)
-        self.random_state_ = check_random_state(self.random_state_)
+        """Copy `random_state` to `random_state_` once, then validate it."""
+        _ensure_random_state(self)
 
     def _validate_budget(self):
-        """Creates a copy "budget_" if budget is a float between 0 and 1. If it
-        is `None`, `budget_` is set to 0.1.
+        """Validate `budget` and store it as `budget_`, which is
+        `_DEFAULT_BUDGET` if `budget` is `None`.
         """
-        if self.budget is not None:
-            self.budget_ = self.budget
-        else:
-            self.budget_ = 0.1
-        check_scalar(
-            self.budget_,
-            "budget",
-            float,
-            min_val=0.0,
-            max_val=1.0,
-            min_inclusive=False,
-        )
+        self.budget_ = _check_budget(self.budget)
 
     def _validate_data(
         self,
@@ -1388,19 +1340,14 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # Check candidate samples.
         candidates = check_array(candidates, **check_candidates_params)
 
-        # Check number of features.
         check_n_features(self, candidates, reset=reset)
 
-        # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check random state.
         self._validate_random_state()
 
-        # Check budgetmanager.
         self._validate_budget()
 
         return candidates, return_utilities
@@ -1420,8 +1367,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         - A flat vocabulary describes single-output classification and is
           applied to every annotator entry for multi-annotator components.
         - Nested binary vocabularies describe multi-label classification, one
-          class vocabulary per label output. Nested non-binary vocabularies
-          describe recognized multi-output classification semantics.
+          class vocabulary per label output.
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -1432,10 +1378,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
-        Declared target type. Components reject resolved target specifications
-        outside their exact capabilities.
 
     Attributes
     ----------
@@ -1450,13 +1392,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
-        target_type="auto",
     ):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
         self.random_state = random_state
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -1464,6 +1404,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         return frozenset(
             {("classification", "single-output", "single-annotator")}
         )
+
+    @property
+    def _declared_classes(self):
+        """Class vocabulary declared before fitting."""
+        return self.classes
 
     def _resolve_target_spec(self, y, classes=None):
         annotation_type = getattr(self, "_annotation_type", "single-annotator")
@@ -1508,7 +1453,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         """Initialize resolved class metadata without fitting model state."""
         effective_classes = self.classes if classes is None else classes
         annotation_type = getattr(self, "_annotation_type", "single-annotator")
-        resolution_y = np.asarray(y)
+        resolution_y = _as_label_array(y)
         if annotation_type == "multi-annotator" and resolution_y.ndim == 1:
             resolution_y = resolution_y.reshape(-1, 1)
         target_spec = self._resolve_target_spec(
@@ -1539,12 +1484,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     def _class_label_dtype(self):
         """Return the dtype the declared class labels are described by.
 
-        For a single-output target, `classes_` is one array and its dtype
-        describes every label. For a multi-label target, `classes_` is one
-        array per output, so the labels of one sample are described by the
-        dtype their vocabularies have in common. Resolution rejects outputs
-        of differing dtype kinds, so this common dtype only ever widens
-        between vocabularies of one kind, e.g. `<U3` and `<U6` to `<U6`.
+        For a multi-label target, this is the common dtype of the per-output
+        vocabularies, e.g., `<U6` for `<U3` and `<U6`.
 
         Returns
         -------
@@ -1552,19 +1493,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             The dtype of the declared class labels.
         """
         if self.target_spec_.target_type == "multi-label":
-            return np.result_type(*[c.dtype for c in self.classes_])
-        return self.classes_.dtype
+            return _common_label_dtype(self.classes_)
+        return _common_label_dtype([self.classes_])
 
     def _decode_class_labels(self, y_enc):
         """Decode encoded class labels into the declared class dtype.
-
-        The label encoder decodes into a dtype that can also represent
-        `missing_label`, e.g., `float64` for integer classes and
-        `missing_label=np.nan`. Encoded predictions never carry
-        `missing_label`, so their decoded labels are narrowed back to the
-        dtype of the declared classes. Without this narrowing, predictions
-        are no longer the labels that were declared and cannot be used
-        where those labels are expected, e.g., as indices.
 
         Parameters
         ----------
@@ -1578,9 +1511,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 (n_samples, n_outputs)
             The decoded class labels in the declared class dtype.
         """
-        return self._le.inverse_transform(y_enc).astype(
-            self._class_label_dtype(), copy=False
-        )
+        return self._le._inverse_transform(y_enc, allow_missing=False)
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -1593,7 +1524,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
                 (n_samples, n_annotators)
             Labels of the training data set (possibly including unlabeled
-            ones indicated by `missing_label`). For multioutput
+            ones indicated by `missing_label`). For multi-label
             problems, a row `y[i]` must either contain only observed
             labels or only `missing_label` values, i.e., no mixing
             within a row. For multi-annotator classification, a row can contain
@@ -1623,9 +1554,12 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Returns
         -------
-        P : numpy.ndarray of shape (n_samples, classes)
-            The class probabilities of the test samples. Classes are ordered
-            according to `self.classes_`.
+        P : numpy.ndarray of shape (n_samples, n_classes) or \
+                (n_samples, n_outputs)
+            The class probabilities of the test samples. For single-output
+            classification, classes are ordered according to `self.classes_`.
+            For multi-label classification, `P` holds the positive-class
+            probability of each output.
         """
         raise NotImplementedError
 
@@ -1639,7 +1573,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Returns
         -------
-        y : numpy.ndarray of shape (n_samples,)
+        y : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
             Predicted class labels of the test samples `X`.
         """
         # Extract primary output.
@@ -1668,7 +1602,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         ----------
         X : array-like of shape (n_samples, ...)
             Test samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             True class labels of the test samples `X`.
         sample_weight : array-like of shape (n_samples,), default=None
             Sample weights of the test sample `X`.
@@ -1676,7 +1610,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         Returns
         -------
         score : float
-            Mean accuracy of `self.predict(X)` regarding `y`.
+            Mean accuracy of `self.predict(X)` regarding `y`. For multi-label
+            classification, this is the subset accuracy, i.e., a sample counts
+            as correct only if all of its labels are predicted correctly.
         """
         y_pred = self.predict(X)
         y_pred = self._le.transform(y_pred)
@@ -1717,7 +1653,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        # Create label encoder.
         self._le = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label,
@@ -1725,7 +1660,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         )
 
         # Check input parameters.
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         structured_target = (
             target_spec.target_type == "multi-label"
             or target_spec.annotation_type == "multi-annotator"
@@ -1736,19 +1671,16 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")
         else:
-            # Resolving the target specification has already rejected a `y`
-            # without observed class labels and without declared `classes`,
-            # so the encoder always has a vocabulary to fit here.
+            # Target resolution has already rejected a `y` without observed
+            # class labels and without declared `classes`.
             self._le.fit(y)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
         check_n_features(self, X, reset=reset)
 
-        # Update detected classes.
         self.classes_ = self._le.classes_
 
-        # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
             if sample_weight.ndim == 1:
@@ -1771,7 +1703,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                     "two-dimensional targets, the same shape as `y`."
                 )
 
-        # Update cost matrix.
         if target_spec.target_type == "multi-label":
             self.cost_matrix_ = None
         else:
@@ -1784,7 +1715,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 self.cost_matrix_, len(self.classes_)
             )
             if self.classes is not None:
-                class_indices = np.argsort(self.classes)
+                class_indices = np.argsort(
+                    _as_class_vocabulary_array(self.classes)
+                )
                 self.cost_matrix_ = self.cost_matrix_[class_indices]
                 self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 
@@ -1798,6 +1731,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     Extends `scikit-activeml` classifiers to estimators that are able to
     estimate class frequencies for given samples (by calling `predict_freq`).
+    Sample weights represent non-negative amounts of class evidence.
 
     Parameters
     ----------
@@ -1824,8 +1758,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     random_state : int or np.RandomState or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-label" or \
-            "multi-output", default="auto"
+    target_type : "auto" or "single-output" or "multi-label", default="auto"
         Declared target type. Concrete estimators reject resolved
         specifications outside their exact capabilities.
 
@@ -1851,8 +1784,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-            target_type=target_type,
         )
+        self.target_type = target_type
         self.class_prior = class_prior
 
     @abstractmethod
@@ -1861,18 +1794,58 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Parameters
         ----------
-        X: array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             Test samples whose class frequencies are to be estimated.
 
         Returns
         -------
-        F: array-like of shape (n_samples, n_classes) or \
+        F : array-like of shape (n_samples, n_classes) or \
                 (n_samples, n_outputs, 2)
             The class frequency estimates of the test samples `X`. For
             multi-label targets, the final axis follows each output's
-            canonical binary class vocabulary.
+            canonical binary class vocabulary. Implementations must return
+            non-negative frequencies, because `predict_proba` and
+            `sample_proba` reject negative ones.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _check_frequencies(F, name="predict_freq"):
+        """Reject class frequency estimates that are not counts.
+
+        Parameters
+        ----------
+        F : numpy.ndarray
+            Class frequency estimates to validate.
+        name : str, default="predict_freq"
+            Name of the quantity reported in the error message.
+
+        Returns
+        -------
+        F : numpy.ndarray
+            The validated estimates, unchanged.
+
+        Raises
+        ------
+        ValueError
+            If any estimate is negative or not finite.
+        """
+        if not np.all(np.isfinite(F)):
+            raise ValueError(
+                f"`{name}` returned a non-finite class frequency. Check the "
+                "inputs and parameters this estimator derives its "
+                "frequencies from, which must be finite."
+            )
+        if np.any(np.asarray(F) < 0):
+            raise ValueError(
+                f"`{name}` returned a negative class frequency, the smallest "
+                f"being {np.min(F)}. A frequency counts weighted evidence "
+                "for a class and can therefore never be negative. Check the "
+                "inputs and parameters this estimator derives its "
+                "frequencies from, whose documentation states which of them "
+                "must be non-negative."
+            )
+        return F
 
     def predict_proba(self, X, **kwargs):
         """Return probability estimates for the test data `X`.
@@ -1890,9 +1863,15 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             targets, each entry is the probability of the second class in the
             corresponding canonical binary class vocabulary. An output with
             zero estimated frequencies and zero prior has probability `0.5`.
+
+        Raises
+        ------
+        ValueError
+            If `predict_freq` returns a negative class frequency.
         """
         out = self.predict_freq(X, **kwargs)
         F = out[0] if isinstance(out, tuple) else out
+        self._check_frequencies(F)
         P = F + self.class_prior_
         target_type = getattr(
             getattr(self, "target_spec_", None),
@@ -1901,9 +1880,11 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         if target_type == "multi-label":
             normalizer = np.sum(P, axis=-1)
-            nonzero = normalizer > 0
-            P[nonzero] /= normalizer[nonzero, np.newaxis]
-            P[~nonzero] = 0.5
+            positive = normalizer > 0
+            P[positive] /= normalizer[positive, np.newaxis]
+            # Negative frequencies and priors are rejected, so a zero
+            # normalizer means an output without any evidence.
+            P[normalizer == 0] = 0.5
             return P[..., 1]
 
         normalizer = np.sum(P, axis=1)
@@ -1938,12 +1919,13 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Raises
         ------
         ValueError
-            If any class has zero frequency observations after adding the
-            prior. Set a positive `class_prior` to make every Dirichlet
-            parameter positive.
+            If `predict_freq` returns a negative class frequency, or if any
+            class has no frequency observations after adding the prior. Set a
+            positive `class_prior` to make every Dirichlet parameter positive.
         """
         random_state = check_random_state(random_state)
-        alphas = self.predict_freq(X) + self.class_prior_
+        alphas = self._check_frequencies(self.predict_freq(X))
+        alphas = alphas + self.class_prior_
         target_type = getattr(
             getattr(self, "target_spec_", None),
             "target_type",
@@ -1951,36 +1933,64 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
         if target_type == "multi-label":
             alphas = np.repeat(alphas[np.newaxis], n_samples, axis=0)
-            if (alphas == 0).any():
+            if (alphas <= 0).any():
                 raise ValueError(
-                    "There are zero frequency observations. "
+                    "There are no frequency observations. "
                     "Set `class_prior > 0` to avoid this error."
                 )
             R = random_state.standard_gamma(alphas)
             R_flat = R.reshape(-1, R.shape[-1])
             is_zero = R_flat.sum(axis=-1) == 0.0
-            sampled_class_indices = random_state.choice(
-                np.array(R.shape[-1]), size=is_zero.sum()
+            alphas_flat = alphas.reshape(-1, alphas.shape[-1])
+            sampled_class_indices = self._sample_dirichlet_vertices(
+                alphas_flat[is_zero], random_state
             )
             R_flat[np.flatnonzero(is_zero), sampled_class_indices] = 1.0
             return R / R.sum(axis=-1, keepdims=True)
 
         alphas = alphas.repeat(repeats=n_samples, axis=0)
-        if (alphas == 0).any():
+        if (alphas <= 0).any():
             raise ValueError(
-                "There are zero frequency observations. "
+                "There are no frequency observations. "
                 "Set `class_prior > 0` to avoid this error."
             )
         R = random_state.standard_gamma(alphas)
         R_sums = R.sum(axis=-1)
         is_zero = (R_sums == 0.0).ravel()
-        sampled_class_indices = random_state.choice(
-            np.array(R.shape[-1]), size=is_zero.sum()
+        sampled_class_indices = self._sample_dirichlet_vertices(
+            alphas[is_zero], random_state
         )
         R[is_zero, sampled_class_indices] = 1.0
         P = R / R.sum(axis=-1, keepdims=True)
-        P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
-        return P
+        return P.reshape(n_samples, len(X), P.shape[-1], order="F")
+
+    @staticmethod
+    def _sample_dirichlet_vertices(alphas, random_state):
+        """Draw one simplex vertex per row with probability given by `alphas`.
+
+        Parameters
+        ----------
+        alphas : numpy.ndarray of shape (n_rows, n_classes)
+            Strictly positive concentration parameters, one row per
+            degenerate Dirichlet sample.
+        random_state : numpy.random.RandomState
+            Random state used to draw one vertex per row.
+
+        Returns
+        -------
+        indices : numpy.ndarray of shape (n_rows,)
+            Index of the vertex drawn for each row.
+        """
+        if len(alphas) == 0:
+            return np.zeros(0, dtype=int)
+        # Scaling the uniform draws by the row total avoids dividing
+        # concentrations that small by each other.
+        cumulative = np.cumsum(alphas, axis=-1)
+        thresholds = (
+            random_state.random_sample(size=(len(alphas), 1))
+            * cumulative[:, -1:]
+        )
+        return np.argmax(cumulative > thresholds, axis=-1)
 
     def _validate_data(
         self,
@@ -2002,7 +2012,11 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             target_spec=target_spec,
         )
 
-        # Check class prior.
+        if sample_weight is not None and np.any(
+            np.asarray(sample_weight, dtype=float) < 0
+        ):
+            raise ValueError("`sample_weight` must be non-negative.")
+
         if self.target_spec_.target_type == "multi-label":
             n_outputs = len(self.classes_)
             if np.isscalar(self.class_prior):
@@ -2011,6 +2025,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
                     name="class_prior",
                     target_type=(int, float),
                     min_val=0,
+                    max_val=np.inf,
+                    max_inclusive=False,
                 )
                 self.class_prior_ = np.full((n_outputs, 2), self.class_prior)
             else:
@@ -2033,19 +2049,20 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     def _compute_class_frequency_vectors(self, y, sample_weight):
         """Convert encoded targets to per-sample class-frequency vectors."""
-        if self.target_spec_.target_type == "single-output":
-            return compute_vote_vectors(
-                y=y,
-                w=sample_weight,
-                classes=np.arange(len(self.classes_)),
-                missing_label=-1,
-            )
-
         weights = (
             np.ones_like(y, dtype=float)
             if sample_weight is None
             else np.asarray(sample_weight, dtype=float).copy()
         )
+        if self.target_spec_.target_type == "single-output":
+            is_lbld = y != -1
+            weights = weights[is_lbld]
+            V = np.zeros((len(y), len(self.classes_)))
+            V[np.flatnonzero(is_lbld), y[is_lbld].astype(int)] += np.where(
+                np.isnan(weights), 0, weights
+            )
+            return V
+
         if weights.ndim == 1:
             weights = np.repeat(weights[:, np.newaxis], y.shape[1], axis=1)
         is_missing = y == -1
@@ -2066,9 +2083,6 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     random_state : int, RandomState or None, default=None
         Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
-    target_type : "auto" or "single-output" or "multi-output", default="auto"
-        Declared target type. Multi-output regression is recognized but not
-        supported for execution in version 1.1.
 
     Attributes
     ----------
@@ -2081,11 +2095,9 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         self,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         self.missing_label = missing_label
         self.random_state = random_state
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -2096,7 +2108,6 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         target_spec = resolve_target_spec(
             y,
             task="regression",
-            target_type=self.target_type,
             annotation_type="single-annotator",
             classes=None,
             missing_label=self.missing_label,
@@ -2118,10 +2129,9 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         ----------
         X : matrix-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_targets)
-            It contains the labels of the training samples.
-            The number of numerical labels may be variable for the samples,
-            where missing labels are represented as `missing_label_`.
+        y : array-like of shape (n_samples,) or (n_samples, 1)
+            It contains the labels of the training samples, where missing
+            labels are represented as `missing_label_`.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -2141,6 +2151,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         ----------
         X :  array-like of shape (n_samples, n_features)
             Input samples.
+
         Returns
         -------
         y : numpy.ndarray of shape (n_samples,)
@@ -2180,7 +2191,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        y = check_array(y, **check_y_dict)
+        y = check_array(_as_label_array(y), **check_y_dict)
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
         else:
@@ -2271,7 +2282,7 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         ----------
         X :  array-like of shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
-        n_samples: int, default=1
+        n_samples : int, default=1
             Number of random samples to be drawn.
         random_state : int or RandomState instance or None, default=None
             Determines random number generation to randomly draw samples. Pass
@@ -2322,12 +2333,9 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            self : SkorchMixin
-                Returned when no input data was supplied
-                (both `X` and `y` are `None`).
-            X_out, y_out : tuple of nd.array, optional
-                Validated `X` and `y` as a tuple, returned when
-                `enforce_check_X_y=True`.
+            self : SkorchMixin or tuple
+                The initialized wrapper, or the tuple `(self, X, y)` with the
+                validated `X` and `y` if `enforce_check_X_y=True`.
             """
             has_data = (X is not None) or (y is not None)
             vd_kwargs = self._validate_data_kwargs()
@@ -2407,8 +2415,7 @@ if successful_skorch_torch_import:
             optionally requested extra outputs as NumPy arrays.
 
             The primary output is defined as the first entry of
-            `forward_outputs` (after applying its transform, if any), or the
-            sole output of `module.forward` if `forward_outputs` is `None`.
+            `forward_outputs` (after applying its transform, if any).
             Primary and extra outputs are always returned after applying their
             configured transforms.
 
@@ -2430,9 +2437,9 @@ if successful_skorch_torch_import:
                   raw tensor; otherwise the raw tensor is used.
             extra_outputs : None or str or sequence of str, default=None
                 Names of additional outputs to return next to the primary
-                output. Must be a subset of `forward_outputs.keys()` if
-                `forward_outputs` is not `None`. The first key in
-                `forward_outputs` (the primary output) is not allowed here.
+                output. Must be a subset of `forward_outputs.keys()`. The
+                first key in `forward_outputs` (the primary output) is not
+                allowed here.
                 Duplicate entries are not allowed.
 
             Returns
@@ -2444,7 +2451,6 @@ if successful_skorch_torch_import:
                 the requested extra outputs in the order specified by
                 `extra_outputs`.
             """
-            # Check forward_outputs configured.
             _check_forward_outputs(forward_outputs=forward_outputs)
 
             # Primary output = first configured output
@@ -2462,10 +2468,8 @@ if successful_skorch_torch_import:
                 primary_name=primary_name,
             )
 
-            # Run module forward once.
             fw_out = self.neural_net_.forward(X)
 
-            # Normalize to tuple of raw outputs.
             if isinstance(fw_out, tuple):
                 raw_outputs = fw_out
             else:
@@ -2489,10 +2493,8 @@ if successful_skorch_torch_import:
                     value = transform(value)
                 return to_numpy(value)
 
-            # Primary output (transform applied here).
             primary_np = _get_named(primary_name)
 
-            # No extra outputs.
             if not extra_names:
                 return primary_np
 
@@ -2542,7 +2544,6 @@ if successful_skorch_torch_import:
                     "All entries in `extra_outputs` must be strings."
                 )
 
-            # No duplicates
             if len(set(names)) != len(names):
                 raise ValueError(
                     "`extra_outputs` must not contain duplicate names."
@@ -2590,7 +2591,7 @@ if successful_skorch_torch_import:
             criterion : torch.nn.Module.__class__
                 The criterion (loss) used to optimize the module.
             params : dict
-                Keyword arguments (excluding `predict_non_linearity`) for
+                Keyword arguments (excluding `predict_nonlinearity`) for
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """

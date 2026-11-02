@@ -9,7 +9,6 @@ import copy
 import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import check_array, check_is_fitted
-from itertools import chain
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -24,6 +23,8 @@ from ..utils import (
     check_equal_missing_label,
     check_scalar,
 )
+from ..utils._label_dtype import _as_label_array, _common_label_dtype
+from ..utils._target import _check_refit_capability
 from ._target import _resolve_estimator_target_spec
 
 
@@ -46,9 +47,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     - Variation ratios (classification). One minus the fraction of votes for
       the modal class measures lack of consensus, and higher values are
       preferred.
-    - Empirical variance (regression). The variance of the committee's
-      real-valued predictions quantifies disagreement, and higher variance is
-      preferred.
+    - Empirical standard deviation (regression). The standard deviation of
+      the committee's real-valued predictions quantifies disagreement, and
+      higher values are preferred.
 
     Parameters
     ----------
@@ -57,7 +58,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         The method to calculate the disagreement in the case of classification.
         'KL_divergence', 'vote_entropy', and 'variation_ratios' are possible.
         In the case of regression, this parameter is ignored and the empirical
-        variance is used.
+        standard deviation is used.
     eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities (only
         relevant for `method='KL_divergence'`).
@@ -76,7 +77,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         - If `sample_predictions_method_name` is not `None` and in the
           case of regression, the method is expected to take samples of the
           shape `(n_samples, ...)` as input and to output numerical values of
-          the shape `(n_members, n_samples)`, e.g., `sample_y` in
+          the shape `(n_samples, n_members)`, e.g., `sample_y` in
           `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
@@ -93,9 +94,6 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
-    target_type : "auto" or "single-output", default="auto"
-        Declared target type. This strategy supports single-output
-        classification and regression.
 
     References
     ----------
@@ -136,12 +134,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
-            target_type=target_type,
         )
         self.method = method
         self.eps = eps
@@ -173,9 +169,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 SkactivemlRegressor or SkactivemlClassifier or \
                 SkactivemlRegressor
             - If `ensemble` is a `SkactivemlClassifier` or a
-              `SkactivemlRegressor` and has `n_estimators` plus
-              `estimators_` after fitting as attributes, its estimators will
-              be used as committee.
+              `SkactivemlRegressor` and has the attribute `estimators_` after
+              fitting, its estimators will be used as committee.
             - If `ensemble` is array-like, each element of this list must be
               `SkactivemlClassifier` or a `SkactivemlRegressor` and will be
               used as committee member.
@@ -186,7 +181,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
@@ -236,7 +231,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label,
+            strategy=self,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,
@@ -273,22 +268,20 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             # Compute utilities.
             if self.method == "KL_divergence":
                 if sample_func is None:
-                    probas = self._aggregate_predict_probas(
-                        X_cand, ensemble, est_arr
-                    )
+                    probas = self._aggregate_predict_probas(X_cand, est_arr)
                 else:
                     probas = sample_func(X_cand, **sample_dict)
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:
                 if sample_func is None:
-                    votes = np.array(
+                    votes = _as_label_array(
                         [est.predict(X_cand) for est in est_arr]
                     ).T
                 else:
                     probas = sample_func(X_cand, **sample_dict)
                     votes = probas.argmax(axis=-1).T
                 if self.method == "vote_entropy":
-                    utilities_cand = vote_entropy(votes, classes)
+                    utilities_cand = vote_entropy(votes, np.unique(votes))
                 else:
                     utilities_cand = variation_ratios(votes)
         else:
@@ -296,6 +289,11 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 results = np.array(
                     [learner.predict(X_cand) for learner in est_arr]
                 )
+                if results.ndim != 2:
+                    raise ValueError(
+                        "The members of `ensemble` must predict single-output "
+                        "regression values."
+                    )
             else:
                 results = sample_func(X_cand, **sample_dict).T
             utilities_cand = np.std(results, axis=0)
@@ -313,50 +311,32 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             return_utilities=return_utilities,
         )
 
-    def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
-        """Aggregate the predicted probabilities across all ensemble members
-        and ensure that all classes are mapped correctly.
+    def _aggregate_predict_probas(self, X_cand, est_arr):
+        """Aggregate the predicted probabilities across all ensemble members.
 
         Parameters
         ----------
         X_cand : array-like of shape (n_samples, n_features)
             Samples whose probabilities are to be predicted.
-        ensemble : SkactivemlClassifier or list or tuple of \
-                SkactivemlClassifier
-            - If `ensemble` is a `SkactivemlClassifier`, it must have
-              `n_estimators` and `estimators_` after fitting as attribute.
-              Then, its estimators will be used as committee.
-            - If `ensemble` is array-like, each element of this list must be
-              `SkactivemlClassifier` and will be used as committee member.
         est_arr : list or tuple of SkactivemlClassifier
-            List of ensemble members contained in `ensemble`.
+            List of ensemble members.
 
         Returns
         -------
-        probas : np.ndarray of shape (n_samples, n_classes)
-            The mapped predicted probabilities.
+        probas : np.ndarray of shape (n_members, n_samples, n_classes)
+            The aligned predicted probabilities, where `n_classes` is the
+            number of distinct classes across all members.
         """
-        if hasattr(ensemble, "classes_"):
-            ensemble_classes = ensemble.classes_
-        else:
-            ensemble_classes = np.unique(
-                list(chain.from_iterable([est.classes_ for est in est_arr]))
+        member_classes = [np.asarray(est.classes_) for est in est_arr]
+        classes = np.unique(
+            np.concatenate(
+                member_classes, dtype=_common_label_dtype(member_classes)
             )
-        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble_classes)))
-        for i, est in enumerate(est_arr):
-            est_proba = est.predict_proba(X_cand)
-            est_classes = est.classes_
-
-            if len(est_classes) == len(ensemble_classes):
-                indices_ensemble = np.arange(len(ensemble_classes))
-            else:
-                indices_est = np.where(np.isin(est_classes, ensemble_classes))[
-                    0
-                ]
-                indices_ensemble = np.searchsorted(
-                    ensemble_classes, est_classes[indices_est]
-                )
-            probas[i, :, indices_ensemble] = est_proba.T
+        )
+        probas = np.zeros((len(est_arr), len(X_cand), len(classes)))
+        for i, (est, est_classes) in enumerate(zip(est_arr, member_classes)):
+            columns = np.searchsorted(classes, est_classes)
+            probas[i][:, columns] = est.predict_proba(X_cand)
         return probas
 
 
@@ -391,7 +371,7 @@ def average_kl_divergence(probas, eps=1e-7):
         target_type=(float, int),
         min_inclusive=False,
     )
-    probas = check_array(probas, allow_nd=True)
+    probas = check_array(probas, allow_nd=True, dtype=float, copy=True)
     if probas.ndim != 3:
         raise ValueError(
             f"Expected 3D array, got {probas.ndim}D array instead."
@@ -407,9 +387,7 @@ def average_kl_divergence(probas, eps=1e-7):
         scores = np.nansum(
             np.nansum(probas * np.log(probas / probas_mean), axis=2), axis=0
         )
-    scores = scores / n_estimators
-
-    return scores
+    return scores / n_estimators
 
 
 def vote_entropy(votes, classes):
@@ -435,7 +413,7 @@ def vote_entropy(votes, classes):
        Linguist., pages 319–326, 1996.
     """
     # Check `votes` array.
-    votes = check_array(votes)
+    votes = check_array(votes, dtype=None)
     n_estimators = votes.shape[1]
 
     # Count the votes.
@@ -472,14 +450,12 @@ def variation_ratios(votes):
        IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages 9368–9377, 2018.
     """
     # Check `votes` array.
-    votes = check_array(votes)
+    votes = check_array(votes, dtype=None)
     n_estimators = votes.shape[1]
 
     # Count the votes.
     vote_count = compute_vote_vectors(y=votes, missing_label=None)
-    scores = 1 - (vote_count.max(axis=-1) / n_estimators)
-
-    return scores
+    return 1 - (vote_count.max(axis=-1) / n_estimators)
 
 
 def _check_ensemble(
@@ -488,24 +464,30 @@ def _check_ensemble(
     X,
     y,
     sample_weight,
+    strategy,
     fit_ensemble=True,
-    missing_label=MISSING_LABEL,
     sample_predictions_method_name=None,
     sample_predictions_dict=None,
 ):
     error_msg = (
-        f"`ensemble` must either be a `{estimator_types} "
-        f"with the attribute `n_ensembles` or `estimators_` or an array-like "
+        f"`ensemble` must either be a `{estimator_types}` "
+        f"with the attribute `n_estimators` or `estimators_` or an array-like "
         f"of {estimator_types} objects or implement a method with the name "
         f"`{sample_predictions_method_name}`."
     )
 
     # Check if the parameter `ensemble` is valid.
+    if isinstance(ensemble, (list, tuple)) and len(ensemble) == 0:
+        raise ValueError("`ensemble` must contain at least one estimator.")
+
     for estimator_type in estimator_types:
         if isinstance(ensemble, estimator_type):
-            check_equal_missing_label(ensemble.missing_label, missing_label)
+            check_equal_missing_label(
+                ensemble.missing_label, strategy.missing_label
+            )
             # Fit the ensemble.
             if fit_ensemble:
+                _check_refit_capability(ensemble)
                 if sample_weight is None:
                     ensemble = clone(ensemble).fit(X, y)
                 else:
@@ -543,7 +525,26 @@ def _check_ensemble(
             if sample_func is not None:
                 est_arr = None
             elif hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
+                # Named members, e.g., of `AnnotatorEnsembleClassifier`, are
+                # unpacked to their fitted estimators.
+                est_arr = [
+                    est[1] if isinstance(est, (tuple, list)) else est
+                    for est in ensemble.estimators_
+                ]
+                if not fit_ensemble:
+                    # Predicting votes can advance a member's random state, so
+                    # fitted members are copied.
+                    est_arr = copy.deepcopy(est_arr)
+                for i, est in enumerate(est_arr):
+                    check_is_fitted(
+                        est,
+                        msg=(
+                            f"The {i}-th member of `ensemble.estimators_` is "
+                            "not fitted. Committee queries require fitted "
+                            "members, even when the ensemble itself can "
+                            "predict."
+                        ),
+                    )
             elif hasattr(ensemble, "estimators"):
                 est_arr = [ensemble] * len(ensemble.estimators)
             elif hasattr(ensemble, "n_estimators"):
@@ -566,14 +567,17 @@ def _check_ensemble(
                     "`sample_predictions_dict` must be `None`, if `ensemble` "
                     "is array-like."
                 )
-            est_arr = copy.deepcopy(ensemble)
-            for i in range(len(est_arr)):
-                check_type(
-                    est_arr[i], f"ensemble[{i}]", estimator_type
-                )  # better error message
+            est_arr = copy.deepcopy(list(ensemble))
+            # Check every member before fitting any of them.
+            for i, est in enumerate(est_arr):
+                check_type(est, f"ensemble[{i}]", estimator_type)
                 check_equal_missing_label(
-                    est_arr[i].missing_label, missing_label
+                    est.missing_label, strategy.missing_label
                 )
+                if fit_ensemble:
+                    _check_refit_capability(est)
+
+            for i in range(len(est_arr)):
                 # Fit the ensemble.
                 if fit_ensemble:
                     if sample_weight is None:

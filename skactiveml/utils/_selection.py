@@ -1,8 +1,6 @@
 """Utilities for selection."""
 
-import operator
 import warnings
-from functools import reduce
 
 import numpy as np
 from scipy.stats import rankdata
@@ -28,21 +26,24 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
 
     Returns
     -------
-    index_array : ndarray of ints
-        Array of indices into the array. It has the same shape as `a.shape`
-        with the dimension along axis removed.
+    index_array : numpy.ndarray of ints
+        Indices of the selected elements, always at least one-dimensional.
+        For multi-dimensional `a`, `axis=None` and `keepdims=False` return
+        coordinates of one element, with shape `(a.ndim,)`. Otherwise, the
+        shape follows `numpy.argmin`, including `keepdims`. With `axis=None`
+        and `keepdims=True`, the index refers to the flattened array.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
+    axis = argmin_kwargs.get("axis")
     index_array = np.argmax(
         random_state.random(a.shape)
-        * (a == np.nanmin(a, **argmin_kwargs, keepdims=True)),
+        * (a == np.nanmin(a, axis=axis, keepdims=True)),
         **argmin_kwargs,
     )
-    if np.isscalar(index_array) and a.ndim > 1:
+    if np.ndim(index_array) == 0 and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
-    index_array = np.atleast_1d(index_array)
-    return index_array
+    return np.atleast_1d(index_array)
 
 
 def rand_argmax(a, random_state=None, **argmax_kwargs):
@@ -51,7 +52,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
     Parameters
     ----------
-     : array-like
+    a : array-like
         Indexable data-structure of whose maximum element's index is to be
         determined.
     random_state : int, RandomState instance or None, default=None
@@ -62,21 +63,24 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
     Returns
     -------
-    index_array : ndarray of ints
-        Array of indices into the array. It has the same shape as `a.shape`
-        with the dimension along axis removed.
+    index_array : numpy.ndarray of ints
+        Indices of the selected elements, always at least one-dimensional.
+        For multi-dimensional `a`, `axis=None` and `keepdims=False` return
+        coordinates of one element, with shape `(a.ndim,)`. Otherwise, the
+        shape follows `numpy.argmax`, including `keepdims`. With `axis=None`
+        and `keepdims=True`, the index refers to the flattened array.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
+    axis = argmax_kwargs.get("axis")
     index_array = np.argmax(
         random_state.random(a.shape)
-        * (a == np.nanmax(a, **argmax_kwargs, keepdims=True)),
+        * (a == np.nanmax(a, axis=axis, keepdims=True)),
         **argmax_kwargs,
     )
-    if np.isscalar(index_array) and a.ndim > 1:
+    if np.ndim(index_array) == 0 and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
-    index_array = np.atleast_1d(index_array)
-    return index_array
+    return np.atleast_1d(index_array)
 
 
 def simple_batch(
@@ -86,34 +90,40 @@ def simple_batch(
     return_utilities=False,
     method="max",
 ):
-    """Generates a batch by selecting the highest values in the `utilities`.
-    If `utilities` is an ND-array, the returned utilities will be an
-    (N+1)D-array, with the shape `batch_size` x `len(utilities)`, filled the
-    given `utilities` but set the n-th highest values in the n-th row to
-    `np.nan`.
+    """Select a batch of entries from the given utilities without replacement.
+
+    Each entry represents one action. For example, a utility matrix can
+    represent sample-annotator pairs. Selection is global over all entries,
+    and only selected entries are excluded from subsequent batch steps.
 
     Parameters
     ----------
     utilities : np.ndarray
-        The utilities to be used to create the batch.
+        The utilities of the actions. `np.nan` excludes an entry. For
+        proportional selection, utilities must be nonnegative, with at least
+        `batch_size` positive entries after reducing the batch size to the
+        number of available entries. If no entries are available, the result
+        is empty.
     random_state : int, RandomState instance or None, default=None
         The random state to use.
     batch_size : int, default=1
-        The number of samples to be selected in one AL cycle.
+        The number of entries to select. If larger than the number of
+        available entries, it is reduced with a warning.
     return_utilities : bool, default=False
         If True, the utilities are returned.
     method : str, default='max'
-        Determines how to select 'best_indices'. 'max' selects the indices with
-        the maximum utilities. 'proportional' randomly choose the
-        'best_indices' with the probabilities proportional to 'utilities'.
+        'max' selects the largest utilities. 'proportional' samples entries
+        with probabilities proportional to their utilities.
 
     Returns
     -------
     best_indices : np.ndarray of shape (batch_size,) if utilities.ndim == 1 \
             else (batch_size, utilities.ndim)
-        The indices of the batch samples.
-    batch_utilities : np.ndarray of shape (batch_size, len(utilities))
-        The `utilities` of the batch (if `return_utilities=True`).
+        The indices of the selected entries, using one coordinate per utility
+        dimension for multidimensional input.
+    batch_utilities : np.ndarray of shape (batch_size, *utilities.shape)
+        Utilities before each batch selection, with previously selected
+        entries set to `np.nan` (if `return_utilities=True`).
 
     """
     # validation
@@ -148,18 +158,30 @@ def simple_batch(
             utilities[tuple(best_indices[i])] = np.nan
     elif method == "proportional":
         random_state = check_random_state(random_state)
-        p = utilities / np.nansum(utilities)
-        p[np.isnan(p)] = 0
-        best_indices = random_state.choice(
-            len(utilities),
-            size=batch_size,
-            p=p,
-            replace=False,
-        )
+        p = np.nan_to_num(utilities.ravel(), nan=0.0)
+        if np.any(p < 0):
+            raise ValueError(
+                "`utilities` must be nonnegative for proportional selection."
+            )
+        if np.count_nonzero(p) < batch_size:
+            raise ValueError(
+                "Proportional selection requires at least `batch_size` "
+                "positive utilities."
+            )
+        if batch_size > 0:
+            # Scale before summing to avoid overflow for finite weights.
+            p /= p.max()
+            p /= p.sum()
+            flat_indices = random_state.choice(
+                p.size, size=batch_size, p=p, replace=False
+            )
+            best_indices = np.column_stack(
+                np.unravel_index(flat_indices, utilities.shape)
+            )
 
         batch_utilities = np.repeat([utilities], batch_size, axis=0)
         for i in range(batch_size):
-            batch_utilities[i, best_indices[:i]] = np.nan
+            batch_utilities[(i,) + tuple(best_indices[:i].T)] = np.nan
     else:
         raise ValueError(
             f'"method" has to be either "max" or "proportional" '
@@ -169,7 +191,6 @@ def simple_batch(
     if utilities.ndim == 1:
         best_indices = best_indices.flatten()
 
-    # Check whether utilities are to be returned.
     if return_utilities:
         return best_indices, batch_utilities
     else:
@@ -177,80 +198,77 @@ def simple_batch(
 
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
-    """Combine different rankings hierarchically to one ranking assignment.
-    A ranking index `i` is ranked higher than index `j` iff
-    `ranking[i] > ranking[j]`. For the combined ranking it will hold that the
-    first ranking of `iter_ranking` always determines the ranking position at
-    an index, and only when two ranking assignments are equal the second
-    ranking will determine the ranking position and so forth.
+    """Combine rankings in order of priority.
+
+    Earlier rankings take precedence over later rankings. Later rankings
+    break ties in earlier rankings.
 
     Parameters
     ----------
     iter_ranking : iterable of array-like
-        The different rankings. They must share a common shape in the sense
-        that they have the same number of dimensions and are broadcastable by
-        numpy.
-    rank_method : string, default=None
-        The method by which the utilities are ranked. See `scipy.rankdata`s
-        argument `method` for details.
+        One or more numerical rankings with the same number of dimensions
+        and shapes that can be broadcast together. An entry containing
+        `np.nan` in any ranking is excluded and receives `np.nan` in the
+        result. Infinite values are valid ranking values.
+    rank_method : {'average', 'min', 'max', 'dense', 'ordinal'}, default=None
+        How to assign ranks to entries tied in every input ranking, following
+        the `method` argument of `scipy.stats.rankdata`. `None` uses 'dense'.
+        With 'ordinal', ties follow the flattened input order.
     rank_per_batch : bool, default=False
-        Whether the first index determines the batch and is not used for
-        ranking.
+        If `True`, the first axis identifies independent batches and the
+        remaining axes are flattened within each batch. Otherwise, all
+        entries are ranked together.
 
     Returns
     -------
-    combined_ranking : np.ndarray
-        The combined ranking.
+    combined_ranking : np.ndarray, dtype=float64
+        The combined ranks in the broadcast shape, with larger values
+        indicating higher priority. A single input ranking is converted to
+        float and returned without reranking.
     """
 
     if rank_method is None:
         rank_method = "dense"
     check_type(rank_method, "rank_method", str)
+    if rank_method not in ("average", "min", "max", "dense", "ordinal"):
+        raise ValueError(f"Unknown rank method '{rank_method}'.")
     check_type(rank_per_batch, "rank_per_batch", bool)
 
-    iter_ranking = list(iter_ranking)
-    for idx, ranking in enumerate(iter_ranking):
-        iter_ranking[idx] = check_array(
+    rankings = [
+        check_array(
             ranking, allow_nd=True, ensure_2d=False, ensure_all_finite=False
-        ).astype(float)
-        if idx != 0 and iter_ranking[idx - 1].ndim != ranking.ndim:
-            raise ValueError(
-                f"The number of dimensions of the `ranking` in "
-                f"`iter_ranking` must be the same, but "
-                f"`iter_ranking[{idx}].ndim == {ranking.ndim}"
-                f" and `iter_ranking[{idx - 1}].ndim == "
-                f"{iter_ranking[idx - 1].ndim}`."
-            )
-    np.broadcast_shapes(*(u.shape for u in iter_ranking))
-
-    combined_ranking = iter_ranking[0]
-
-    for idx in range(1, len(iter_ranking)):
-        next_ranking = iter_ranking[idx]
-        cr_shape = combined_ranking.shape
-        if rank_per_batch:
-            rank_shape = (
-                cr_shape[0],
-                max(reduce(operator.mul, cr_shape[1:], 1), 1),
-            )
-            rank_dict = {"method": rank_method, "axis": 1}
-        else:
-            rank_shape = reduce(operator.mul, cr_shape, 1)
-            rank_dict = {"method": rank_method}
-
-        combined_ranking = combined_ranking.reshape(rank_shape)
-
-        # exchange nan values to make rankdata work.
-        nan_values = np.isnan(combined_ranking)
-        combined_ranking[nan_values] = -np.inf
-        combined_ranking = rankdata(combined_ranking, **rank_dict).astype(
-            float
         )
-        combined_ranking[nan_values] = np.nan
-        combined_ranking = combined_ranking.reshape(cr_shape)
+        for ranking in iter_ranking
+    ]
+    if not rankings:
+        raise ValueError("At least one ranking is required.")
+    if any(ranking.ndim != rankings[0].ndim for ranking in rankings[1:]):
+        raise ValueError(
+            "All rankings must have the same number of dimensions."
+        )
+    if len(rankings) == 1:
+        return rankings[0].astype(float)
 
-        combined_ranking = combined_ranking + 1 / (
-            1 + np.exp(-next_ranking)
-        )  # sigmoid
+    rankings = np.broadcast_arrays(*rankings)
+    shape = rankings[0].shape
+    n_batches = shape[0] if rank_per_batch else 1
+    rankings = [ranking.reshape(n_batches, -1) for ranking in rankings]
+    is_valid = ~np.logical_or.reduce(
+        [np.isnan(ranking) for ranking in rankings]
+    )
+    combined_ranking = np.full(rankings[0].shape, np.nan)
 
-    return combined_ranking
+    # Putting invalid entries last keeps them out of valid tie counts.
+    order = np.lexsort([*reversed(rankings), ~is_valid], axis=1)
+    new_group = np.ones(order.shape, dtype=bool)
+    new_group[:, 1:] = False
+    for ranking in rankings:
+        values = np.take_along_axis(ranking, order, axis=1)
+        new_group[:, 1:] |= values[:, 1:] != values[:, :-1]
+    ranks = np.cumsum(new_group, axis=1)
+    if rank_method != "dense":
+        ranks = rankdata(ranks, method=rank_method, axis=1)
+    np.put_along_axis(combined_ranking, order, ranks, axis=1)
+    combined_ranking[~is_valid] = np.nan
+
+    return combined_ranking.reshape(shape)

@@ -1,12 +1,19 @@
+from copy import deepcopy
+import pickle
 import unittest
 
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import Perceptron
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError
 
-from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier import (
+    ParzenWindowClassifier,
+    SklearnClassifier,
+    SlidingWindowClassifier,
+)
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_estimator import (
@@ -130,6 +137,90 @@ class TestAnnotatorEnsembleClassifier(
         with self.assertRaisesRegex(ValueError, "n_estimators=2"):
             clf.fit(self.X, self.y[:, :1])
 
+    def test_member_costs_preserve_declared_class_order(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        y = np.array([[1], [1], [2], [2]])
+        query = np.array([[-0.1], [0.1]])
+        for inner_classes, costs in [
+            ([2, 1], [[0, 1], [10, 0]]),
+            ([1, 2], [[0, 10], [1, 0]]),
+        ]:
+            with self.subTest(inner_classes=inner_classes):
+                member = ParzenWindowClassifier(
+                    classes=inner_classes, cost_matrix=costs
+                )
+                reference = ParzenWindowClassifier(
+                    classes=inner_classes, cost_matrix=costs
+                ).fit(X, y[:, 0])
+                clf = AnnotatorEnsembleClassifier(
+                    [("pwc", member)], classes=[2, 1], voting="hard"
+                ).fit(X, y)
+                np.testing.assert_array_equal(
+                    clf.predict(query), reference.predict(query)
+                )
+                np.testing.assert_array_equal(member.cost_matrix, costs)
+
+    def test_voting_preserves_original_class_vocabulary(self):
+        X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+        encoded_y = np.array([[0, 0], [0, -1], [1, 1], [1, -1]])
+        for classes, missing_label in [([2, 1], np.nan), (["b", "a"], None)]:
+            canonical = np.sort(classes)
+            y = canonical[np.maximum(encoded_y, 0)].astype(
+                object if missing_label is None else float
+            )
+            y[encoded_y == -1] = missing_label
+            for voting in ["hard", "soft"]:
+                reference = AnnotatorEnsembleClassifier(
+                    [
+                        (str(i), ParzenWindowClassifier(missing_label=-1))
+                        for i in range(2)
+                    ],
+                    voting=voting,
+                    classes=[0, 1],
+                    missing_label=-1,
+                    random_state=0,
+                ).fit(X, encoded_y)
+                for outer, inner in [
+                    (None, None),
+                    (classes, None),
+                    (classes, classes),
+                    (classes, canonical),
+                ]:
+                    with self.subTest(
+                        classes=classes,
+                        voting=voting,
+                        outer=outer,
+                        inner=inner,
+                    ):
+                        members = [
+                            (
+                                str(i),
+                                ParzenWindowClassifier(
+                                    classes=inner, missing_label=missing_label
+                                ),
+                            )
+                            for i in range(2)
+                        ]
+                        clf = AnnotatorEnsembleClassifier(
+                            members,
+                            voting=voting,
+                            classes=outer,
+                            missing_label=missing_label,
+                            random_state=0,
+                        ).fit(X, y)
+                        np.testing.assert_array_equal(clf.classes_, canonical)
+                        np.testing.assert_allclose(
+                            clf.predict_proba(X), reference.predict_proba(X)
+                        )
+                        np.testing.assert_array_equal(
+                            clf.predict(X), canonical[reference.predict(X)]
+                        )
+                        for _, member in members:
+                            np.testing.assert_array_equal(
+                                member.classes, inner
+                            )
+                            self.assertFalse(hasattr(member, "classes_"))
+
     def test_predict_proba(self):
         pwc = ParzenWindowClassifier()
         gnb = SklearnClassifier(GaussianNB())
@@ -146,6 +237,56 @@ class TestAnnotatorEnsembleClassifier(
         P = clf.predict_proba(X=self.X)
         np.testing.assert_allclose(np.ones(len(P)), P.sum(axis=1))
 
+    def test_hard_voting_preserves_member_random_states(self):
+        X = np.zeros((40, 1))
+        y = np.tile([0, 1], len(X) // 2).reshape(-1, 1)
+        members = [
+            ParzenWindowClassifier(random_state=0, missing_label=-1),
+            SlidingWindowClassifier(
+                SlidingWindowClassifier(
+                    ParzenWindowClassifier(random_state=0, missing_label=-1),
+                    random_state=1,
+                    missing_label=-1,
+                ),
+                random_state=2,
+                missing_label=-1,
+            ),
+            SklearnClassifier(
+                DummyClassifier(strategy="prior"),
+                classes=[0, 1],
+                cost_matrix=[[0, 1], [1, 0]],
+                random_state=0,
+                missing_label=-1,
+            ),
+        ]
+        for member in members:
+            with self.subTest(member=member):
+                clf = AnnotatorEnsembleClassifier(
+                    [("member", member)],
+                    classes=[0, 1],
+                    random_state=0,
+                    missing_label=-1,
+                ).fit(X, y)
+                clf_state = pickle.dumps(clf)
+                expected = deepcopy(clf.estimators_[0][1]).predict(X)
+                np.testing.assert_array_equal(np.unique(expected), [0, 1])
+                expected = np.eye(2)[expected]
+                for _ in range(2):
+                    np.testing.assert_array_equal(
+                        clf.predict_proba(X), expected
+                    )
+                    self.assertEqual(pickle.dumps(clf), clf_state)
+
+    def test_hard_voting_preserves_predict_only_member_semantics(self):
+        clf = AnnotatorEnsembleClassifier(
+            [("perceptron", SklearnClassifier(Perceptron(random_state=0)))],
+            random_state=0,
+        ).fit(self.X, self.y[:, :1])
+        expected = clf.estimators_[0][1].predict(self.X)
+        np.testing.assert_array_equal(
+            clf.predict_proba(self.X), np.eye(len(clf.classes_))[expected]
+        )
+
     def test_predict(self):
         pwc = ParzenWindowClassifier(random_state=0)
         gnb = SklearnClassifier(GaussianNB(), random_state=0)
@@ -158,13 +299,13 @@ class TestAnnotatorEnsembleClassifier(
         clf.fit(X=self.X, y=self.y)
         y_pred_soft = clf.predict(X=self.X)
         self.assertEqual(len(y_pred_soft), len(self.X))
-        self.assertTrue(clf.score(self.X, self.y_true), 0.8)
+        self.assertGreaterEqual(clf.score(self.X, self.y_true), 0.8)
         clf.voting = "hard"
         clf.fit(X=self.X, y=self.y)
         y_pred_hard = clf.predict(X=self.X)
         self.assertEqual(len(y_pred_hard), len(self.X))
-        self.assertTrue(clf.score(self.X, self.y_true), 0.8)
+        self.assertGreaterEqual(clf.score(self.X, self.y_true), 0.8)
         clf.fit(X=self.X, y=self.y, sample_weight=np.ones_like(self.y))
         y_pred_hard = clf.predict(X=self.X)
         self.assertEqual(len(y_pred_hard), len(self.X))
-        self.assertTrue(clf.score(self.X, self.y_true), 0.8)
+        self.assertGreaterEqual(clf.score(self.X, self.y_true), 0.8)
