@@ -140,8 +140,8 @@
     <circle class="unlabeled" cx="28" cy="36" r="4.4"/>
     <path class="pair" d="M38 34 L64 30"/>
     <use xlink:href="#annotator" x="76" y="26" fill="#2a7fff"/>
-    <path class="bubble" d="M87 15 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
-    <text class="answer" x="99.5" y="18.5">y</text>
+    <path class="bubble" d="M87 15 c0 -10 28 -10 28 0 c0 8 -14 10 -21 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+    <text class="answer" x="101" y="18.5">cat</text>
   </g>
   <text class="label" x="934" y="144">Single annotator</text>
   <g transform="translate(1056.67 60)">
@@ -150,12 +150,12 @@
     <path class="pair" d="M24 29 L48 15"/>
     <path class="pair" d="M24 37 L48 47"/>
     <use xlink:href="#annotator" x="58" y="10" fill="#2a7fff"/>
-    <path class="bubble" d="M69 8 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
-    <text class="answer" x="81.5" y="11.5">y</text>
+    <path class="bubble" d="M69 8 c0 -10 28 -10 28 0 c0 8 -14 10 -21 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+    <text class="answer" x="83" y="11.5">cat</text>
     <use xlink:href="#annotator" x="58" y="42" fill="#2a7fff"/>
-    <path class="bubble" d="M69 40 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
-    <text class="answer" x="81.5" y="43.5">y</text>
-    <use xlink:href="#annotator" x="110" y="28" fill="#8c8c8c" fill-opacity=".55"/>
+    <path class="bubble" d="M69 40 c0 -10 28 -10 28 0 c0 8 -14 10 -21 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+    <text class="answer" x="83" y="43.5">dog</text>
+    <use xlink:href="#annotator" x="111" y="28" fill="#8c8c8c" fill-opacity=".55"/>
   </g>
   <text class="label" x="1116.67" y="144">Multiple annotators</text>
 

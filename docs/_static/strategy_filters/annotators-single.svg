@@ -24,6 +24,6 @@
   <circle class="unlabeled" cx="28" cy="36" r="4.4"/>
   <path class="pair" d="M38 34 L64 30"/>
   <use xlink:href="#annotator" x="76" y="26" fill="#2a7fff"/>
-  <path class="bubble" d="M87 15 c0 -10 25 -10 25 0 c0 8 -11 10 -18 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
-  <text class="answer" x="99.5" y="18.5">y</text>
+  <path class="bubble" d="M87 15 c0 -10 28 -10 28 0 c0 8 -14 10 -21 7 l-7 4 l2 -6 c-.8 -1.5 -1.5 -3 -1.5 -4.5 z"/>
+  <text class="answer" x="101" y="18.5">cat</text>
 </svg>

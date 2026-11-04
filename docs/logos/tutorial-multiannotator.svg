@@ -24,7 +24,8 @@
     </g>
   </defs>
 
-  <!-- Two selected sample-annotator pairs. The third annotator is not asked. -->
+  <!-- Two selected sample-annotator pairs with different labels. The third
+       annotator is not asked. -->
   <circle class="query" cx="56" cy="59" r="10"/>
   <circle class="unlabeled" cx="56" cy="59" r="5.5"/>
   <path class="pair" d="M68 53 L130 34"/>
@@ -32,11 +33,11 @@
 
   <use xlink:href="#annotator" x="146" y="19" fill="#2a7fff"/>
   <path class="bubble" d="M162 13 c0 -13 34 -13 34 0 c0 11 -15 14 -25 10 l-10 5 l3 -9 c-1 -2 -2 -4 -2 -6 z"/>
-  <text x="179" y="18">y</text>
+  <text x="179" y="18">cat</text>
 
   <use xlink:href="#annotator" x="146" y="79" fill="#2a7fff"/>
   <path class="bubble" d="M162 73 c0 -13 34 -13 34 0 c0 11 -15 14 -25 10 l-10 5 l3 -9 c-1 -2 -2 -4 -2 -6 z"/>
-  <text x="179" y="78">y</text>
+  <text x="179" y="78">dog</text>
 
   <use xlink:href="#annotator" x="222" y="49" fill="#8c8c8c" fill-opacity=".55"/>
 </svg>
