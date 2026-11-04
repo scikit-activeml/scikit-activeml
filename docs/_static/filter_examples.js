@@ -5,6 +5,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const tables = Array.from(document.querySelectorAll('table.strategy-table'));
+    // Wrap API class names only where a new word starts.
+    tables.forEach(function (table) {
+        table.querySelectorAll('td:nth-child(2) a span').forEach(function (name) {
+            const words = name.textContent
+                .replace(/([a-z0-9])(?=[A-Z])|([A-Z])(?=[A-Z][a-z])/g, '$1$2\n')
+                .split('\n');
+            name.replaceChildren(...words.flatMap(function (word, index) {
+                return index ? [document.createElement('wbr'), word] : [word];
+            }));
+        });
+    });
     const groups = Array.from(filters.querySelectorAll('[data-filter]'));
     const status = document.getElementById('tag-filter-status');
     const summary = document.getElementById('strategy-filter-summary');
