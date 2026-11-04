@@ -415,7 +415,7 @@ def _boundaries(confidences, utility="Utility"):
             (_swatch(_line(color, dashed=True)), f"75% confidence {value}")
             for value, color in zip(confidences, _CLASS_COLORS)
         ],
-        (_swatch(_ramp("Purples", 0.5)), f"{utility}, from low to high"),
+        (_swatch(_ramp("Purples", 0.35)), f"{utility}, from low to high"),
     ]
 
 

@@ -59,7 +59,7 @@ qs = "$init_qs"
 class_cmap = ListedColormap(["#2a78d6", "#1baf7a"])
 selection_color = "#eb6834"
 line_color = "#222832"
-utility_cmap, utility_alpha = "Purples", 0.5
+utility_cmap, utility_alpha = "Purples", 0.35
 plt.rcParams.update(
     {
         "font.size": 11,
