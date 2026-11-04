@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import tempfile
+import textwrap
 import unittest
 from os import path
 from unittest import mock
@@ -809,6 +810,15 @@ class TestExamples(unittest.TestCase):
                         f"<{blob}/{target}/README.rst>`__",
                         linked,
                     )
+
+    def test_readme_quickstart_runs(self):
+        with open(path.join(self.skaml_path, "README.rst")) as file:
+            readme = file.read()
+        quickstart = readme.split(".. quickstart_start")[1].split(
+            ".. quickstart_end"
+        )[0]
+        code = quickstart.split(".. code-block:: python")[1]
+        exec(textwrap.dedent(code), {})
 
     def test_tutorial_documentation_links_in_colab_match_version(self):
         for version in ["latest", "development", "1.0"]:
