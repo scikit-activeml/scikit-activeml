@@ -22,6 +22,10 @@
    :end-before: user_installation_end
 
 .. include:: generated/readme.rst
+   :start-after: quickstart_start
+   :end-before: quickstart_end
+
+.. include:: generated/readme.rst
    :start-after: overview_start
    :end-before: overview_end
 

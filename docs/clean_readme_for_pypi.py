@@ -4,6 +4,32 @@ import sys
 from pathlib import Path
 
 
+def link_code_snippets(text: str, ref: str | None = None) -> str:
+    """
+    Replace the collapsible code snippets with links named by their
+    summaries. The links lead to the README on GitHub at the release tag
+    `ref`, or at the development branch without a tag.
+
+    PyPI cannot collapse the snippets, so they would push the installation
+    far down the page.
+    """
+    url = (
+        "https://github.com/scikit-activeml/scikit-activeml/blob/"
+        f"{ref or 'development'}/README.rst"
+    )
+
+    def links(match):
+        titles = re.findall(r"<b>(.*?)</b>", match[1])
+        return "\n\n".join(f"`{title} <{url}>`__" for title in titles) + "\n"
+
+    return re.sub(
+        r"^\.\. code_snippets_start\n(.*?)^\.\. code_snippets_end\n",
+        links,
+        text,
+        flags=re.DOTALL | re.MULTILINE,
+    )
+
+
 def transform_raw_blocks(text):
     """
     Process `.. raw::` blocks:
@@ -152,6 +178,7 @@ def main(src, dst, ref=None):
     src_path = Path(src)
     dst_path = Path(dst)
     text = src_path.read_text(encoding="utf8")
+    text = link_code_snippets(text, ref)
     text = transform_raw_blocks(text)
     text = cleanup_html_fragments(text)
     text = ensure_blank_before_code_blocks(text)

@@ -11,7 +11,7 @@
 ==========================================================================
 A Comprehensive and User-Friendly Active Learning Library
 ==========================================================================
-|Doc| |Codecov| |PythonVersion| |PyPi| |Black| |Downloads| |Paper|
+|Doc| |Codecov| |PythonVersion| |PyPi| |Downloads| |Paper|
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
    :target: https://scikit-activeml.github.io/latest/
@@ -19,7 +19,7 @@ A Comprehensive and User-Friendly Active Learning Library
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
    :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.11%20%7C3.12%20%7C3.13%20%7C3.14-blue.svg
+.. |PythonVersion| image:: https://img.shields.io/pypi/pyversions/scikit-activeml.svg
    :target: https://pypi.org/project/scikit-activeml/
 
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
@@ -28,24 +28,32 @@ A Comprehensive and User-Friendly Active Learning Library
 .. |Paper| image:: https://img.shields.io/badge/paper-JMLR-blue.svg
    :target: https://jmlr.org/papers/v27/25-1999.html
 
-.. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
-   :target: https://github.com/psf/black
-
 .. |Downloads| image:: https://static.pepy.tech/badge/scikit-activeml
    :target: https://www.pepy.tech/projects/scikit-activeml
 
-Machine learning models often require substantial amounts of training data to perform effectively.
-While unlabeled data can be gathered with relative ease, labeling is typically difficult,
-time-consuming, or expensive. Active learning addresses this challenge by querying labels
-for the most informative samples, achieving high performance with fewer labeled examples.
-With this goal in mind, **scikit-activeml** has been developed as a Python library for active
-learning on top of `scikit-learn <https://scikit-learn.org/stable/>`_. As a
-result, it natively supports **deep active learning** via
-`skorch <https://skorch.readthedocs.io/en/stable/>`__. To learn the basic cycle, read the
-`Concepts <https://scikit-activeml.github.io/latest/concepts.html>`_ page and the tutorial
+**scikit-activeml** is a Python library for active learning. Labeling data is
+often difficult, time-consuming, or expensive. Active learning aims to reduce
+labeling effort by selecting informative samples for annotation.
+The library builds on `scikit-learn <https://scikit-learn.org/stable/>`_ and
+supports deep learning with PyTorch via
+`skorch <https://skorch.readthedocs.io/en/stable/>`__.
+
+- **Over 60 query strategies** for pool-based and stream-based active
+  learning, from uncertainty sampling to BADGE.
+- **Many learning tasks**: classification and regression, single-output and
+  multi-label, with labels from one or multiple annotators.
+- **scikit-learn interface**: use scikit-learn classifiers and regressors,
+  and mark unlabeled samples as missing labels in ``y``.
+- **Deep active learning**: train PyTorch modules via skorch and query with
+  their learned embeddings.
+- **Peer-reviewed**: published in the Journal of Machine Learning Research.
+
+To learn the basic cycle, read the
+`Concepts <https://scikit-activeml.github.io/latest/concepts.html>`_ page and
+the tutorial
 `Pool-based Active Learning: Getting Started <https://scikit-activeml.github.io/latest/generated/tutorials/00_pool_getting_started.html>`_.
-Illustrations for pool-based and stream-based active learning with code
-snippets are given below:
+The animations below show pool-based and stream-based active learning on
+real data, together with the code that produces them:
 
 
 .. list-table::
@@ -65,6 +73,8 @@ snippets are given below:
 .. raw:: html
 
    <div style="clear: both;"></div>
+
+.. code_snippets_start
 
 .. raw:: html
 
@@ -342,29 +352,27 @@ PyTorch.
 
    </details>
 
+.. code_snippets_end
+
 .. intro_end
 
 .. user_installation_start
 
 💾 User Installation
 --------------------
-In most cases, we recommend installing scikit-activeml together with the
-optional dependencies for better support of **deep active learning**:
+We recommend installing scikit-activeml with the optional dependencies, which
+include skorch for **deep active learning**:
 
 .. code-block:: bash
 
    pip install -U 'scikit-activeml[opt]'
 
-The ``opt`` installs additional packages such as skorch to enable
-more sophisticated deep learning support.
-Version constraints are chosen to be reasonably flexible so that scikit-activeml
-can integrate well into an existing environment. The optional deep learning functionality
-(via skorch) assumes that PyTorch is already installed in
-your environment. Since the correct PyTorch build depends on your hardware
-and CUDA setup, we do **not** install PyTorch automatically.
-
-    Please install PyTorch separately by following the installation
-    instructions of from `skorch <https://github.com/skorch-dev/skorch?tab=readme-ov-file#pytorch>`__.
+The deep learning support expects PyTorch in your environment. Since the
+right PyTorch build depends on your hardware and CUDA setup, scikit-activeml
+does **not** install PyTorch. Install it by following the
+`PyTorch instructions of skorch <https://github.com/skorch-dev/skorch?tab=readme-ov-file#pytorch>`__.
+Version constraints are kept flexible so that scikit-activeml fits into
+existing environments.
 
 .. raw:: html
 
@@ -413,15 +421,60 @@ You can also install only the maximum tested core dependencies via:
 
 .. user_installation_end
 
+.. quickstart_start
+
+🚀 Quickstart
+-------------
+The following snippet needs only the minimal installation and runs in a few
+seconds. Starting from 10 random labels on the digits dataset, BADGE selects
+5 samples per cycle, and a logistic regression is retrained on the labels
+acquired so far.
+
+.. code-block:: python
+
+   import numpy as np
+   from sklearn.datasets import load_digits
+   from sklearn.linear_model import LogisticRegression
+   from sklearn.model_selection import train_test_split
+
+   from skactiveml.classifier import SklearnClassifier
+   from skactiveml.pool import Badge
+   from skactiveml.utils import MISSING_LABEL, is_labeled
+
+   X, y_true = load_digits(return_X_y=True)
+   X_pool, X_test, y_pool, y_test = train_test_split(X, y_true, random_state=0)
+
+   # Start with 10 random labels. `MISSING_LABEL` marks unlabeled samples.
+   rng = np.random.default_rng(0)
+   y = np.full(len(y_pool), MISSING_LABEL)
+   init_idx = rng.choice(len(y_pool), size=10, replace=False)
+   y[init_idx] = y_pool[init_idx]
+
+   clf = SklearnClassifier(
+       LogisticRegression(max_iter=1000), classes=np.unique(y_true)
+   )
+   qs = Badge(random_state=0)
+
+   clf.fit(X_pool, y)
+   for cycle in range(18):
+       query_idx = qs.query(X=X_pool, y=y, clf=clf, fit_clf=False, batch_size=5)
+       y[query_idx] = y_pool[query_idx]  # Replace with your labeling process.
+       clf.fit(X_pool, y)
+
+   accuracy = clf.score(X_test, y_test)
+   print(f"Accuracy with {is_labeled(y).sum()} labels: {accuracy:.2f}")
+
+.. quickstart_end
+
 .. overview_start
 
 🗂️ Query Strategy Overview
 --------------------------
-For better orientation, we provide an `overview <https://scikit-activeml
-.github.io/latest/generated/strategy_overview.html>`_
-(including paper references and `visual examples <https://scikit-activeml.github.io/latest/generated/sphinx_gallery_examples/index.html>`_)
-of the over **60 query strategies** implemented by scikit-activeml. The
-overview filters them by the properties in the following figure.
+Use the `overview <https://scikit-activeml
+.github.io/latest/generated/strategy_overview.html>`_ to find query strategies
+for your learning setting. It filters strategies by the properties shown
+below and provides paper references and
+`visual examples <https://scikit-activeml.github.io/latest/generated/sphinx_gallery_examples/index.html>`_.
 
 .. image:: docs/logos/query-strategy-properties.svg
    :alt: Query strategy properties: task, target type, annotation type, selection principle, and pool batching

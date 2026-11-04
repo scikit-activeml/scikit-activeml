@@ -52,6 +52,10 @@ of the documentation includes it.
   ``generate_documentation_readme`` in ``docs/generate.py`` maps them to the
   build's own files and turns the links to the latest documentation into
   links within the build.
+* PyPI cannot collapse the two code snippets of the animations. Between the
+  ``code_snippets_start`` and ``code_snippets_end`` markers,
+  ``docs/clean_readme_for_pypi.py`` replaces them with links named by their
+  summaries, which lead to the README on GitHub at the release tag.
 * The two animations come from ``docs/readme_pool.py`` and
   ``docs/readme_stream.py``. Each script runs the README's code snippet with
   added plotting code, so that the animation shows the snippet's run. When a

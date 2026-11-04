@@ -775,9 +775,10 @@ def generate_documentation_readme(src_path, dst_path):
         document_link,
         content,
     )
-    content = content.replace(
-        ":target: https://scikit-activeml.github.io/latest/",
-        ":target: index.html",
+    content = re.sub(
+        r":target: https://scikit-activeml\.github\.io/latest/(\S*)",
+        lambda match: f":target: {match[1] or 'index.html'}",
+        content,
     )
     content = re.sub(r"((?:image|figure)::\s+)docs/", r"\1/", content)
     # The logo's wordmark is dark gray. Dark mode shows a light variant.

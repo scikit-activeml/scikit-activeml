@@ -738,6 +738,7 @@ class TestExamples(unittest.TestCase):
             with open(destination) as file:
                 rendered = file.read()
         self.assertNotIn("scikit-activeml.github.io/latest/", rendered)
+        self.assertIn(":target: index.html\n", rendered)
         self.assertIn("Strategy Overview", rendered)
         self.assertIn("</generated/strategy_overview>`", rendered)
         self.assertIn(
@@ -790,6 +791,24 @@ class TestExamples(unittest.TestCase):
                 self.assertIn(
                     f"{raw}/{target}/docs/logos/readme_pool.gif", linked
                 )
+
+    def test_pypi_readme_links_code_snippets_to_release_tag(self):
+        readme = path.join(self.skaml_path, "README.rst")
+        blob = "https://github.com/scikit-activeml/scikit-activeml/blob"
+        for ref, target in [("1.1.0", "1.1.0"), (None, "development")]:
+            with self.subTest(ref=ref), tempfile.TemporaryDirectory() as tmp:
+                destination = path.join(tmp, "README-pypi.rst")
+                clean_readme_for_pypi(readme, destination, ref)
+                with open(destination) as file:
+                    linked = file.read()
+                self.assertNotIn("import torch", linked)
+                self.assertIn("from skactiveml.pool import Badge", linked)
+                for scenario in ["Pool", "Stream"]:
+                    self.assertIn(
+                        f"{scenario}-based Active Learning: Code Snippet "
+                        f"<{blob}/{target}/README.rst>`__",
+                        linked,
+                    )
 
     def test_tutorial_documentation_links_in_colab_match_version(self):
         for version in ["latest", "development", "1.0"]:
