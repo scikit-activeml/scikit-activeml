@@ -46,8 +46,8 @@ declare the setting:
 
 * For multi-label classification, set ``target_type="multi-label"`` or a
   nested binary class vocabulary on the classifier. Query strategies take the
-  declaration from it. A strategy that uses no estimator for ``y``, such as
-  :class:`~skactiveml.pool.RandomSampling`, takes
+  declaration from it. A pool query strategy that uses no estimator for
+  ``y``, such as :class:`~skactiveml.pool.RandomSampling`, takes
   ``target_type="multi-label"`` itself. See
   :doc:`label_formats/multilabel`.
 * For multiple annotators, pass the label matrix to a multi-annotator
@@ -55,9 +55,9 @@ declare the setting:
 
 As in scikit-learn, labels with shape ``(n_samples, 1)`` are single-output
 unless multi-label classification is declared. This holds for classification,
-regression, and strategies that use no estimator for ``y``. Classifiers and
-pool query strategies convert such a column to shape ``(n_samples,)`` and emit
-a ``DataConversionWarning``.
+regression, and strategies that use no estimator for ``y``. Single-annotator
+classifiers and pool query strategies convert such a column to shape
+``(n_samples,)`` and emit a ``DataConversionWarning``.
 
 .. _current-limitations:
 

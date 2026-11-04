@@ -439,8 +439,10 @@ The tests live in ``skactiveml/classifier/tests`` and reuse a template from
 ``estimator_class``, ``init_default_params``, ``fit_default_params``, and
 ``predict_default_params`` in the template setup, then adjust the generated
 tests as needed. The tests of multi-annotator classifiers live in
-``skactiveml/classifier/multiannotator/tests`` and reuse
-``TemplateMultiAnnotatorClassifier``.
+``skactiveml/classifier/multiannotator/tests``. They combine
+``TemplateMultiAnnotatorClassifier`` with ``TemplateEstimator`` and also set
+``target_contract_estimator_factory`` and ``target_contract_fit_params`` in
+``setUp``.
 
 Regressors
 ----------

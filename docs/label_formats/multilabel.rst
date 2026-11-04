@@ -69,7 +69,7 @@ Declare multi-label classification where the labels are interpreted:
   vocabulary. With ``target_type="auto"``, a flat vocabulary selects
   single-output classification, and a nested vocabulary selects multi-label
   classification. Every nested vocabulary must be binary.
-* On a strategy that uses no estimator for ``y``, such as
+* On a pool query strategy that uses no estimator for ``y``, such as
   :class:`~skactiveml.pool.RandomSampling`, with
   ``target_type="multi-label"``.
 

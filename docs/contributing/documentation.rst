@@ -293,8 +293,9 @@ The ``example_setup`` has these fields:
 * ``selection``, for pool entries only: the batch selection that the example
   uses.
 
-The build stops with an error that names the method if an entry breaks one of
-these rules, among others:
+The build stops with an error if an entry breaks one of these rules, among
+others. The error names the method, or the class if it is missing from
+``__all__``:
 
 * ``class`` is in the ``__all__`` list of its package.
 * ``category`` is one of the categories above.
@@ -392,7 +393,8 @@ A new tutorial needs these parts:
   ``docs/_static/notebooks.css``. Copy an existing card in the same section
   to keep its classes. Its first badge names the data, such as
   ``:bdg-primary-line:`Tabular```. Add ``:bdg-secondary-line:`PyTorch``` if
-  the tutorial uses PyTorch.
+  the tutorial assumes PyTorch knowledge, i.e., its code uses PyTorch beyond
+  selecting the device.
 
 Structure
 ~~~~~~~~~

@@ -119,10 +119,11 @@ request of each note, as the earlier releases do.
 
 A patch release can also start from ``master``. Branch from ``master``, add
 the fixes and update the versions as in step 1, and check the package as in
-step 2. Then merge the branch into ``master`` through a pull request and
-continue with step 3. Step 5 brings the fixes into ``development``. The documentation workflow
-always builds ``master``, so it cannot publish the documentation of a patch
-release for an older version line.
+step 2. Then merge the branch into ``master`` through a pull request, wait
+until the checks of the merge commit pass, and continue with step 4. Step 5
+brings the fixes into ``development``. The documentation workflow always
+builds ``master``, so it cannot publish the documentation of a patch release
+for an older version line.
 
 Publishing the release runs ``.github/workflows/python-publish.yml``. It sets
 ``__version__`` from the tag, writes ``README-pypi.rst`` with the images
