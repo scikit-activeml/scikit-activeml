@@ -156,6 +156,7 @@ Each tutorial names the getting-started tutorial to read first.
       Add pseudo-labels to acquired labels under the same annotation budget.
       +++
       :bdg-primary-line:`Image`
+      :bdg-secondary-line:`PyTorch`
 
    .. grid-item-card:: Fine-tuning DINOv2
       :link: generated/tutorials/01_deep_pool_al_with_skorch

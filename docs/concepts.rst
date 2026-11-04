@@ -79,13 +79,13 @@ Learning Settings
 
 A learning setting combines three properties of the labels:
 
-* **Task:** classification predicts class labels; regression predicts
+* **Task:** classification predicts class labels. Regression predicts
   continuous labels.
-* **Target type:** single-output means one value per sample; multi-label
+* **Target type:** single-output means one value per sample. Multi-label
   means a vector of binary labels per sample, and a query asks for the
   complete vector.
 * **Annotation type:** a single annotator provides one label or label vector
-  per sample; with multiple annotators, labels are stored per annotator, and
+  per sample. With multiple annotators, labels are stored per annotator, and
   a query selects sample–annotator pairs.
 
 The supported combinations depend on the estimator and query strategy. The
