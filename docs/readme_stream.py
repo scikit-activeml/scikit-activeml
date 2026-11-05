@@ -4,7 +4,6 @@ import torch
 from datasets import load_dataset
 from matplotlib import pyplot as plt, animation
 from matplotlib.lines import Line2D
-from PIL import Image
 from skactiveml.classifier import SkorchClassifier
 from skactiveml.stream import Split
 from skactiveml.utils import is_labeled
@@ -14,6 +13,8 @@ from skorch.callbacks import LRScheduler
 from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import AutoImageProcessor, Dinov2Model
+
+from _readme_utils import SharedPaletteWriter
 
 # Define the device depending on its availability.
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -276,38 +277,6 @@ for t in range(-1, n_cycles):
         va="bottom" if low else "top",
     )
     artists.append(frame + [share_line, curve, point, value])
-
-
-class SharedPaletteWriter(animation.PillowWriter):
-    """Map all frames to one palette that keeps `colors` exact."""
-
-    def __init__(self, colors, **kwargs):
-        super().__init__(**kwargs)
-        self.colors = colors
-
-    def finish(self):
-        frames = np.stack([np.asarray(f.convert("RGB")) for f in self._frames])
-        codes = frames.astype(np.int32) @ np.array([65536, 256, 1])
-        values, inverse, counts = np.unique(
-            codes, return_inverse=True, return_counts=True
-        )
-        exact = [int(color[1:], 16) for color in self.colors]
-        frequent = values[np.argsort(-counts)].tolist()
-        # One index stays free, so that the GIF can store unchanged
-        # pixels as transparent.
-        palette = list(dict.fromkeys(exact + frequent))[:255]
-        palette = np.array(
-            [[p >> 16, (p >> 8) & 255, p & 255] for p in palette]
-        )
-        values = np.stack([values >> 16, (values >> 8) & 255, values & 255], 1)
-        distances = ((values[:, None] - palette[None]) ** 2).sum(-1)
-        indices = distances.argmin(1)[inverse].reshape(codes.shape)
-        self._frames = []
-        for frame in indices.astype(np.uint8):
-            image = Image.fromarray(frame, "P")
-            image.putpalette(palette.ravel().tolist())
-            self._frames.append(image)
-        super().finish()
 
 
 # Plotting stuff.
