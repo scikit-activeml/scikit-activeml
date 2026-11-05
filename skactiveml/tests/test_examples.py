@@ -871,8 +871,3 @@ class TestExamples(unittest.TestCase):
                     self.assertIn(
                         "[Notebook](00_pool_getting_started.ipynb)", source
                     )
-
-
-class Dummy:
-    def __init__(self):
-        pass

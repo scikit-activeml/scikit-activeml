@@ -8,7 +8,6 @@ import packaging.version
 import importlib
 import inspect
 import json
-import os
 import re
 import shutil
 import warnings
@@ -18,7 +17,6 @@ import numpy as np
 from docutils.utils import column_width
 from matplotlib import colormaps
 from matplotlib.colors import to_hex
-from pybtex.database import parse_file
 
 from joblib import Parallel, delayed
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -803,7 +801,6 @@ def generate_api_reference_rst(gen_path):
         The path of the main directory in which all generated files should be
         created.
     """
-    path = os.path.join(os.path.basename(gen_path), "api_reference.rst")
     gen_path = os.path.join(os.path.basename(gen_path), "api")
     os.makedirs(os.path.abspath(gen_path), exist_ok=True)
     automodule(skactiveml, api_root_path=gen_path)
@@ -1443,7 +1440,6 @@ def generate_example_script(
     file_path = os.path.join(dir_path, filename)
     # Create the file.
     with open(file_path, "w") as file:
-        code_blocks = []
         # Iterate over the 'blocks' and generate the corresponding strings
         # expected from sphinx-gallery.
         for block in data["sequence"]:
@@ -1455,7 +1451,6 @@ def generate_example_script(
             elif block.startswith("text"):
                 block_str = format_text(data[block])
             elif block.startswith("code"):
-                code_blocks.append(data[block])
                 block_str = format_code(data[block])
             elif block.startswith("plot"):
                 block_str = format_plot(data, template_path) + format_legend(
@@ -1499,26 +1494,6 @@ def format_title(title, first_title):
         block_str = "# %%\n" "# .. rubric:: " + title + ":\n"
 
     return block_str + "\n"
-
-
-def format_subtitle(title):
-    """
-    Generates the string for a subtitle of the example page, formatted for a
-    'sphinx-gallery' example script.
-
-    Parameters
-    ----------
-    title : str
-        The subtitle string.
-
-    Returns
-    -------
-    str : The formatted string for the example script.
-    """
-    block_str = (
-        "# %%\n" "# " + title + "\n" "# ".ljust(len(title) + 1, "-") + "\n\n"
-    )
-    return block_str
 
 
 def format_text(text):
@@ -1676,46 +1651,6 @@ def format_refs(refs: list):
     block_str += "# .. footbibliography::\n"
 
     return block_str + "\n"
-
-
-def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
-    """Converts a dictionary into a string.
-    Parameters
-    ----------
-    d : dict
-        The dictionary to be converted.
-        Shape: {key1:value1,...} or {key1:[value1, value2,...],...} or a
-        combination of both.
-    idx: : dict, optional
-        If a key has multiple values, idx[key] chooses the used value for the
-        specific key. If idx is not given, the first value in the list is
-        always used. It is not necessary to specify all keys from d.
-        shape: {key1:int1,...}
-    allocator: str, optional (Default='=')
-        The allocator is used to separate the key and the value.
-
-    Returns
-    -------
-    str : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or
-             'key1=value1, key2=value2...' or a combination of both.
-    """
-    dd_str = ""
-    for key, value in d.items():
-        if not isinstance(value, list):
-            value = [value]
-        if idx is not None and key in idx.keys():
-            value = value[idx[key]]
-        else:
-            value = value[0]
-        key = str(key)
-        if key_as_string:
-            if not (
-                (key.startswith('"') and key.endswith('"'))
-                or (key.startswith("'") and key.endswith("'"))
-            ):
-                key = '"' + key + '"'
-        dd_str += str(key) + allocator + value + ", "
-    return dd_str[0:-2]
 
 
 def generate_tutorials(src_path, dst_path, dst_path_colab, version="latest"):
