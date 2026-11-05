@@ -15,12 +15,14 @@ from unittest import mock
 from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
 from matplotlib import pyplot as plt
+from matplotlib.collections import PolyCollection
 
 from docs.clean_readme_for_pypi import main as clean_readme_for_pypi
 from docs.generate import (
     OVERVIEW_FILTERS,
     OVERVIEW_SCENARIOS,
     check_example_setup,
+    format_plot,
     generate_examples,
     generate_strategy_overview_rst,
     generate_visualizations_rst,
@@ -100,6 +102,53 @@ class TestExamples(unittest.TestCase):
                         runpy.run_path(str(file_path), run_name="__main__")
                     finally:
                         plt.close("all")
+
+    def test_regression_template_batch_and_uncertainty_options(self):
+        # Cover the combinations not shown in the existing gallery:
+        # a probabilistic regressor with a batch, and a tree with one sample.
+        cases = [
+            ("_query_by_commitee.json", "3", True),
+            ("_regression_tree_based_al.json", "1", False),
+        ]
+        for filename, batch_size, plot_std in cases:
+            with self.subTest(filename=filename, batch_size=batch_size):
+                with open(
+                    path.join(self.json_path, "2-pool-regression", filename)
+                ) as file:
+                    data = json.load(file)[0]
+                data.update(
+                    batch_size=batch_size,
+                    n_samples="50",
+                    n_cycles="5",
+                    res="20",
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    script = Path(directory) / "example.py"
+                    script.write_text(
+                        format_plot(
+                            data, path.join(self.docs_path, data["template"])
+                        )
+                    )
+                    with plt.rc_context():
+                        try:
+                            namespace = runpy.run_path(str(script))
+                            self.assertEqual(
+                                namespace["n_acquired"],
+                                list(
+                                    range(
+                                        0, 5 * int(batch_size), int(batch_size)
+                                    )
+                                ),
+                            )
+                            self.assertEqual(
+                                any(
+                                    isinstance(artist, PolyCollection)
+                                    for artist in namespace["ax"].collections
+                                ),
+                                plot_std,
+                            )
+                        finally:
+                            plt.close("all")
 
     def test_json(self):
         strats_with_json = []

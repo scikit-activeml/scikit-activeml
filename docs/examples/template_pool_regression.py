@@ -59,6 +59,7 @@ reg = "$init_reg|NICKernelRegressor(random_state=random_state, metric_dict={'gam
 qs = "$init_qs"
 "$preproc"
 # Preparation for plotting.
+plot_std = "$plot_std|True"
 sample_color = "#2a78d6"
 unlabeled_color = "#8c8c8c"
 selection_color = "#eb6834"
@@ -116,24 +117,29 @@ for c in range(n_cycles):
     n_acquired.append(np.sum(is_lbld))
     scores.append(reg.score(X_test, y_test))
 
-    # Query the next sample.
+    # Query the next sample(s).
     query_idx, utilities = qs.query(
         "$query_params", batch_size=batch_size, return_utilities=True
     )
-    utilities = scale_utilities(utilities[0])
+
+    # Combine the utilities of the batch's selections.
+    utilities = scale_utilities(np.fmax.reduce(utilities, axis=0))
 
     # Capture the current plot state.
     coll_old = list(ax.collections) + list(ax_utility.collections)
 
     # Update plot with the prediction and samples.
-    y_pred, y_std = reg.predict(X_test, return_std=True)
-    ax.fill_between(
-        X_test.ravel(),
-        y_pred - y_std,
-        y_pred + y_std,
-        color=line_color,
-        alpha=0.12,
-    )
+    if plot_std:
+        y_pred, y_std = reg.predict(X_test, return_std=True)
+        ax.fill_between(
+            X_test.ravel(),
+            y_pred - y_std,
+            y_pred + y_std,
+            color=line_color,
+            alpha=0.12,
+        )
+    else:
+        y_pred = reg.predict(X_test)
     (prediction,) = ax.plot(X_test, y_pred, c=line_color, lw=2)
     ax.scatter(
         X[~is_lbld],

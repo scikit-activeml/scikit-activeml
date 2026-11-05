@@ -224,6 +224,12 @@ These fields are optional:
    Python code that imports and creates the regressor. The default is a
    ``NICKernelRegressor``.
 
+``plot_std``
+   Regression entries only. The string ``"True"`` (default) shows one
+   predicted standard deviation around the regression curve and requires
+   ``predict(X, return_std=True)``. Set it to ``"False"`` for regressors
+   without this support, or to show only the prediction curve.
+
 ``preproc``
    Python code that runs before the cycle, as a string or a list of lines.
 
@@ -339,11 +345,11 @@ These templates in ``docs/examples/`` are shared:
 * ``template_pool_multilabel.py``: pool multi-label classification.
 * ``template_pool_multi_annotator.py``: pool classification with multiple
   annotators.
-* ``template_pool_regression.py``: pool regression, one sample per cycle.
-  Its regressor must support ``predict(X, return_std=True)``.
-* ``template_pool_regression_batch.py``: pool regression with batches. It
-  expects ``query`` to return the utilities, so the entry's
-  ``query_params`` include ``return_utilities=True``.
+* ``template_pool_regression.py``: pool regression with one sample or a batch
+  per cycle. It combines each candidate's utilities across the batch by
+  taking their maximum, ignoring NaNs. It passes ``return_utilities=True``
+  itself, so leave that argument out of ``query_params``. Use ``plot_std``
+  to control the uncertainty band.
 * ``template_stream.py``: stream classification with a single-output
   classifier.
 

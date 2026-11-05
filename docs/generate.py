@@ -291,7 +291,6 @@ EXAMPLE_TEMPLATE_GROUPS = {
     "template_pool_batch.py": "pool-classification-batch",
     "template_pool_multilabel.py": "pool-multilabel",
     "template_pool_regression.py": "pool-regression",
-    "template_pool_regression_batch.py": "pool-regression",
     "template_pool_multi_annotator.py": "pool-multi-annotator",
     "template_stream.py": "stream-classification",
 }

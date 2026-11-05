@@ -4,7 +4,7 @@
     "package" : "pool",
     "method" : "Regression Tree Based Active Learning (RT-AL) with Random Selection",
     "category" : "Hybrid",
-    "template" : "examples/template_pool_regression_batch.py",
+    "template" : "examples/template_pool_regression.py",
     "tags" : ["pool", "regression", "single-annotator", "random-batch"],
     "example_setup" : {
       "task" : "regression",
@@ -21,7 +21,9 @@
     "import_misc" : ["from skactiveml.pool import RegressionTreeBasedAL"],
     "init_reg" : "SklearnRegressor(DecisionTreeRegressor(min_samples_leaf=2, random_state=random_state), random_state=random_state)",
     "init_qs" : "RegressionTreeBasedAL(random_state=random_state)",
-    "query_params" : "X=X, y=y, reg=reg, return_utilities=True",
+    "query_params" : "X=X, y=y, reg=reg",
+    "plot_std" : "False",
+    "res" : "1000",
     "batch_size" : "3"
   },
   {
@@ -29,7 +31,7 @@
     "package" : "pool",
     "method" : "Regression Tree Based Active Learning (RT-AL) with Diversity Selection",
     "category" : "Hybrid",
-    "template" : "examples/template_pool_regression_batch.py",
+    "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
     "example_setup" : {
       "task" : "regression",
@@ -45,7 +47,9 @@
     "import_misc" : ["from skactiveml.pool import RegressionTreeBasedAL"],
     "init_reg" : "SklearnRegressor(DecisionTreeRegressor(min_samples_leaf=2, random_state=random_state), random_state=random_state)",
     "init_qs" : "RegressionTreeBasedAL(method='diversity', random_state=random_state)",
-    "query_params" : "X=X, y=y, reg=reg, return_utilities=True",
+    "query_params" : "X=X, y=y, reg=reg",
+    "plot_std" : "False",
+    "res" : "1000",
     "batch_size" : "3"
   },
   {
@@ -53,7 +57,7 @@
     "package" : "pool",
     "method" : "Regression Tree Based Active Learning (RT-AL) with Representativity Selection",
     "category" : "Hybrid",
-    "template" : "examples/template_pool_regression_batch.py",
+    "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator", "diverse-batch"],
     "example_setup" : {
       "task" : "regression",
@@ -69,7 +73,9 @@
     "import_misc" : ["from skactiveml.pool import RegressionTreeBasedAL"],
     "init_reg" : "SklearnRegressor(DecisionTreeRegressor(min_samples_leaf=2, random_state=random_state), random_state=random_state)",
     "init_qs" : "RegressionTreeBasedAL(method='representativity', random_state=random_state)",
-    "query_params" : "X=X, y=y, reg=reg, return_utilities=True",
+    "query_params" : "X=X, y=y, reg=reg",
+    "plot_std" : "False",
+    "res" : "1000",
     "batch_size" : "3"
   }
 ]
