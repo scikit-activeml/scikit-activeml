@@ -2,15 +2,19 @@ import inspect
 import json
 import os
 import re
+import runpy
 import shutil
 import tempfile
 import textwrap
 import unittest
+from contextlib import chdir
 from os import path
+from pathlib import Path
 from unittest import mock
 
 from docutils.utils import column_width
 from jinja2 import Environment, FileSystemLoader
+from matplotlib import pyplot as plt
 
 from docs.clean_readme_for_pypi import main as clean_readme_for_pypi
 from docs.generate import (
@@ -60,38 +64,42 @@ def _multilabel_capable_strategy_names():
 
 class TestExamples(unittest.TestCase):
     def setUp(self):
-        self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
+        self.skaml_path = str(Path(__file__).resolve().parents[2])
         self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples")
         self.exceptions = [
             qs.__name__ for qs in QUERY_STRATEGY_EXCEPTIONS_LIST
         ]
-        self.working_dir = os.path.abspath(os.curdir)
-
         self.modules = [pool, stream]
 
     def test_example_files(self):
-        examples_path = path.join(self.skaml_path, "docs", "temp_examples")
-        notebooks_path = path.join(self.skaml_path, "docs", "temp_notebooks")
-        os.chdir(self.docs_path)
-        generate_examples(examples_path, self.json_path, notebooks_path)
-        os.chdir(self.working_dir)
+        with tempfile.TemporaryDirectory() as directory:
+            examples_path = Path(directory) / "examples"
+            notebooks_path = path.join(directory, "notebooks")
+            # Generate serially inside the test worker.
+            with (
+                chdir(self.docs_path),
+                mock.patch.dict(os.environ, {"num_cpus": "1"}),
+            ):
+                generate_examples(
+                    str(examples_path), self.json_path, notebooks_path
+                )
 
-        for root, dirs, files in os.walk(examples_path, topdown=True):
-            for filename in files:
-                if filename.endswith(".py"):
-                    msg = os.path.join(root, filename).replace(
-                        examples_path, ""
-                    )
-                    file_path = path.join(root, filename)
-                    with (
-                        self.subTest(msg=msg),
-                        mock.patch("matplotlib.pyplot.show"),
-                    ):
-                        with open(file_path, "r") as f:
-                            exec(f.read(), locals())
-
-        shutil.rmtree(examples_path)
+            scripts = sorted(examples_path.rglob("*.py"))
+            self.assertTrue(scripts, "No example scripts were generated.")
+            for file_path in scripts:
+                with (
+                    self.subTest(
+                        example=str(file_path.relative_to(examples_path))
+                    ),
+                    chdir(directory),
+                    plt.rc_context(),
+                    mock.patch("matplotlib.pyplot.show"),
+                ):
+                    try:
+                        runpy.run_path(str(file_path), run_name="__main__")
+                    finally:
+                        plt.close("all")
 
     def test_json(self):
         strats_with_json = []
