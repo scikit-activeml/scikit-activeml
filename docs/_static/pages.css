@@ -1,0 +1,142 @@
+/* Tutorials page: pictogram band above each getting-started card. Its
+   dark-light class keeps the theme from adding a white background in dark
+   mode. */
+.bd-content .tutorial-start .sd-card-img-top {
+    background-color: var(--pst-color-surface);
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid var(--pst-color-border);
+}
+
+/* Small uppercase label, such as the topic line above each further
+   tutorial's title or the title of a visualization legend. */
+.kicker {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pst-color-text-muted);
+}
+
+.bd-content .sd-card .sd-card-header.kicker {
+    background-color: var(--pst-color-on-background);
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.kicker p {
+    margin: 0;
+}
+
+.tutorial-topic.sd-card {
+    border-top: 3px solid var(--tutorial-topic-color);
+}
+
+.topic-evaluation {
+    --tutorial-topic-color: #7f9bd8;
+}
+
+.topic-deep-learning {
+    --tutorial-topic-color: #8cc68c;
+}
+
+.topic-human-labels {
+    --tutorial-topic-color: #f0b383;
+}
+
+/* Tutorials that extend a getting-started setting share one color. */
+.topic-setting {
+    --tutorial-topic-color: #6cc6e3;
+}
+
+/* Inline SVG figures: a single figure keeps a readable size on wide
+   screens, and panels sit in two columns that stack on narrow screens. The
+   caption matches the theme's figure captions. */
+.inline-figure {
+    margin-bottom: 1rem;
+}
+
+.inline-figure svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.inline-figure > svg {
+    max-width: 32rem;
+    margin: 0 auto;
+}
+
+.inline-figure > p {
+    margin: 0.3rem 1rem 1rem;
+    color: var(--pst-color-text-muted);
+    font-family: var(--pst-font-family-heading);
+    font-weight: var(--pst-font-weight-caption);
+}
+
+.inline-figure-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 767.98px) {
+    .inline-figure-panels {
+        grid-template-columns: minmax(0, 26rem);
+        justify-content: center;
+    }
+}
+
+/* On narrow screens, a stacked table shows each row as a block instead of
+   scrolling sideways, and page rules label its cells. */
+@media (max-width: 767.98px) {
+    table.stacked-table thead {
+        display: none;
+    }
+
+    table.stacked-table,
+    table.stacked-table tbody,
+    table.stacked-table tr,
+    table.stacked-table td {
+        display: block;
+        width: 100%;
+    }
+
+    table.stacked-table tr {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--pst-color-border);
+    }
+
+    table.stacked-table td {
+        padding: 0.125rem 0.5rem;
+        border: 0;
+    }
+
+    /* Landing page: the tutorial summary. */
+    table.tutorial-summary-table td:nth-child(2) > p:first-child::before {
+        content: "Scenario: ";
+        font-weight: 600;
+    }
+
+    table.tutorial-summary-table td:nth-child(3) > p:first-child::before {
+        content: "Task: ";
+        font-weight: 600;
+    }
+
+    table.tutorial-summary-table td:nth-child(4) > p:first-child::before {
+        content: "Data: ";
+        font-weight: 600;
+    }
+
+    table.tutorial-summary-table td:nth-child(5) ul {
+        margin: 0;
+    }
+}
+
+/* All pages: on phones, let long inline code break instead of running past
+   the screen edge. */
+@media (max-width: 575.98px) {
+    .bd-article code.literal span.pre {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+}

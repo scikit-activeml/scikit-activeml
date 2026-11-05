@@ -214,7 +214,7 @@
     display: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 575.98px) {
     .strategy-filters {
         padding: 1rem 1rem 0;
     }
@@ -272,33 +272,12 @@
         white-space: normal;
         text-align: center;
     }
+}
 
-    /* Show each strategy as a block instead of a table that scrolls
-       sideways. */
+/* The table is a stacked table, see pages.css. */
+@media (max-width: 767.98px) {
     .strategy-table {
         min-width: 0;
-    }
-
-    .strategy-table thead {
-        display: none;
-    }
-
-    .strategy-table,
-    .strategy-table tbody,
-    .strategy-table tr,
-    .strategy-table td {
-        display: block;
-        width: 100%;
-    }
-
-    .strategy-table tr {
-        padding: 0.5rem 0;
-        border-bottom: 1px solid var(--pst-color-border);
-    }
-
-    .strategy-table td {
-        padding: 0.125rem 0.5rem;
-        border: 0;
     }
 
     .strategy-table td:first-child > p:first-child {

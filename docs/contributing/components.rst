@@ -16,7 +16,7 @@ class to open its API reference.
 .. The tree is embedded inline so that its text follows the light and dark
    theme. Its title and description provide the alternative text.
 
-.. container:: structure-figure
+.. container:: inline-figure
 
    .. raw:: html
       :file: ../logos/base-classes.svg

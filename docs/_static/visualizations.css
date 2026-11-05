@@ -87,7 +87,7 @@
 }
 
 /* Legends: the animations are drawn on white in both themes, so each swatch
-   brings its own white chip. The title matches the tutorial kickers. */
+   brings its own white chip. */
 .visualization-legend {
     margin: 1rem 0 1.5rem;
     padding: 0.625rem 0.875rem 0.75rem;
@@ -98,11 +98,6 @@
 
 .visualization-legend-title {
     margin: 0 0 0.5rem;
-    color: var(--pst-color-text-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
 }
 
 .bd-content .visualization-legend-items {

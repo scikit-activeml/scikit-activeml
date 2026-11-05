@@ -15,9 +15,9 @@ examples.
    dark theme, and they stack on narrow screens. Their titles and
    descriptions provide the alternative text.
 
-.. container:: label-formats-figure
+.. container:: inline-figure
 
-   .. container:: label-formats-panels
+   .. container:: inline-figure-panels
 
       .. raw:: html
          :file: logos/label-format-single-output.svg

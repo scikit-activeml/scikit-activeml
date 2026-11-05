@@ -110,7 +110,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/04_pool_simple_evaluation_study
       :link-type: doc
       :class-card: tutorial-topic topic-evaluation
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Evaluation
       ^^^
@@ -123,7 +123,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/07_pool_advanced_regression
       :link-type: doc
       :class-card: tutorial-topic topic-setting
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Regression
       ^^^
@@ -136,7 +136,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/05_pool_al_with_self_supervised_learning
       :link-type: doc
       :class-card: tutorial-topic topic-deep-learning
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Deep learning
       ^^^
@@ -149,7 +149,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/08_pool_ssl
       :link-type: doc
       :class-card: tutorial-topic topic-deep-learning
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Deep learning
       ^^^
@@ -162,7 +162,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/01_deep_pool_al_with_skorch
       :link-type: doc
       :class-card: tutorial-topic topic-deep-learning
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Deep learning
       ^^^
@@ -175,7 +175,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/09_bayesian_al
       :link-type: doc
       :class-card: tutorial-topic topic-deep-learning
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Deep learning
       ^^^
@@ -188,7 +188,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/03_pool_oracle_annotations
       :link-type: doc
       :class-card: tutorial-topic topic-human-labels
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Human labels
       ^^^
@@ -200,7 +200,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/06_pool_al_text_annotation_tool
       :link-type: doc
       :class-card: tutorial-topic topic-human-labels
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Human labels
       ^^^
@@ -212,7 +212,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/11_multiple_annotators_advanced
       :link-type: doc
       :class-card: tutorial-topic topic-setting
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Multiple annotators
       ^^^
@@ -225,7 +225,7 @@ Each tutorial names the getting-started tutorial to read first.
       :link: generated/tutorials/21_stream_batch_with_pool_al
       :link-type: doc
       :class-card: tutorial-topic topic-setting
-      :class-header: tutorial-kicker
+      :class-header: kicker
 
       Stream
       ^^^

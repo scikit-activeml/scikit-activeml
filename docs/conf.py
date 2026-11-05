@@ -263,7 +263,12 @@ html_static_path = ["_static"]
 # pages.
 html_extra_path = ["_extra"]
 
-html_css_files = ["strategy_filters.css", "notebooks.css", "visualizations.css"]
+html_css_files = [
+    "strategy_filters.css",
+    "notebooks.css",
+    "pages.css",
+    "visualizations.css",
+]
 
 html_js_files = [
     "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js",

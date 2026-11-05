@@ -12,12 +12,10 @@ support it.
 .. The figure is embedded inline so that its text follows the light and dark
    theme. Its title and description provide the alternative text.
 
-.. container:: label-formats-figure
+.. container:: inline-figure
 
-   .. container:: label-formats-flow
-
-      .. raw:: html
-         :file: ../logos/label-resolution.svg
+   .. raw:: html
+      :file: ../logos/label-resolution.svg
 
    The two steps raise the errors in the red boxes. The component determines
    the task and annotation type, and a fitted estimator supplies the

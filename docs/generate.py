@@ -545,7 +545,7 @@ def visualization_legend_html(group):
     )
     return (
         '<div class="visualization-legend">\n'
-        '<p class="visualization-legend-title">Legend</p>\n'
+        '<p class="visualization-legend-title kicker">Legend</p>\n'
         f'<ul class="visualization-legend-items">\n{items}\n</ul>\n'
         f"{note}</div>"
     )
@@ -1068,7 +1068,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
                     table,
                     widths="30 19 1 36 14",
                     header_lines=1,
-                    classes="strategy-table",
+                    classes="strategy-table stacked-table",
                 )
             )
             file.write("\n")

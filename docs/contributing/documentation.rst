@@ -390,7 +390,7 @@ A new tutorial needs these parts:
   learning or for a learning setting goes to Getting Started with a
   pictogram ``docs/logos/tutorial-*.svg``. Other tutorials go to Go Further
   with a topic line and a ``topic-*`` class from
-  ``docs/_static/notebooks.css``. Copy an existing card in the same section
+  ``docs/_static/pages.css``. Copy an existing card in the same section
   to keep its classes. Its first badge names the data, such as
   ``:bdg-primary-line:`Tabular```. Add ``:bdg-secondary-line:`PyTorch``` if
   the tutorial assumes PyTorch knowledge, i.e., its code uses PyTorch beyond

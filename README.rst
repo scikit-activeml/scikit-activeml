@@ -496,7 +496,7 @@ modality, and models used in the tutorial.
 
 .. list-table::
    :header-rows: 1
-   :class: tutorial-summary-table
+   :class: tutorial-summary-table stacked-table
 
    * - Tutorial
      - Scenario

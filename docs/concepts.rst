@@ -28,9 +28,9 @@ Components and Responsibilities
    dark theme, and they stack on narrow screens. Their titles and
    descriptions provide the alternative text.
 
-.. container:: concepts-figure
+.. container:: inline-figure
 
-   .. container:: concepts-panels
+   .. container:: inline-figure-panels
 
       .. raw:: html
          :file: logos/concepts-pool.svg
