@@ -21,7 +21,7 @@ import git
 
 import skactiveml
 
-from docs._visualization_legends import visualization_legend_html
+from .visualization_legends import visualization_legend_html
 
 for module in skactiveml.__all__:
     importlib.import_module("skactiveml." + module)
@@ -445,7 +445,7 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
     ]
 
     legends = {group: visualization_legend_html(group) for group in examples}
-    docs_path = Path(__file__).parent
+    docs_path = Path(__file__).resolve().parents[1]
     environment = Environment(
         loader=FileSystemLoader(docs_path / "_templates"),
         undefined=StrictUndefined,

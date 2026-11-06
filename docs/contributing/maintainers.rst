@@ -9,27 +9,29 @@ contributions do not touch.
 Documentation Generator
 -----------------------
 
-``docs/conf.py`` calls the functions in ``docs/generate.py`` before Sphinx
-reads the sources. They write the API reference, the example scripts from the
-JSON entries, the Visualizations pages, the Strategy Overview, the tutorial
-pages with their Colab copies, and a copy of the README for the start page to
-``docs/generated/``. They also write the version switcher to
+``docs/conf.py`` calls the functions in ``docs/_scripts/generate.py`` before
+Sphinx reads the sources. They write the API reference, the example scripts
+from the JSON entries, the Visualizations pages, the Strategy Overview, the
+tutorial pages with their Colab copies, and a copy of the README for the start
+page to ``docs/generated/``. They also write the version switcher to
 ``docs/_static/switcher.json``.
 
 * The Visualizations pages come from ``visualizations.rst.jinja`` and
   ``visualization_section.rst.jinja`` in ``docs/_templates/``, which share the
   macros in ``visualization_macros.rst.jinja``. The legend of each group comes
-  from ``VISUALIZATION_LEGENDS`` in ``docs/_visualization_legends.py``. The
-  build shows it on these pages and between each example's code and its
-  animation.
+  from ``VISUALIZATION_LEGENDS`` in
+  ``docs/_scripts/visualization_legends.py``. The build shows it on these
+  pages and between each example's code and its animation.
 * The Strategy Overview notes that the target types of ``SubSamplingWrapper``
   and ``ParallelUtilityEstimationWrapper`` depend on the wrapped strategy.
   The batch selection of ``SubSamplingWrapper`` does too.
   ``get_strategy_metadata`` and ``json_data_to_strategy_table`` in
-  ``docs/generate.py`` name these wrappers. Add a new generic wrapper there.
+  ``docs/_scripts/generate.py`` name these wrappers. Add a new generic
+  wrapper there.
 * The filter groups of the Strategy Overview come from ``OVERVIEW_FILTERS`` in
-  ``docs/generate.py``. ``docs/_static/filter_examples.js`` matches each group
-  against the metadata of the entries, so a new group needs a rule there too.
+  ``docs/_scripts/generate.py``. ``docs/_static/filter_examples.js`` matches
+  each group against the metadata of the entries, so a new group needs a rule
+  there too.
   Each option shows a pictogram from ``docs/_static/strategy_filters/``. The
   README figure ``docs/logos/query-strategy-properties.svg`` repeats these
   pictograms, so update it together with them.
@@ -47,16 +49,17 @@ of the documentation includes it.
 
 * Its images use paths relative to the repository, such as
   ``docs/logos/readme_pool.gif``, so that GitHub shows the images of the
-  branch or tag a reader views. For PyPI, ``docs/clean_readme_for_pypi.py``
-  turns them into raw GitHub URLs at the release tag. So commit changed
-  images before you tag a release. For the documentation,
-  ``generate_documentation_readme`` in ``docs/generate.py`` maps them to the
-  build's own files and turns the links to the latest documentation into
-  links within the build.
+  branch or tag a reader views. For PyPI,
+  ``docs/_scripts/clean_readme_for_pypi.py`` turns them into raw GitHub URLs
+  at the release tag. So commit changed images before you tag a release.
+  For the documentation,
+  ``generate_documentation_readme`` in ``docs/_scripts/generate.py`` maps
+  them to the build's own files and turns the links to the latest
+  documentation into links within the build.
 * PyPI cannot collapse the two code snippets of the animations. Between the
   ``code_snippets_start`` and ``code_snippets_end`` markers,
-  ``docs/clean_readme_for_pypi.py`` replaces them with links named by their
-  summaries, which lead to the README on GitHub at the release tag.
+  ``docs/_scripts/clean_readme_for_pypi.py`` replaces them with links named
+  by their summaries, which lead to the README on GitHub at the release tag.
 * The two animations come from ``docs/readme_pool.py`` and
   ``docs/readme_stream.py``. Each script runs the README's code snippet with
   added plotting code, so that the animation shows the snippet's run. When a
@@ -94,7 +97,7 @@ To publish a release from ``development``:
    .. code:: bash
 
       pip install build twine
-      python docs/clean_readme_for_pypi.py README.rst README-pypi.rst
+      python docs/_scripts/clean_readme_for_pypi.py README.rst README-pypi.rst
       python -m build
       twine check dist/*
 
@@ -138,9 +141,9 @@ Then the run asks the documentation repository
 to build the documentation of the release. Its workflow ``release.yml``
 clones ``master``, not the tag. The workflow names the documentation after
 the highest tag of the repository and deploys it to ``latest`` and to
-``X.Y``. It and the version switcher in ``docs/generate.py`` handle only
-lightweight tags of the form ``X.Y.Z`` with single-digit ``Y`` and ``Z``. The
-release form creates lightweight tags.
+``X.Y``. It and the version switcher in ``docs/_scripts/generate.py`` handle
+only lightweight tags of the form ``X.Y.Z`` with single-digit ``Y`` and ``Z``.
+The release form creates lightweight tags.
 
 The workflows ``main.yml`` and ``development.yml`` of the documentation
 repository rebuild ``latest`` from ``master`` and ``development`` from

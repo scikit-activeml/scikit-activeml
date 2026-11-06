@@ -17,8 +17,8 @@ from jinja2 import Environment, FileSystemLoader
 from matplotlib import pyplot as plt
 from matplotlib.collections import PolyCollection
 
-from docs.clean_readme_for_pypi import main as clean_readme_for_pypi
-from docs.generate import (
+from docs._scripts.clean_readme_for_pypi import main as clean_readme_for_pypi
+from docs._scripts.generate import (
     OVERVIEW_FILTERS,
     OVERVIEW_SCENARIOS,
     check_example_setup,

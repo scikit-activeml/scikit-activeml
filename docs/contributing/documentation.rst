@@ -68,8 +68,8 @@ links to it should keep working:
   When a section moves to another page, add its old anchor to the
   forwarding script of the old page, as ``docs/contributing.rst`` does. The
   Strategy Overview keeps old anchors through ``OVERVIEW_LEGACY_IDS`` in
-  ``docs/generate.py``. The Visualizations pages keep them through the
-  ``anchor()`` macro in ``visualization_macros.rst.jinja``.
+  ``docs/_scripts/generate.py``. The Visualizations pages keep them through
+  the ``anchor()`` macro in ``visualization_macros.rst.jinja``.
 * Notebook pages do not keep section anchors. A link to a renamed notebook
   heading opens the top of the page.
 * The documentation of earlier releases and their READMEs on PyPI load some
@@ -158,7 +158,7 @@ Each entry needs these fields, except that only pool entries have
    only when the Selection Principle filter is set to Any. An entry that
    wraps a specific strategy, such as ``SingleAnnotatorWrapper`` with
    ``CoreSet``, uses the principle of that strategy. A new generic wrapper
-   also needs an entry in ``docs/generate.py``, as
+   also needs an entry in ``docs/_scripts/generate.py``, as
    :ref:`contributing-generator` describes.
 
 ``template``
@@ -364,9 +364,9 @@ each template. In the notebooks, it replaces this cell with a player for the
 animation. Therefore, a template must end with a code block, import
 ``matplotlib.pyplot as plt``, and name its figure ``fig`` and its animation
 ``ani``. The legends come from ``VISUALIZATION_LEGENDS`` in
-``docs/_visualization_legends.py``. Since a custom template gets the legend of
-its group, its plot must match this legend. When a template changes its plot,
-update the legend too.
+``docs/_scripts/visualization_legends.py``. Since a custom template gets
+the legend of its group, its plot must match this legend. When a template
+changes its plot, update the legend too.
 
 Tutorials
 ---------

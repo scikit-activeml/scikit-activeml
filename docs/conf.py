@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(".."))
 import skactiveml
 from sphinx_gallery.sorting import ExampleTitleSortKey
 
-from docs.generate import (
+from docs._scripts.generate import (
     generate_strategy_overview_rst,
     generate_api_reference_rst,
     generate_examples,

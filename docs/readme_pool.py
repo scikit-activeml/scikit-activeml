@@ -14,7 +14,7 @@ from skorch.callbacks import LRScheduler
 from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from _readme_utils import SharedPaletteWriter
+from _scripts.readme_utils import SharedPaletteWriter
 
 # Define the device depending on its availability.
 device = "cuda" if torch.cuda.is_available() else "cpu"

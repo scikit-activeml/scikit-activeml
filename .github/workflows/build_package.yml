@@ -19,7 +19,7 @@ jobs:
           python -m pip install build twine
       - name: Prepare README for PyPI
         run: |
-          python docs/clean_readme_for_pypi.py README.rst README-pypi.rst
+          python docs/_scripts/clean_readme_for_pypi.py README.rst README-pypi.rst
       - name: Build sdist and wheel
         run: python -m build
       - name: Check built distributions
