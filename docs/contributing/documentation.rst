@@ -364,9 +364,9 @@ each template. In the notebooks, it replaces this cell with a player for the
 animation. Therefore, a template must end with a code block, import
 ``matplotlib.pyplot as plt``, and name its figure ``fig`` and its animation
 ``ani``. The legends come from ``VISUALIZATION_LEGENDS`` in
-``docs/generate.py``. Since a custom template gets the legend of its group,
-its plot must match this legend. When a template changes its plot, update the
-legend too.
+``docs/_visualization_legends.py``. Since a custom template gets the legend of
+its group, its plot must match this legend. When a template changes its plot,
+update the legend too.
 
 Tutorials
 ---------

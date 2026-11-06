@@ -19,8 +19,9 @@ pages with their Colab copies, and a copy of the README for the start page to
 * The Visualizations pages come from ``visualizations.rst.jinja`` and
   ``visualization_section.rst.jinja`` in ``docs/_templates/``, which share the
   macros in ``visualization_macros.rst.jinja``. The legend of each group comes
-  from ``VISUALIZATION_LEGENDS`` in ``docs/generate.py``. The build shows it
-  on these pages and between each example's code and its animation.
+  from ``VISUALIZATION_LEGENDS`` in ``docs/_visualization_legends.py``. The
+  build shows it on these pages and between each example's code and its
+  animation.
 * The Strategy Overview notes that the target types of ``SubSamplingWrapper``
   and ``ParallelUtilityEstimationWrapper`` depend on the wrapped strategy.
   The batch selection of ``SubSamplingWrapper`` does too.
