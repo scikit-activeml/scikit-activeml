@@ -21,7 +21,10 @@ import git
 
 import skactiveml
 
-from .visualization_legends import visualization_legend_html
+from .visualization_legends import (
+    VISUALIZATION_LEGENDS,
+    visualization_legend_html,
+)
 
 for module in skactiveml.__all__:
     importlib.import_module("skactiveml." + module)
@@ -249,16 +252,6 @@ def get_strategy_metadata(data):
     }
 
 
-EXAMPLE_GROUPS = (
-    "pool-classification",
-    "pool-classification-batch",
-    "pool-multilabel",
-    "pool-regression",
-    "pool-multi-annotator",
-    "stream-classification",
-)
-
-
 def _example_setup(data):
     """Identify the demonstrated setup, independently of supported tasks."""
     demonstrated = data["example_setup"]
@@ -351,7 +344,7 @@ def check_example_setup(data):
             )
         if setup["selection"] == "single-sample" and batch_size != "1":
             raise ValueError(f'Give single-sample {method!r} batch_size "1".')
-    if _example_setup(data) not in EXAMPLE_GROUPS:
+    if _example_setup(data) not in VISUALIZATION_LEGENDS:
         raise ValueError(
             f"No visualization group for {method!r}: {_example_setup(data)!r}."
         )
@@ -375,7 +368,7 @@ def generate_visualizations_rst(gen_path, json_data, examples_path):
     reference the scripts below ``examples_path`` (relative to the Sphinx
     source directory), retaining existing example URLs and thumbnails.
     """
-    examples = {setup: [] for setup in EXAMPLE_GROUPS}
+    examples = {setup: [] for setup in VISUALIZATION_LEGENDS}
     documents = {setup: [] for setup in examples}
     for section, contents in json_data.items():
         if not contents["data"]:

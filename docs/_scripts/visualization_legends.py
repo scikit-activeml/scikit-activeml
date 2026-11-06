@@ -133,8 +133,8 @@ _SELECTION = (
     "Sample selected in this cycle",
 )
 
-# The legend of each visualization group. Keep the swatches in line with the
-# plots of the group's templates.
+# Supported visualization groups and their legends. Keep the swatches in
+# line with the plots of the group's templates.
 VISUALIZATION_LEGENDS = {
     "pool-classification": [
         *_samples(_CLASSES),
@@ -224,18 +224,6 @@ VISUALIZATION_LEGENDS = {
 }
 
 
-# The visualization groups whose animations show a learning curve. Their
-# legends add a note on its noise.
-LEARNING_CURVE_GROUPS = (
-    "pool-classification",
-    "pool-classification-batch",
-    "pool-multilabel",
-    "pool-multi-annotator",
-    "pool-regression",
-    "stream-classification",
-)
-
-
 def visualization_legend_html(group):
     """Render the legend of a visualization group as HTML without blank
     lines, so that notebooks show it as one HTML block."""
@@ -247,8 +235,6 @@ def visualization_legend_html(group):
         '<p class="visualization-legend-note">The learning curve shows a '
         "single run on a small synthetic dataset. Runs with other data or "
         "seeds can give noticeably different curves.</p>\n"
-        if group in LEARNING_CURVE_GROUPS
-        else ""
     )
     return (
         '<div class="visualization-legend">\n'
