@@ -1469,10 +1469,15 @@ class TestFunctions(unittest.TestCase):
             (12, 12),
         ]
         for n_train, expected_size in test_cases:
-            for sample_weight in [None, np.arange(1, 11)]:
+            for sample_weight in [
+                None,
+                np.arange(1, 11),
+                list(range(1, 11)),
+                tuple(range(1, 11)),
+            ]:
                 with self.subTest(
                     n_train=n_train,
-                    weighted=sample_weight is not None,
+                    weights=type(sample_weight),
                 ):
                     regressors = _bootstrap_estimators(
                         RecordingRegressor(),
@@ -1495,7 +1500,7 @@ class TestFunctions(unittest.TestCase):
                         else:
                             np.testing.assert_array_equal(
                                 reg.sample_weight_fit_,
-                                sample_weight[sampled_indices],
+                                np.asarray(sample_weight)[sampled_indices],
                             )
 
     def test_cross_entropy(self):

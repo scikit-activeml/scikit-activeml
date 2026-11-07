@@ -113,6 +113,35 @@ class TestExpectedModelChangeMaximization(
         ]
         super().test_query_param_reg(test_cases=test_cases)
 
+    def test_query_array_like_sample_weight(self):
+        X = np.arange(6, dtype=float).reshape(-1, 1)
+        y = np.array([0.0, 1.0, 5.0, 2.0, np.nan, np.nan])
+        sample_weight = np.arange(1, 7, dtype=float)
+        reg = SklearnRegressor(LinearRegression()).fit(
+            X, y, sample_weight=sample_weight
+        )
+        qs = ExpectedModelChangeMaximization(n_train=1.0, random_state=0)
+        for fit_reg in [True, False]:
+            query_kwargs = dict(
+                X=X,
+                y=y,
+                reg=reg,
+                fit_reg=fit_reg,
+                candidates=[5, 4],
+                return_utilities=True,
+            )
+            expected_indices, expected_utilities = qs.query(
+                **query_kwargs, sample_weight=sample_weight
+            )
+            for weights in [sample_weight.tolist(), tuple(sample_weight)]:
+                with self.subTest(fit_reg=fit_reg, weights=type(weights)):
+                    indices, utilities = qs.query(
+                        **query_kwargs, sample_weight=weights
+                    )
+                    np.testing.assert_array_equal(indices, expected_indices)
+                    np.testing.assert_allclose(utilities, expected_utilities)
+                    np.testing.assert_array_equal(weights, sample_weight)
+
     def test_query(self):
         class ZeroRegressor(ProbabilisticRegressor):
             def predict_target_distribution(self, X):
