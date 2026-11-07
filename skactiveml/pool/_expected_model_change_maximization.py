@@ -250,7 +250,11 @@ def _bootstrap_estimators(
         The estimators trained on different bootstraps.
     """
 
-    check_X_y(X=X, y=y, sample_weight=sample_weight)
+    _, _, checked_sample_weight = check_X_y(
+        X=X, y=y, sample_weight=sample_weight
+    )
+    if sample_weight is not None:
+        sample_weight = checked_sample_weight
     check_scalar(bootstrap_size, "bootstrap_size", int, min_val=1)
 
     if isinstance(n_train, int):
