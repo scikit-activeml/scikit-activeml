@@ -40,6 +40,7 @@ from ._uncertainty_sampling import (
 from ._core_set import CoreSet, k_greedy_center
 from ._typi_clust import TypiClust
 from ._badge import Badge
+from ._uwe import UWE
 from ._prob_cover import ProbCover
 from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
@@ -96,6 +97,7 @@ __all__ = [
     "k_greedy_center",
     "TypiClust",
     "Badge",
+    "UWE",
     "ProbCover",
     "ContrastiveAL",
     "GreedyBALD",
